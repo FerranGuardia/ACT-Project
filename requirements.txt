@@ -1,0 +1,14 @@
+# Core dependencies
+edge-tts>=6.1.0
+PyQt6>=6.6.0
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
+# Optional but recommended
+playwright>=1.40.0  # For advanced scraping with JavaScript
+pydub>=0.25.1  # For audio processing
+
+# Audio format support
+mutagen>=1.47.0  # For metadata handling in audio files
+

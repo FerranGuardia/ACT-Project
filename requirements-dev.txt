@@ -1,0 +1,19 @@
+# Development dependencies
+# Include all production dependencies
+-r requirements.txt
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-qt>=4.2.0  # For PyQt testing
+pytest-asyncio>=0.21.0  # For async tests
+
+# Code quality
+black>=23.11.0
+flake8>=6.1.0
+mypy>=1.7.0
+
+# Type stubs
+types-requests>=2.31.0
+types-beautifulsoup4>=4.12.0
+
