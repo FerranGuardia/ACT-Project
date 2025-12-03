@@ -101,14 +101,46 @@ class ChapterUrlFetcher:
         Supports:
         - Standard patterns: /chapter/, chapter-123, ch_123, etc.
         - FanMTL pattern: novel-name_123.html or novel-name/123.html
+        - LightNovelPub/NovelLive pattern: /book/novel-name/chapter-123 or /book/novel-name/123
+        - Generic patterns with chapter indicators in text
         """
-        # Standard chapter patterns
-        if (re.search(r"chapter|ch[_\-\s]?\d+", url, re.I) or
-            re.search(r"chapter|ch[_\-\s]?\d+", link_text, re.I)):
+        url_lower = url.lower()
+        text_lower = link_text.strip().lower()
+        
+        # Most important: Check if text starts with "Chapter" followed by a number
+        # This catches cases like "Chapter 1", "Chapter 2720", etc.
+        if re.search(r"^chapter\s+\d+", text_lower) or re.search(r"\bchapter\s+\d+", text_lower):
             return True
+        
+        # Standard chapter patterns in URL
+        if re.search(r"chapter|ch[_\-\s]?\d+", url_lower):
+            return True
+        
+        # Standard chapter patterns in link text
+        if re.search(r"chapter|ch[_\-\s]?\d+|第\s*\d+\s*章", text_lower):
+            return True
+        
         # FanMTL pattern: novel-name_123.html or novel-name/123.html
-        if re.search(r"_\d+\.html|/\d+\.html", url):
+        if re.search(r"_\d+\.html|/\d+\.html", url_lower):
             return True
+        
+        # LightNovelPub/NovelLive pattern: /book/novel-name/chapter-123 or /book/novel-name/123
+        # Also match /book/novel-name/chapter/123 or similar variations
+        if re.search(r"/book/[^/]+/(?:chapter[/\-]?)?\d+", url_lower):
+            return True
+        
+        # Generic pattern: URL contains numbers and link text suggests it's a chapter
+        # This catches cases where URL structure is non-standard but text indicates chapter
+        if re.search(r"\d+", url_lower):
+            # Check if link text has chapter indicators
+            chapter_indicators = [
+                r"chapter", r"ch\s*\d+", r"第\s*\d+\s*章", r"episode", r"ep\s*\d+",
+                r"part\s*\d+", r"vol\s*\d+", r"volume\s*\d+"
+            ]
+            for pattern in chapter_indicators:
+                if re.search(pattern, text_lower):
+                    return True
+        
         return False
 
     def get_reference_count(self, toc_url: str, should_stop: Optional[Callable[[], bool]] = None) -> Optional[int]:
@@ -350,8 +382,8 @@ class ChapterUrlFetcher:
         # Helper function to check if result seems incomplete (pagination issue)
         def seems_incomplete(found_urls: List[str]) -> bool:
             """Check if the result might be incomplete due to pagination."""
-            if not found_urls or len(found_urls) < 50:
-                return False  # Too few to judge
+            if not found_urls:
+                return False
             
             url_count = len(found_urls)
             
@@ -382,21 +414,24 @@ class ChapterUrlFetcher:
                 if min_chapter_number and min_chapter_number > max_ch and url_count >= 50:
                     logger.info(f"⚠ Detected pagination: Found {url_count} URLs (max chapter {max_ch}) but need {min_chapter_number}")
                     return True
+                
+                # NEW: If we found a small number of chapters (like 46) but requested high chapters,
+                # it's likely pagination (e.g., LightNovelPub with 2000+ chapters but only showing first page)
+                if min_chapter_number and min_chapter_number > max_ch and url_count < 100:
+                    logger.info(f"⚠ Detected pagination: Found only {url_count} URLs (max chapter {max_ch}) but need {min_chapter_number} - likely pagination")
+                    return True
+                
+                # NEW: If chapters end at a round number and count is relatively small, suspect pagination
+                # Common pagination limits: 20, 25, 30, 40, 50, 55, 100
+                common_limits = [20, 25, 30, 40, 50, 55, 100]
+                if url_count in common_limits and max_ch in common_limits and url_count == max_ch:
+                    logger.info(f"⚠ Detected pagination: Found exactly {url_count} URLs ending at common pagination limit {max_ch}")
+                    return True
             
-            # Check other round numbers that suggest pagination
-            if chapter_numbers:
-                max_ch = max(chapter_numbers)
-                min_ch = min(chapter_numbers)
-                
-                # Round numbers with matching count suggest pagination
-                if url_count in [50, 55, 100, 200] and max_ch in [50, 55, 100, 200] and url_count == max_ch:
-                    logger.info(f"⚠ Detected pagination: Found exactly {url_count} URLs ending at round number {max_ch}")
-                    return True
-                
-                # If we need higher chapters but found low max
-                if min_chapter_number and min_chapter_number > max_ch and url_count >= 50:
-                    logger.info(f"⚠ Detected pagination: Found {url_count} URLs (max chapter {max_ch}) but need {min_chapter_number}")
-                    return True
+            # If we have a small number of URLs (< 100) and requested high chapters, suspect pagination
+            if min_chapter_number and url_count < 100 and min_chapter_number > 100:
+                logger.info(f"⚠ Detected pagination: Found only {url_count} URLs but need chapter {min_chapter_number} - likely pagination")
+                return True
             
             return False
         
@@ -592,19 +627,26 @@ class ChapterUrlFetcher:
             
             soup = BeautifulSoup(response.content, "html.parser")
             
-            # Try multiple selector patterns (including FanMTL)
+            # Try multiple selector patterns (including FanMTL, LightNovelPub, etc.)
             selectors_to_try = [
-                # Generic selectors
-                'a[href*="chapter"]',
-                # FanMTL selectors (discovered from diagnosis)
-                '.chapter-list a',
-                '#chapters a',
-                'ul.chapter-list a',
+                # Site-specific selectors
+                '.list-chapter a',           # NovelFull
+                '#list-chapter a',            # NovelFull
+                'ul.list-chapter a',          # NovelFull
+                '.chapter-list a',            # Generic, FanMTL
+                '#chapters a',                # Generic, FanMTL
+                'ul.chapter-list a',          # Generic, FanMTL
+                # LightNovelPub specific
+                '.chapter-item a',            # LightNovelPub
+                '.chapter-name a',            # LightNovelPub
+                'a[href*="/book/"]',          # LightNovelPub pattern
                 # Other common patterns
                 '.chapters a',
                 'div.chapter-list a',
                 '[class*="chapter"] a',
                 '[id*="chapter"] a',
+                # Generic fallback
+                'a[href*="chapter"]',
             ]
             
             chapter_urls = []
@@ -620,13 +662,10 @@ class ChapterUrlFetcher:
                             if href:
                                 # Normalize URL
                                 full_url = normalize_url(href, self.base_url)
+                                link_text = link.get_text(strip=True)
                                 
-                                # Check if it's a chapter link
-                                # Accept various patterns: /chapter/, _chapter_, -chapter-, etc.
-                                if (re.search(r"chapter|ch[_\-\s]?\d+", full_url, re.I) or
-                                    re.search(r"chapter|ch[_\-\s]?\d+", link.get_text(strip=True), re.I) or
-                                    # FanMTL pattern: novel-name_1.html
-                                    re.search(r"_\d+\.html", full_url)):
+                                # Use our flexible chapter detection method
+                                if self._is_chapter_url(full_url, link_text):
                                     chapter_urls.append(full_url)
                 except Exception:
                     continue
@@ -667,11 +706,285 @@ class ChapterUrlFetcher:
                     page = browser.new_page()
                     logger.debug(f"Navigating to {toc_url}...")
                     page.goto(toc_url, wait_until="networkidle", timeout=60000)
+                    
+                    # Check for Cloudflare challenge (primary concern for novellive.app)
+                    # Wait a bit to allow Cloudflare challenge to appear/complete
+                    logger.debug("Checking for Cloudflare challenge...")
+                    time.sleep(3)  # Initial wait before checking
+                    
+                    # Check if page is still showing Cloudflare challenge
+                    # Only check title - more reliable than DOM selectors which may persist
+                    try:
+                        page_title = page.title()
+                        is_cloudflare = "just a moment" in page_title.lower() or "checking your browser" in page_title.lower()
+                    except Exception as e:
+                        logger.debug(f"Error getting page title (page may be navigating): {e}")
+                        # Wait a bit more and try again
+                        time.sleep(2)
+                        try:
+                            page_title = page.title()
+                            is_cloudflare = "just a moment" in page_title.lower() or "checking your browser" in page_title.lower()
+                        except Exception:
+                            is_cloudflare = False
+                    
+                    if is_cloudflare:
+                        logger.warning("⚠ Cloudflare challenge detected - waiting...")
+                        # Wait for Cloudflare to complete (typically takes 7-10 seconds)
+                        # Cloudflare will navigate the page when it completes, so we wait for that
+                        max_wait = 15  # Increased slightly to handle navigation delays
+                        waited = 0
+                        challenge_complete = False
+                        
+                        while waited < max_wait and not challenge_complete:
+                            try:
+                                # Wait for any navigation to complete
+                                page.wait_for_load_state("domcontentloaded", timeout=5000)
+                                time.sleep(1)
+                                waited += 1
+                                
+                                # Check if Cloudflare challenge is gone
+                                try:
+                                    current_title = page.title()
+                                    if not ("just a moment" in current_title.lower() or "checking your browser" in current_title.lower()):
+                                        logger.debug(f"Cloudflare challenge completed after {waited} seconds")
+                                        challenge_complete = True
+                                        break
+                                except Exception as nav_error:
+                                    # Navigation might be happening - this is actually good, means Cloudflare is redirecting
+                                    logger.debug(f"Page navigation detected (Cloudflare completing): {nav_error}")
+                                    # Wait for navigation to finish
+                                    try:
+                                        page.wait_for_load_state("domcontentloaded", timeout=10000)
+                                        time.sleep(2)
+                                        waited += 2
+                                        # Check title after navigation
+                                        current_title = page.title()
+                                        if not ("just a moment" in current_title.lower() or "checking your browser" in current_title.lower()):
+                                            logger.debug(f"Cloudflare challenge completed after navigation ({waited}s)")
+                                            challenge_complete = True
+                                            break
+                                    except Exception:
+                                        # Navigation still in progress, continue waiting
+                                        pass
+                                
+                                if waited % 4 == 0 and not challenge_complete:
+                                    logger.debug(f"Still waiting for Cloudflare... ({waited}s)")
+                                    
+                            except Exception as e:
+                                # Any other error - might be navigation, wait and retry
+                                logger.debug(f"Error during Cloudflare wait (may be navigation): {e}")
+                                time.sleep(2)
+                                waited += 2
+                                # Try to check if page loaded
+                                try:
+                                    page.wait_for_load_state("domcontentloaded", timeout=5000)
+                                    current_title = page.title()
+                                    if not ("just a moment" in current_title.lower() or "checking your browser" in current_title.lower()):
+                                        challenge_complete = True
+                                        break
+                                except Exception:
+                                    pass
+                        
+                        # Wait for page to be fully loaded after Cloudflare completes
+                        if challenge_complete:
+                            try:
+                                page.wait_for_load_state("networkidle", timeout=10000)
+                            except Exception:
+                                # If networkidle times out, at least wait for DOM
+                                try:
+                                    page.wait_for_load_state("domcontentloaded", timeout=5000)
+                                except Exception:
+                                    pass
+                            time.sleep(1)  # Brief additional wait
+                        else:
+                            logger.warning("⚠ Cloudflare wait timed out, proceeding anyway...")
+                            # Still wait a bit for page to stabilize
+                            try:
+                                page.wait_for_load_state("domcontentloaded", timeout=5000)
+                            except Exception:
+                                pass
+                    else:
+                        logger.debug("No Cloudflare challenge detected, proceeding...")
+                    
+                    # Check for actual CAPTCHA (separate from Cloudflare) - only if blocking
+                    # This is less common and usually only appears if there's suspicious activity
+                    try:
+                        captcha_iframes = page.query_selector_all('iframe[src*="captcha"], iframe[src*="recaptcha"]')
+                        if captcha_iframes:
+                            logger.warning("⚠ CAPTCHA detected (separate from Cloudflare) - this may block scraping")
+                            # Don't wait indefinitely for CAPTCHA - it requires human interaction
+                            time.sleep(3)  # Brief wait in case it auto-resolves
+                    except Exception:
+                        pass  # Ignore selector errors
+                    
                     logger.debug("Page loaded, starting scroll...")
                     
-                    # Check for pagination links first (NovelFull uses page numbers)
+                    # Check for pagination links first (various sites use different patterns)
                     logger.debug("Checking for pagination links...")
-                    pagination_links = page.query_selector_all('a[href*="page"], a[href*="?p="], .pagination a, .page-numbers a')
+                    # Try multiple pagination selector patterns (including LightNovelPub)
+                    pagination_selectors = [
+                        # Generic patterns
+                        'a[href*="page"]',           # Generic page links
+                        'a[href*="?p="]',            # Query parameter pagination
+                        'a[href*="&p="]',            # Query parameter pagination (with other params)
+                        'a[href*="?page="]',         # Query parameter with "page="
+                        'a[href*="&page="]',         # Query parameter with "&page="
+                        # Class-based patterns
+                        '.pagination a',             # Generic pagination class
+                        '.page-numbers a',            # WordPress-style pagination
+                        '.pager a',                  # Generic pager
+                        '.pagination-wrapper a',     # Wrapper pagination
+                        '[class*="pagination"] a',   # Any element with pagination in class
+                        '[class*="pager"] a',        # Any element with pager in class
+                        '[class*="page"] a',         # Any element with "page" in class
+                        # Path-based patterns
+                        'a[href*="/page/"]',         # Path-based pagination
+                        'a[href*="/p/"]',            # Short path pagination
+                        # LightNovelPub specific patterns (common patterns for novel sites)
+                        '.pagination li a',          # Pagination list items
+                        '.pagination .page a',      # Page links in pagination
+                        '.pagination .next',         # Next page button
+                        '.pagination .prev',         # Previous page button
+                        'nav.pagination a',         # Navigation pagination
+                        'ul.pagination a',          # Unordered list pagination
+                        # Data attribute patterns
+                        'button[data-page]',        # Data attribute pagination
+                        'a[data-page]',              # Data attribute pagination
+                        '[data-page]',               # Any element with data-page
+                        # Number-based patterns (for sites that show page numbers)
+                        'a:has-text("2")',          # Links containing "2" (page 2)
+                        'a:has-text("3")',           # Links containing "3" (page 3)
+                    ]
+                    
+                    pagination_links = []
+                    for selector in pagination_selectors:
+                        try:
+                            found = page.query_selector_all(selector)
+                            if found:
+                                pagination_links.extend(found)
+                                logger.debug(f"Found {len(found)} pagination links using: {selector}")
+                        except Exception:
+                            continue
+                    
+                    # Also try to find pagination by looking for links with numbers (page numbers)
+                    # This catches cases where pagination doesn't have specific classes
+                    # Pattern: /book/novel-name/2 or /book/novel-name/3 (LightNovelPub style)
+                    try:
+                        all_links = page.query_selector_all('a[href]')
+                        base_path = toc_url.rstrip('/')
+                        # Remove trailing slash and any existing page number from base
+                        if re.search(r'/\d+$', base_path):
+                            base_path = re.sub(r'/\d+$', '', base_path)
+                        
+                        for link in all_links:
+                            href = link.get_attribute('href') or ''
+                            text = (link.inner_text() or '').strip()
+                            
+                            if not href:
+                                continue
+                            
+                            # Normalize href for comparison
+                            normalized_href = normalize_url(href, toc_url)
+                            
+                            # Pattern 1: Check if text is just a number (likely a page number)
+                            if text and text.isdigit() and 1 <= int(text) <= 999:
+                                # Check if href suggests it's a pagination link
+                                href_lower = normalized_href.lower()
+                                
+                                # Check for query parameter patterns
+                                if any(pattern in href_lower for pattern in ['page', 'p=', '?p', '&p']):
+                                    if link not in pagination_links:
+                                        pagination_links.append(link)
+                                        logger.debug(f"Found pagination link by number pattern (query): {text} -> {normalized_href}")
+                                # Check for path-based patterns like /book/novel-name/2
+                                elif re.search(r'/\d+$', normalized_href):
+                                    # Check if it's the same base path (e.g., /book/shadow-slave/2)
+                                    href_base = re.sub(r'/\d+$', '', normalized_href.rstrip('/'))
+                                    if href_base.lower() == base_path.lower() or href_base.lower() in base_path.lower():
+                                        if link not in pagination_links:
+                                            pagination_links.append(link)
+                                            logger.debug(f"Found pagination link by number pattern (path): {text} -> {normalized_href}")
+                            
+                            # Pattern 2: Check if href ends with a number and is on the same base path
+                            # This catches links like /book/shadow-slave/2 even if text isn't just the number
+                            if re.search(r'/\d+$', normalized_href):
+                                href_base = re.sub(r'/\d+$', '', normalized_href.rstrip('/'))
+                                if href_base.lower() == base_path.lower() or (href_base.lower() in base_path.lower() and len(href_base) >= len(base_path) - 5):
+                                    # Extract the page number
+                                    page_match = re.search(r'/(\d+)$', normalized_href)
+                                    if page_match:
+                                        page_num = int(page_match.group(1))
+                                        if 1 <= page_num <= 999:  # Reasonable page number range
+                                            if link not in pagination_links:
+                                                pagination_links.append(link)
+                                                logger.debug(f"Found pagination link by path pattern: page {page_num} -> {normalized_href}")
+                    except Exception as e:
+                        logger.debug(f"Error finding pagination by number pattern: {e}")
+                    
+                    # Also check for "Next" and page number links in the page HTML directly
+                    try:
+                        html = page.content()
+                        if HAS_BS4:
+                            soup = BeautifulSoup(html, "html.parser")
+                            base_path = toc_url.rstrip('/')
+                            # Remove trailing slash and any existing page number from base
+                            if re.search(r'/\d+$', base_path):
+                                base_path = re.sub(r'/\d+$', '', base_path)
+                            
+                            # Look for links that might be pagination
+                            potential_pagination = soup.find_all('a', href=True)
+                            for link in potential_pagination:
+                                href = link.get('href', '')
+                                text = link.get_text(strip=True)
+                                
+                                if not href:
+                                    continue
+                                
+                                # Normalize href
+                                normalized_href = normalize_url(href, toc_url)
+                                
+                                # Pattern 1: If text is a number and href suggests pagination
+                                if text.isdigit() and 1 <= int(text) <= 999:
+                                    href_lower = normalized_href.lower()
+                                    # Check for query parameter patterns
+                                    if any(pattern in href_lower for pattern in ['page', 'p=', '?p', '&p', '/p/']):
+                                        # This is likely a pagination link
+                                        try:
+                                            playwright_link = page.query_selector(f'a[href*="{href.split("?")[0].split("#")[0]}"]')
+                                            if playwright_link and playwright_link not in pagination_links:
+                                                pagination_links.append(playwright_link)
+                                                logger.debug(f"Found pagination link via HTML (query): {text} -> {normalized_href}")
+                                        except:
+                                            pass
+                                    # Check for path-based patterns like /book/novel-name/2
+                                    elif re.search(r'/\d+$', normalized_href):
+                                        href_base = re.sub(r'/\d+$', '', normalized_href.rstrip('/'))
+                                        if href_base.lower() == base_path.lower() or href_base.lower() in base_path.lower():
+                                            try:
+                                                playwright_link = page.query_selector(f'a[href*="{href.split("?")[0].split("#")[0]}"]')
+                                                if playwright_link and playwright_link not in pagination_links:
+                                                    pagination_links.append(playwright_link)
+                                                    logger.debug(f"Found pagination link via HTML (path): {text} -> {normalized_href}")
+                                            except:
+                                                pass
+                                
+                                # Pattern 2: Check if href ends with a number on same base path (even if text isn't just the number)
+                                if re.search(r'/\d+$', normalized_href):
+                                    href_base = re.sub(r'/\d+$', '', normalized_href.rstrip('/'))
+                                    if href_base.lower() == base_path.lower() or (href_base.lower() in base_path.lower() and len(href_base) >= len(base_path) - 5):
+                                        page_match = re.search(r'/(\d+)$', normalized_href)
+                                        if page_match:
+                                            page_num = int(page_match.group(1))
+                                            if 1 <= page_num <= 999:
+                                                try:
+                                                    playwright_link = page.query_selector(f'a[href*="{href.split("?")[0].split("#")[0]}"]')
+                                                    if playwright_link and playwright_link not in pagination_links:
+                                                        pagination_links.append(playwright_link)
+                                                        logger.debug(f"Found pagination link via HTML (path, no text): page {page_num} -> {normalized_href}")
+                                                except:
+                                                    pass
+                    except Exception as e:
+                        logger.debug(f"Error finding pagination via HTML: {e}")
                     
                     # Extract page URLs from pagination
                     page_urls_to_visit = []
@@ -681,6 +994,18 @@ class ChapterUrlFetcher:
                         seen_page_urls = set()
                         for link in pagination_links:
                             href = link.get_attribute('href') or ''
+                            # Also check data attributes for pagination
+                            if not href:
+                                href = link.get_attribute('data-href') or ''
+                            if not href:
+                                data_page = link.get_attribute('data-page')
+                                if data_page:
+                                    # Try to construct URL from data-page attribute
+                                    if '?' in toc_url:
+                                        href = f"{toc_url}&page={data_page}"
+                                    else:
+                                        href = f"{toc_url}?page={data_page}"
+                            
                             if href:
                                 # Normalize the pagination URL
                                 full_page_url = normalize_url(href, toc_url)
@@ -688,6 +1013,20 @@ class ChapterUrlFetcher:
                                 if full_page_url not in seen_page_urls and full_page_url != toc_url:
                                     seen_page_urls.add(full_page_url)
                                     page_urls_to_visit.append(full_page_url)
+                        
+                        # Sort page URLs to visit them in order (if they contain page numbers)
+                        def extract_page_number(url):
+                            """Extract page number from URL for sorting."""
+                            # Try multiple patterns:
+                            # 1. /book/novel-name/3 (direct path with number at end)
+                            # 2. ?page=3 or &page=3 (query parameter)
+                            # 3. /page/3 or /p/3 (path-based)
+                            match = re.search(r'/(\d+)$|[/?&]page[=_](\d+)|/page[/-](\d+)|/p[/-](\d+)|page(\d+)', url.lower())
+                            if match:
+                                return int(match.group(1) or match.group(2) or match.group(3) or match.group(4) or match.group(5))
+                            return 0
+                        
+                        page_urls_to_visit.sort(key=extract_page_number)
                         
                         if page_urls_to_visit:
                             logger.info(f"Detected pagination: {len(page_urls_to_visit)} additional pages to visit")
@@ -710,10 +1049,12 @@ class ChapterUrlFetcher:
                                         if self._is_chapter_url(full_url, link_text):
                                             all_chapter_urls.append(full_url)
                             
-                            # Visit additional pages (limit to reasonable number)
-                            max_pages_to_visit = min(len(page_urls_to_visit), 50)  # Limit to 50 pages for performance
+                            # Visit additional pages (limit to reasonable number, but allow more for large novels)
+                            # For novels with 2000+ chapters, we might need 100+ pages (assuming ~20-50 chapters per page)
+                            max_pages_to_visit = min(len(page_urls_to_visit), 200)  # Increased from 50 to 200 for large novels
                             if page_urls_to_visit:
                                 logger.info(f"Visiting {max_pages_to_visit} additional pages to collect all chapters...")
+                                logger.info(f"(Total pagination links found: {len(page_urls_to_visit)}, visiting first {max_pages_to_visit})")
                                 
                             for idx, page_url in enumerate(page_urls_to_visit[:max_pages_to_visit], 1):
                                 if should_stop and should_stop():
@@ -722,6 +1063,15 @@ class ChapterUrlFetcher:
                                 try:
                                     logger.debug(f"Loading page {idx}/{max_pages_to_visit}: {page_url}")
                                     page.goto(page_url, wait_until="domcontentloaded", timeout=30000)
+                                    
+                                    # Wait a bit for page to load
+                                    time.sleep(1)  # Small delay for page load
+                                    
+                                    # Check for Cloudflare challenge on pagination pages
+                                    page_title = page.title()
+                                    if "just a moment" in page_title.lower() or "checking your browser" in page_title.lower():
+                                        logger.warning(f"⚠ Cloudflare challenge on page {idx}, waiting...")
+                                        time.sleep(5)  # Brief wait for Cloudflare
                                     
                                     # Extract chapters from this page
                                     html = page.content()
@@ -765,6 +1115,160 @@ class ChapterUrlFetcher:
                             browser.close()
                             return unique_urls
                     
+                    # If no pagination detected, try to construct pagination URLs as fallback
+                    # This helps with sites like LightNovelPub that use pagination (~40 chapters per page)
+                    logger.debug("No pagination links found via selectors, trying fallback pagination detection...")
+                    
+                    # Check if we should try constructing pagination URLs
+                    # If we found ~40-50 chapters but need high chapters, try pagination
+                    html = page.content()
+                    if HAS_BS4:
+                        soup = BeautifulSoup(html, "html.parser")
+                        # Count chapters on current page
+                        current_page_links = soup.find_all("a", href=True)
+                        current_chapters = []
+                        for link in current_page_links:
+                            href = link.get("href", "")
+                            if href:
+                                full_url = normalize_url(href, self.base_url)
+                                link_text = link.get_text(strip=True)
+                                if self._is_chapter_url(full_url, link_text):
+                                    current_chapters.append(full_url)
+                        
+                        current_chapter_count = len(current_chapters)
+                        logger.debug(f"Found {current_chapter_count} chapters on current page")
+                        
+                        # If we found ~40-50 chapters and need high chapters, try constructing pagination URLs
+                        if 30 <= current_chapter_count <= 60 and min_chapter_number and min_chapter_number > 100:
+                            logger.info(f"Found {current_chapter_count} chapters but need {min_chapter_number}, trying to construct pagination URLs...")
+                            
+                            # Try common pagination URL patterns for LightNovelPub/NovelLive
+                            # Pattern: /book/novel-name/3 (direct path with page number)
+                            base_path = toc_url.rstrip('/')
+                            # Remove trailing slash and any existing page number
+                            if base_path.endswith('/1') or base_path.endswith('/0'):
+                                base_path = base_path[:-2]
+                            
+                            pagination_patterns = [
+                                f"{base_path}/{{}}",              # /book/shadow-slave/3 (LightNovelPub/NovelLive pattern)
+                                f"{toc_url}/{{}}",                # Same but with original URL
+                                f"{toc_url}?page={{}}",           # Query parameter
+                                f"{toc_url}?p={{}}",              # Short query parameter
+                                f"{toc_url}/page/{{}}",           # Path-based /page/2
+                                f"{toc_url}/p/{{}}",               # Short path /p/2
+                                f"{toc_url}?page={{}}&",          # Query with other params
+                                f"{toc_url}&page={{}}",            # Query with existing params
+                            ]
+                            
+                            # Estimate how many pages we need (assuming ~40 chapters per page)
+                            estimated_pages = max(10, (min_chapter_number // 40) + 2)  # Add buffer
+                            estimated_pages = min(estimated_pages, 200)  # Cap at 200 pages
+                            
+                            working_pattern = None
+                            for pattern in pagination_patterns:
+                                try:
+                                    # Try page 2 first to see if pattern works
+                                    test_url = pattern.format(2)
+                                    logger.debug(f"Testing pagination pattern: {test_url}")
+                                    test_response = page.goto(test_url, wait_until="domcontentloaded", timeout=10000)
+                                    if test_response and test_response.status == 200:
+                                        # Check if we got different chapters (not just redirected to page 1)
+                                        test_html = page.content()
+                                        test_soup = BeautifulSoup(test_html, "html.parser")
+                                        test_links = test_soup.find_all("a", href=True)
+                                        test_chapters = []
+                                        for link in test_links:
+                                            href = link.get("href", "")
+                                            if href:
+                                                full_url = normalize_url(href, self.base_url)
+                                                link_text = link.get_text(strip=True)
+                                                if self._is_chapter_url(full_url, link_text):
+                                                    test_chapters.append(full_url)
+                                        
+                                        # If we got different chapters, this pattern works!
+                                        if len(test_chapters) > 0 and set(test_chapters) != set(current_chapters):
+                                            working_pattern = pattern
+                                            logger.info(f"✓ Found working pagination pattern: {pattern} (page 2 has {len(test_chapters)} chapters)")
+                                            # Go back to page 1
+                                            page.goto(toc_url, wait_until="domcontentloaded", timeout=30000)
+                                            break
+                                except Exception as e:
+                                    logger.debug(f"Pagination pattern {pattern} failed: {e}")
+                                    continue
+                            
+                            # If we found a working pattern, collect all pages
+                            if working_pattern:
+                                page_urls_to_visit = []
+                                for page_num in range(2, estimated_pages + 1):
+                                    page_url = working_pattern.format(page_num)
+                                    page_urls_to_visit.append(page_url)
+                                
+                                logger.info(f"Constructed {len(page_urls_to_visit)} pagination URLs to visit")
+                                
+                                # Collect chapters from all pages
+                                all_chapter_urls = list(current_chapters)  # Start with page 1
+                                
+                                # Visit additional pages
+                                max_pages_to_visit = min(len(page_urls_to_visit), 200)
+                                logger.info(f"Visiting {max_pages_to_visit} additional pages to collect all chapters...")
+                                
+                                for idx, page_url in enumerate(page_urls_to_visit[:max_pages_to_visit], 1):
+                                    if should_stop and should_stop():
+                                        break
+                                    
+                                    try:
+                                        logger.debug(f"Loading page {idx}/{max_pages_to_visit}: {page_url}")
+                                        page.goto(page_url, wait_until="domcontentloaded", timeout=30000)
+                                        
+                                        # Wait a bit for page to load
+                                        time.sleep(1)  # Small delay for page load
+                                        
+                                        # Check for Cloudflare challenge on pagination pages
+                                        page_title = page.title()
+                                        if "just a moment" in page_title.lower() or "checking your browser" in page_title.lower():
+                                            logger.warning(f"⚠ Cloudflare challenge on page {idx}, waiting...")
+                                            time.sleep(5)  # Brief wait for Cloudflare
+                                        
+                                        # Extract chapters from this page
+                                        html = page.content()
+                                        if HAS_BS4:
+                                            soup = BeautifulSoup(html, "html.parser")
+                                            links = soup.find_all("a", href=True)
+                                            page_chapters = []
+                                            for link in links:
+                                                href = link.get("href", "")
+                                                if href:
+                                                    full_url = normalize_url(href, self.base_url)
+                                                    link_text = link.get_text(strip=True)
+                                                    if self._is_chapter_url(full_url, link_text):
+                                                        page_chapters.append(full_url)
+                                            
+                                            all_chapter_urls.extend(page_chapters)
+                                            logger.debug(f"Page {idx}: Found {len(page_chapters)} chapters")
+                                            
+                                            if len(page_chapters) == 0:
+                                                logger.debug(f"No chapters on page {idx}, stopping pagination")
+                                                break
+                                        
+                                        time.sleep(0.3)
+                                        
+                                    except Exception as e:
+                                        logger.debug(f"Error loading page {idx} ({page_url}): {e}")
+                                        break
+                                
+                                # Remove duplicates and return
+                                seen = set()
+                                unique_urls = []
+                                for url in all_chapter_urls:
+                                    if url not in seen:
+                                        seen.add(url)
+                                        unique_urls.append(url)
+                                
+                                logger.info(f"✓ Playwright found {len(unique_urls)} unique chapter URLs from {len(page_urls_to_visit[:max_pages_to_visit]) + 1} pages (constructed pagination)")
+                                page.close()
+                                browser.close()
+                                return unique_urls
+                    
                     # If no pagination detected or pagination extraction failed, use scrolling method
                     logger.debug("No pagination detected or pagination extraction failed, using scrolling method...")
                     
@@ -772,62 +1276,287 @@ class ChapterUrlFetcher:
                     logger.debug("Starting scroll to load chapters...")
                     scroll_result = page.evaluate("""
                         async () => {
+                            // Enhanced chapter detection function - matches Python _is_chapter_url() logic
+                            function isChapterLink(link) {
+                                if (!link || !link.href) return false;
+                                
+                                var href = link.href.toLowerCase();
+                                var text = (link.textContent || '').trim().toLowerCase();
+                                
+                                // Most important: Check if text contains "chapter" followed by a number
+                                // This catches cases where href doesn't have "chapter" but text does
+                                if (/^chapter\\s+\\d+/i.test(text) || /chapter\\s+\\d+/i.test(text)) {
+                                    return true;
+                                }
+                                
+                                // Standard patterns: /chapter/, chapter-123, ch_123, etc. in href
+                                if (/chapter|ch[_\\-\\s]?\\d+/.test(href) || /chapter|ch[_\\-\\s]?\\d+/.test(text)) {
+                                    return true;
+                                }
+                                
+                                // FanMTL pattern: novel-name_123.html or novel-name/123.html
+                                if (/\\d+\\.html/.test(href)) {
+                                    // Check if it's in a chapter list context
+                                    var parent = link.closest('.chapter-list, #chapters, [class*="chapter"], [id*="chapter"]');
+                                    if (parent) return true;
+                                    // Or if link text suggests it's a chapter
+                                    if (/chapter|第.*章|ch\\s*\\d+/i.test(text)) return true;
+                                }
+                                
+                                // LightNovelPub/NovelLive pattern: /book/novel-name/chapter-123 or /book/novel-name/123
+                                // Also match /book/novel-name/chapter/123 or similar variations
+                                if (/\\/book\\/[^\\/]+\\/(?:chapter[\\/\\-]?)?\\d+/.test(href)) {
+                                    return true;
+                                }
+                                
+                                // Generic pattern: URL contains numbers and link text suggests it's a chapter
+                                // This is more flexible - checks if text has "chapter" indicator
+                                if (/\\d+/.test(href)) {
+                                    // Check if text contains chapter indicators
+                                    if (/chapter|第.*章|ch\\s*\\d+/i.test(text)) {
+                                        // Also check if it's in a chapter list container
+                                        var parent = link.closest('.chapter-list, #chapters, .list-chapter, [class*="chapter"], [id*="chapter"], ul, ol, [role="list"]');
+                                        if (parent) {
+                                            // Additional check: see if parent or siblings have chapter-related content
+                                            var parentText = (parent.textContent || '').toLowerCase();
+                                            if (/chapter/i.test(parentText)) {
+                                                return true;
+                                            }
+                                        }
+                                        // If text clearly indicates chapter, trust it
+                                        if (/^chapter\\s+\\d+/i.test(text)) {
+                                            return true;
+                                        }
+                                    }
+                                }
+                                
+                                return false;
+                            }
+                            
+                            // Count chapter links using flexible detection
+                            function countChapterLinks() {
+                                var allLinks = Array.from(document.querySelectorAll('a[href]'));
+                                return allLinks.filter(isChapterLink).length;
+                            }
+                            
                             var lastCount = 0;
                             var currentCount = 0;
                             var scrollAttempts = 0;
-                            var maxScrolls = 500;  // Reduced from 2000 for faster testing
+                            var maxScrolls = 1000;  // Increased for thoroughness
                             var noChangeCount = 0;
-                            var maxNoChange = 20;  // Reduced from 50
+                            var maxNoChange = 30;  // Increased to allow more time for lazy loading
                             
-                            function tryClickLoadMore() {
-                                var buttons = Array.from(document.querySelectorAll('a, button, span, div, li'));
-                                for (var btn of buttons) {
+                            async function tryClickLoadMore() {
+                                // Try multiple strategies to find and click "Load More" buttons
+                                // Strategy 1: Try by text content (most reliable)
+                                var allClickable = Array.from(document.querySelectorAll('a, button, span, div, li, [role="button"], [onclick]'));
+                                for (var btn of allClickable) {
                                     try {
-                                        var text = (btn.textContent || '').toLowerCase();
-                                        var isVisible = btn.offsetParent !== null;
+                                        var text = (btn.textContent || '').toLowerCase().trim();
+                                        var isVisible = btn.offsetParent !== null && 
+                                                       btn.offsetWidth > 0 && 
+                                                       btn.offsetHeight > 0;
+                                        
                                         if (isVisible && (
-                                            text.includes('load more') || text.includes('show more') ||
-                                            text.includes('view more') || text.includes('see more') ||
-                                            text.includes('more chapters') || text.includes('next page')
+                                            text.includes('load more') || 
+                                            text.includes('show more') ||
+                                            text.includes('view more') || 
+                                            text.includes('see more') ||
+                                            text.includes('more chapters') || 
+                                            text.includes('next page') ||
+                                            text.includes('load all') ||
+                                            text.includes('show all') ||
+                                            text.includes('expand') ||
+                                            text === 'more' ||
+                                            text === 'load' ||
+                                            (text.includes('more') && text.length < 20)
                                         )) {
+                                            // Scroll button into view first
+                                            btn.scrollIntoView({ behavior: 'auto', block: 'center' });
+                                            await new Promise(r => setTimeout(r, 200));
                                             btn.click();
+                                            await new Promise(r => setTimeout(r, 500));
                                             return true;
                                         }
                                     } catch(e) {}
                                 }
+                                
+                                // Strategy 2: Try by class/id patterns
+                                var patternSelectors = [
+                                    '[class*="load-more"]',
+                                    '[class*="loadmore"]',
+                                    '[id*="load-more"]',
+                                    '[id*="loadmore"]',
+                                    '[class*="show-more"]',
+                                    '[class*="expand"]',
+                                    '[class*="more-button"]',
+                                    '[class*="load-button"]',
+                                ];
+                                
+                                for (var selector of patternSelectors) {
+                                    try {
+                                        var elements = document.querySelectorAll(selector);
+                                        for (var el of elements) {
+                                            if (el.offsetParent !== null && el.offsetWidth > 0) {
+                                                el.scrollIntoView({ behavior: 'auto', block: 'center' });
+                                                await new Promise(r => setTimeout(r, 200));
+                                                el.click();
+                                                await new Promise(r => setTimeout(r, 500));
+                                                return true;
+                                            }
+                                        }
+                                    } catch(e) {}
+                                }
+                                
                                 return false;
                             }
                             
+                            // Try to find and scroll within chapter container
+                            var chapterContainer = document.querySelector('#chapters, .chapter-list, .list-chapter, [class*="chapter"], [id*="chapter"]');
+                            if (!chapterContainer) {
+                                chapterContainer = document.querySelector('main, .content, #content, .container');
+                            }
+                            if (!chapterContainer) {
+                                chapterContainer = document.body;
+                            }
+                            
+                            // Initial count
+                            currentCount = countChapterLinks();
+                            lastCount = currentCount;
+                            
                             while (scrollAttempts < maxScrolls) {
-                                // Scroll to bottom
-                                window.scrollTo(0, document.body.scrollHeight);
-                                await new Promise(resolve => setTimeout(resolve, 500));  // Reduced from 1000
-                                
-                                // Try clicking "Load More" or pagination buttons
-                                if (scrollAttempts % 5 === 0) {  // More frequent checks
-                                    tryClickLoadMore();
-                                    await new Promise(resolve => setTimeout(resolve, 300));
+                                // Scroll container if it's not body
+                                if (chapterContainer !== document.body) {
+                                    var containerHeight = chapterContainer.scrollHeight;
+                                    var containerClient = chapterContainer.clientHeight;
+                                    var currentScroll = chapterContainer.scrollTop;
+                                    
+                                    if (currentScroll + 200 < containerHeight - containerClient) {
+                                        chapterContainer.scrollTop = currentScroll + 200;
+                                    } else {
+                                        chapterContainer.scrollTop = containerHeight;
+                                    }
                                 }
                                 
-                                currentCount = document.querySelectorAll('a[href*="chapter"]').length;
+                                // Also scroll window
+                                window.scrollTo(0, document.body.scrollHeight);
+                                
+                                // Wait for content to load
+                                await new Promise(resolve => setTimeout(resolve, 1000));  // Increased from 800
+                                
+                                // Try clicking "Load More" buttons more frequently and aggressively
+                                if (scrollAttempts % 2 === 0) {  // More frequent - every 2 scrolls
+                                    if (await tryClickLoadMore()) {
+                                        // Wait longer after clicking to allow content to load
+                                        await new Promise(resolve => setTimeout(resolve, 2000));  // Increased from 1000
+                                        // Recheck count after load more
+                                        currentCount = countChapterLinks();
+                                        if (currentCount > lastCount) {
+                                            console.log('Load More clicked! Found ' + currentCount + ' chapters (was ' + lastCount + ')');
+                                            lastCount = currentCount;
+                                            noChangeCount = 0;
+                                        }
+                                    }
+                                }
+                                
+                                // Scroll last chapter link into view to trigger lazy loading
+                                var allLinks = Array.from(document.querySelectorAll('a[href]'));
+                                var chapterLinks = allLinks.filter(isChapterLink);
+                                if (chapterLinks.length > 0) {
+                                    var lastLink = chapterLinks[chapterLinks.length - 1];
+                                    try {
+                                        lastLink.scrollIntoView({ behavior: 'auto', block: 'end', inline: 'nearest' });
+                                        await new Promise(resolve => setTimeout(resolve, 800));  // Increased wait
+                                    } catch(e) {}
+                                }
+                                
+                                // Also try scrolling past the last link to trigger infinite scroll
+                                if (chapterLinks.length > 0) {
+                                    try {
+                                        var lastLinkRect = chapterLinks[chapterLinks.length - 1].getBoundingClientRect();
+                                        window.scrollBy(0, lastLinkRect.height * 2);  // Scroll past last link
+                                        await new Promise(resolve => setTimeout(resolve, 500));
+                                    } catch(e) {}
+                                }
+                                
+                                // Recount chapter links
+                                currentCount = countChapterLinks();
                                 
                                 if (currentCount === lastCount) {
                                     noChangeCount++;
                                     if (noChangeCount >= maxNoChange) {
-                                        console.log('No more chapters loading, stopping scroll');
-                                        break;
+                                        // Before giving up, try one more aggressive "Load More" attempt
+                                        console.log('No change detected, trying final aggressive Load More attempt...');
+                                        for (var attempt = 0; attempt < 5; attempt++) {
+                                            if (await tryClickLoadMore()) {
+                                                await new Promise(resolve => setTimeout(resolve, 3000));
+                                                currentCount = countChapterLinks();
+                                                if (currentCount > lastCount) {
+                                                    console.log('Final Load More successful! Found ' + currentCount + ' chapters');
+                                                    lastCount = currentCount;
+                                                    noChangeCount = 0;
+                                                    break;
+                                                }
+                                            }
+                                            await new Promise(resolve => setTimeout(resolve, 500));
+                                        }
+                                        
+                                        if (currentCount === lastCount) {
+                                            console.log('No more chapters loading after ' + noChangeCount + ' attempts, stopping scroll');
+                                            break;
+                                        }
                                     }
                                 } else {
                                     noChangeCount = 0;
+                                    console.log('Found ' + currentCount + ' chapters (was ' + lastCount + ')');
                                 }
                                 
                                 lastCount = currentCount;
                                 scrollAttempts++;
                                 
-                                if (scrollAttempts % 20 === 0) {  // More frequent progress updates
+                                if (scrollAttempts % 10 === 0) {
                                     console.log('Progress: Scroll ' + scrollAttempts + ', Found ' + currentCount + ' chapters...');
                                 }
                             }
+                            
+                            // Final aggressive scroll to ensure everything is loaded
+                            console.log('Starting final aggressive scroll phase...');
+                            for (var i = 0; i < 10; i++) {  // Increased from 5 to 10
+                                if (chapterContainer !== document.body) {
+                                    chapterContainer.scrollTop = chapterContainer.scrollHeight;
+                                }
+                                window.scrollTo(0, document.body.scrollHeight);
+                                
+                                // Try clicking load more multiple times
+                                for (var j = 0; j < 3; j++) {
+                                    if (await tryClickLoadMore()) {
+                                        await new Promise(resolve => setTimeout(resolve, 2000));
+                                        var newCount = countChapterLinks();
+                                        if (newCount > currentCount) {
+                                            console.log('Final scroll found more chapters: ' + newCount);
+                                            currentCount = newCount;
+                                        }
+                                    }
+                                }
+                                
+                                await new Promise(resolve => setTimeout(resolve, 1000));
+                                
+                                // Scroll past the last chapter to trigger infinite scroll
+                                var allLinks = Array.from(document.querySelectorAll('a[href]'));
+                                var chapterLinks = allLinks.filter(isChapterLink);
+                                if (chapterLinks.length > 0) {
+                                    var lastLink = chapterLinks[chapterLinks.length - 1];
+                                    try {
+                                        var lastLinkRect = lastLink.getBoundingClientRect();
+                                        window.scrollBy(0, lastLinkRect.height * 3);  // Scroll further past
+                                        await new Promise(resolve => setTimeout(resolve, 1500));
+                                    } catch(e) {}
+                                }
+                            }
+                            
+                            // Final count
+                            currentCount = countChapterLinks();
+                            console.log('Final chapter count: ' + currentCount);
                             
                             return currentCount;
                         }
@@ -853,43 +1582,77 @@ class ChapterUrlFetcher:
                     
                     soup = BeautifulSoup(html, "html.parser")
                     
-                    # Try multiple selectors for NovelFull
+                    # Try multiple selectors for different sites
+                    # Start with most specific, then fall back to generic
                     selectors = [
-                        'a[href*="chapter"]',
-                        '.list-chapter a',
-                        '#list-chapter a',
-                        'ul.list-chapter a',
-                        '.chapter-list a',
+                        # Site-specific selectors
+                        '.list-chapter a',           # NovelFull
+                        '#list-chapter a',            # NovelFull
+                        'ul.list-chapter a',          # NovelFull
+                        '.chapter-list a',            # Generic
+                        '#chapters a',                # Generic
+                        'ul.chapter-list a',          # Generic
+                        'div.chapter-list a',         # Generic
+                        '[class*="chapter"] a',       # Generic (any element with "chapter" in class)
+                        '[id*="chapter"] a',          # Generic (any element with "chapter" in id)
+                        # LightNovelPub/NovelLive specific patterns
+                        '.chapter-item a',            # LightNovelPub
+                        '.chapter-name a',            # LightNovelPub
+                        'a[href*="/book/"]',          # LightNovelPub/NovelLive pattern
+                        'li a[href*="/book/"]',       # NovelLive: links in list items
+                        'ul li a[href]',              # Generic list items (NovelLive uses lists)
+                        'ol li a[href]',              # Ordered list items
+                        # Generic fallbacks
+                        'a[href*="chapter"]',         # Standard pattern
+                        'main a[href]',               # All links in main content
+                        '.content a[href]',           # All links in content area
+                        '#content a[href]',           # All links in content div
+                        'article a[href]',            # All links in article
                     ]
                     
                     links = []
+                    found_selectors = set()
                     for selector in selectors:
-                        found = soup.select(selector)
-                        if found:
-                            links.extend(found)
-                            logger.debug(f"Found {len(found)} links using selector: {selector}")
+                        try:
+                            found = soup.select(selector)
+                            if found:
+                                links.extend(found)
+                                found_selectors.add(selector)
+                                logger.debug(f"Found {len(found)} links using selector: {selector}")
+                        except Exception as e:
+                            logger.debug(f"Selector '{selector}' failed: {e}")
+                            continue
                     
-                    # Remove duplicates
+                    if found_selectors:
+                        logger.debug(f"Used selectors: {', '.join(found_selectors)}")
+                    
+                    # Remove duplicates by href
                     seen_hrefs = set()
                     unique_links = []
                     for link in links:
                         href = link.get("href", "")
-                        if href and href not in seen_hrefs:
-                            seen_hrefs.add(href)
-                            unique_links.append(link)
+                        if href:
+                            # Normalize href for comparison
+                            normalized = normalize_url(href, self.base_url)
+                            if normalized not in seen_hrefs:
+                                seen_hrefs.add(normalized)
+                                unique_links.append(link)
                     
-                    logger.debug(f"Found {len(unique_links)} unique chapter links")
+                    logger.debug(f"Found {len(unique_links)} unique links (before chapter filtering)")
                     
+                    # Filter to only chapter URLs using our flexible detection
                     chapter_urls = []
                     for link in unique_links:
                         href = link.get("href", "")
                         if href:
                             full_url = normalize_url(href, self.base_url)
                             link_text = link.get_text(strip=True)
+                            
+                            # Use our flexible chapter detection
                             if self._is_chapter_url(full_url, link_text):
                                 chapter_urls.append(full_url)
                     
-                    logger.debug(f"Extracted {len(chapter_urls)} chapter URLs")
+                    logger.debug(f"Extracted {len(chapter_urls)} chapter URLs (after filtering)")
                     
                     # Remove duplicates
                     seen = set()
@@ -911,7 +1674,13 @@ class ChapterUrlFetcher:
                     browser.close()
                     
         except Exception as e:
-            logger.error(f"Playwright with scrolling failed: {e}")
+            error_msg = str(e).lower()
+            if "execution context was destroyed" in error_msg or "navigation" in error_msg:
+                logger.error(f"Playwright failed due to page navigation (likely Cloudflare protection): {e}")
+                logger.warning("⚠ This site may have strong anti-bot protection that prevents automated scraping")
+                logger.warning("💡 Consider using manual methods or alternative scraping approaches for this site")
+            else:
+                logger.error(f"Playwright with scrolling failed: {e}")
             import traceback
             logger.debug(traceback.format_exc())
             return []
