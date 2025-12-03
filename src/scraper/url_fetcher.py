@@ -13,7 +13,7 @@ import time
 import re
 import json
 from typing import Optional, List, Callable, Dict, Tuple
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse, parse_qs, urlencode, urlunparse
 
 try:
     from bs4 import BeautifulSoup
@@ -255,7 +255,7 @@ class ChapterUrlFetcher:
             logger.debug(f"Failed to extract chapter count from metadata: {e}")
             return None
 
-    def fetch(self, toc_url: str, should_stop: Optional[Callable[[], bool]] = None, use_reference: bool = False) -> Tuple[List[str], Dict[str, any]]:
+    def fetch(self, toc_url: str, should_stop: Optional[Callable[[], bool]] = None, use_reference: bool = False, min_chapter_number: Optional[int] = None) -> Tuple[List[str], Dict[str, any]]:
         """
         Fetch chapter URLs using failsafe methods.
         
@@ -270,6 +270,7 @@ class ChapterUrlFetcher:
             toc_url: URL of the table of contents page
             should_stop: Optional callback that returns True if fetching should stop
             use_reference: If True, also get reference count for validation
+            min_chapter_number: Optional minimum chapter number needed (for range validation)
             
         Returns:
             Tuple of (list of chapter URLs, metadata dict with method used and counts)
@@ -290,39 +291,137 @@ class ChapterUrlFetcher:
         if use_reference:
             metadata["reference_count"] = self.get_reference_count(toc_url, should_stop)
         
+        # Helper function to check if found chapters cover the needed range
+        def covers_range(found_urls: List[str]) -> bool:
+            """Check if found URLs cover the minimum chapter number needed."""
+            if not min_chapter_number or not found_urls:
+                return True  # No specific requirement, or no URLs found
+            
+            # Extract max chapter number from found URLs
+            max_found = 0
+            for url in found_urls:
+                ch_num = extract_chapter_number(url)
+                if ch_num and ch_num > max_found:
+                    max_found = ch_num
+            
+            # Check if we have chapters up to the minimum needed
+            if max_found < min_chapter_number:
+                logger.debug(f"Found max chapter {max_found}, but need at least {min_chapter_number}")
+                return False
+            
+            return True
+        
+        # Helper function to check if result seems incomplete (pagination issue)
+        def seems_incomplete(found_urls: List[str]) -> bool:
+            """Check if the result might be incomplete due to pagination."""
+            if not found_urls or len(found_urls) < 50:
+                return False  # Too few to judge
+            
+            url_count = len(found_urls)
+            
+            # CRITICAL: If we have exactly 55 URLs, ALWAYS suspect pagination
+            # 55 is a very common pagination limit (NovelFull, many sites use this)
+            # Most novels have way more than 55 chapters
+            if url_count == 55:
+                logger.info(f"⚠ Detected pagination: Found exactly 55 URLs - this is a common pagination limit, trying Playwright for complete list")
+                return True
+            
+            # Extract all chapter numbers for additional checks
+            chapter_numbers = []
+            for url in found_urls:
+                ch_num = extract_chapter_number(url)
+                if ch_num:
+                    chapter_numbers.append(ch_num)
+            
+            if chapter_numbers:
+                max_ch = max(chapter_numbers)
+                min_ch = min(chapter_numbers)
+                
+                # Round numbers with matching count suggest pagination
+                if url_count in [50, 55, 100, 200] and max_ch in [50, 55, 100, 200] and url_count == max_ch:
+                    logger.info(f"⚠ Detected pagination: Found exactly {url_count} URLs ending at round number {max_ch}")
+                    return True
+                
+                # If we need higher chapters but found low max
+                if min_chapter_number and min_chapter_number > max_ch and url_count >= 50:
+                    logger.info(f"⚠ Detected pagination: Found {url_count} URLs (max chapter {max_ch}) but need {min_chapter_number}")
+                    return True
+            
+            # Check other round numbers that suggest pagination
+            if chapter_numbers:
+                max_ch = max(chapter_numbers)
+                min_ch = min(chapter_numbers)
+                
+                # Round numbers with matching count suggest pagination
+                if url_count in [50, 55, 100, 200] and max_ch in [50, 55, 100, 200] and url_count == max_ch:
+                    logger.info(f"⚠ Detected pagination: Found exactly {url_count} URLs ending at round number {max_ch}")
+                    return True
+                
+                # If we need higher chapters but found low max
+                if min_chapter_number and min_chapter_number > max_ch and url_count >= 50:
+                    logger.info(f"⚠ Detected pagination: Found {url_count} URLs (max chapter {max_ch}) but need {min_chapter_number}")
+                    return True
+            
+            return False
+        
         # Method 1: Try JavaScript variable extraction (fastest)
         logger.debug("Trying method 1: JavaScript variable extraction")
         urls = self._try_js_extraction(toc_url)
         metadata["methods_tried"]["js"] = len(urls) if urls else 0
         if urls and len(urls) >= 10:
-            logger.info(f"✓ Found {len(urls)} chapters via JavaScript extraction")
-            metadata["method_used"] = "js"
-            metadata["urls_found"] = len(urls)
-            return sort_chapters_by_number(urls), metadata
+            # Check if it covers the needed range
+            if covers_range(urls) and not seems_incomplete(urls):
+                logger.info(f"✓ Found {len(urls)} chapters via JavaScript extraction")
+                metadata["method_used"] = "js"
+                metadata["urls_found"] = len(urls)
+                return sort_chapters_by_number(urls), metadata
+            else:
+                logger.debug(f"JS extraction found {len(urls)} chapters but may be incomplete, trying next method")
         
         # Method 2: Try AJAX endpoint discovery (fast)
         logger.debug("Trying method 2: AJAX endpoint discovery")
         urls = self._try_ajax_endpoints(toc_url)
         metadata["methods_tried"]["ajax"] = len(urls) if urls else 0
         if urls and len(urls) >= 10:
-            logger.info(f"✓ Found {len(urls)} chapters via AJAX endpoint")
-            metadata["method_used"] = "ajax"
-            metadata["urls_found"] = len(urls)
-            return sort_chapters_by_number(urls), metadata
+            # Check if it covers the needed range
+            if covers_range(urls) and not seems_incomplete(urls):
+                logger.info(f"✓ Found {len(urls)} chapters via AJAX endpoint")
+                metadata["method_used"] = "ajax"
+                metadata["urls_found"] = len(urls)
+                return sort_chapters_by_number(urls), metadata
+            else:
+                logger.debug(f"AJAX found {len(urls)} chapters but may be incomplete, trying next method")
         
         # Method 3: Try HTML parsing (medium)
         logger.debug("Trying method 3: HTML parsing")
         urls = self._try_html_parsing(toc_url)
         metadata["methods_tried"]["html"] = len(urls) if urls else 0
         if urls and len(urls) >= 10:
-            logger.info(f"✓ Found {len(urls)} chapters via HTML parsing")
-            metadata["method_used"] = "html"
-            metadata["urls_found"] = len(urls)
-            return sort_chapters_by_number(urls), metadata
+            # CRITICAL CHECK: If exactly 55 URLs, always try Playwright (pagination)
+            if len(urls) == 55:
+                logger.info(f"⚠ HTML parsing found exactly 55 URLs - detected pagination limit, trying Playwright for complete list")
+                # Don't return, continue to Playwright
+            else:
+                # Check if it covers the needed range or seems complete
+                is_complete = not seems_incomplete(urls)
+                covers_needed = covers_range(urls)
+                logger.debug(f"HTML parsing: found {len(urls)} URLs, covers_range={covers_needed}, seems_incomplete={not is_complete}")
+                
+                if covers_needed and is_complete:
+                    logger.info(f"✓ Found {len(urls)} chapters via HTML parsing")
+                    metadata["method_used"] = "html"
+                    metadata["urls_found"] = len(urls)
+                    return sort_chapters_by_number(urls), metadata
+                else:
+                    if not is_complete:
+                        logger.info(f"⚠ HTML parsing found {len(urls)} chapters but seems incomplete (pagination detected), trying Playwright")
+                    elif not covers_needed:
+                        logger.info(f"⚠ HTML parsing found {len(urls)} chapters but doesn't cover needed range, trying Playwright")
+                    # Continue to next method
         
         # Method 4: Try Playwright with scrolling (slow but gets all)
         if HAS_PLAYWRIGHT:
-            logger.debug("Trying method 4: Playwright with scrolling")
+            logger.info("Trying method 4: Playwright with scrolling (this may take a while...)")
             urls = self._try_playwright_with_scrolling(toc_url, should_stop=should_stop)
             metadata["methods_tried"]["playwright"] = len(urls) if urls else 0
             if urls:
@@ -330,6 +429,10 @@ class ChapterUrlFetcher:
                 metadata["method_used"] = "playwright"
                 metadata["urls_found"] = len(urls)
                 return sort_chapters_by_number(urls), metadata
+            else:
+                logger.warning("⚠ Playwright did not find any chapter URLs")
+        else:
+            logger.warning("⚠ Playwright not available - install with: pip install playwright && playwright install chromium")
         
         # Method 5: Try following "next" links (slow but reliable)
         logger.debug("Trying method 5: Follow 'next' links")
@@ -515,26 +618,139 @@ class ChapterUrlFetcher:
         for getting the true chapter count.
         """
         if not HAS_PLAYWRIGHT:
-            logger.debug("Playwright not available")
+            logger.warning("Playwright not available - install with: pip install playwright && playwright install chromium")
             return []
         
         try:
             logger.info("Using Playwright with scrolling to get all chapters...")
+            logger.debug(f"Launching browser (headless=True) for {toc_url}")
             with sync_playwright() as p:
                 browser = p.chromium.launch(headless=True)
                 try:
                     page = browser.new_page()
+                    logger.debug(f"Navigating to {toc_url}...")
                     page.goto(toc_url, wait_until="networkidle", timeout=60000)
+                    logger.debug("Page loaded, starting scroll...")
                     
-                    # Scroll to load all chapters
+                    # Check for pagination links first (NovelFull uses page numbers)
+                    logger.debug("Checking for pagination links...")
+                    pagination_links = page.query_selector_all('a[href*="page"], a[href*="?p="], .pagination a, .page-numbers a')
+                    
+                    # Extract page numbers from pagination
+                    max_page = 1
+                    if pagination_links:
+                        logger.info(f"Found {len(pagination_links)} pagination links - NovelFull uses page-based pagination")
+                        # Extract page numbers from links
+                        page_numbers = []
+                        for link in pagination_links:
+                            href = link.get_attribute('href') or ''
+                            text = link.inner_text().strip()
+                            # Try to extract page number from href or text
+                            import re
+                            # Look for ?page=2, ?p=3, /page/2, etc.
+                            page_match = re.search(r'[?&]page[=_]?(\d+)|/page[/_-]?(\d+)', href, re.I)
+                            if page_match:
+                                page_num = int(page_match.group(1) or page_match.group(2))
+                                page_numbers.append(page_num)
+                            # Or from text if it's a number
+                            elif text.isdigit():
+                                try:
+                                    page_numbers.append(int(text))
+                                except:
+                                    pass
+                        
+                        if page_numbers:
+                            max_page = max(page_numbers)
+                            logger.info(f"Detected pagination: pages 1 to {max_page} (estimated {max_page * 55} chapters)")
+                            
+                            # Collect chapters from all pages
+                            all_chapter_urls = []
+                            
+                            # Page 1 (already loaded)
+                            logger.debug("Collecting chapters from page 1...")
+                            html = page.content()
+                            if HAS_BS4:
+                                soup = BeautifulSoup(html, "html.parser")
+                                links = soup.find_all("a", href=re.compile(r"chapter", re.I))
+                                for link in links:
+                                    href = link.get("href", "")
+                                    if href:
+                                        full_url = normalize_url(href, self.base_url)
+                                        if "chapter" in full_url.lower():
+                                            all_chapter_urls.append(full_url)
+                            
+                            # Visit additional pages (limit to reasonable number)
+                            max_pages_to_visit = min(max_page, 50)  # Limit to 50 pages for performance
+                            if max_page > 1:
+                                logger.info(f"Visiting pages 2-{max_pages_to_visit} to collect all chapters...")
+                                
+                            for page_num in range(2, max_pages_to_visit + 1):
+                                if should_stop and should_stop():
+                                    break
+                                
+                                # Construct page URL
+                                if '?' in toc_url:
+                                    page_url = f"{toc_url.split('?')[0]}?page={page_num}"
+                                else:
+                                    page_url = f"{toc_url}?page={page_num}"
+                                
+                                try:
+                                    logger.debug(f"Loading page {page_num}/{max_pages_to_visit}...")
+                                    page.goto(page_url, wait_until="domcontentloaded", timeout=30000)
+                                    
+                                    # Extract chapters from this page
+                                    html = page.content()
+                                    if HAS_BS4:
+                                        soup = BeautifulSoup(html, "html.parser")
+                                        links = soup.find_all("a", href=re.compile(r"chapter", re.I))
+                                        page_chapters = []
+                                        for link in links:
+                                            href = link.get("href", "")
+                                            if href:
+                                                full_url = normalize_url(href, self.base_url)
+                                                if "chapter" in full_url.lower():
+                                                    page_chapters.append(full_url)
+                                        
+                                        all_chapter_urls.extend(page_chapters)
+                                        logger.debug(f"Page {page_num}: Found {len(page_chapters)} chapters")
+                                        
+                                        if len(page_chapters) == 0:
+                                            logger.debug(f"No chapters on page {page_num}, stopping pagination")
+                                            break
+                                    
+                                    # Small delay between pages
+                                    time.sleep(0.3)
+                                    
+                                except Exception as e:
+                                    logger.debug(f"Error loading page {page_num}: {e}")
+                                    break
+                            
+                            # Remove duplicates and return
+                            seen = set()
+                            unique_urls = []
+                            for url in all_chapter_urls:
+                                if url not in seen:
+                                    seen.add(url)
+                                    unique_urls.append(url)
+                            
+                            logger.info(f"✓ Playwright found {len(unique_urls)} unique chapter URLs from {max_pages_to_visit} pages")
+                            page.close()
+                            browser.close()
+                            return unique_urls
+                    
+                    # If no pagination detected or pagination extraction failed, use scrolling method
+                    logger.debug("No pagination detected or pagination extraction failed, using scrolling method...")
+                    
+                    # Scroll to load all chapters (for lazy loading sites)
+                    logger.debug("Starting scroll to load chapters...")
                     scroll_result = page.evaluate("""
                         async () => {
                             var lastCount = 0;
                             var currentCount = 0;
                             var scrollAttempts = 0;
-                            var maxScrolls = 2000;
+                            var maxScrolls = 500;  // Reduced from 2000 for faster testing
                             var noChangeCount = 0;
-                            var maxNoChange = 50;
+                            var maxNoChange = 20;  // Reduced from 50
                             
                             function tryClickLoadMore() {
                                 var buttons = Array.from(document.querySelectorAll('a, button, span, div, li'));
@@ -545,7 +761,7 @@ class ChapterUrlFetcher:
                                         if (isVisible && (
                                             text.includes('load more') || text.includes('show more') ||
                                             text.includes('view more') || text.includes('see more') ||
-                                            text.includes('more chapters')
+                                            text.includes('more chapters') || text.includes('next page')
                                         )) {
                                             btn.click();
                                             return true;
@@ -558,12 +774,12 @@ class ChapterUrlFetcher:
                             while (scrollAttempts < maxScrolls) {
                                 // Scroll to bottom
                                 window.scrollTo(0, document.body.scrollHeight);
-                                await new Promise(resolve => setTimeout(resolve, 1000));
+                                await new Promise(resolve => setTimeout(resolve, 500));  // Reduced from 1000
                                 
-                                // Try clicking "Load More" buttons
-                                if (scrollAttempts % 10 === 0) {
+                                // Try clicking "Load More" or pagination buttons
+                                if (scrollAttempts % 5 === 0) {  // More frequent checks
                                     tryClickLoadMore();
-                                    await new Promise(resolve => setTimeout(resolve, 500));
+                                    await new Promise(resolve => setTimeout(resolve, 300));
                                 }
                                 
                                 currentCount = document.querySelectorAll('a[href*="chapter"]').length;
@@ -571,6 +787,7 @@ class ChapterUrlFetcher:
                                 if (currentCount === lastCount) {
                                     noChangeCount++;
                                     if (noChangeCount >= maxNoChange) {
+                                        console.log('No more chapters loading, stopping scroll');
                                         break;
                                     }
                                 } else {
@@ -580,7 +797,7 @@ class ChapterUrlFetcher:
                                 lastCount = currentCount;
                                 scrollAttempts++;
                                 
-                                if (scrollAttempts % 50 === 0) {
+                                if (scrollAttempts % 20 === 0) {  // More frequent progress updates
                                     console.log('Progress: Scroll ' + scrollAttempts + ', Found ' + currentCount + ' chapters...');
                                 }
                             }
@@ -589,25 +806,62 @@ class ChapterUrlFetcher:
                         }
                     """)
                     
-                    logger.info(f"Scrolling complete. Found {scroll_result} chapter links.")
+                    logger.info(f"Scrolling complete. Found {scroll_result} chapter links in DOM.")
+                    
+                    # Check if we need to navigate to other pages (NovelFull pagination)
+                    # Look for page navigation links
+                    page_links = page.query_selector_all('.pagination a, .page-numbers a, a[href*="page"]')
+                    if page_links and scroll_result <= 60:
+                        logger.info(f"Detected pagination links ({len(page_links)} found). NovelFull uses page-based pagination.")
+                        logger.info("Note: Current implementation scrolls one page. For full chapter list, may need page navigation.")
                     
                     # Extract all chapter URLs
+                    logger.debug("Extracting chapter URLs from page HTML...")
                     html = page.content()
                     page.close()
                     
                     if not HAS_BS4:
+                        logger.warning("BeautifulSoup4 not available, cannot parse HTML")
                         return []
                     
                     soup = BeautifulSoup(html, "html.parser")
-                    links = soup.find_all("a", href=re.compile(r"chapter", re.I))
+                    
+                    # Try multiple selectors for NovelFull
+                    selectors = [
+                        'a[href*="chapter"]',
+                        '.list-chapter a',
+                        '#list-chapter a',
+                        'ul.list-chapter a',
+                        '.chapter-list a',
+                    ]
+                    
+                    links = []
+                    for selector in selectors:
+                        found = soup.select(selector)
+                        if found:
+                            links.extend(found)
+                            logger.debug(f"Found {len(found)} links using selector: {selector}")
+                    
+                    # Remove duplicates
+                    seen_hrefs = set()
+                    unique_links = []
+                    for link in links:
+                        href = link.get("href", "")
+                        if href and href not in seen_hrefs:
+                            seen_hrefs.add(href)
+                            unique_links.append(link)
+                    
+                    logger.debug(f"Found {len(unique_links)} unique chapter links")
                     
                     chapter_urls = []
-                    for link in links:
+                    for link in unique_links:
                         href = link.get("href", "")
                         if href:
                             full_url = normalize_url(href, self.base_url)
                             if "chapter" in full_url.lower():
                                 chapter_urls.append(full_url)
+                    
+                    logger.debug(f"Extracted {len(chapter_urls)} chapter URLs")
                     
                     # Remove duplicates
                     seen = set()
@@ -617,13 +871,21 @@ class ChapterUrlFetcher:
                             seen.add(url)
                             unique_urls.append(url)
                     
+                    if unique_urls:
+                        logger.info(f"✓ Playwright found {len(unique_urls)} unique chapter URLs")
+                    else:
+                        logger.warning(f"⚠ Playwright found {len(unique_links)} links but extracted 0 chapter URLs")
+                        logger.warning("This might indicate a selector issue or different page structure")
+                    
                     return unique_urls
                     
                 finally:
                     browser.close()
                     
         except Exception as e:
-            logger.debug(f"Playwright with scrolling failed: {e}")
+            logger.error(f"Playwright with scrolling failed: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
             return []
 
     def _try_follow_next_links(self, toc_url: str, max_chapters: int = 100, should_stop: Optional[Callable[[], bool]] = None) -> List[str]:
