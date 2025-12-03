@@ -205,3 +205,154 @@ def normalize_chapter_number(url: str) -> Optional[int]:
     """
     return extract_chapter_number(url)
 
+
+def extract_chapters_from_javascript(html: str, base_url: str) -> List[str]:
+    """
+    Extract chapter URLs from JavaScript variables in HTML.
+    
+    Args:
+        html: HTML content containing JavaScript
+        base_url: Base URL for normalizing relative URLs
+        
+    Returns:
+        List of chapter URLs found in JavaScript
+    """
+    import re
+    from urllib.parse import urljoin
+    
+    urls = []
+    
+    # Look for common JavaScript patterns with chapter URLs
+    patterns = [
+        r'chapters["\']?\s*[:=]\s*\[([^\]]+)\]',
+        r'chapterList["\']?\s*[:=]\s*\[([^\]]+)\]',
+        r'chapterUrls["\']?\s*[:=]\s*\[([^\]]+)\]',
+    ]
+    
+    for pattern in patterns:
+        matches = re.finditer(pattern, html, re.IGNORECASE)
+        for match in matches:
+            # Extract URLs from the array
+            content = match.group(1)
+            # Find URLs in the content
+            url_matches = re.finditer(r'["\']([^"\']+)["\']', content)
+            for url_match in url_matches:
+                url = url_match.group(1)
+                if 'chapter' in url.lower():
+                    full_url = urljoin(base_url, url)
+                    urls.append(full_url)
+    
+    return list(set(urls))  # Remove duplicates
+
+
+def extract_novel_id_from_html(html: str) -> Optional[str]:
+    """
+    Extract novel ID from HTML content.
+    
+    Args:
+        html: HTML content
+        
+    Returns:
+        Novel ID string, or None if not found
+    """
+    import re
+    
+    try:
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html, 'html.parser')
+        
+        # Try data attributes
+        selectors = [
+            '#rating[data-novel-id]',
+            '[data-novel-id]',
+            '[data-book-id]',
+            '[data-id]',
+        ]
+        
+        for selector in selectors:
+            tag = soup.select_one(selector)
+            if tag:
+                novel_id = tag.get('data-novel-id') or tag.get('data-book-id') or tag.get('data-id')
+                if novel_id:
+                    return str(novel_id).strip()
+        
+        # Try JavaScript variables
+        scripts = soup.find_all('script')
+        for script in scripts:
+            if script.string:
+                patterns = [
+                    r'novelId["\']?\s*[:=]\s*["\']?([^"\']+)',
+                    r'novel_id["\']?\s*[:=]\s*["\']?([^"\']+)',
+                    r'bookId["\']?\s*[:=]\s*["\']?([^"\']+)',
+                ]
+                for pattern in patterns:
+                    match = re.search(pattern, script.string, re.IGNORECASE)
+                    if match:
+                        return match.group(1).strip().strip('"\'')
+    except ImportError:
+        pass
+    except Exception:
+        pass
+    
+    return None
+
+
+def discover_ajax_endpoints(html: str, base_url: str, novel_id: Optional[str] = None) -> List[str]:
+    """
+    Discover potential AJAX endpoints for chapter lists.
+    
+    Args:
+        html: HTML content
+        base_url: Base URL of the site
+        novel_id: Optional novel ID
+        
+    Returns:
+        List of potential AJAX endpoint URLs
+    """
+    import re
+    from urllib.parse import urljoin
+    
+    endpoints = []
+    base_url = base_url.rstrip('/')
+    
+    try:
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html, 'html.parser')
+        
+        # Method 1: Check JavaScript variables
+        scripts = soup.find_all('script')
+        for script in scripts:
+            if script.string:
+                patterns = [
+                    r'ajaxChapterOptionUrl["\']?\s*[:=]\s*["\']?([^"\']+)',
+                    r'chapterApiUrl["\']?\s*[:=]\s*["\']?([^"\']+)',
+                    r'ajaxUrl["\']?\s*[:=]\s*["\']?([^"\']+)',
+                ]
+                for pattern in patterns:
+                    match = re.search(pattern, script.string, re.IGNORECASE)
+                    if match:
+                        url = match.group(1)
+                        if novel_id:
+                            url = url.replace('{novelId}', novel_id).replace('{id}', novel_id)
+                        if url.startswith('/'):
+                            url = base_url + url
+                        elif not url.startswith('http'):
+                            url = urljoin(base_url, url)
+                        endpoints.append(url)
+    except ImportError:
+        pass
+    except Exception:
+        pass
+    
+    # Method 2: Common patterns (if novel_id provided)
+    if novel_id:
+        common_patterns = [
+            f"{base_url}/ajax-chapter-option?novelId={novel_id}",
+            f"{base_url}/ajax/chapter-archive?novelId={novel_id}",
+            f"{base_url}/api/chapters?novel_id={novel_id}",
+            f"{base_url}/api/chapter-list?novelId={novel_id}",
+        ]
+        endpoints.extend(common_patterns)
+    
+    # Remove duplicates
+    return list(dict.fromkeys(endpoints))
