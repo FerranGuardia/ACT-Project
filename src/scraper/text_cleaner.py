@@ -177,7 +177,11 @@ def clean_text(text: Optional[str]) -> str:
 
     text = "\n".join(cleaned_lines)
 
-    # Step 12: Final whitespace cleanup
+    # Step 12: Replace square brackets with parentheses for TTS compatibility
+    # TTS engines may read [] as "bracket" or "square bracket", so use () instead
+    text = text.replace('[', '(').replace(']', ')')
+
+    # Step 13: Final whitespace cleanup
     text = re.sub(r"[ \t]+", " ", text)  # Multiple spaces to single space
     text = re.sub(r"\n\s*\n\s*\n+", "\n\n", text)  # Max 2 consecutive newlines
     text = re.sub(r"^\s+|\s+$", "", text, flags=re.MULTILINE)  # Trim each line
