@@ -174,3 +174,4 @@ class BaseScraper(ABC):
         log_func(message)
 
 
+
