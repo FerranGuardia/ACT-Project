@@ -61,7 +61,29 @@ def clean_text(text: Optional[str]) -> str:
     for pattern in ui_block_patterns:
         text = re.sub(pattern, "", text, flags=re.IGNORECASE | re.DOTALL)
 
-    # Step 4: Remove navigation elements
+    # Step 4: Remove translator/editor credits (common at start/end of chapters)
+    translator_patterns = [
+        r"Translator\s*:?\s*\w+",
+        r"Editor\s*:?\s*\w+",
+        r"Translation\s*:?\s*\w+",
+        r"Translated\s+by\s*:?\s*\w+",
+        r"Edited\s+by\s*:?\s*\w+",
+        r"Translator\s*:?\s*\w+\s*Editor\s*:?\s*\w+",
+        r"Translator\s*:?\s*\w+\s*In\s*Editor\s*:?\s*\w+",
+        r"\w+\s*Editor\s*:?\s*\w+",
+        r"Translator\s*:?\s*[A-Za-z_]+",
+        r"Editor\s*:?\s*[A-Za-z_]+",
+        # Specific format: Translator:Name_Editor:Name or Translator:NameEditor:Name
+        r"Translator\s*:?\s*[A-Za-z_]+\s*_?\s*Editor\s*:?\s*[A-Za-z_]+",
+        r"Translator\s*:?\s*[A-Za-z_]+\s*Editor\s*:?\s*[A-Za-z_]+",
+        # Standalone lines with translator/editor info
+        r"^Translator\s*:?\s*[A-Za-z_]+\s*Editor\s*:?\s*[A-Za-z_]+\s*In\s*$",
+        r"^Translator\s*:?\s*[A-Za-z_]+\s*_?\s*Editor\s*:?\s*[A-Za-z_]+\s*In\s*$",
+    ]
+    for pattern in translator_patterns:
+        text = re.sub(pattern, "", text, flags=re.IGNORECASE | re.MULTILINE)
+    
+    # Step 5: Remove navigation elements
     navigation_patterns = [
         r"\bNext\s+Chapter\b",
         r"\bPrevious\s+Chapter\b",
@@ -82,18 +104,18 @@ def clean_text(text: Optional[str]) -> str:
     for pattern in navigation_patterns:
         text = re.sub(pattern, "", text, flags=re.IGNORECASE)
 
-    # Step 5: Remove URLs, emails, social media
+    # Step 6: Remove URLs, emails, social media
     text = re.sub(r"http[s]?://\S+", "", text)
     text = re.sub(r"www\.\S+", "", text)
     text = re.sub(r"\S+@\S+", "", text)
     text = re.sub(r"@\w+", "", text)  # Social mentions
     text = re.sub(r"#\w+", "", text)  # Hashtags
 
-    # Step 6: Remove timestamps and dates
+    # Step 7: Remove timestamps and dates
     text = re.sub(r"\d{1,2}[/-]\d{1,2}[/-]\d{2,4}", "", text)  # Dates
     text = re.sub(r"\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?", "", text)  # Times
 
-    # Step 7: Remove excessive separators
+    # Step 8: Remove excessive separators
     text = re.sub(r"[=]{2,}", "", text)  # ===
     text = re.sub(r"[-]{3,}", "", text)  # ---
     text = re.sub(r"[_]{3,}", "", text)  # ___
@@ -101,7 +123,7 @@ def clean_text(text: Optional[str]) -> str:
     text = re.sub(r"[~]{2,}", "", text)  # ~~~
     text = re.sub(r"×", "", text)  # UI multiplication symbol
 
-    # Step 8: Context-aware removal of UI words
+    # Step 9: Context-aware removal of UI words
     context_aware_patterns = [
         (r"(Sort\s+by:?\s*)(Latest|Most|Oldest)\b", r"\1"),
         (r"Liked(\s*Oldest|\s*Add|\s*Post|\s*Comment|\s*Sort)", r"\1"),
@@ -110,11 +132,11 @@ def clean_text(text: Optional[str]) -> str:
     for pattern, replacement in context_aware_patterns:
         text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
 
-    # Step 9: Remove repeated UI sequences at end of chapters
+    # Step 10: Remove repeated UI sequences at end of chapters
     text = re.sub(r"(LikedOldest\s*)+$", "", text, flags=re.IGNORECASE | re.MULTILINE)
     text = re.sub(r"((Latest|Most|Oldest)\s*){3,}$", "", text, flags=re.IGNORECASE | re.MULTILINE)
 
-    # Step 10: Line-by-line filtering (whitelist approach)
+    # Step 11: Line-by-line filtering (whitelist approach)
     lines = text.split("\n")
     cleaned_lines = []
 
@@ -155,10 +177,11 @@ def clean_text(text: Optional[str]) -> str:
 
     text = "\n".join(cleaned_lines)
 
-    # Step 11: Final whitespace cleanup
+    # Step 12: Final whitespace cleanup
     text = re.sub(r"[ \t]+", " ", text)  # Multiple spaces to single space
     text = re.sub(r"\n\s*\n\s*\n+", "\n\n", text)  # Max 2 consecutive newlines
     text = re.sub(r"^\s+|\s+$", "", text, flags=re.MULTILINE)  # Trim each line
 
     return text.strip()
+
 

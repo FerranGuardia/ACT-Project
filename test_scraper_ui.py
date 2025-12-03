@@ -35,6 +35,7 @@ try:
     from core.config_manager import get_config
     # Now import scraper modules (they depend on core)
     from scraper import GenericScraper, ChapterUrlFetcher, ContentScraper
+    from scraper.chapter_parser import extract_chapter_number
     HAS_SCRAPER = True
 except ImportError as e:
     import traceback
@@ -235,11 +236,75 @@ TOC URL: https://www.royalroad.com/fiction/12345/novel-title"""
         self.test_content_var = BooleanVar(value=True)
         tk.Checkbutton(
             options_frame,
-            text="Test: Scrape Chapter Content (First Chapter)",
+            text="Test: Scrape Chapter Content",
             variable=self.test_content_var,
             font=("Segoe UI", 10),
             bg="#ffffff"
         ).pack(anchor="w", pady=5)
+        
+        # Chapter range selection
+        range_frame = tk.LabelFrame(
+            main_frame,
+            text="Chapter Range (for content scraping)",
+            font=("Segoe UI", 12, "bold"),
+            bg="#ffffff",
+            padx=20,
+            pady=15
+        )
+        range_frame.pack(fill="x", pady=10)
+        
+        range_inner = tk.Frame(range_frame, bg="#ffffff")
+        range_inner.pack(fill="x")
+        
+        tk.Label(
+            range_inner,
+            text="Start Chapter:",
+            font=("Segoe UI", 10),
+            bg="#ffffff"
+        ).pack(side="left", padx=10)
+        
+        self.start_chapter_var = StringVar(value="1")
+        start_entry = tk.Entry(
+            range_inner,
+            textvariable=self.start_chapter_var,
+            width=10,
+            font=("Segoe UI", 10)
+        )
+        start_entry.pack(side="left", padx=5)
+        
+        tk.Label(
+            range_inner,
+            text="End Chapter:",
+            font=("Segoe UI", 10),
+            bg="#ffffff"
+        ).pack(side="left", padx=10)
+        
+        self.end_chapter_var = StringVar(value="")
+        end_entry = tk.Entry(
+            range_inner,
+            textvariable=self.end_chapter_var,
+            width=10,
+            font=("Segoe UI", 10)
+        )
+        end_entry.pack(side="left", padx=5)
+        
+        tk.Label(
+            range_inner,
+            text="(leave empty for all chapters)",
+            font=("Segoe UI", 9),
+            bg="#ffffff",
+            fg="#7f8c8d"
+        ).pack(side="left", padx=10)
+        
+        # Option to scrape all or just test range
+        self.scrape_range_var = BooleanVar(value=False)
+        tk.Checkbutton(
+            range_frame,
+            text="Scrape all chapters in range (not just test)",
+            variable=self.scrape_range_var,
+            font=("Segoe UI", 10),
+            bg="#ffffff"
+        ).pack(anchor="w", padx=10, pady=5)
         
         # Action buttons
         button_frame = tk.Frame(main_frame, bg="#f0f4f8")
@@ -469,11 +534,11 @@ TOC URL: https://www.royalroad.com/fiction/12345/novel-title"""
                     import traceback
                     self.log(traceback.format_exc())
             
-            # Test 3: Scrape first chapter content
+            # Test 3: Scrape chapter content (with range support)
             if self.test_content_var.get() and not self.should_stop:
                 self.log("\n--- Test 3: Scrape Chapter Content ---")
                 self.add_result("\n" + "=" * 60)
-                self.add_result("Test 3: Scrape Chapter Content (First Chapter)")
+                self.add_result("Test 3: Scrape Chapter Content")
                 self.add_result("=" * 60)
                 
                 try:
@@ -485,54 +550,107 @@ TOC URL: https://www.royalroad.com/fiction/12345/novel-title"""
                         self.log("❌ No chapter URLs to scrape")
                         self.add_result("❌ No chapter URLs to scrape")
                     else:
-                        first_url = chapter_urls[0]
-                        self.log(f"Scraping first chapter: {first_url}")
-                        self.add_result(f"Chapter URL: {first_url}")
+                        # Filter by chapter range
+                        start_ch_str = self.start_chapter_var.get().strip()
+                        end_ch_str = self.end_chapter_var.get().strip()
                         
-                        content, title, error = self.scraper.scrape_chapter(first_url)
+                        filtered_urls = chapter_urls
+                        range_info = "all chapters"
                         
-                        if error:
-                            self.log(f"❌ Error: {error}")
-                            self.add_result(f"❌ Error: {error}")
-                        elif content:
-                            self.log(f"✓ Scraped successfully!")
-                            self.add_result(f"✓ Title: {title or 'N/A'}")
-                            self.add_result(f"✓ Content length: {len(content)} characters")
-                            self.add_result(f"\nContent preview (first 500 chars):")
-                            self.add_result("-" * 60)
-                            preview = content[:500].replace('\n', ' ')
-                            self.add_result(preview + ("..." if len(content) > 500 else ""))
-                            
-                            # Save scraped content to file
+                        if start_ch_str or end_ch_str:
                             try:
-                                # Create a safe filename from title or URL
-                                if title:
-                                    safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()[:50]
-                                    filename = f"{safe_title}.txt"
+                                start_ch = int(start_ch_str) if start_ch_str else 1
+                                end_ch = int(end_ch_str) if end_ch_str else None
+                                
+                                # Filter URLs by chapter number
+                                filtered_urls = []
+                                for url in chapter_urls:
+                                    ch_num = extract_chapter_number(url)
+                                    if ch_num is not None:
+                                        if ch_num >= start_ch:
+                                            if end_ch is None or ch_num <= end_ch:
+                                                filtered_urls.append(url)
+                                
+                                if end_ch:
+                                    range_info = f"chapters {start_ch} to {end_ch}"
                                 else:
-                                    # Extract from URL
-                                    from urllib.parse import urlparse
-                                    url_path = urlparse(first_url).path
-                                    filename = url_path.split('/')[-1] or "chapter_1.txt"
-                                    if not filename.endswith('.txt'):
-                                        filename += ".txt"
+                                    range_info = f"chapters {start_ch} onwards"
                                 
-                                # Save to export folder
-                                filepath = self.export_folder / filename
-                                with open(filepath, 'w', encoding='utf-8') as f:
-                                    f.write(f"Title: {title or 'N/A'}\n")
-                                    f.write(f"URL: {first_url}\n")
-                                    f.write(f"{'='*60}\n\n")
-                                    f.write(content)
-                                
-                                self.log(f"✓ Saved to: {filepath}")
-                                self.add_result(f"✓ Saved to: {filepath}")
-                            except Exception as save_error:
-                                self.log(f"⚠ Could not save file: {save_error}")
-                                self.add_result(f"⚠ Could not save file: {save_error}")
+                                self.log(f"Filtered to {len(filtered_urls)} URLs ({range_info})")
+                                self.add_result(f"Filtered to {len(filtered_urls)} URLs ({range_info})")
+                            except ValueError:
+                                self.log("⚠ Invalid chapter range, using all chapters")
+                                self.add_result("⚠ Invalid chapter range, using all chapters")
+                        
+                        if not filtered_urls:
+                            self.log("❌ No chapters in specified range")
+                            self.add_result("❌ No chapters in specified range")
                         else:
-                            self.log("❌ No content scraped")
-                            self.add_result("❌ No content scraped")
+                            # Determine how many to scrape
+                            scrape_all = self.scrape_range_var.get()
+                            
+                            if scrape_all:
+                                chapters_to_scrape = filtered_urls
+                                self.log(f"Scraping {len(chapters_to_scrape)} chapters ({range_info})...")
+                                self.add_result(f"Scraping {len(chapters_to_scrape)} chapters ({range_info})...")
+                            else:
+                                # Just test first 3 chapters in range
+                                chapters_to_scrape = filtered_urls[:3]
+                                self.log(f"Testing first {len(chapters_to_scrape)} chapters in range...")
+                                self.add_result(f"Testing first {len(chapters_to_scrape)} chapters in range...")
+                            
+                            # Scrape chapters
+                            successful = 0
+                            failed = 0
+                            
+                            for i, url in enumerate(chapters_to_scrape, 1):
+                                if self.should_stop:
+                                    break
+                                
+                                ch_num = extract_chapter_number(url) or i
+                                self.log(f"Scraping chapter {ch_num} ({i}/{len(chapters_to_scrape)})...")
+                                
+                                content, title, error = self.scraper.scrape_chapter(url)
+                                
+                                if error:
+                                    self.log(f"  ❌ Error: {error}")
+                                    failed += 1
+                                elif content:
+                                    self.log(f"  ✓ Scraped successfully! ({len(content)} chars)")
+                                    successful += 1
+                                    
+                                    # Save scraped content to file
+                                    try:
+                                        # Create a safe filename
+                                        if title:
+                                            safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()[:50]
+                                            filename = f"Chapter_{ch_num:04d}_{safe_title}.txt"
+                                        else:
+                                            filename = f"Chapter_{ch_num:04d}.txt"
+                                        
+                                        # Save to export folder (clean content only, no metadata)
+                                        filepath = self.export_folder / filename
+                                        with open(filepath, 'w', encoding='utf-8') as f:
+                                            # Write only the clean content, ready for TTS
+                                            f.write(content)
+                                        
+                                        self.log(f"  ✓ Saved to: {filepath.name}")
+                                    except Exception as save_error:
+                                        self.log(f"  ⚠ Could not save file: {save_error}")
+                                else:
+                                    self.log(f"  ❌ No content scraped")
+                                    failed += 1
+                            
+                            # Summary
+                            self.add_result(f"\n--- Summary ---")
+                            self.add_result(f"✓ Successfully scraped: {successful} chapters")
+                            if failed > 0:
+                                self.add_result(f"❌ Failed: {failed} chapters")
+                            
+                            if successful > 0 and not scrape_all:
+                                self.add_result(f"\nNote: Only tested first {len(chapters_to_scrape)} chapters.")
+                                self.add_result(f"Check 'Scrape all chapters in range' to scrape all {len(filtered_urls)} chapters.")
+                            
                 except Exception as e:
                     error_msg = f"❌ Error scraping content: {str(e)}"
                     self.log(error_msg)
