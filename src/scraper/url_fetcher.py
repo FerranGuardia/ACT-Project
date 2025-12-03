@@ -96,10 +96,21 @@ class ChapterUrlFetcher:
 
     def get_reference_count(self, toc_url: str, should_stop: Optional[Callable[[], bool]] = None) -> Optional[int]:
         """
-        Get the reference/expected chapter count using the most reliable method.
+        Get the reference/expected chapter count by fetching all URLs and counting them.
         
-        This method uses Playwright with scrolling to get the "ground truth" count.
-        Use this to validate test results.
+        NOTE: This is a helper method for testing/validation purposes only.
+        In normal scraping, users specify the chapter range/count they want to scrape.
+        This method is not required for production use.
+        
+        This mimics Novel-Grabber's approach: extract all chapter URLs and count them.
+        More reliable than metadata extraction since count = actual URLs found.
+        
+        Uses our existing fetch() method which tries all methods in order:
+        1. JavaScript extraction (fastest)
+        2. AJAX endpoints (fast)
+        3. HTML parsing (medium)
+        4. Playwright with scrolling (slow but gets all)
+        5. Follow next links (slow but reliable)
         
         Args:
             toc_url: URL of the table of contents page
@@ -107,23 +118,25 @@ class ChapterUrlFetcher:
             
         Returns:
             Expected chapter count, or None if unable to determine
+            
+        Note:
+            This method fetches ALL chapter URLs, which can be slow for novels with
+            many chapters. For production scraping, users should specify the chapter
+            range/count they want instead of relying on automatic detection.
         """
-        logger.info(f"Getting reference chapter count from {toc_url}")
+        logger.info(f"Getting reference chapter count from {toc_url} (helper method for testing)")
         
-        # Try to extract from page metadata first (fastest)
-        metadata_count = self._extract_chapter_count_from_metadata(toc_url)
-        if metadata_count:
-            logger.info(f"Found chapter count in metadata: {metadata_count}")
-            return metadata_count
+        # Use our existing fetch() method to get all chapter URLs
+        # This uses all our methods (JS, AJAX, HTML, Playwright, etc.)
+        urls, metadata = self.fetch(toc_url, should_stop=should_stop)
         
-        # Use Playwright as ground truth (most reliable)
-        if HAS_PLAYWRIGHT:
-            urls = self._try_playwright_with_scrolling(toc_url, should_stop=should_stop)
-            if urls:
-                count = len(urls)
-                logger.info(f"Reference count via Playwright: {count}")
-                return count
+        if urls:
+            count = len(urls)
+            method_used = metadata.get("method_used", "unknown")
+            logger.info(f"Reference count via {method_used}: {count} chapters")
+            return count
         
+        logger.warning("Could not fetch chapter URLs to determine count")
         return None
 
     def _extract_chapter_count_from_metadata(self, toc_url: str) -> Optional[int]:
@@ -135,6 +148,7 @@ class ChapterUrlFetcher:
         - "Chapters: 2000"
         - Data attributes
         - JavaScript variables
+        - Maximum chapter number from chapter links (fallback)
         """
         session = self.get_session()
         if not session:
@@ -147,11 +161,14 @@ class ChapterUrlFetcher:
             
             html = response.text
             
-            # Pattern 1: Look for "Total: X chapters" or similar
+            # Pattern 1: Look for explicit total counts (avoid matching "Chapter 1")
+            # These patterns require context like "total", "共", or number before "chapter"
             patterns = [
-                r'total[:\s]+(\d+)[\s]*chapters?',
-                r'chapters?[:\s]+(\d+)',
-                r'(\d+)[\s]*chapters?[^\d]',
+                r'total[:\s]+(\d+)[\s]*chapters?',  # "Total: 423 chapters"
+                r'共[：:\s]+(\d+)[\s]*章',  # Chinese "共: 423 章"
+                r'总计[：:\s]+(\d+)',  # Chinese "总计: 423"
+                r'(\d+)[\s]*章[^\d]',  # Chinese "423章" (not "第423章")
+                r'chapters?[:\s]+(\d+)[^\d]',  # "Chapters: 423" (not "Chapter 1")
                 r'data-total-chapters=["\'](\d+)["\']',
                 r'data-chapter-count=["\'](\d+)["\']',
                 r'totalChapters["\']?\s*[:=]\s*(\d+)',
@@ -162,25 +179,76 @@ class ChapterUrlFetcher:
                 match = re.search(pattern, html, re.IGNORECASE)
                 if match:
                     count = int(match.group(1))
-                    if count > 0:
+                    # Only accept counts > 1 to avoid matching "Chapter 1"
+                    if count > 1:
                         logger.debug(f"Found chapter count via pattern '{pattern}': {count}")
                         return count
             
             # Pattern 2: Look in JavaScript variables
             js_patterns = [
-                r'window\.chapters\s*=\s*\[.*?\];',
                 r'var\s+totalChapters\s*=\s*(\d+)',
                 r'let\s+totalChapters\s*=\s*(\d+)',
                 r'const\s+totalChapters\s*=\s*(\d+)',
+                r'totalChapters["\']?\s*[:=]\s*(\d+)',
+                r'chapterCount["\']?\s*[:=]\s*(\d+)',
             ]
             
             for pattern in js_patterns:
                 match = re.search(pattern, html, re.IGNORECASE | re.DOTALL)
                 if match and len(match.groups()) > 0:
                     count = int(match.group(1))
-                    if count > 0:
+                    if count > 1:
                         logger.debug(f"Found chapter count in JS: {count}")
                         return count
+            
+            # Pattern 3: Fallback - find maximum chapter number from chapter links
+            # This works for sites like FanMTL where all chapters are listed
+            # Extract all chapter numbers from links and use the maximum
+            # Be conservative - only use if we're confident these are chapter numbers
+            chapter_numbers = []
+            
+            # Pattern for "Chapter 423" or "第423章" or "/chapter-423" or similar
+            # Focus on patterns that are clearly chapter-related
+            chapter_link_patterns = [
+                r'chapter[-\s]+(\d+)',  # "Chapter 423" or "chapter-423"
+                r'第(\d+)章',  # Chinese "第423章"
+                r'/chapter[/-](\d+)',  # URL pattern "/chapter/423"
+                r'href=["\'][^"\']*chapter[^"\']*(\d+)',  # Chapter in href
+            ]
+            
+            for pattern in chapter_link_patterns:
+                matches = re.findall(pattern, html, re.IGNORECASE)
+                for match in matches:
+                    try:
+                        num = int(match)
+                        # Only consider reasonable chapter numbers
+                        # Avoid very small numbers (likely page numbers) and very large ones
+                        if 10 <= num <= 5000:  # Reasonable range for chapters
+                            chapter_numbers.append(num)
+                    except ValueError:
+                        continue
+            
+            if chapter_numbers:
+                # Get unique chapter numbers and sort
+                unique_chapters = sorted(set(chapter_numbers))
+                max_chapter = unique_chapters[-1]
+                
+                # Only use this fallback if:
+                # 1. We found a reasonable number of unique chapters (at least 10)
+                # 2. The max is reasonably high (not just a few chapters)
+                # 3. The numbers form a reasonable sequence (most chapters are present)
+                if len(unique_chapters) >= 10 and max_chapter >= 20:
+                    # Check if we have a good distribution (not just scattered numbers)
+                    # If we have at least 50% of chapters from 1 to max, it's likely the total
+                    expected_range = max_chapter
+                    found_in_range = len([n for n in unique_chapters if n <= max_chapter])
+                    coverage = found_in_range / expected_range if expected_range > 0 else 0
+                    
+                    # Only use if we have good coverage (at least 30% of chapters found)
+                    # This helps avoid matching page numbers or other unrelated numbers
+                    if coverage >= 0.3:
+                        logger.debug(f"Found max chapter number from links: {max_chapter} (coverage: {coverage:.2%})")
+                        return max_chapter
             
             return None
         except Exception as e:
