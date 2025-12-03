@@ -93,6 +93,23 @@ class ChapterUrlFetcher:
                 logger.error("Neither cloudscraper nor requests available")
                 return None
         return self._session
+    
+    def _is_chapter_url(self, url: str, link_text: str = "") -> bool:
+        """
+        Check if a URL is a chapter link using multiple patterns.
+        
+        Supports:
+        - Standard patterns: /chapter/, chapter-123, ch_123, etc.
+        - FanMTL pattern: novel-name_123.html or novel-name/123.html
+        """
+        # Standard chapter patterns
+        if (re.search(r"chapter|ch[_\-\s]?\d+", url, re.I) or
+            re.search(r"chapter|ch[_\-\s]?\d+", link_text, re.I)):
+            return True
+        # FanMTL pattern: novel-name_123.html or novel-name/123.html
+        if re.search(r"_\d+\.html|/\d+\.html", url):
+            return True
+        return False
 
     def get_reference_count(self, toc_url: str, should_stop: Optional[Callable[[], bool]] = None) -> Optional[int]:
         """
@@ -255,7 +272,7 @@ class ChapterUrlFetcher:
             logger.debug(f"Failed to extract chapter count from metadata: {e}")
             return None
 
-    def fetch(self, toc_url: str, should_stop: Optional[Callable[[], bool]] = None, use_reference: bool = False, min_chapter_number: Optional[int] = None) -> Tuple[List[str], Dict[str, any]]:
+    def fetch(self, toc_url: str, should_stop: Optional[Callable[[], bool]] = None, use_reference: bool = False, min_chapter_number: Optional[int] = None, max_chapter_number: Optional[int] = None) -> Tuple[List[str], Dict[str, any]]:
         """
         Fetch chapter URLs using failsafe methods.
         
@@ -271,6 +288,7 @@ class ChapterUrlFetcher:
             should_stop: Optional callback that returns True if fetching should stop
             use_reference: If True, also get reference count for validation
             min_chapter_number: Optional minimum chapter number needed (for range validation)
+            max_chapter_number: Optional maximum chapter number needed (for range validation)
             
         Returns:
             Tuple of (list of chapter URLs, metadata dict with method used and counts)
@@ -293,21 +311,39 @@ class ChapterUrlFetcher:
         
         # Helper function to check if found chapters cover the needed range
         def covers_range(found_urls: List[str]) -> bool:
-            """Check if found URLs cover the minimum chapter number needed."""
+            """Check if found URLs cover the requested chapter range."""
             if not min_chapter_number or not found_urls:
                 return True  # No specific requirement, or no URLs found
             
-            # Extract max chapter number from found URLs
-            max_found = 0
+            # Extract all chapter numbers from found URLs
+            found_chapters = set()
             for url in found_urls:
                 ch_num = extract_chapter_number(url)
-                if ch_num and ch_num > max_found:
-                    max_found = ch_num
+                if ch_num:
+                    found_chapters.add(ch_num)
+            
+            if not found_chapters:
+                return False  # No valid chapter numbers found
+            
+            max_found = max(found_chapters)
+            min_found = min(found_chapters)
             
             # Check if we have chapters up to the minimum needed
             if max_found < min_chapter_number:
                 logger.debug(f"Found max chapter {max_found}, but need at least {min_chapter_number}")
                 return False
+            
+            # If max_chapter_number is specified, check if we have all chapters in the range
+            if max_chapter_number:
+                # Check how many chapters in the requested range we actually found
+                requested_range = set(range(min_chapter_number, max_chapter_number + 1))
+                found_in_range = requested_range.intersection(found_chapters)
+                coverage = len(found_in_range) / len(requested_range) if requested_range else 0
+                
+                # If we're missing more than 20% of chapters in the range, it's incomplete
+                if coverage < 0.8:
+                    logger.info(f"⚠ Range incomplete: Found {len(found_in_range)}/{len(requested_range)} chapters in range {min_chapter_number}-{max_chapter_number} (coverage: {coverage:.1%})")
+                    return False
             
             return True
         
@@ -525,7 +561,8 @@ class ChapterUrlFetcher:
                                 href = link.get("href", "")
                                 if href:
                                     full_url = normalize_url(href, self.base_url)
-                                    if "chapter" in full_url.lower():
+                                    link_text = link.get_text(strip=True)
+                                    if self._is_chapter_url(full_url, link_text):
                                         urls.append(full_url)
                             if urls:
                                 return urls
@@ -636,32 +673,24 @@ class ChapterUrlFetcher:
                     logger.debug("Checking for pagination links...")
                     pagination_links = page.query_selector_all('a[href*="page"], a[href*="?p="], .pagination a, .page-numbers a')
                     
-                    # Extract page numbers from pagination
-                    max_page = 1
+                    # Extract page URLs from pagination
+                    page_urls_to_visit = []
                     if pagination_links:
-                        logger.info(f"Found {len(pagination_links)} pagination links - NovelFull uses page-based pagination")
-                        # Extract page numbers from links
-                        page_numbers = []
+                        logger.info(f"Found {len(pagination_links)} pagination links - using page-based pagination")
+                        # Collect actual pagination URLs from the links
+                        seen_page_urls = set()
                         for link in pagination_links:
                             href = link.get_attribute('href') or ''
-                            text = link.inner_text().strip()
-                            # Try to extract page number from href or text
-                            import re
-                            # Look for ?page=2, ?p=3, /page/2, etc.
-                            page_match = re.search(r'[?&]page[=_]?(\d+)|/page[/_-]?(\d+)', href, re.I)
-                            if page_match:
-                                page_num = int(page_match.group(1) or page_match.group(2))
-                                page_numbers.append(page_num)
-                            # Or from text if it's a number
-                            elif text.isdigit():
-                                try:
-                                    page_numbers.append(int(text))
-                                except:
-                                    pass
+                            if href:
+                                # Normalize the pagination URL
+                                full_page_url = normalize_url(href, toc_url)
+                                # Avoid duplicates and the current page
+                                if full_page_url not in seen_page_urls and full_page_url != toc_url:
+                                    seen_page_urls.add(full_page_url)
+                                    page_urls_to_visit.append(full_page_url)
                         
-                        if page_numbers:
-                            max_page = max(page_numbers)
-                            logger.info(f"Detected pagination: pages 1 to {max_page} (estimated {max_page * 55} chapters)")
+                        if page_urls_to_visit:
+                            logger.info(f"Detected pagination: {len(page_urls_to_visit)} additional pages to visit")
                             
                             # Collect chapters from all pages
                             all_chapter_urls = []
@@ -671,58 +700,56 @@ class ChapterUrlFetcher:
                             html = page.content()
                             if HAS_BS4:
                                 soup = BeautifulSoup(html, "html.parser")
-                                links = soup.find_all("a", href=re.compile(r"chapter", re.I))
+                                # Get all links, not just those with "chapter" in href
+                                links = soup.find_all("a", href=True)
                                 for link in links:
                                     href = link.get("href", "")
                                     if href:
                                         full_url = normalize_url(href, self.base_url)
-                                        if "chapter" in full_url.lower():
+                                        link_text = link.get_text(strip=True)
+                                        if self._is_chapter_url(full_url, link_text):
                                             all_chapter_urls.append(full_url)
                             
                             # Visit additional pages (limit to reasonable number)
-                            max_pages_to_visit = min(max_page, 50)  # Limit to 50 pages for performance
-                            if max_page > 1:
-                                logger.info(f"Visiting pages 2-{max_pages_to_visit} to collect all chapters...")
+                            max_pages_to_visit = min(len(page_urls_to_visit), 50)  # Limit to 50 pages for performance
+                            if page_urls_to_visit:
+                                logger.info(f"Visiting {max_pages_to_visit} additional pages to collect all chapters...")
                                 
-                            for page_num in range(2, max_pages_to_visit + 1):
+                            for idx, page_url in enumerate(page_urls_to_visit[:max_pages_to_visit], 1):
                                 if should_stop and should_stop():
                                     break
                                 
-                                # Construct page URL
-                                if '?' in toc_url:
-                                    page_url = f"{toc_url.split('?')[0]}?page={page_num}"
-                                else:
-                                    page_url = f"{toc_url}?page={page_num}"
-                                
                                 try:
-                                    logger.debug(f"Loading page {page_num}/{max_pages_to_visit}...")
+                                    logger.debug(f"Loading page {idx}/{max_pages_to_visit}: {page_url}")
                                     page.goto(page_url, wait_until="domcontentloaded", timeout=30000)
                                     
                                     # Extract chapters from this page
                                     html = page.content()
                                     if HAS_BS4:
                                         soup = BeautifulSoup(html, "html.parser")
-                                        links = soup.find_all("a", href=re.compile(r"chapter", re.I))
+                                        # Get all links, not just those with "chapter" in href
+                                        links = soup.find_all("a", href=True)
                                         page_chapters = []
                                         for link in links:
                                             href = link.get("href", "")
                                             if href:
                                                 full_url = normalize_url(href, self.base_url)
-                                                if "chapter" in full_url.lower():
+                                                link_text = link.get_text(strip=True)
+                                                if self._is_chapter_url(full_url, link_text):
                                                     page_chapters.append(full_url)
                                         
                                         all_chapter_urls.extend(page_chapters)
-                                        logger.debug(f"Page {page_num}: Found {len(page_chapters)} chapters")
+                                        logger.debug(f"Page {idx}: Found {len(page_chapters)} chapters")
                                         
                                         if len(page_chapters) == 0:
-                                            logger.debug(f"No chapters on page {page_num}, stopping pagination")
+                                            logger.debug(f"No chapters on page {idx}, stopping pagination")
                                             break
                                     
                                     # Small delay between pages
                                     time.sleep(0.3)
                                     
                                 except Exception as e:
-                                    logger.debug(f"Error loading page {page_num}: {e}")
+                                    logger.debug(f"Error loading page {idx} ({page_url}): {e}")
                                     break
                             
                             # Remove duplicates and return
@@ -733,7 +760,7 @@ class ChapterUrlFetcher:
                                     seen.add(url)
                                     unique_urls.append(url)
                             
-                            logger.info(f"✓ Playwright found {len(unique_urls)} unique chapter URLs from {max_pages_to_visit} pages")
+                            logger.info(f"✓ Playwright found {len(unique_urls)} unique chapter URLs from {len(page_urls_to_visit[:max_pages_to_visit]) + 1} pages")
                             page.close()
                             browser.close()
                             return unique_urls
@@ -858,7 +885,8 @@ class ChapterUrlFetcher:
                         href = link.get("href", "")
                         if href:
                             full_url = normalize_url(href, self.base_url)
-                            if "chapter" in full_url.lower():
+                            link_text = link.get_text(strip=True)
+                            if self._is_chapter_url(full_url, link_text):
                                 chapter_urls.append(full_url)
                     
                     logger.debug(f"Extracted {len(chapter_urls)} chapter URLs")
