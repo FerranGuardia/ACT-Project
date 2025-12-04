@@ -183,3 +183,5 @@ class TestConfigManagerIntegration:
         finally:
             cm.Path.home = original_dir
 
+
+
