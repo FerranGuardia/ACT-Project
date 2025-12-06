@@ -48,7 +48,7 @@ class GenericScraper(BaseScraper):
             delay=self.delay
         )
 
-    def get_chapter_urls(self, toc_url: str) -> List[str]:
+    def get_chapter_urls(self, toc_url: str, min_chapter_number: Optional[int] = None, max_chapter_number: Optional[int] = None) -> List[str]:
         """
         Get list of chapter URLs using failsafe methods.
         
@@ -61,11 +61,18 @@ class GenericScraper(BaseScraper):
         
         Args:
             toc_url: URL of the table of contents page
+            min_chapter_number: Optional minimum chapter number needed (for pagination detection)
+            max_chapter_number: Optional maximum chapter number needed (for range validation)
             
         Returns:
             List of chapter URLs, sorted by chapter number
         """
-        urls, _ = self.url_fetcher.fetch(toc_url, should_stop=self.check_should_stop)
+        urls, _ = self.url_fetcher.fetch(
+            toc_url, 
+            should_stop=self.check_should_stop,
+            min_chapter_number=min_chapter_number,
+            max_chapter_number=max_chapter_number
+        )
         return urls
 
 

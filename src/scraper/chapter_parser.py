@@ -18,6 +18,7 @@ def extract_chapter_number(url: str) -> Optional[int]:
 
     Handles standard formats like "chapter-1" and weird formats
     like "chapter-1-3" by taking the first number.
+    Also handles FanMTL format like "/novel/6953074/70.html"
 
     Args:
         url: Chapter URL
@@ -30,6 +31,8 @@ def extract_chapter_number(url: str) -> Optional[int]:
         5
         >>> extract_chapter_number("https://example.com/chapter-1-3")
         1
+        >>> extract_chapter_number("https://fanmtl.com/novel/6953074/70.html")
+        70
     """
     # First try the standard pattern
     match = re.search(CHAPTER_URL_PATTERN, url, re.I)
@@ -41,6 +44,28 @@ def extract_chapter_number(url: str) -> Optional[int]:
     weird_match = re.search(r"chapter[_-]?(\d+)[_-]?\d*", url, re.I)
     if weird_match:
         return int(weird_match.group(1))
+
+    # Handle FanMTL format: /novel/6953074_70.html or /novel/name_70.html
+    # Pattern: /novel/{novel-id}_{chapter-number}.html
+    fanmtl_match = re.search(r"/novel/[^/]+_(\d+)\.html", url, re.I)
+    if fanmtl_match:
+        return int(fanmtl_match.group(1))
+
+    # Handle FanMTL format with slash: /novel/6953074/70.html or /novel/6953074/chapter-70.html
+    # Pattern: /novel/\d+/(\d+)\.html or /novel/\d+/chapter-(\d+)\.html
+    fanmtl_slash_match = re.search(r"/novel/\d+/(?:chapter[_-]?)?(\d+)\.html", url, re.I)
+    if fanmtl_slash_match:
+        return int(fanmtl_slash_match.group(1))
+
+    # Handle numeric-only paths like /70.html (fallback, but be careful not to match novel IDs)
+    # This catches cases like /novel/6953074/70.html where the number is standalone
+    numeric_path_match = re.search(r"/(\d+)\.html", url)
+    if numeric_path_match:
+        # Only use if it looks like a chapter number (reasonable range)
+        # And make sure it's not part of a novel ID pattern
+        num = int(numeric_path_match.group(1))
+        if 1 <= num <= 10000 and not re.search(r"/novel/\d+$", url):  # Reasonable range and not novel ID
+            return num
 
     return None
 

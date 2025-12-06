@@ -3,9 +3,11 @@ Text cleaning utilities for scraped webnovel content.
 
 Provides functions to clean and normalize text extracted from webnovel sites,
 removing UI elements, HTML artifacts, and other unwanted content.
+Optimized for TTS (text-to-speech) readability.
 """
 
 import re
+import unicodedata
 from typing import Optional
 
 
@@ -38,6 +40,13 @@ def clean_text(text: Optional[str]) -> str:
     # Step 1: Remove HTML artifacts
     text = re.sub(r"<[^>]+>", "", text)  # HTML tags
     text = re.sub(r"&nbsp;|&amp;|&lt;|&gt;|&quot;|&#\d+;", " ", text)  # HTML entities
+    
+    # Step 1.5: Handle tables and structured content
+    # Convert table separators to readable text
+    text = re.sub(r"\|{2,}", " | ", text)  # Table column separators
+    text = re.sub(r"\|(?=\s*\w)", " | ", text)  # Table pipes with spacing
+    text = re.sub(r"\+-+\+", "", text)  # Table borders
+    text = re.sub(r"-{3,}", " ", text)  # Table row separators (but keep shorter dashes for dialogue)
 
     # Step 2: Remove concatenated UI patterns (always safe - these are never in dialogue)
     concatenated_ui_patterns = [
@@ -177,14 +186,98 @@ def clean_text(text: Optional[str]) -> str:
 
     text = "\n".join(cleaned_lines)
 
-    # Step 12: Replace square brackets with parentheses for TTS compatibility
+    # Step 12: Handle emojis and special Unicode characters for TTS
+    # Convert common emojis to text descriptions or remove them
+    emoji_replacements = {
+        '🗿': ' (stone face) ',  # Moai emoji - common in Royal Road
+        '😀': '', '😃': '', '😄': '', '😁': '', '😆': '', '😅': '', '🤣': '', '😂': '',
+        '🙂': '', '🙃': '', '😉': '', '😊': '', '😇': '', '🥰': '', '😍': '', '🤩': '',
+        '😘': '', '😗': '', '😚': '', '😙': '', '😋': '', '😛': '', '😜': '', '🤪': '',
+        '😝': '', '🤑': '', '🤗': '', '🤭': '', '🤫': '', '🤔': '', '🤐': '', '🤨': '',
+        '😐': '', '😑': '', '😶': '', '😏': '', '😒': '', '🙄': '', '😬': '', '🤥': '',
+        '😌': '', '😔': '', '😪': '', '🤤': '', '😴': '', '😷': '', '🤒': '', '🤕': '',
+        '🤢': '', '🤮': '', '🤧': '', '🥵': '', '🥶': '', '😵': '', '🤯': '', '🤠': '',
+        '🥳': '', '😎': '', '🤓': '', '🧐': '', '😕': '', '😟': '', '🙁': '', '☹️': '',
+        '😮': '', '😯': '', '😲': '', '😳': '', '🥺': '', '😦': '', '😧': '', '😨': '',
+        '😰': '', '😥': '', '😢': '', '😭': '', '😱': '', '😖': '', '😣': '', '😞': '',
+        '😓': '', '😩': '', '😫': '', '🥱': '', '😤': '', '😡': '', '😠': '', '🤬': '',
+        '😈': '', '👿': '', '💀': '', '☠️': '', '💩': '', '🤡': '', '👹': '', '👺': '',
+        '👻': '', '👽': '', '👾': '', '🤖': '', '😺': '', '😸': '', '😹': '', '😻': '',
+        '😼': '', '😽': '', '🙀': '', '😿': '', '😾': '',
+        # Common symbols that TTS might read awkwardly
+        '→': ' to ', '←': ' from ', '↑': ' up ', '↓': ' down ',
+        '⇒': ' then ', '⇐': ' from ', '⇔': ' or ',
+        '★': ' star ', '☆': ' star ', '✦': ' star ', '✧': ' star ',
+        '♥': ' heart ', '♡': ' heart ', '♦': ' diamond ', '♣': ' club ', '♠': ' spade ',
+        '♪': ' note ', '♫': ' notes ', '♬': ' notes ',
+        '©': ' copyright ', '®': ' registered ', '™': ' trademark ',
+        '…': '...',  # Ellipsis character to three dots
+        '—': ' - ',  # Em dash to hyphen
+        '–': ' - ',  # En dash to hyphen
+        '"': '"', '"': '"',  # Smart quotes to regular quotes
+        ''': "'", ''': "'",  # Smart apostrophes to regular apostrophes
+    }
+    
+    # Replace known emojis and symbols
+    for emoji, replacement in emoji_replacements.items():
+        text = text.replace(emoji, replacement)
+    
+    # Remove other emojis and special Unicode characters that TTS can't handle well
+    # Keep basic punctuation and letters/numbers
+    def is_tts_safe(char):
+        """Check if character is safe for TTS (letters, numbers, basic punctuation)"""
+        if char.isalnum():
+            return True
+        if char in " .,!?;:()[]{}\"'/-_=+*&%$#@~`|\\":
+            return True
+        # Check Unicode category
+        category = unicodedata.category(char)
+        # Keep punctuation, symbols that are common in text
+        if category in ('Po', 'Pd', 'Pe', 'Pf', 'Pi', 'Ps', 'Sc', 'Sk', 'Sm', 'So'):
+            # But skip emoji and pictographic symbols
+            if category == 'So' and ord(char) > 0x1F000:  # Emoji range
+                return False
+            return True
+        return False
+    
+    # Filter out problematic Unicode characters
+    text = ''.join(char if is_tts_safe(char) else ' ' for char in text)
+    
+    # Step 13: Replace square brackets with parentheses for TTS compatibility
     # TTS engines may read [] as "bracket" or "square bracket", so use () instead
     text = text.replace('[', '(').replace(']', ')')
 
-    # Step 13: Final whitespace cleanup
+    # Step 14: Normalize punctuation for TTS
+    # Multiple punctuation marks can confuse TTS
+    text = re.sub(r"\.{4,}", "...", text)  # More than 3 dots becomes ...
+    text = re.sub(r"!{3,}", "!", text)  # Multiple ! becomes single
+    text = re.sub(r"\?{3,}", "?", text)  # Multiple ? becomes single
+    text = re.sub(r",{2,}", ",", text)  # Multiple commas to single
+    text = re.sub(r";{2,}", ";", text)  # Multiple semicolons to single
+    text = re.sub(r":{2,}", ":", text)  # Multiple colons to single (but keep time like 12:30)
+    
+    # Step 15: Clean up spacing around punctuation (improves TTS flow)
+    text = re.sub(r"\s+([,.!?;:])", r"\1", text)  # Remove space before punctuation
+    text = re.sub(r"([,.!?;:])([^\s])", r"\1 \2", text)  # Add space after punctuation if missing
+    
+    # Step 16: Handle special formatting that might confuse TTS
+    # Remove standalone symbols on their own lines
+    text = re.sub(r"^\s*[=*#~|_-]{2,}\s*$", "", text, flags=re.MULTILINE)
+    # Remove lines with only symbols and numbers (likely UI elements)
+    text = re.sub(r"^\s*[\d\s=*#~|_-]+\s*$", "", text, flags=re.MULTILINE)
+    
+    # Step 17: Final whitespace cleanup
     text = re.sub(r"[ \t]+", " ", text)  # Multiple spaces to single space
     text = re.sub(r"\n\s*\n\s*\n+", "\n\n", text)  # Max 2 consecutive newlines
     text = re.sub(r"^\s+|\s+$", "", text, flags=re.MULTILINE)  # Trim each line
+    
+    # Step 18: Remove empty parentheses and brackets (leftover from cleaning)
+    text = re.sub(r"\(\s*\)", "", text)  # Empty parentheses
+    text = re.sub(r"\[\s*\]", "", text)  # Empty brackets
+    text = re.sub(r"\{\s*\}", "", text)  # Empty braces
+    
+    # Final cleanup of any double spaces that might have been created
+    text = re.sub(r"  +", " ", text)
 
     return text.strip()
 
