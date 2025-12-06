@@ -173,5 +173,3 @@ class BaseScraper(ABC):
         log_func = getattr(self.logger, level.lower(), self.logger.info)
         log_func(message)
 
-
-

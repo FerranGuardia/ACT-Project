@@ -55,5 +55,3 @@ NOVEL_ID_PATTERNS = [
     r'data-novel-id="(\d+)"',
 ]
 
-
-

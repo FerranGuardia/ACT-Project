@@ -80,3 +80,6 @@ class TestLoggerIntegration:
         assert "Warning message" in caplog.text
         assert "Error message" in caplog.text
 
+
+
+
