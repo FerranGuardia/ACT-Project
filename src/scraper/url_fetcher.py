@@ -53,6 +53,47 @@ from .config import REQUEST_TIMEOUT, REQUEST_DELAY
 logger = get_logger("scraper.url_fetcher")
 
 
+def retry_with_backoff(func, max_retries: int = 3, base_delay: float = 1.0, should_stop: Optional[Callable[[], bool]] = None):
+    """
+    Retry a function with exponential backoff.
+    
+    Args:
+        func: Function to retry (should be a callable that takes no arguments)
+        max_retries: Maximum number of retry attempts
+        base_delay: Base delay in seconds (will be multiplied by 2^attempt)
+        should_stop: Optional callable to check if we should stop retrying
+    
+    Returns:
+        Result of the function call
+    
+    Raises:
+        Exception: The last exception if all retries fail
+    """
+    last_exception = None
+    
+    for attempt in range(max_retries):
+        if should_stop and should_stop():
+            raise Exception("Operation cancelled by user")
+        
+        try:
+            return func()
+        except Exception as e:
+            last_exception = e
+            
+            if attempt < max_retries - 1:
+                wait_time = base_delay * (2 ** attempt)  # Exponential backoff
+                logger.debug(f"Retry {attempt + 1}/{max_retries} after {wait_time:.1f}s: {str(e)[:100]}")
+                time.sleep(wait_time)
+                continue
+            else:
+                # Last attempt failed, raise the exception
+                raise
+    
+    # Should never reach here, but just in case
+    if last_exception:
+        raise last_exception
+
+
 class ChapterUrlFetcher:
     """
     Fetches chapter URLs from table of contents pages.
@@ -78,6 +119,8 @@ class ChapterUrlFetcher:
         self.timeout = timeout
         self.delay = delay
         self._session = None
+        self._last_request_time = 0.0
+        self._min_request_delay = 0.5  # Minimum delay between requests (rate limiting)
 
     def get_session(self):
         """Get or create a requests session."""
@@ -93,6 +136,21 @@ class ChapterUrlFetcher:
                 logger.error("Neither cloudscraper nor requests available")
                 return None
         return self._session
+    
+    def _rate_limit(self):
+        """
+        Enforce rate limiting between requests.
+        Ensures minimum delay between requests to avoid being blocked.
+        """
+        current_time = time.time()
+        elapsed = current_time - self._last_request_time
+        
+        if elapsed < self._min_request_delay:
+            sleep_time = self._min_request_delay - elapsed
+            logger.debug(f"Rate limiting: waiting {sleep_time:.2f}s")
+            time.sleep(sleep_time)
+        
+        self._last_request_time = time.time()
     
     def _is_chapter_url(self, url: str, link_text: str = "") -> bool:
         """
@@ -436,7 +494,7 @@ class ChapterUrlFetcher:
             return False
         
         # Method 1: Try JavaScript variable extraction (fastest)
-        logger.debug("Trying method 1: JavaScript variable extraction")
+        logger.info("Trying method 1: JavaScript variable extraction")
         urls = self._try_js_extraction(toc_url)
         metadata["methods_tried"]["js"] = len(urls) if urls else 0
         if urls and len(urls) >= 10:
@@ -447,10 +505,12 @@ class ChapterUrlFetcher:
                 metadata["urls_found"] = len(urls)
                 return sort_chapters_by_number(urls), metadata
             else:
-                logger.debug(f"JS extraction found {len(urls)} chapters but may be incomplete, trying next method")
+                logger.info(f"Method 1 found {len(urls)} chapters but may be incomplete, trying next method")
+        else:
+            logger.info(f"Method 1 (JavaScript extraction): Found {len(urls) if urls else 0} chapters - trying next method")
         
         # Method 2: Try AJAX endpoint discovery (fast)
-        logger.debug("Trying method 2: AJAX endpoint discovery")
+        logger.info("Trying method 2: AJAX endpoint discovery")
         urls = self._try_ajax_endpoints(toc_url)
         metadata["methods_tried"]["ajax"] = len(urls) if urls else 0
         if urls and len(urls) >= 10:
@@ -461,16 +521,18 @@ class ChapterUrlFetcher:
                 metadata["urls_found"] = len(urls)
                 return sort_chapters_by_number(urls), metadata
             else:
-                logger.debug(f"AJAX found {len(urls)} chapters but may be incomplete, trying next method")
+                logger.info(f"Method 2 found {len(urls)} chapters but may be incomplete, trying next method")
+        else:
+            logger.info(f"Method 2 (AJAX endpoint): Found {len(urls) if urls else 0} chapters - trying next method")
         
         # Method 3: Try HTML parsing (medium)
-        logger.debug("Trying method 3: HTML parsing")
+        logger.info("Trying method 3: HTML parsing")
         urls = self._try_html_parsing(toc_url)
         metadata["methods_tried"]["html"] = len(urls) if urls else 0
         if urls and len(urls) >= 10:
             # CRITICAL CHECK: If exactly 55 URLs, always try Playwright (pagination)
             if len(urls) == 55:
-                logger.info(f"⚠ HTML parsing found exactly 55 URLs - detected pagination limit, trying Playwright for complete list")
+                logger.info(f"⚠ Method 3 (HTML parsing) found exactly 55 URLs - detected pagination limit, trying Playwright for complete list")
                 # Don't return, continue to Playwright
             else:
                 # Check if it covers the needed range or seems complete
@@ -485,10 +547,12 @@ class ChapterUrlFetcher:
                     return sort_chapters_by_number(urls), metadata
                 else:
                     if not is_complete:
-                        logger.info(f"⚠ HTML parsing found {len(urls)} chapters but seems incomplete (pagination detected), trying Playwright")
+                        logger.info(f"⚠ Method 3 (HTML parsing) found {len(urls)} chapters but seems incomplete (pagination detected), trying Playwright")
                     elif not covers_needed:
-                        logger.info(f"⚠ HTML parsing found {len(urls)} chapters but doesn't cover needed range, trying Playwright")
+                        logger.info(f"⚠ Method 3 (HTML parsing) found {len(urls)} chapters but doesn't cover needed range, trying Playwright")
                     # Continue to next method
+        else:
+            logger.info(f"Method 3 (HTML parsing): Found {len(urls) if urls else 0} chapters - trying next method")
         
         # Method 4: Try Playwright with scrolling (slow but gets all)
         if HAS_PLAYWRIGHT:
@@ -506,7 +570,7 @@ class ChapterUrlFetcher:
             logger.warning("⚠ Playwright not available - install with: pip install playwright && playwright install chromium")
         
         # Method 5: Try following "next" links (slow but reliable)
-        logger.debug("Trying method 5: Follow 'next' links")
+        logger.info("Trying method 5: Follow 'next' links")
         urls = self._try_follow_next_links(toc_url, should_stop=should_stop)
         metadata["methods_tried"]["next"] = len(urls) if urls else 0
         if urls:
@@ -514,8 +578,15 @@ class ChapterUrlFetcher:
             metadata["method_used"] = "next"
             metadata["urls_found"] = len(urls)
             return sort_chapters_by_number(urls), metadata
+        else:
+            logger.info(f"Method 5 (Follow 'next' links): Found {len(urls) if urls else 0} chapters")
         
-        logger.warning("All methods failed to fetch chapter URLs")
+        # Log summary of all methods tried
+        methods_summary = ", ".join([f"{method}: {count}" for method, count in metadata["methods_tried"].items() if count > 0])
+        if methods_summary:
+            logger.warning(f"All methods attempted. Results: {methods_summary}. All methods failed to fetch sufficient chapter URLs")
+        else:
+            logger.warning("All methods failed to fetch chapter URLs")
         return [], metadata
 
     def _try_js_extraction(self, toc_url: str) -> List[str]:
@@ -992,8 +1063,12 @@ class ChapterUrlFetcher:
                         logger.info(f"Found {len(pagination_links)} pagination links - using page-based pagination")
                         # Collect actual pagination URLs from the links
                         seen_page_urls = set()
+                        base_toc = toc_url.split('?')[0].split('#')[0]
+                        
                         for link in pagination_links:
                             href = link.get_attribute('href') or ''
+                            link_text = (link.inner_text() or '').strip()
+                            
                             # Also check data attributes for pagination
                             if not href:
                                 href = link.get_attribute('data-href') or ''
@@ -1001,18 +1076,232 @@ class ChapterUrlFetcher:
                                 data_page = link.get_attribute('data-page')
                                 if data_page:
                                     # Try to construct URL from data-page attribute
-                                    if '?' in toc_url:
-                                        href = f"{toc_url}&page={data_page}"
-                                    else:
-                                        href = f"{toc_url}?page={data_page}"
+                                    href = f"{base_toc}?page={data_page}"
+                            
+                            # Fallback: Try to extract page number from link text if href is missing
+                            if not href:
+                                # Try to extract number from text (remove non-digits)
+                                text_clean = re.sub(r'[^\d]', '', link_text)
+                                if text_clean.isdigit() and 1 <= int(text_clean) <= 200:
+                                    page_num = int(text_clean)
+                                    href = f"{base_toc}?page={page_num}"
+                                    logger.debug(f"Constructed pagination URL from link text '{link_text}': page {page_num} -> {href}")
+                                elif link_text.isdigit() and 1 <= int(link_text) <= 200:
+                                    page_num = int(link_text)
+                                    href = f"{base_toc}?page={page_num}"
+                                    logger.debug(f"Constructed pagination URL from link text: page {page_num} -> {href}")
+                            
+                            # If href still missing but we have a number in text, construct it
+                            if not href and link_text:
+                                # Try to find any number in the text
+                                num_match = re.search(r'\d+', link_text)
+                                if num_match:
+                                    page_num = int(num_match.group())
+                                    if 1 <= page_num <= 200:
+                                        href = f"{base_toc}?page={page_num}"
+                                        logger.debug(f"Constructed pagination URL from number in text '{link_text}': page {page_num} -> {href}")
                             
                             if href:
                                 # Normalize the pagination URL
                                 full_page_url = normalize_url(href, toc_url)
+                                
+                                # CRITICAL: Filter out chapter URLs - they should not be treated as pagination
+                                link_text = (link.inner_text() or '').strip()
+                                if self._is_chapter_url(full_page_url, link_text):
+                                    logger.debug(f"Filtered out chapter URL from pagination links: {full_page_url}")
+                                    continue
+                                
+                                # Additional validation: Ensure it's actually a pagination URL
+                                # Pagination URLs typically have: ?page=, &page=, /page/, /p/, or are on same base path with just a number
+                                url_lower = full_page_url.lower()
+                                is_pagination_url = (
+                                    '?page=' in url_lower or 
+                                    '&page=' in url_lower or 
+                                    '/page/' in url_lower or 
+                                    '/p/' in url_lower or
+                                    re.search(r'[?&]p=\d+', url_lower) or
+                                    # Path-based pagination: same base path ending with just a number (not chapter)
+                                    (re.search(r'/\d+$', url_lower) and not self._is_chapter_url(full_page_url, link_text))
+                                )
+                                
+                                if not is_pagination_url:
+                                    logger.debug(f"Filtered out non-pagination URL: {full_page_url}")
+                                    continue
+                                
                                 # Avoid duplicates and the current page
                                 if full_page_url not in seen_page_urls and full_page_url != toc_url:
                                     seen_page_urls.add(full_page_url)
                                     page_urls_to_visit.append(full_page_url)
+                        
+                        # If we still have very few pages but found many links, try constructing URLs from page numbers
+                        # This handles cases where pagination links don't have proper hrefs
+                        if len(page_urls_to_visit) < 10 and len(pagination_links) > 20:
+                            logger.warning(f"Found {len(pagination_links)} pagination links but only {len(page_urls_to_visit)} valid URLs. Trying fallback construction...")
+                            # Try to extract page numbers from link text and construct URLs
+                            base_toc = toc_url.split('?')[0].split('#')[0]
+                            
+                            # First, try to extract from all pagination links
+                            extracted_page_nums = set()
+                            for link in pagination_links:
+                                # Try link text
+                                link_text = (link.inner_text() or '').strip()
+                                # Remove any non-digit characters and try to extract number
+                                link_text_clean = re.sub(r'[^\d]', '', link_text)
+                                if link_text_clean.isdigit() and 1 <= int(link_text_clean) <= 200:
+                                    extracted_page_nums.add(int(link_text_clean))
+                                elif link_text.isdigit() and 1 <= int(link_text) <= 200:
+                                    extracted_page_nums.add(int(link_text))
+                                
+                                # Try href extraction
+                                href = link.get_attribute('href') or ''
+                                if href:
+                                    # Normalize href first
+                                    normalized_href = normalize_url(href, toc_url).lower()
+                                    # Try to extract page number from href - multiple patterns
+                                    page_match = re.search(
+                                        r'[?&]page[=_](\d+)|/page[/-](\d+)|/p[/-](\d+)|page[=_](\d+)|p[=_](\d+)',
+                                        normalized_href
+                                    )
+                                    if page_match:
+                                        page_num = int(page_match.group(1) or page_match.group(2) or page_match.group(3) or page_match.group(4) or page_match.group(5))
+                                        if 1 <= page_num <= 200:
+                                            extracted_page_nums.add(page_num)
+                            
+                            # Also try to extract from HTML directly (more reliable for some sites)
+                            try:
+                                html = page.content()
+                                if HAS_BS4:
+                                    soup = BeautifulSoup(html, "html.parser")
+                                    # Find all pagination links in HTML
+                                    pagination_elements = soup.find_all(['a', 'button'], class_=re.compile(r'page|pagination|pager', re.I))
+                                    pagination_elements.extend(soup.find_all('a', href=re.compile(r'[?&]page=|/page/', re.I)))
+                                    
+                                    for elem in pagination_elements:
+                                        # Try text
+                                        text = elem.get_text(strip=True)
+                                        text_clean = re.sub(r'[^\d]', '', text)
+                                        if text_clean.isdigit() and 1 <= int(text_clean) <= 200:
+                                            extracted_page_nums.add(int(text_clean))
+                                        
+                                        # Try href
+                                        href = elem.get('href', '')
+                                        if href:
+                                            normalized_href = normalize_url(href, toc_url).lower()
+                                            page_match = re.search(
+                                                r'[?&]page[=_](\d+)|/page[/-](\d+)|/p[/-](\d+)',
+                                                normalized_href
+                                            )
+                                            if page_match:
+                                                page_num = int(page_match.group(1) or page_match.group(2) or page_match.group(3))
+                                                if 1 <= page_num <= 200:
+                                                    extracted_page_nums.add(page_num)
+                            except Exception as e:
+                                logger.debug(f"Error extracting page numbers from HTML: {e}")
+                            
+                            # Construct URLs from all extracted page numbers
+                            new_urls_count = 0
+                            for page_num in sorted(extracted_page_nums):
+                                constructed_url = f"{base_toc}?page={page_num}"
+                                if constructed_url not in seen_page_urls and constructed_url != toc_url:
+                                    seen_page_urls.add(constructed_url)
+                                    page_urls_to_visit.append(constructed_url)
+                                    new_urls_count += 1
+                                    logger.debug(f"Fallback: Constructed pagination URL for page {page_num}: {constructed_url}")
+                            
+                            logger.info(f"Fallback construction: Extracted {len(extracted_page_nums)} unique page numbers, added {new_urls_count} new URLs (total: {len(page_urls_to_visit)})")
+                            
+                            # Fill in gaps between detected page numbers
+                            # NovelFull pagination shows: 1, 2, 3, 4, 5, 6, 7, ..., 12, 13, ..., 20, 21, etc.
+                            # We need to fill in the missing pages (8, 9, 10, 11, 14-19, etc.)
+                            if extracted_page_nums and len(extracted_page_nums) > 0:
+                                sorted_pages = sorted(extracted_page_nums)
+                                min_page = sorted_pages[0]
+                                max_page = sorted_pages[-1]
+                                
+                                # Check if there are gaps (more pages between min and max than we detected)
+                                expected_pages = max_page - min_page + 1
+                                if expected_pages > len(sorted_pages):
+                                    logger.info(f"Detected gaps in pagination: pages {min_page} to {max_page} with {len(sorted_pages)} detected pages (expected {expected_pages}). Filling gaps...")
+                                    
+                                    # Fill all pages from min to max
+                                    gaps_filled = 0
+                                    for page_num in range(min_page, max_page + 1):
+                                        constructed_url = f"{base_toc}?page={page_num}"
+                                        if constructed_url not in seen_page_urls and constructed_url != toc_url:
+                                            seen_page_urls.add(constructed_url)
+                                            if constructed_url not in page_urls_to_visit:
+                                                page_urls_to_visit.append(constructed_url)
+                                                gaps_filled += 1
+                                    
+                                    if gaps_filled > 0:
+                                        logger.info(f"Filled {gaps_filled} gaps in pagination (now have {len(page_urls_to_visit)} total pages)")
+                            
+                            # If we still have very few pages OR if max page is high but we're missing early pages, estimate total pages needed
+                            # This is a last resort - construct pages 1-N based on estimated total
+                            max_detected_page = max(extracted_page_nums) if extracted_page_nums else 0
+                            if (len(page_urls_to_visit) < 15 and len(pagination_links) > 50) or (max_detected_page > 20 and min(extracted_page_nums) if extracted_page_nums else 0 > 1):
+                                logger.warning(f"Still have only {len(page_urls_to_visit)} pages after fallback. Trying to estimate total pages needed...")
+                                
+                                # Count chapters on first page to estimate pages needed
+                                try:
+                                    html = page.content()
+                                    if HAS_BS4:
+                                        soup = BeautifulSoup(html, "html.parser")
+                                        first_page_links = soup.find_all("a", href=True)
+                                        first_page_chapters = []
+                                        for link in first_page_links:
+                                            href = link.get("href", "")
+                                            if href:
+                                                full_url = normalize_url(href, self.base_url)
+                                                link_text = link.get_text(strip=True)
+                                                if self._is_chapter_url(full_url, link_text):
+                                                    first_page_chapters.append(full_url)
+                                        
+                                        if first_page_chapters:
+                                            # Extract max and min chapter numbers from first page
+                                            max_ch_on_page = 0
+                                            min_ch_on_page = float('inf')
+                                            for url in first_page_chapters:
+                                                ch_num = extract_chapter_number(url)
+                                                if ch_num:
+                                                    if ch_num > max_ch_on_page:
+                                                        max_ch_on_page = ch_num
+                                                    if ch_num < min_ch_on_page:
+                                                        min_ch_on_page = ch_num
+                                            
+                                            if max_ch_on_page > 0:
+                                                # Estimate pages needed: max_chapter / chapters_per_page
+                                                chapters_per_page = len(first_page_chapters)
+                                                estimated_total_pages = (max_ch_on_page // chapters_per_page) + 2  # Add buffer
+                                                # Cap at reasonable maximum (for very large novels)
+                                                estimated_total_pages = min(estimated_total_pages, 50)
+                                                
+                                                logger.info(f"First page has {chapters_per_page} chapters, max chapter: {max_ch_on_page}, min chapter: {min_ch_on_page}")
+                                                logger.info(f"Estimating {estimated_total_pages} total pages needed (based on max chapter {max_ch_on_page})")
+                                                
+                                                # Construct all pages from 1 to estimated_total_pages
+                                                new_pages_added = 0
+                                                for page_num in range(1, estimated_total_pages + 1):
+                                                    constructed_url = f"{base_toc}?page={page_num}"
+                                                    if constructed_url not in seen_page_urls and constructed_url != toc_url:
+                                                        seen_page_urls.add(constructed_url)
+                                                        if constructed_url not in page_urls_to_visit:
+                                                            page_urls_to_visit.append(constructed_url)
+                                                            new_pages_added += 1
+                                                
+                                                logger.info(f"Constructed {estimated_total_pages} total pages (added {new_pages_added} new pages)")
+                                except Exception as e:
+                                    logger.debug(f"Error estimating pages: {e}")
+                            
+                            # Re-sort after adding fallback URLs
+                            def extract_page_number(url):
+                                """Extract page number from URL for sorting."""
+                                match = re.search(r'/(\d+)$|[/?&]page[=_](\d+)|/page[/-](\d+)|/p[/-](\d+)|page(\d+)', url.lower())
+                                if match:
+                                    return int(match.group(1) or match.group(2) or match.group(3) or match.group(4) or match.group(5))
+                                return 0
+                            page_urls_to_visit.sort(key=extract_page_number)
+                            logger.info(f"After fallback construction: {len(page_urls_to_visit)} pagination pages to visit")
                         
                         # Sort page URLs to visit them in order (if they contain page numbers)
                         def extract_page_number(url):
@@ -1056,22 +1345,61 @@ class ChapterUrlFetcher:
                                 logger.info(f"Visiting {max_pages_to_visit} additional pages to collect all chapters...")
                                 logger.info(f"(Total pagination links found: {len(page_urls_to_visit)}, visiting first {max_pages_to_visit})")
                                 
+                            total_pages = len(page_urls_to_visit[:max_pages_to_visit])
                             for idx, page_url in enumerate(page_urls_to_visit[:max_pages_to_visit], 1):
                                 if should_stop and should_stop():
                                     break
                                 
-                                try:
-                                    logger.debug(f"Loading page {idx}/{max_pages_to_visit}: {page_url}")
+                                # Progress tracking
+                                progress_pct = (idx / total_pages * 100) if total_pages > 0 else 0
+                                logger.info(f"Loading page {idx}/{total_pages} ({progress_pct:.1f}%): {page_url}")
+                                
+                                # Rate limiting between requests
+                                self._rate_limit()
+                                
+                                # Retry logic with exponential backoff for page loading
+                                def load_page():
                                     page.goto(page_url, wait_until="domcontentloaded", timeout=30000)
                                     
-                                    # Wait a bit for page to load
-                                    time.sleep(1)  # Small delay for page load
+                                    # Wait for page content to fully load using networkidle
+                                    try:
+                                        page.wait_for_load_state("networkidle", timeout=10000)
+                                    except Exception:
+                                        # If networkidle times out, at least wait for DOM
+                                        try:
+                                            page.wait_for_load_state("domcontentloaded", timeout=5000)
+                                        except Exception:
+                                            pass
+                                        logger.debug(f"Network idle timeout on page {idx}, continuing with DOM content...")
                                     
                                     # Check for Cloudflare challenge on pagination pages
                                     page_title = page.title()
                                     if "just a moment" in page_title.lower() or "checking your browser" in page_title.lower():
                                         logger.warning(f"⚠ Cloudflare challenge on page {idx}, waiting...")
-                                        time.sleep(5)  # Brief wait for Cloudflare
+                                        # Wait for Cloudflare to complete
+                                        max_wait = 10
+                                        waited = 0
+                                        while waited < max_wait:
+                                            time.sleep(1)
+                                            waited += 1
+                                            try:
+                                                current_title = page.title()
+                                                if not ("just a moment" in current_title.lower() or "checking your browser" in current_title.lower()):
+                                                    logger.debug(f"Cloudflare challenge completed after {waited}s")
+                                                    break
+                                            except Exception:
+                                                pass
+                                    
+                                    return True
+                                
+                                try:
+                                    # Use retry logic for page loading
+                                    retry_with_backoff(
+                                        load_page,
+                                        max_retries=3,
+                                        base_delay=1.0,
+                                        should_stop=should_stop
+                                    )
                                     
                                     # Extract chapters from this page
                                     html = page.content()
@@ -1089,18 +1417,27 @@ class ChapterUrlFetcher:
                                                     page_chapters.append(full_url)
                                         
                                         all_chapter_urls.extend(page_chapters)
-                                        logger.debug(f"Page {idx}: Found {len(page_chapters)} chapters")
+                                        logger.info(f"Page {idx}/{total_pages}: Found {len(page_chapters)} chapters (total so far: {len(all_chapter_urls)})")
                                         
+                                        # Don't stop on first empty page - might be a gap or loading issue
+                                        # Only stop if we've had multiple consecutive empty pages
                                         if len(page_chapters) == 0:
-                                            logger.debug(f"No chapters on page {idx}, stopping pagination")
-                                            break
-                                    
-                                    # Small delay between pages
-                                    time.sleep(0.3)
+                                            logger.warning(f"⚠ No chapters found on page {idx}, but continuing...")
+                                            # Only break if we've had 3+ consecutive empty pages after collecting some chapters
+                                            # This prevents stopping too early on loading issues
+                                            if len(all_chapter_urls) > 0 and idx > 5:
+                                                # Check if we've been getting chapters recently
+                                                # If last few pages had chapters, continue
+                                                logger.debug(f"Empty page {idx}, but continuing to check more pages...")
+                                        else:
+                                            # Reset empty page counter when we find chapters
+                                            logger.debug(f"Found {len(page_chapters)} chapters on page {idx}")
                                     
                                 except Exception as e:
-                                    logger.debug(f"Error loading page {idx} ({page_url}): {e}")
-                                    break
+                                    logger.warning(f"Error loading page {idx} ({page_url}) after retries: {e}")
+                                    # Don't break on error - continue to next page
+                                    # Some pages might fail but others might work
+                                    continue
                             
                             # Remove duplicates and return
                             seen = set()
@@ -1212,22 +1549,61 @@ class ChapterUrlFetcher:
                                 max_pages_to_visit = min(len(page_urls_to_visit), 200)
                                 logger.info(f"Visiting {max_pages_to_visit} additional pages to collect all chapters...")
                                 
+                                total_pages_fallback = len(page_urls_to_visit[:max_pages_to_visit])
                                 for idx, page_url in enumerate(page_urls_to_visit[:max_pages_to_visit], 1):
                                     if should_stop and should_stop():
                                         break
                                     
-                                    try:
-                                        logger.debug(f"Loading page {idx}/{max_pages_to_visit}: {page_url}")
+                                    # Progress tracking
+                                    progress_pct = (idx / total_pages_fallback * 100) if total_pages_fallback > 0 else 0
+                                    logger.info(f"Loading page {idx}/{total_pages_fallback} ({progress_pct:.1f}%): {page_url}")
+                                    
+                                    # Rate limiting between requests
+                                    self._rate_limit()
+                                    
+                                    # Retry logic with exponential backoff for page loading
+                                    def load_page_fallback():
                                         page.goto(page_url, wait_until="domcontentloaded", timeout=30000)
                                         
-                                        # Wait a bit for page to load
-                                        time.sleep(1)  # Small delay for page load
+                                        # Wait for page content to fully load using networkidle
+                                        try:
+                                            page.wait_for_load_state("networkidle", timeout=10000)
+                                        except Exception:
+                                            # If networkidle times out, at least wait for DOM
+                                            try:
+                                                page.wait_for_load_state("domcontentloaded", timeout=5000)
+                                            except Exception:
+                                                pass
+                                            logger.debug(f"Network idle timeout on page {idx}, continuing with DOM content...")
                                         
                                         # Check for Cloudflare challenge on pagination pages
                                         page_title = page.title()
                                         if "just a moment" in page_title.lower() or "checking your browser" in page_title.lower():
                                             logger.warning(f"⚠ Cloudflare challenge on page {idx}, waiting...")
-                                            time.sleep(5)  # Brief wait for Cloudflare
+                                            # Wait for Cloudflare to complete
+                                            max_wait = 10
+                                            waited = 0
+                                            while waited < max_wait:
+                                                time.sleep(1)
+                                                waited += 1
+                                                try:
+                                                    current_title = page.title()
+                                                    if not ("just a moment" in current_title.lower() or "checking your browser" in current_title.lower()):
+                                                        logger.debug(f"Cloudflare challenge completed after {waited}s")
+                                                        break
+                                                except Exception:
+                                                    pass
+                                        
+                                        return True
+                                    
+                                    try:
+                                        # Use retry logic for page loading
+                                        retry_with_backoff(
+                                            load_page_fallback,
+                                            max_retries=3,
+                                            base_delay=1.0,
+                                            should_stop=should_stop
+                                        )
                                         
                                         # Extract chapters from this page
                                         html = page.content()
@@ -1244,17 +1620,20 @@ class ChapterUrlFetcher:
                                                         page_chapters.append(full_url)
                                             
                                             all_chapter_urls.extend(page_chapters)
-                                            logger.debug(f"Page {idx}: Found {len(page_chapters)} chapters")
+                                            logger.info(f"Page {idx}/{total_pages_fallback}: Found {len(page_chapters)} chapters (total so far: {len(all_chapter_urls)})")
                                             
+                                            # Don't stop on first empty page - might be a gap or loading issue
                                             if len(page_chapters) == 0:
-                                                logger.debug(f"No chapters on page {idx}, stopping pagination")
-                                                break
-                                        
-                                        time.sleep(0.3)
+                                                logger.warning(f"⚠ No chapters found on page {idx}, but continuing...")
+                                                # Only break if we've already collected chapters and hit empty page
+                                                if len(all_chapter_urls) > 0 and idx > 3:
+                                                    logger.info(f"Stopping pagination after {idx} pages (found {len(all_chapter_urls)} total chapters)")
+                                                    break
                                         
                                     except Exception as e:
-                                        logger.debug(f"Error loading page {idx} ({page_url}): {e}")
-                                        break
+                                        logger.warning(f"Error loading page {idx} ({page_url}) after retries: {e}")
+                                        # Don't break on error - continue to next page
+                                        continue
                                 
                                 # Remove duplicates and return
                                 seen = set()
@@ -1563,6 +1942,20 @@ class ChapterUrlFetcher:
                     """)
                     
                     logger.info(f"Scrolling complete. Found {scroll_result} chapter links in DOM.")
+                    
+                    # Wait for network to be idle after scrolling to ensure all lazy-loaded content is loaded
+                    # This replaces fixed delays with adaptive waiting based on network activity
+                    logger.debug("Waiting for network to be idle after scrolling...")
+                    try:
+                        page.wait_for_load_state("networkidle", timeout=15000)
+                        logger.debug("Network idle - all content should be loaded")
+                    except Exception:
+                        # If networkidle times out, at least wait for DOM to be stable
+                        try:
+                            page.wait_for_load_state("domcontentloaded", timeout=5000)
+                            logger.debug("Network idle timeout, but DOM is loaded")
+                        except Exception:
+                            pass
                     
                     # Check if we need to navigate to other pages (NovelFull pagination)
                     # Look for page navigation links

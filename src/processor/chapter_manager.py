@@ -337,3 +337,9 @@ class ChapterManager:
         chapters = [Chapter.from_dict(ch_data) for ch_data in data.get("chapters", [])]
         return cls(chapters=chapters)
 
+
+
+
+
+
+

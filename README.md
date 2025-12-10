@@ -8,7 +8,7 @@ Una herramienta completa y modular para la creación de audiolibros usando voces
 - **Text-to-Speech**: Convierte texto a audio usando Edge-TTS (gratis, alta calidad)
 - **Editor de Texto Integrado**: Edita y formatea el contenido antes de convertir
 - **Proceso Completo**: Pipeline automatizado desde scraping hasta MP3
-- **Interfaz Gráfica Moderna**: GUI con PyQt6
+- **Interfaz Gráfica Moderna**: GUI con PySide6
 - **Gestión de Proyectos**: Guarda y organiza tus proyectos de audiolibros
 
 ## Requisitos
@@ -82,6 +82,7 @@ python -m src.main
 ## Contribuir
 
 Las contribuciones son bienvenidas. Por favor, lee las guías de contribución antes de enviar un PR.
+
 
 
 

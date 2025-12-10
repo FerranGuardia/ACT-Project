@@ -55,7 +55,7 @@ class ConfigManager:
                 "language": "es",
             },
             "paths": {
-                "output_dir": str(Path.home() / "Documents" / "ACT" / "audiobooks"),
+                "output_dir": str(Path.home() / "Desktop"),
                 "scraped_dir": str(Path.home() / "Documents" / "ACT" / "scraped"),
                 "projects_dir": str(Path.home() / "Documents" / "ACT" / "projects"),
             },
@@ -234,6 +234,8 @@ def get_config() -> ConfigManager:
         >>> voice = config.get('tts.voice')
     """
     return ConfigManager()
+
+
 
 
 

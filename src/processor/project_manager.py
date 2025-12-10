@@ -250,6 +250,42 @@ class ProjectManager:
         failed = len(self.chapter_manager.get_failed_chapters())
         return pending > 0 or failed > 0
     
+    def clear_project_data(self) -> None:
+        """
+        Clear project data (chapters and progress) without deleting files.
+        
+        This resets the chapter manager and clears progress tracking,
+        allowing the project to be re-processed from scratch.
+        
+        Deletes the project.json file to ensure a completely fresh start.
+        """
+        # Delete the project file to ensure fresh start
+        if self.metadata_file.exists():
+            try:
+                self.metadata_file.unlink()
+                logger.info(f"Deleted project file: {self.metadata_file}")
+            except Exception as e:
+                logger.error(f"Error deleting project file: {e}")
+        
+        # Reset chapter manager
+        self.chapter_manager = ChapterManager()
+        
+        # Reset progress metadata to initial state
+        self.metadata = {
+            "name": self.project_name,
+            "created_at": None,
+            "updated_at": None,
+            "novel_url": None,
+            "toc_url": None,
+            "novel_title": None,
+            "novel_author": None,
+            "total_chapters": 0,
+            "completed_chapters": 0,
+            "status": "new"
+        }
+        
+        logger.info(f"Cleared project data for: {self.project_name} (project file deleted)")
+    
     @staticmethod
     def list_projects(base_projects_dir: Optional[Path] = None) -> List[Dict[str, Any]]:
         """

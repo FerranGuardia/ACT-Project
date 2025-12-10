@@ -24,16 +24,18 @@ class FileManager:
     and manages project file structure.
     """
     
-    def __init__(self, project_name: str, base_output_dir: Optional[Path] = None):
+    def __init__(self, project_name: str, base_output_dir: Optional[Path] = None, novel_title: Optional[str] = None):
         """
         Initialize file manager for a project.
         
         Args:
             project_name: Name of the project (used for directory naming)
             base_output_dir: Base output directory. If None, uses config default
+            novel_title: Optional novel title for folder naming (if None, uses project_name)
         """
         self.config = get_config()
         self.project_name = self._sanitize_filename(project_name)
+        self.novel_title = self._sanitize_filename(novel_title or project_name)
         
         # Get base output directory
         if base_output_dir is None:
@@ -43,9 +45,9 @@ class FileManager:
         self.base_output_dir = base_output_dir
         self.project_dir = base_output_dir / self.project_name
         
-        # Subdirectories
-        self.text_dir = self.project_dir / "text"
-        self.audio_dir = self.project_dir / "audio"
+        # Subdirectories with title prefix: "novel_title_scraps" and "novel_title_audio"
+        self.text_dir = self.project_dir / f"{self.novel_title}_scraps"
+        self.audio_dir = self.project_dir / f"{self.novel_title}_audio"
         self.metadata_dir = self.project_dir / "metadata"
         
         # Create directories
@@ -294,4 +296,6 @@ class FileManager:
             except Exception as e:
                 logger.error(f"Error deleting project directory: {e}")
                 raise
+
+
 

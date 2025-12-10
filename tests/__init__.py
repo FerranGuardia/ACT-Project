@@ -1,7 +1,0 @@
-"""
-Test suite for ACT.
-"""
-
-
-
-
