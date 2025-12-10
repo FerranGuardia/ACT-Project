@@ -250,9 +250,13 @@ def clean_text(text: Optional[str]) -> str:
     # Step 14: Normalize punctuation for TTS
     # Multiple punctuation marks can confuse TTS
     # Fix dot spacing patterns: ". .." or ".. ." or ". . ." should become "..."
+    # Order matters: handle ". . ." first, then ". .." and ".. ."
+    text = re.sub(r"\.\s+\.\s+\.", "...", text)  # ". . ." → "..."
     text = re.sub(r"\.\s+\.\.", "...", text)  # ". .." → "..."
     text = re.sub(r"\.\.\s+\.", "...", text)  # ".. ." → "..."
-    text = re.sub(r"\.\s+\.\s+\.", "...", text)  # ". . ." → "..."
+    # Also handle cases where there might be more dots with spaces
+    text = re.sub(r"\.\s+\.{2,}", "...", text)  # ". ..." or ". ...." → "..."
+    text = re.sub(r"\.{2,}\s+\.", "...", text)  # ".. ." or "... ." → "..."
     text = re.sub(r"\.{4,}", "...", text)  # More than 3 dots becomes ...
     text = re.sub(r"!{3,}", "!", text)  # Multiple ! becomes single
     text = re.sub(r"\?{3,}", "?", text)  # Multiple ? becomes single
@@ -261,8 +265,12 @@ def clean_text(text: Optional[str]) -> str:
     text = re.sub(r":{2,}", ":", text)  # Multiple colons to single (but keep time like 12:30)
     
     # Step 15: Clean up spacing around punctuation (improves TTS flow)
+    # But preserve ellipses (three dots) - don't add space after them
     text = re.sub(r"\s+([,.!?;:])", r"\1", text)  # Remove space before punctuation
-    text = re.sub(r"([,.!?;:])([^\s])", r"\1 \2", text)  # Add space after punctuation if missing
+    # Add space after punctuation if missing, but not after ellipses
+    text = re.sub(r"([,.!?;:])([^\s.])", r"\1 \2", text)  # Add space after punctuation if missing (but not if next char is dot)
+    # Handle ellipses separately - ensure space after "..."
+    text = re.sub(r"\.{3}([^\s])", r"... \1", text)  # Add space after "..." if missing
     
     # Step 16: Handle special formatting that might confuse TTS
     # Remove standalone symbols on their own lines

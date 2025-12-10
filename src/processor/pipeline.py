@@ -80,6 +80,17 @@ class ProcessingPipeline:
         # Processing state
         self.should_stop = False
         self.specific_chapters: Optional[List[int]] = None
+        # Callback to check if processing is paused (set by ProcessingThread)
+        self._check_paused_callback: Optional[Callable[[], bool]] = None
+    
+    def set_pause_check_callback(self, callback: Callable[[], bool]) -> None:
+        """
+        Set a callback function to check if processing should be paused.
+        
+        Args:
+            callback: Function that returns True if processing should pause, False otherwise
+        """
+        self._check_paused_callback = callback
     
     def stop(self) -> None:
         """Stop the processing pipeline."""
@@ -99,6 +110,18 @@ class ProcessingPipeline:
     def _check_should_stop(self) -> bool:
         """Check if processing should stop."""
         return self.should_stop
+    
+    def _check_should_pause(self) -> bool:
+        """Check if processing should pause."""
+        if self._check_paused_callback:
+            return self._check_paused_callback()
+        return False
+    
+    def _wait_if_paused(self) -> None:
+        """Wait while processing is paused."""
+        import time
+        while self._check_should_pause() and not self._check_should_stop():
+            time.sleep(0.1)  # Small sleep to avoid busy-waiting
     
     def _extract_base_url(self, url: str) -> str:
         """
@@ -253,6 +276,11 @@ class ProcessingPipeline:
             return True
         
         try:
+            # Check for pause/stop before starting
+            self._wait_if_paused()
+            if self._check_should_stop():
+                return False
+            
             # Step 1: Scrape chapter
             logger.info(f"Scraping chapter {chapter_num} from {chapter.url}")
             if self.progress_tracker:
@@ -304,6 +332,11 @@ class ProcessingPipeline:
                     "Chapter scraped successfully"
                 )
             
+            # Check for pause/stop before TTS conversion
+            self._wait_if_paused()
+            if self._check_should_stop():
+                return False
+            
             # Step 2: Convert to audio
             logger.info(f"Converting chapter {chapter_num} to audio (text length: {len(content)} characters)")
             if self.progress_tracker:
@@ -320,12 +353,19 @@ class ProcessingPipeline:
             
             # Convert to speech (use voice and provider if set, otherwise use defaults)
             voice = self.voice if self.voice else None
+            # Note: TTS conversion (especially pyttsx3) is blocking and cannot be interrupted
+            # once started. Stop/pause flags are checked before starting conversion.
             success = self.tts_engine.convert_text_to_speech(
                 text=content,
                 output_path=temp_audio_path,
                 voice=voice,
                 provider=self.provider
             )
+            
+            # Check stop flag after TTS conversion (in case user stopped during conversion)
+            if self._check_should_stop():
+                logger.info(f"Stop requested after TTS conversion for chapter {chapter_num}")
+                return False
             
             if not success:
                 error_msg = "Failed to convert to audio"
@@ -351,6 +391,20 @@ class ProcessingPipeline:
                 temp_audio_path,
                 title
             )
+            
+            # Verify audio file was saved correctly
+            if not audio_file_path.exists() or audio_file_path.stat().st_size == 0:
+                error_msg = f"Audio file not saved correctly: {audio_file_path}"
+                logger.error(error_msg)
+                if self.progress_tracker:
+                    self.progress_tracker.update_chapter(
+                        chapter_num,
+                        ProcessingStatus.FAILED,
+                        error_msg
+                    )
+                return False
+            
+            logger.debug(f"Audio file saved: {audio_file_path} ({audio_file_path.stat().st_size} bytes)")
             chapter.audio_file_path = str(audio_file_path)
             
             # Clean up temp file
@@ -473,6 +527,12 @@ class ProcessingPipeline:
                     logger.warning(f"Failure callback: Failed to cleanup temp file: {cleanup_error}")
         
         for chapter in chapters_to_process:
+            if self._check_should_stop():
+                logger.info("Processing stopped by user")
+                break
+            
+            # Check for pause before processing each chapter
+            self._wait_if_paused()
             if self._check_should_stop():
                 logger.info("Processing stopped by user")
                 break

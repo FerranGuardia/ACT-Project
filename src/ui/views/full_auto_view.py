@@ -391,6 +391,9 @@ class ProcessingThread(QThread):
                 novel_title=self.novel_title
             )
             
+            # Set pause check callback so pipeline can check if processing is paused
+            self.pipeline.set_pause_check_callback(lambda: self.is_paused)
+            
             # Set specific chapters if needed
             if specific_chapters:
                 self.pipeline.specific_chapters = specific_chapters
