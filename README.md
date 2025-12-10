@@ -242,6 +242,14 @@ Contributions are welcome! Please read the contribution guidelines before submit
 
 For issues, questions, or feature requests, please open an issue on the repository.
 
+### ☕ Support This Project
+
+If you find this project helpful, consider supporting its development:
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/ferrangp)
+
+[Support on Buy Me a Coffee](https://buymeacoffee.com/ferrangp)
+
 ---
 
 **Version**: 0.1.0  
