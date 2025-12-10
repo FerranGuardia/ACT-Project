@@ -195,6 +195,17 @@ pip install PySide6
 - Try installing Playwright for better JavaScript support
 - Check internet connection
 
+## Documentation
+
+Comprehensive documentation is available in the [`docs/`](docs/) folder:
+
+- **[Architecture](docs/ARCHITECTURE.md)** - System design and architecture
+- **[Current Status](docs/CURRENT_STATUS_SUMMARY.md)** - Project status and module completion
+- **[Module Documentation](docs/modules/)** - Detailed documentation for each module
+- **[Testing Guide](docs/tests/)** - Test documentation and procedures
+
+See [docs/README.md](docs/README.md) for the complete documentation index.
+
 ## Development
 
 ### Running Tests
@@ -212,10 +223,12 @@ pytest tests/integration/
 
 - **Block 1 (Core)**: ✅ Complete
 - **Block 2 (Scraper)**: ✅ Complete
-- **Block 3 (TTS)**: ✅ Complete
+- **Block 3 (TTS)**: ✅ Complete (Multi-provider with fallback)
 - **Block 4 (Editor)**: ⚠️ Optional, not implemented
 - **Block 5 (Processor)**: ✅ Complete
 - **Block 6 (UI)**: ✅ Complete
+
+**Status**: ✅ MVP Complete (2025-12-10)
 
 ## License
 
