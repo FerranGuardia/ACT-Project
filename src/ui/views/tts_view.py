@@ -29,7 +29,7 @@ class TTSConversionThread(QThread):
     file_created = Signal(str)  # File path
     
     def __init__(self, file_paths: List[str], output_dir: str, voice: str, 
-                 rate: int, pitch: int, volume: int, file_format: str):
+                 rate: int, pitch: int, volume: int, file_format: str, provider: Optional[str] = None):
         super().__init__()
         self.file_paths = file_paths
         self.output_dir = output_dir
@@ -38,6 +38,7 @@ class TTSConversionThread(QThread):
         self.pitch = pitch
         self.volume = volume
         self.file_format = file_format
+        self.provider = provider
         self.should_stop = False
         self.is_paused = False
         self.tts_engine = TTSEngine()
@@ -109,7 +110,8 @@ class TTSConversionThread(QThread):
                         voice=self.voice,
                         rate=rate_value,
                         pitch=pitch_value,
-                        volume=volume_value
+                        volume=volume_value,
+                        provider=self.provider
                     )
                     
                     if success:
@@ -146,6 +148,7 @@ class TTSView(QWidget):
         self.voice_manager = VoiceManager()
         self.setup_ui()
         self._connect_handlers()
+        self._load_providers()
         self._load_voices()
         logger.info("TTS view initialized")
     
@@ -209,6 +212,15 @@ class TTSView(QWidget):
         # Voice settings
         voice_group = QGroupBox("Voice Settings")
         voice_layout = QVBoxLayout()
+        
+        # Provider selector
+        provider_layout = QHBoxLayout()
+        provider_layout.addWidget(QLabel("Provider:"))
+        self.provider_combo = QComboBox()
+        # Will be populated by _load_providers()
+        provider_layout.addWidget(self.provider_combo)
+        provider_layout.addStretch()
+        voice_layout.addLayout(provider_layout)
         
         voice_select_layout = QHBoxLayout()
         voice_select_layout.addWidget(QLabel("Voice:"))
@@ -317,6 +329,7 @@ class TTSView(QWidget):
         self.add_files_button.clicked.connect(self.add_files)
         self.add_folder_button.clicked.connect(self.add_folder)
         self.remove_button.clicked.connect(self.remove_selected_files)
+        self.provider_combo.currentTextChanged.connect(self._on_provider_changed)
         self.preview_button.clicked.connect(self.preview_voice)
         self.start_button.clicked.connect(self.start_conversion)
         self.pause_button.clicked.connect(self.pause_conversion)
@@ -343,11 +356,67 @@ class TTSView(QWidget):
                     return
             widget = widget.parent()
     
-    def _load_voices(self):
-        """Load available voices into the combo box."""
+    def _load_providers(self):
+        """Load available providers into the combo box."""
         try:
-            voices = self.voice_manager.get_voice_list(locale="en-US")
+            providers = self.voice_manager.get_providers()
+            if not providers:
+                logger.warning("No TTS providers available")
+                self.provider_combo.addItems(["No providers available"])
+                self.provider_combo.setEnabled(False)
+                return
+            
+            # Add provider names with display labels
+            provider_labels = {
+                "edge_tts": "Edge TTS (Cloud)",
+                "pyttsx3": "pyttsx3 (Offline)"
+            }
+            
+            for provider in providers:
+                label = provider_labels.get(provider, provider)
+                self.provider_combo.addItem(label, provider)
+            
+            # Set default to first provider
+            if providers:
+                self.provider_combo.setCurrentIndex(0)
+        except Exception as e:
+            logger.error(f"Error loading providers: {e}")
+            # Fallback to Edge TTS
+            self.provider_combo.addItem("Edge TTS (Cloud)", "edge_tts")
+    
+    def _on_provider_changed(self):
+        """Handle provider selection change."""
+        # Reload voices for the selected provider
+        self._load_voices()
+    
+    def _get_selected_provider(self) -> Optional[str]:
+        """Get the currently selected provider name."""
+        current_index = self.provider_combo.currentIndex()
+        if current_index < 0:
+            return None
+        return self.provider_combo.itemData(current_index)
+    
+    def _load_voices(self):
+        """Load available voices into the combo box based on selected provider."""
+        try:
+            # Clear existing voices
+            self.voice_combo.clear()
+            
+            # Get selected provider
+            provider = self._get_selected_provider()
+            
+            # Load voices for the selected provider (filtered to en-US only)
+            voices = self.voice_manager.get_voice_list(locale="en-US", provider=provider)
+            
+            if not voices:
+                logger.warning(f"No voices available for provider: {provider}")
+                self.voice_combo.addItems(["No voices available"])
+                self.voice_combo.setEnabled(False)
+                return
+            
+            self.voice_combo.setEnabled(True)
             self.voice_combo.addItems(voices)
+            
             # Set default to first voice if available
             if voices:
                 self.voice_combo.setCurrentIndex(0)
@@ -421,6 +490,9 @@ class TTSView(QWidget):
             QMessageBox.warning(self, "No Voice", "Please select a voice")
             return
         
+        # Get selected provider
+        provider = self._get_selected_provider()
+        
         # Sample text for preview
         sample_text = "Hello, this is a preview of the selected voice."
         
@@ -436,14 +508,15 @@ class TTSView(QWidget):
             pitch = self.pitch_slider.value()
             volume = ((self.volume_slider.value() - 100) / 100) * 50
             
-            # Convert preview
+            # Convert preview with provider
             success = self.tts_engine.convert_text_to_speech(
                 text=sample_text,
                 output_path=Path(temp_path),
                 voice=voice,
                 rate=rate,
                 pitch=pitch,
-                volume=volume
+                volume=volume,
+                provider=provider
             )
             
             if success:
@@ -500,6 +573,7 @@ class TTSView(QWidget):
         pitch = self.pitch_slider.value()
         volume = self.volume_slider.value()
         file_format = self.format_combo.currentText()
+        provider = self._get_selected_provider()
         
         # Create and start thread
         self.conversion_thread = TTSConversionThread(
@@ -509,7 +583,8 @@ class TTSView(QWidget):
             rate,
             pitch,
             volume,
-            file_format
+            file_format,
+            provider
         )
         self.conversion_thread.progress.connect(self._on_progress)
         self.conversion_thread.status.connect(self._on_status)
