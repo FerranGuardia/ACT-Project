@@ -139,3 +139,4 @@ class TestScraperReal:
         except Exception as e:
             pytest.skip(f"Progress callback test failed: {e}")
 
+

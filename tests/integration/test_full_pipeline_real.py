@@ -140,3 +140,4 @@ class TestFullPipelineReal:
         except Exception as e:
             pytest.skip(f"Output structure test requires full setup: {e}")
 
+

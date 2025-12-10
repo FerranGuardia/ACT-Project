@@ -4,7 +4,9 @@
 
 **ACT (Audiobook Creator Tools)** - A modular Python application for creating audiobooks from webnovels using AI voices (Edge-TTS).
 
-**Project Location**: `ACT/` (repository root)
+**Project Location**: `C:\Users\Nitropc\Desktop\ACT`
+
+**Reference Location**: `C:\Users\Nitropc\Desktop\ACT REFERENCES`
 
 ## Current Status
 
@@ -42,7 +44,7 @@ ACT/
 └── requirements.txt
 ```
 
-> **📚 For detailed module documentation, see**: [modules/](modules/) directory
+> **📚 For detailed module documentation, see**: [MODULES/](MODULES/) directory
 
 ## Git Flow
 
@@ -86,11 +88,12 @@ From `requirements.txt`:
 - Can be used as reference for fixes
 - **DO NOT copy directly**, use as reference only
 
-**Documentation**: `docs/`
+**Documentation**: `ACT REFERENCES/DESIGN/`
 - **[README.md](README.md)** - Documentation index and navigation
 - **[CURRENT_STATUS_SUMMARY.md](CURRENT_STATUS_SUMMARY.md)** - Current project status
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - Project architecture
-- **[modules/](modules/)** - Detailed module documentation
+- **[MODULES/](MODULES/)** - Detailed module documentation
+- **[GIT_FLOW_GUIDE.md](GIT_FLOW_GUIDE.md)** - Git workflow
 
 ## Important Notes
 
@@ -103,11 +106,11 @@ From `requirements.txt`:
 
 ## How to Start
 
-1. Clone the repository and navigate to project root
+1. Open the project: `C:\Users\Nitropc\Desktop\ACT`
 2. Check current branch: `git branch` (should be `dev`)
 3. Review current status: See [CURRENT_STATUS_SUMMARY.md](CURRENT_STATUS_SUMMARY.md)
 4. Run tests: `pytest tests/unit/` or check test documentation
-5. Review documentation in `docs/` folder
+5. Start manual testing or work on polish/enhancements
 
 ## Quick Commands
 
@@ -137,8 +140,8 @@ git log --oneline -10
 
 ---
 
-**Last Updated**: 2025-12-10
-**Status**: ✅ MVP Complete
+**Last Updated**: 2025-12-06
+**Current Focus**: Manual Testing, Polish, and Production Readiness
 
 
 
