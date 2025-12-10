@@ -152,9 +152,14 @@ class FileManager:
         
         file_path = self.text_dir / filename
         
+        # Add "Chapter X" at the start of content if not already present
+        content_to_save = content.strip()
+        if not content_to_save.startswith(f"Chapter {chapter_num}"):
+            content_to_save = f"Chapter {chapter_num}\n\n{content_to_save}"
+        
         # Save content
         try:
-            file_path.write_text(content, encoding="utf-8")
+            file_path.write_text(content_to_save, encoding="utf-8")
             logger.debug(f"Saved text file: {file_path}")
             return file_path
         except Exception as e:

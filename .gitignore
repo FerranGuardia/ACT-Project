@@ -49,6 +49,19 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
+# Test outputs and artifacts
+tests/**/__pycache__/
+tests/**/*.pyc
+tests/**/*.pyo
+tests/**/*.pyd
+test_output/
+test_results/
+*.test.log
+test_*.mp3
+test_*.wav
+test_*.m4a
+test_*.ogg
+
 # Translations
 *.mo
 *.pot

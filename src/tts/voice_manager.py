@@ -100,12 +100,23 @@ class VoiceManager:
             Voice dictionary or None if not found
         """
         voices = self.get_voices(provider=provider)
+        voice_name_lower = voice_name.lower().strip()
+        
         for voice in voices:
-            # Check both id and name fields, and legacy ShortName for backward compatibility
-            if (voice.get("id") == voice_name or 
-                voice.get("name") == voice_name or 
-                voice.get("ShortName") == voice_name):
+            # Check exact matches first
+            voice_id = (voice.get("id") or "").lower()
+            voice_name_full = (voice.get("name") or "").lower()
+            voice_short = (voice.get("ShortName") or "").lower()
+            
+            if (voice_id == voice_name_lower or 
+                voice_name_full == voice_name_lower or 
+                voice_short == voice_name_lower):
                 return voice
+            
+            # Check partial matches (for pyttsx3 voices like "Microsoft David Desktop" matching "Microsoft David Desktop - English (United States)")
+            if voice_name_lower in voice_name_full or voice_name_full.startswith(voice_name_lower):
+                return voice
+        
         return None
     
     def get_providers(self) -> List[str]:

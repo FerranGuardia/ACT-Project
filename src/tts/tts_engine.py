@@ -103,14 +103,36 @@ class TTSEngine:
         # Otherwise, search all providers
         voice_dict = self.voice_manager.get_voice_by_name(voice, provider=provider)
         if not voice_dict:
-            logger.warning(f"Voice '{voice}' not found, trying default 'en-US-AndrewNeural'")
+            logger.warning(f"Voice '{voice}' not found, trying fallback...")
             logger.info(f"Attempted voice name: '{original_voice}' (cleaned: '{voice}')")
-            voice = "en-US-AndrewNeural"
-            voice_dict = self.voice_manager.get_voice_by_name(voice, provider=provider)
+            
+            # Try default Edge TTS voice first
+            default_edge_voice = "en-US-AndrewNeural"
+            voice_dict = self.voice_manager.get_voice_by_name(default_edge_voice, provider=provider)
+            
+            # If Edge TTS voice not found, try to get any available voice from available providers
             if not voice_dict:
-                logger.error(f"Default voice 'en-US-AndrewNeural' also not found!")
-                return False
-            logger.info(f"Using fallback voice: {voice}")
+                logger.warning(f"Default Edge TTS voice '{default_edge_voice}' not found, trying available providers...")
+                
+                # Get available providers in priority order
+                available_providers = self.provider_manager.get_providers()
+                logger.info(f"Available providers: {available_providers}")
+                
+                # Try to get first available voice from any available provider
+                for provider_name in available_providers:
+                    provider_voices = self.voice_manager.get_voices(provider=provider_name)
+                    if provider_voices:
+                        voice_dict = provider_voices[0]  # Use first available voice
+                        voice = voice_dict.get("id") or voice_dict.get("name", voice)
+                        logger.info(f"Using fallback voice '{voice}' from provider '{provider_name}'")
+                        break
+                
+                if not voice_dict:
+                    logger.error(f"No voices found in any available provider!")
+                    return False
+            else:
+                logger.info(f"Using fallback voice: {default_edge_voice}")
+                voice = default_edge_voice
         
         # Get the voice ID (prefer id, then ShortName for backward compatibility)
         voice_id = voice_dict.get("id") or voice_dict.get("ShortName", voice)

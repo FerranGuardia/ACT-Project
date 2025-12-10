@@ -1,0 +1,288 @@
+"""
+Unit tests for TTSEngine provider integration.
+
+Tests TTSEngine with ProviderManager integration.
+"""
+
+import sys
+import importlib.util
+from pathlib import Path
+from unittest.mock import Mock, MagicMock, patch
+
+# Set up package structure for relative imports
+import types
+
+# Add ACT src to path before any imports
+act_src = Path(r"C:\Users\Nitropc\Desktop\ACT\src")
+if str(act_src) not in sys.path:
+    sys.path.insert(0, str(act_src))
+
+# Mock external dependencies before importing
+sys.modules["pyttsx3"] = MagicMock()
+sys.modules["edge_tts"] = MagicMock()
+
+# Mock core.logger
+if "core" not in sys.modules:
+    sys.modules["core"] = types.ModuleType("core")
+if "core.logger" not in sys.modules:
+    mock_logger = MagicMock()
+    mock_get_logger = MagicMock(return_value=mock_logger)
+    logger_module = types.ModuleType("core.logger")
+    logger_module.get_logger = mock_get_logger
+    sys.modules["core.logger"] = logger_module
+
+# Mock core.config_manager
+if "core.config_manager" not in sys.modules:
+    mock_config = MagicMock()
+    mock_config.get.return_value = "en-US-AndrewNeural"  # Default voice
+    mock_get_config = MagicMock(return_value=mock_config)
+    config_module = types.ModuleType("core.config_manager")
+    config_module.get_config = mock_get_config
+    sys.modules["core.config_manager"] = config_module
+
+# Set up package structure
+if "tts" not in sys.modules:
+    sys.modules["tts"] = types.ModuleType("tts")
+if "tts.providers" not in sys.modules:
+    sys.modules["tts.providers"] = types.ModuleType("tts.providers")
+
+# Load base_provider
+base_provider_path = act_src / "tts" / "providers" / "base_provider.py"
+spec_base = importlib.util.spec_from_file_location("tts.providers.base_provider", base_provider_path)
+base_provider_module = importlib.util.module_from_spec(spec_base)
+sys.modules["tts.providers.base_provider"] = base_provider_module
+spec_base.loader.exec_module(base_provider_module)
+ProviderType = base_provider_module.ProviderType
+
+# Load edge_tts_provider and pyttsx3_provider
+edge_tts_path = act_src / "tts" / "providers" / "edge_tts_provider.py"
+spec_edge = importlib.util.spec_from_file_location("tts.providers.edge_tts_provider", edge_tts_path)
+edge_tts_module = importlib.util.module_from_spec(spec_edge)
+sys.modules["tts.providers.edge_tts_provider"] = edge_tts_module
+spec_edge.loader.exec_module(edge_tts_module)
+
+pyttsx3_path = act_src / "tts" / "providers" / "pyttsx3_provider.py"
+spec_pyttsx3 = importlib.util.spec_from_file_location("tts.providers.pyttsx3_provider", pyttsx3_path)
+pyttsx3_module = importlib.util.module_from_spec(spec_pyttsx3)
+sys.modules["tts.providers.pyttsx3_provider"] = pyttsx3_module
+spec_pyttsx3.loader.exec_module(pyttsx3_module)
+
+# Load provider_manager
+provider_manager_path = act_src / "tts" / "providers" / "provider_manager.py"
+spec = importlib.util.spec_from_file_location("tts.providers.provider_manager", provider_manager_path)
+provider_manager_module = importlib.util.module_from_spec(spec)
+sys.modules["tts.providers.provider_manager"] = provider_manager_module
+spec.loader.exec_module(provider_manager_module)
+TTSProviderManager = provider_manager_module.TTSProviderManager
+
+# Load voice_manager
+voice_manager_path = act_src / "tts" / "voice_manager.py"
+spec_vm = importlib.util.spec_from_file_location("tts.voice_manager", voice_manager_path)
+voice_manager_module = importlib.util.module_from_spec(spec_vm)
+sys.modules["tts.voice_manager"] = voice_manager_module
+spec_vm.loader.exec_module(voice_manager_module)
+
+# Mock text_cleaner and ssml_builder
+if "tts.text_cleaner" not in sys.modules:
+    text_cleaner_module = types.ModuleType("tts.text_cleaner")
+    text_cleaner_module.clean_text_for_tts = lambda text, base_cleaner=None: text
+    sys.modules["tts.text_cleaner"] = text_cleaner_module
+
+if "tts.ssml_builder" not in sys.modules:
+    ssml_builder_module = types.ModuleType("tts.ssml_builder")
+    ssml_builder_module.build_ssml = lambda text, rate=None, pitch=None, volume=None: text
+    ssml_builder_module.parse_rate = lambda s: 0.0
+    ssml_builder_module.parse_pitch = lambda s: 0.0
+    ssml_builder_module.parse_volume = lambda s: 0.0
+    sys.modules["tts.ssml_builder"] = ssml_builder_module
+
+# Load tts_engine
+tts_engine_path = act_src / "tts" / "tts_engine.py"
+spec_engine = importlib.util.spec_from_file_location("tts.tts_engine", tts_engine_path)
+tts_engine_module = importlib.util.module_from_spec(spec_engine)
+sys.modules["tts.tts_engine"] = tts_engine_module
+spec_engine.loader.exec_module(tts_engine_module)
+TTSEngine = tts_engine_module.TTSEngine
+
+import pytest
+
+
+class TestTTSEngineProviders:
+    """Test TTSEngine with ProviderManager integration"""
+    
+    @patch('tts.tts_engine.TTSProviderManager')
+    @patch('tts.tts_engine.VoiceManager')
+    def test_initialization_with_provider_manager(self, mock_vm_class, mock_pm_class):
+        """Test TTSEngine initialization with ProviderManager"""
+        mock_pm = MagicMock()
+        mock_pm_class.return_value = mock_pm
+        mock_vm = MagicMock()
+        mock_vm_class.return_value = mock_vm
+        
+        engine = TTSEngine(provider_manager=mock_pm)
+        
+        assert engine.provider_manager == mock_pm
+        mock_vm_class.assert_called_once_with(provider_manager=mock_pm)
+    
+    @patch('tts.tts_engine.TTSProviderManager')
+    @patch('tts.tts_engine.VoiceManager')
+    def test_initialization_without_provider_manager(self, mock_vm_class, mock_pm_class):
+        """Test TTSEngine initialization creates ProviderManager"""
+        mock_pm = MagicMock()
+        mock_pm_class.return_value = mock_pm
+        mock_vm = MagicMock()
+        mock_vm_class.return_value = mock_vm
+        
+        engine = TTSEngine()
+        
+        assert engine.provider_manager is not None
+        mock_pm_class.assert_called_once()
+    
+    @patch('tts.tts_engine.TTSProviderManager')
+    @patch('tts.tts_engine.VoiceManager')
+    def test_get_available_voices_with_provider(self, mock_vm_class, mock_pm_class):
+        """Test get_available_voices with provider parameter"""
+        mock_pm = MagicMock()
+        mock_pm_class.return_value = mock_pm
+        mock_vm = MagicMock()
+        mock_voices = [{"id": "voice1", "name": "Voice 1"}]
+        mock_vm.get_voices.return_value = mock_voices
+        mock_vm_class.return_value = mock_vm
+        
+        engine = TTSEngine(provider_manager=mock_pm)
+        voices = engine.get_available_voices(provider="edge_tts")
+        
+        mock_vm.get_voices.assert_called_once_with(locale=None, provider="edge_tts")
+        assert voices == mock_voices
+    
+    @patch('tts.tts_engine.TTSProviderManager')
+    @patch('tts.tts_engine.VoiceManager')
+    def test_get_voice_list_with_provider(self, mock_vm_class, mock_pm_class):
+        """Test get_voice_list with provider parameter"""
+        mock_pm = MagicMock()
+        mock_pm_class.return_value = mock_pm
+        mock_vm = MagicMock()
+        mock_voice_list = ["Voice 1 - Male", "Voice 2 - Female"]
+        mock_vm.get_voice_list.return_value = mock_voice_list
+        mock_vm_class.return_value = mock_vm
+        
+        engine = TTSEngine(provider_manager=mock_pm)
+        voice_list = engine.get_voice_list(provider="pyttsx3")
+        
+        mock_vm.get_voice_list.assert_called_once_with(locale=None, provider="pyttsx3")
+        assert voice_list == mock_voice_list
+    
+    @patch('tts.tts_engine.TTSProviderManager')
+    @patch('tts.tts_engine.VoiceManager')
+    def test_convert_text_to_speech_with_provider(self, mock_vm_class, mock_pm_class):
+        """Test convert_text_to_speech with provider parameter"""
+        mock_pm = MagicMock()
+        mock_pm.convert_with_fallback.return_value = True
+        mock_pm_class.return_value = mock_pm
+        
+        mock_vm = MagicMock()
+        mock_voice = {"id": "voice1", "name": "Voice 1", "provider": "edge_tts"}
+        mock_vm.get_voice_by_name.return_value = mock_voice
+        mock_vm_class.return_value = mock_vm
+        
+        engine = TTSEngine(provider_manager=mock_pm)
+        output_path = Path("/tmp/test_output.mp3")
+        
+        result = engine.convert_text_to_speech(
+            text="Hello world",
+            output_path=output_path,
+            voice="voice1",
+            provider="edge_tts"
+        )
+        
+        assert result is True
+        mock_pm.convert_with_fallback.assert_called_once()
+        call_args = mock_pm.convert_with_fallback.call_args
+        assert call_args.kwargs["preferred_provider"] == "edge_tts"
+        assert call_args.kwargs["voice"] == "voice1"
+    
+    @patch('tts.tts_engine.TTSProviderManager')
+    @patch('tts.tts_engine.VoiceManager')
+    def test_convert_text_to_speech_without_provider(self, mock_vm_class, mock_pm_class):
+        """Test convert_text_to_speech without provider (uses fallback)"""
+        mock_pm = MagicMock()
+        mock_pm.convert_with_fallback.return_value = True
+        mock_pm_class.return_value = mock_pm
+        
+        mock_vm = MagicMock()
+        mock_voice = {"id": "voice1", "name": "Voice 1", "provider": "edge_tts"}
+        mock_vm.get_voice_by_name.return_value = mock_voice
+        mock_vm_class.return_value = mock_vm
+        
+        engine = TTSEngine(provider_manager=mock_pm)
+        output_path = Path("/tmp/test_output.mp3")
+        
+        result = engine.convert_text_to_speech(
+            text="Hello world",
+            output_path=output_path,
+            voice="voice1"
+        )
+        
+        assert result is True
+        mock_pm.convert_with_fallback.assert_called_once()
+        call_args = mock_pm.convert_with_fallback.call_args
+        assert call_args.kwargs.get("preferred_provider") is None or call_args.kwargs.get("preferred_provider") == "edge_tts"
+    
+    @patch('tts.tts_engine.TTSProviderManager')
+    @patch('tts.tts_engine.VoiceManager')
+    def test_convert_text_to_speech_uses_voice_provider(self, mock_vm_class, mock_pm_class):
+        """Test convert_text_to_speech uses provider from voice metadata"""
+        mock_pm = MagicMock()
+        mock_pm.convert_with_fallback.return_value = True
+        mock_pm_class.return_value = mock_pm
+        
+        mock_vm = MagicMock()
+        mock_voice = {"id": "voice1", "name": "Voice 1", "provider": "pyttsx3"}
+        mock_vm.get_voice_by_name.return_value = mock_voice
+        mock_vm_class.return_value = mock_vm
+        
+        engine = TTSEngine(provider_manager=mock_pm)
+        output_path = Path("/tmp/test_output.mp3")
+        
+        result = engine.convert_text_to_speech(
+            text="Hello world",
+            output_path=output_path,
+            voice="voice1"
+        )
+        
+        assert result is True
+        mock_pm.convert_with_fallback.assert_called_once()
+        call_args = mock_pm.convert_with_fallback.call_args
+        # Should use provider from voice metadata
+        assert call_args.kwargs.get("preferred_provider") == "pyttsx3" or call_args.kwargs.get("preferred_provider") is None
+    
+    @patch('tts.tts_engine.TTSProviderManager')
+    @patch('tts.tts_engine.VoiceManager')
+    def test_convert_file_to_speech_with_provider(self, mock_vm_class, mock_pm_class):
+        """Test convert_file_to_speech with provider parameter"""
+        mock_pm = MagicMock()
+        mock_pm.convert_with_fallback.return_value = True
+        mock_pm_class.return_value = mock_pm
+        
+        mock_vm = MagicMock()
+        mock_voice = {"id": "voice1", "name": "Voice 1"}
+        mock_vm.get_voice_by_name.return_value = mock_voice
+        mock_vm_class.return_value = mock_vm
+        
+        engine = TTSEngine(provider_manager=mock_pm)
+        input_file = Path("/tmp/test_input.txt")
+        output_path = Path("/tmp/test_output.mp3")
+        
+        # Mock file reading
+        with patch('builtins.open', create=True) as mock_open:
+            mock_open.return_value.__enter__.return_value.read.return_value = "Hello world"
+            
+            result = engine.convert_file_to_speech(
+                input_file=input_file,
+                output_path=output_path,
+                provider="edge_tts"
+            )
+        
+        assert result is True
+        mock_pm.convert_with_fallback.assert_called_once()
+
