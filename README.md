@@ -1,19 +1,25 @@
-# ACT - Audiobook Creator Tools
+# 🎙️ ACT - Audiobook Creator Tools
 
-A complete and modular tool for creating audiobooks from webnovels using AI voices.
+[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/Status-MVP%20Complete-success)](https://github.com/FerranGuardia/ACT-Project)
 
-## Features
+A complete and modular Python tool for creating audiobooks from webnovels using AI voices. Transform your favorite web novels into high-quality audiobooks with automated scraping, multi-provider text-to-speech, and a modern GUI.
 
-- **Automated Scraping**: Extracts content from webnovel sites (NovelFull, NovelBin, etc.)
-- **Multi-Provider Text-to-Speech**: Converts text to audio using:
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/ferrangp)
+
+## ✨ Features
+
+- 🔍 **Automated Scraping**: Extracts content from webnovel sites (NovelFull, NovelBin, etc.)
+- 🎤 **Multi-Provider Text-to-Speech**: Converts text to audio using:
   - **Edge TTS** (Cloud, high quality, free)
   - **pyttsx3** (Offline, system voices, fallback)
-- **Automatic Fallback**: Seamlessly switches between TTS providers when needed
-- **Complete Pipeline**: Automated workflow from novel URL to finished audiobook
-- **Modern GUI**: PySide6-based interface with 4 operational modes
-- **Project Management**: Save, load, and resume projects
-- **Queue System**: Process multiple novels in sequence
-- **Progress Tracking**: Real-time progress updates and status monitoring
+- 🔄 **Automatic Fallback**: Seamlessly switches between TTS providers when needed
+- ⚙️ **Complete Pipeline**: Automated workflow from novel URL to finished audiobook
+- 🖥️ **Modern GUI**: PySide6-based interface with 4 operational modes
+- 💾 **Project Management**: Save, load, and resume projects
+- 📋 **Queue System**: Process multiple novels in sequence
+- 📊 **Progress Tracking**: Real-time progress updates and status monitoring
 
 ## Requirements
 
@@ -26,8 +32,8 @@ A complete and modular tool for creating audiobooks from webnovels using AI voic
 ### 1. Clone the Repository
 
 ```bash
-git clone <repository-url>
-cd ACT
+git clone https://github.com/FerranGuardia/ACT-Project.git
+cd ACT-Project
 ```
 
 ### 2. Create Virtual Environment (Recommended)
@@ -232,23 +238,24 @@ pytest tests/integration/
 
 ## License
 
-[Specify license]
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Contributing
 
-Contributions are welcome! Please read the contribution guidelines before submitting a PR.
+## 🤝 Contributing
 
-## Support
+Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
 
-For issues, questions, or feature requests, please open an issue on the repository.
+## 🐛 Issues & Support
 
-### ☕ Support This Project
+For issues, questions, or feature requests, please open an issue on the [GitHub Issues](https://github.com/FerranGuardia/ACT-Project/issues) page.
+
+## ☕ Support This Project
 
 If you find this project helpful, consider supporting its development:
 
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/ferrangp)
 
-[Support on Buy Me a Coffee](https://buymeacoffee.com/ferrangp)
+[Support on Buy Me a Coffee](https://buymeacoffee.com/ferrangp) - Your support helps maintain and improve this project!
 
 ---
 
