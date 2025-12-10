@@ -249,6 +249,10 @@ def clean_text(text: Optional[str]) -> str:
 
     # Step 14: Normalize punctuation for TTS
     # Multiple punctuation marks can confuse TTS
+    # Fix dot spacing patterns: ". .." or ".. ." or ". . ." should become "..."
+    text = re.sub(r"\.\s+\.\.", "...", text)  # ". .." → "..."
+    text = re.sub(r"\.\.\s+\.", "...", text)  # ".. ." → "..."
+    text = re.sub(r"\.\s+\.\s+\.", "...", text)  # ". . ." → "..."
     text = re.sub(r"\.{4,}", "...", text)  # More than 3 dots becomes ...
     text = re.sub(r"!{3,}", "!", text)  # Multiple ! becomes single
     text = re.sub(r"\?{3,}", "?", text)  # Multiple ? becomes single
