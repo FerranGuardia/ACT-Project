@@ -38,21 +38,34 @@ def main() -> int:
         logger.debug(f"Config directory: {config.get_config_dir()}")
         logger.debug(f"Config file: {config.get_config_file_path()}")
 
-        # TODO: Initialize UI when ready
-        # For now, just print that we're ready
-        logger.info("Application initialized successfully")
-        logger.info("UI will be implemented in Block 6")
-
-        # This will be replaced with UI initialization
-        print("\nACT - Audiobook Creator Tools")
-        print("=" * 60)
-        print(f"Version: {config.get('app.version')}")
-        print(f"Configuration loaded from: {config.get_config_file_path()}")
-        print("\nApplication is ready!")
-        print("UI implementation coming in Block 6...")
-        print("=" * 60)
-
-        return 0
+        # Initialize and launch UI
+        logger.info("Initializing UI...")
+        try:
+            from ui.main_window import MainWindow
+            from PySide6.QtWidgets import QApplication
+            
+            app = QApplication(sys.argv)
+            app.setApplicationName("ACT - Audiobook Creator Tools")
+            app.setApplicationVersion(config.get('app.version', '0.1.0'))
+            
+            window = MainWindow()
+            window.show()
+            
+            logger.info("UI launched successfully")
+            return app.exec()
+            
+        except ImportError as e:
+            logger.error(f"Failed to import UI components: {e}")
+            print(f"\nError: Failed to import UI components: {e}", file=sys.stderr)
+            print("\nMake sure PySide6 is installed:", file=sys.stderr)
+            print("  pip install PySide6", file=sys.stderr)
+            return 1
+        except Exception as e:
+            logger.exception(f"Error launching UI: {e}")
+            print(f"\nError launching UI: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc()
+            return 1
 
     except Exception as e:
         logger.exception(f"Fatal error during application startup: {e}")
