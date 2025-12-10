@@ -36,6 +36,7 @@ class ProcessingPipeline:
         on_status_change: Optional[Callable[[str], None]] = None,
         on_chapter_update: Optional[Callable[[int, str, str], None]] = None,
         voice: Optional[str] = None,
+        provider: Optional[str] = None,
         base_output_dir: Optional[Path] = None,
         novel_title: Optional[str] = None
     ):
@@ -48,6 +49,7 @@ class ProcessingPipeline:
             on_status_change: Optional callback for status changes
             on_chapter_update: Optional callback for chapter updates
             voice: Optional voice name for TTS (e.g., "en-US-AndrewNeural")
+            provider: Optional TTS provider name ("edge_tts" or "pyttsx3")
             base_output_dir: Optional custom output directory (defaults to config)
             novel_title: Optional novel title for folder naming
         """
@@ -68,6 +70,7 @@ class ProcessingPipeline:
         
         # Voice settings
         self.voice = voice or self.config.get("tts.voice", "en-US-AndrewNeural")
+        self.provider = provider
         
         # Callbacks
         self.on_progress = on_progress
@@ -315,12 +318,13 @@ class ProcessingPipeline:
             temp_dir = Path(tempfile.gettempdir())
             temp_audio_path = temp_dir / f"chapter_{chapter_num}_temp.mp3"
             
-            # Convert to speech (use voice if set, otherwise use default from config)
+            # Convert to speech (use voice and provider if set, otherwise use defaults)
             voice = self.voice if self.voice else None
             success = self.tts_engine.convert_text_to_speech(
                 text=content,
                 output_path=temp_audio_path,
-                voice=voice
+                voice=voice,
+                provider=self.provider
             )
             
             if not success:
@@ -515,7 +519,8 @@ class ProcessingPipeline:
         novel_author: Optional[str] = None,
         start_from: int = 1,
         max_chapters: Optional[int] = None,
-        voice: Optional[str] = None
+        voice: Optional[str] = None,
+        provider: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Run the complete pipeline from TOC URL to finished audiobook.
@@ -528,15 +533,18 @@ class ProcessingPipeline:
             start_from: Chapter number to start from
             max_chapters: Maximum number of chapters to process
             voice: Optional voice name for TTS (overrides instance voice)
+            provider: Optional TTS provider name (overrides instance provider)
             
         Returns:
             Dictionary with processing results
         """
         logger.info("Starting full pipeline...")
         
-        # Update voice if provided
+        # Update voice and provider if provided
         if voice:
             self.voice = voice
+        if provider:
+            self.provider = provider
         
         # Step 1: Initialize project
         if not self.initialize_project(

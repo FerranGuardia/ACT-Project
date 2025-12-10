@@ -33,6 +33,7 @@ class AddQueueDialog(QDialog):
         self.setMinimumWidth(500)
         self.voice_manager = VoiceManager()
         self.setup_ui()
+        self._load_providers()
         self._load_voices()
     
     def setup_ui(self):
@@ -65,6 +66,13 @@ class AddQueueDialog(QDialog):
         # Voice Selection
         voice_group = QGroupBox("Voice Settings")
         voice_layout = QVBoxLayout()
+        
+        # Provider selector
+        provider_layout = QHBoxLayout()
+        provider_layout.addWidget(QLabel("Provider:"))
+        self.provider_combo = QComboBox()
+        provider_layout.addWidget(self.provider_combo, 1)
+        voice_layout.addLayout(provider_layout)
         
         voice_select_layout = QHBoxLayout()
         voice_select_layout.addWidget(QLabel("Voice:"))
@@ -135,27 +143,90 @@ class AddQueueDialog(QDialog):
         if folder:
             self.folder_input.setText(folder)
     
-    def _load_voices(self):
-        """Load available voices into the combo box."""
+    def _load_providers(self):
+        """Load available providers into the combo box."""
         try:
-            voices = self.voice_manager.get_voice_list()
+            providers = self.voice_manager.get_providers()
+            if not providers:
+                logger.warning("No TTS providers available")
+                self.provider_combo.addItems(["No providers available"])
+                self.provider_combo.setEnabled(False)
+                return
+            
+            # Add provider names with display labels
+            provider_labels = {
+                "edge_tts": "Edge TTS (Cloud)",
+                "pyttsx3": "pyttsx3 (Offline)"
+            }
+            
+            for provider in providers:
+                label = provider_labels.get(provider, provider)
+                self.provider_combo.addItem(label, provider)
+            
+            # Set default to first provider
+            if providers:
+                self.provider_combo.setCurrentIndex(0)
+            
+            # Connect provider change handler
+            self.provider_combo.currentTextChanged.connect(self._on_provider_changed)
+        except Exception as e:
+            logger.error(f"Error loading providers: {e}")
+            # Fallback to Edge TTS
+            self.provider_combo.addItem("Edge TTS (Cloud)", "edge_tts")
+    
+    def _on_provider_changed(self):
+        """Handle provider selection change."""
+        # Reload voices for the selected provider
+        self._load_voices()
+    
+    def _get_selected_provider(self) -> Optional[str]:
+        """Get the currently selected provider name."""
+        current_index = self.provider_combo.currentIndex()
+        if current_index < 0:
+            return None
+        return self.provider_combo.itemData(current_index)
+    
+    def _load_voices(self):
+        """Load available voices into the combo box based on selected provider."""
+        try:
+            # Clear existing voices
+            self.voice_combo.clear()
+            
+            # Get selected provider
+            provider = self._get_selected_provider()
+            
+            # Load voices for the selected provider (filtered to en-US only)
+            voices = self.voice_manager.get_voice_list(locale="en-US", provider=provider)
+            
+            if not voices:
+                logger.warning(f"No voices available for provider: {provider}")
+                self.voice_combo.addItems(["No voices available"])
+                self.voice_combo.setEnabled(False)
+                return
+            
+            self.voice_combo.setEnabled(True)
             self.voice_combo.addItems(voices)
+            
             # Set default voice
             default_voice = "en-US-AndrewNeural"
             index = self.voice_combo.findText(default_voice, Qt.MatchFlag.MatchContains)
             if index >= 0:
                 self.voice_combo.setCurrentIndex(index)
+            elif voices:
+                # If default not found, use first available
+                self.voice_combo.setCurrentIndex(0)
         except Exception as e:
             logger.error(f"Error loading voices: {e}")
             self.voice_combo.addItem("en-US-AndrewNeural")
     
-    def get_data(self) -> tuple[str, str, str, dict]:
-        """Get the entered URL, title, voice, and chapter selection."""
+    def get_data(self) -> tuple[str, str, str, str, dict]:
+        """Get the entered URL, title, voice, provider, and chapter selection."""
         url = self.url_input.text().strip()
         title = self.title_input.text().strip()
         # Extract voice name from formatted string (e.g., "en-US-AndrewNeural - Male" -> "en-US-AndrewNeural")
         voice_display = self.voice_combo.currentText()
         voice = voice_display.split(" - ")[0] if " - " in voice_display else voice_display
+        provider = self._get_selected_provider()
         
         # Get chapter selection
         if self.all_chapters_radio.isChecked():
@@ -176,7 +247,7 @@ class AddQueueDialog(QDialog):
             except ValueError:
                 chapter_selection = {'type': 'all'}  # Default to all if invalid
         
-        return url, title, voice, chapter_selection
+        return url, title, voice, provider, chapter_selection
 
 
 class QueueItemWidget(QWidget):
@@ -257,11 +328,12 @@ class ProcessingThread(QThread):
     chapter_update = Signal(int, str, str)  # Chapter num, status, message
     finished = Signal(bool, str)  # Success, message
     
-    def __init__(self, url: str, project_name: str, voice: str = None, chapter_selection: dict = None, output_folder: str = None, novel_title: str = None):
+    def __init__(self, url: str, project_name: str, voice: str = None, provider: str = None, chapter_selection: dict = None, output_folder: str = None, novel_title: str = None):
         super().__init__()
         self.url = url
         self.project_name = project_name
         self.voice = voice
+        self.provider = provider
         self.chapter_selection = chapter_selection or {'type': 'all'}
         self.output_folder = output_folder or str(Path.home() / "Desktop")
         self.novel_title = novel_title or project_name
@@ -314,6 +386,7 @@ class ProcessingThread(QThread):
                 on_status_change=lambda s: self.status.emit(s),
                 on_chapter_update=lambda num, status, msg: self.chapter_update.emit(num, status, msg),
                 voice=self.voice,
+                provider=self.provider,
                 base_output_dir=base_output_dir,
                 novel_title=self.novel_title
             )
@@ -328,6 +401,7 @@ class ProcessingThread(QThread):
                 toc_url=self.url,
                 novel_url=self.url,
                 voice=self.voice,
+                provider=self.provider,
                 start_from=start_from,
                 max_chapters=max_chapters
             )
@@ -502,7 +576,7 @@ class FullAutoView(QWidget):
         """Add a new item to the queue."""
         dialog = AddQueueDialog(self)
         if dialog.exec():
-            url, title, voice, chapter_selection = dialog.get_data()
+            url, title, voice, provider, chapter_selection = dialog.get_data()
             
             # Validate URL
             valid, error_msg = self._validate_url(url)
@@ -532,6 +606,7 @@ class FullAutoView(QWidget):
                 'url': url,
                 'title': title,
                 'voice': voice,
+                'provider': provider,
                 'chapter_selection': chapter_selection,
                 'status': 'Pending',
                 'progress': 0
@@ -539,7 +614,7 @@ class FullAutoView(QWidget):
             self.queue_items.append(queue_item)
             self._update_queue_display()
             self._save_queue()  # Persist queue state (pyLoad pattern)
-            logger.info(f"Added to queue: {title} ({url}) - Voice: {voice}, Chapters: {chapter_selection}")
+            logger.info(f"Added to queue: {title} ({url}) - Voice: {voice}, Provider: {provider}, Chapters: {chapter_selection}")
     
     def clear_queue(self):
         """Clear all items from the queue."""
@@ -630,6 +705,7 @@ class FullAutoView(QWidget):
         # Create and start processing thread
         project_name = item['title'].replace(' ', '_').lower()
         voice = item.get('voice', 'en-US-AndrewNeural')
+        provider = item.get('provider')
         chapter_selection = item.get('chapter_selection', {'type': 'all'})
         output_folder = item.get('output_folder', str(Path.home() / "Desktop"))
         novel_title = item.get('title', project_name)
@@ -637,6 +713,7 @@ class FullAutoView(QWidget):
             item['url'], 
             project_name,
             voice=voice,
+            provider=provider,
             chapter_selection=chapter_selection,
             output_folder=output_folder,
             novel_title=novel_title
@@ -798,6 +875,7 @@ class FullAutoView(QWidget):
                         'url': item['url'],
                         'title': item['title'],
                         'voice': item.get('voice', 'en-US-AndrewNeural'),
+                        'provider': item.get('provider'),
                         'chapter_selection': item.get('chapter_selection', {'type': 'all'}),
                         'output_folder': item.get('output_folder'),
                         'status': 'Pending',  # Reset to Pending on save (will resume on load)

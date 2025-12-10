@@ -1,7 +1,7 @@
 """
 Voice manager for TTS module.
 
-Handles loading, caching, and managing Edge-TTS voices.
+Handles loading, caching, and managing TTS voices from multiple providers.
 """
 
 import asyncio
@@ -12,22 +12,27 @@ from typing import Dict, List, Optional
 
 from core.config_manager import get_config
 from core.logger import get_logger
+from tts.providers.provider_manager import TTSProviderManager
 
 logger = get_logger("tts.voice_manager")
 
 
 class VoiceManager:
-    """Manages Edge-TTS voices with caching support."""
+    """Manages TTS voices from multiple providers with caching support."""
 
-    def __init__(self, cache_duration_days: int = 7):
+    def __init__(self, cache_duration_days: int = 7, provider_manager: Optional[TTSProviderManager] = None):
         """
         Initialize voice manager.
 
         Args:
             cache_duration_days: How long to keep cached voices (default: 7 days)
+            provider_manager: Optional TTSProviderManager instance. If None, creates a new one.
         """
         self.cache_duration = cache_duration_days * 24 * 3600  # Convert to seconds
         self.config = get_config()
+        
+        # Initialize provider manager
+        self.provider_manager = provider_manager or TTSProviderManager()
         
         # Cache file location
         cache_dir = Path.home() / ".act" / "cache"
@@ -37,54 +42,98 @@ class VoiceManager:
         self._voices: List[Dict] = []
         self._voices_loaded = False
 
-    def get_voices(self, locale: Optional[str] = None) -> List[Dict]:
+    def get_voices(self, locale: Optional[str] = None, provider: Optional[str] = None) -> List[Dict]:
         """
-        Get available voices, optionally filtered by locale.
+        Get available voices, optionally filtered by locale and provider.
 
         Args:
-            locale: Locale filter (e.g., "en-US"). If None, returns all voices.
+            locale: Locale filter (e.g., "en-US"). Defaults to "en-US" only.
+            provider: Optional provider name ("edge_tts" or "pyttsx3"). 
+                     If None, returns voices from all providers.
 
         Returns:
-            List of voice dictionaries
+            List of voice dictionaries with keys: id, name, language, gender, quality, provider
         """
-        if not self._voices_loaded:
-            self._load_voices()
+        # Default to en-US only as per requirements
+        if locale is None:
+            locale = "en-US"
         
-        if locale:
-            return [v for v in self._voices if v.get("Locale") == locale]
-        return self._voices.copy()
+        # If provider is specified, get voices from that provider only
+        if provider:
+            voices = self.provider_manager.get_voices_by_provider(provider, locale=locale)
+        else:
+            # Get voices from all providers
+            voices = self.provider_manager.get_all_voices(locale=locale)
+        
+        return voices
 
-    def get_voice_list(self, locale: Optional[str] = None) -> List[str]:
+    def get_voice_list(self, locale: Optional[str] = None, provider: Optional[str] = None) -> List[str]:
         """
         Get list of voice names formatted for display.
 
         Args:
-            locale: Locale filter (e.g., "en-US"). If None, returns all voices.
+            locale: Locale filter (e.g., "en-US"). Defaults to "en-US" only.
+            provider: Optional provider name ("edge_tts" or "pyttsx3").
+                     If None, returns voices from all providers.
 
         Returns:
-            List of formatted voice strings: "ShortName - Gender"
+            List of formatted voice strings: "name - gender"
         """
-        voices = self.get_voices(locale)
-        return [f"{v['ShortName']} - {v['Gender']}" for v in voices]
+        voices = self.get_voices(locale=locale, provider=provider)
+        # Handle both old format (ShortName) and new format (name)
+        result = []
+        for v in voices:
+            name = v.get("name") or v.get("ShortName", "Unknown")
+            gender = v.get("gender", "").capitalize() or v.get("Gender", "")
+            result.append(f"{name} - {gender}")
+        return result
 
-    def get_voice_by_name(self, voice_name: str) -> Optional[Dict]:
+    def get_voice_by_name(self, voice_name: str, provider: Optional[str] = None) -> Optional[Dict]:
         """
-        Get voice dictionary by short name.
+        Get voice dictionary by name or ID.
 
         Args:
-            voice_name: Voice short name (e.g., "en-US-AndrewNeural")
+            voice_name: Voice name or ID (e.g., "en-US-AndrewNeural" or voice name)
+            provider: Optional provider name to search within
 
         Returns:
             Voice dictionary or None if not found
         """
-        voices = self.get_voices()
+        voices = self.get_voices(provider=provider)
         for voice in voices:
-            if voice.get("ShortName") == voice_name:
+            # Check both id and name fields, and legacy ShortName for backward compatibility
+            if (voice.get("id") == voice_name or 
+                voice.get("name") == voice_name or 
+                voice.get("ShortName") == voice_name):
                 return voice
         return None
+    
+    def get_providers(self) -> List[str]:
+        """
+        Get list of available provider names.
+
+        Returns:
+            List of provider names (e.g., ["edge_tts", "pyttsx3"])
+        """
+        return self.provider_manager.get_providers()
+    
+    def get_voices_by_provider(self, provider: str, locale: Optional[str] = None) -> List[Dict]:
+        """
+        Get voices from a specific provider.
+
+        Args:
+            provider: Provider name ("edge_tts" or "pyttsx3")
+            locale: Optional locale filter (e.g., "en-US"). Defaults to "en-US" only.
+
+        Returns:
+            List of voice dictionaries from the specified provider
+        """
+        if locale is None:
+            locale = "en-US"
+        return self.provider_manager.get_voices_by_provider(provider, locale=locale)
 
     def _load_voices(self) -> None:
-        """Load voices from cache or Edge-TTS API."""
+        """Load voices from cache or providers (legacy method for backward compatibility)."""
         # Try cache first
         cached_voices = self._load_cache()
         if cached_voices:
@@ -93,58 +142,64 @@ class VoiceManager:
             logger.info(f"Loaded {len(cached_voices)} voices from cache")
             return
 
-        # Load from API
-        logger.info("Loading voices from Edge-TTS API...")
+        # Load from providers using ProviderManager
+        logger.info("Loading voices from TTS providers...")
         try:
-            import edge_tts
+            voices = self.provider_manager.get_all_voices(locale="en-US")
             
-            # Run async function in new event loop
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            voices = loop.run_until_complete(edge_tts.list_voices())
-            loop.close()
+            # Convert to legacy format for backward compatibility
+            legacy_voices = []
+            for voice in voices:
+                legacy_voice = {
+                    "ShortName": voice.get("id", ""),
+                    "FriendlyName": voice.get("name", ""),
+                    "Locale": voice.get("language", "en-US"),
+                    "Gender": voice.get("gender", "neutral").capitalize(),
+                    "Name": voice.get("name", ""),
+                }
+                legacy_voices.append(legacy_voice)
             
             # Sort by ShortName
-            voices.sort(key=lambda x: x.get("ShortName", ""))
-            self._voices = voices
+            legacy_voices.sort(key=lambda x: x.get("ShortName", ""))
+            self._voices = legacy_voices
             self._voices_loaded = True
             
             # Save to cache
-            self._save_cache(voices)
+            self._save_cache(legacy_voices)
             
-            logger.info(f"Loaded {len(voices)} voices from API")
-        except ImportError:
-            logger.error("edge-tts not installed. Install with: pip install edge-tts")
-            self._voices = []
-            self._voices_loaded = True
+            logger.info(f"Loaded {len(legacy_voices)} voices from providers")
         except Exception as e:
             logger.error(f"Error loading voices: {e}")
             self._voices = []
             self._voices_loaded = True
 
     def refresh_voices(self) -> None:
-        """Refresh voices list from API and update cache."""
-        logger.info("Refreshing voices from Edge-TTS API...")
+        """Refresh voices list from providers and update cache."""
+        logger.info("Refreshing voices from TTS providers...")
         try:
-            import edge_tts
+            voices = self.provider_manager.get_all_voices(locale="en-US")
             
-            # Run async function in new event loop
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            voices = loop.run_until_complete(edge_tts.list_voices())
-            loop.close()
+            # Convert to legacy format for backward compatibility
+            legacy_voices = []
+            for voice in voices:
+                legacy_voice = {
+                    "ShortName": voice.get("id", ""),
+                    "FriendlyName": voice.get("name", ""),
+                    "Locale": voice.get("language", "en-US"),
+                    "Gender": voice.get("gender", "neutral").capitalize(),
+                    "Name": voice.get("name", ""),
+                }
+                legacy_voices.append(legacy_voice)
             
             # Sort by ShortName
-            voices.sort(key=lambda x: x.get("ShortName", ""))
-            self._voices = voices
+            legacy_voices.sort(key=lambda x: x.get("ShortName", ""))
+            self._voices = legacy_voices
             self._voices_loaded = True
             
             # Update cache
-            self._save_cache(voices)
+            self._save_cache(legacy_voices)
             
-            logger.info(f"Refreshed {len(voices)} voices")
-        except ImportError:
-            logger.error("edge-tts not installed. Install with: pip install edge-tts")
+            logger.info(f"Refreshed {len(legacy_voices)} voices")
         except Exception as e:
             logger.error(f"Error refreshing voices: {e}")
 
