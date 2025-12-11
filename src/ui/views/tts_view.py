@@ -587,7 +587,11 @@ class TTSView(QWidget):
         # Find and update the item
         for i in range(self.provider_combo.count()):
             if self.provider_combo.itemData(i) == provider_name:
+                current_text = self.provider_combo.itemText(i)
                 self.provider_combo.setItemText(i, display_text)
+                logger.debug(f"Updated provider {provider_name} display: {current_text} -> {display_text}")
+                # Force UI update
+                self.provider_combo.update()
                 break
     
     def _on_provider_changed(self):
