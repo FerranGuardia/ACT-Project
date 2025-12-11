@@ -175,9 +175,13 @@ class TestTTSEngineProviders:
     @patch('tts.tts_engine.TTSProviderManager')
     @patch('tts.tts_engine.VoiceManager')
     def test_convert_text_to_speech_with_provider(self, mock_vm_class, mock_pm_class):
-        """Test convert_text_to_speech with provider parameter"""
+        """Test convert_text_to_speech with provider parameter - should use provider directly (no fallback)"""
+        mock_provider = MagicMock()
+        mock_provider.is_available.return_value = True
+        mock_provider.convert_text_to_speech.return_value = True
+        
         mock_pm = MagicMock()
-        mock_pm.convert_with_fallback.return_value = True
+        mock_pm.get_provider.return_value = mock_provider
         mock_pm_class.return_value = mock_pm
         
         mock_vm = MagicMock()
@@ -196,10 +200,11 @@ class TestTTSEngineProviders:
         )
         
         assert result is True
-        mock_pm.convert_with_fallback.assert_called_once()
-        call_args = mock_pm.convert_with_fallback.call_args
-        assert call_args.kwargs["preferred_provider"] == "edge_tts"
-        assert call_args.kwargs["voice"] == "voice1"
+        # Should use provider directly, not convert_with_fallback
+        mock_pm.get_provider.assert_called_with("edge_tts")
+        mock_provider.convert_text_to_speech.assert_called_once()
+        # Should NOT call convert_with_fallback when provider is specified
+        assert not hasattr(mock_pm, 'convert_with_fallback') or not mock_pm.convert_with_fallback.called
     
     @patch('tts.tts_engine.TTSProviderManager')
     @patch('tts.tts_engine.VoiceManager')
@@ -226,18 +231,22 @@ class TestTTSEngineProviders:
         assert result is True
         mock_pm.convert_with_fallback.assert_called_once()
         call_args = mock_pm.convert_with_fallback.call_args
-        assert call_args.kwargs.get("preferred_provider") is None or call_args.kwargs.get("preferred_provider") == "edge_tts"
+        # When no provider specified, preferred_provider should be None (allows fallback)
+        assert call_args.kwargs.get("preferred_provider") is None
     
     @patch('tts.tts_engine.TTSProviderManager')
     @patch('tts.tts_engine.VoiceManager')
-    def test_convert_text_to_speech_uses_voice_provider(self, mock_vm_class, mock_pm_class):
-        """Test convert_text_to_speech uses provider from voice metadata"""
+    def test_convert_text_to_speech_fails_when_provider_unavailable(self, mock_vm_class, mock_pm_class):
+        """Test convert_text_to_speech fails when specified provider is unavailable (no fallback)"""
+        mock_provider = MagicMock()
+        mock_provider.is_available.return_value = False
+        
         mock_pm = MagicMock()
-        mock_pm.convert_with_fallback.return_value = True
+        mock_pm.get_provider.return_value = mock_provider
         mock_pm_class.return_value = mock_pm
         
         mock_vm = MagicMock()
-        mock_voice = {"id": "voice1", "name": "Voice 1", "provider": "pyttsx3"}
+        mock_voice = {"id": "voice1", "name": "Voice 1", "provider": "edge_tts"}
         mock_vm.get_voice_by_name.return_value = mock_voice
         mock_vm_class.return_value = mock_vm
         
@@ -247,14 +256,14 @@ class TestTTSEngineProviders:
         result = engine.convert_text_to_speech(
             text="Hello world",
             output_path=output_path,
-            voice="voice1"
+            voice="voice1",
+            provider="edge_tts"
         )
         
-        assert result is True
-        mock_pm.convert_with_fallback.assert_called_once()
-        call_args = mock_pm.convert_with_fallback.call_args
-        # Should use provider from voice metadata
-        assert call_args.kwargs.get("preferred_provider") == "pyttsx3" or call_args.kwargs.get("preferred_provider") is None
+        assert result is False  # Should fail when provider is unavailable
+        mock_pm.get_provider.assert_called_with("edge_tts")
+        # Should NOT call convert_with_fallback when provider is specified
+        assert not hasattr(mock_pm, 'convert_with_fallback') or not mock_pm.convert_with_fallback.called
     
     @patch('tts.tts_engine.TTSProviderManager')
     @patch('tts.tts_engine.VoiceManager')

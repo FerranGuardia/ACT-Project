@@ -241,8 +241,8 @@ class TestTTSProviderManager:
     
     @patch('tts.providers.provider_manager.EdgeTTSProvider')
     @patch('tts.providers.provider_manager.Pyttsx3Provider')
-    def test_convert_with_fallback_uses_fallback(self, mock_pyttsx3, mock_edge):
-        """Test convert_with_fallback uses fallback when first provider fails"""
+    def test_convert_with_fallback_uses_fallback_when_no_preference(self, mock_pyttsx3, mock_edge):
+        """Test convert_with_fallback uses fallback when no preferred provider and first fails"""
         edge_provider = MockProvider("edge_tts", ProviderType.CLOUD, available=True)
         pyttsx3_provider = MockProvider("pyttsx3", ProviderType.OFFLINE, available=True)
         
@@ -255,11 +255,12 @@ class TestTTSProviderManager:
         manager = TTSProviderManager()
         output_path = Path("/tmp/test_output.mp3")
         
+        # No preferred provider - should fallback
         result = manager.convert_with_fallback(
             text="Hello",
             voice="edge_tts_voice1",
             output_path=output_path,
-            preferred_provider="edge_tts"
+            preferred_provider=None  # No preference - fallback allowed
         )
         
         assert result is True  # Should succeed with pyttsx3 fallback

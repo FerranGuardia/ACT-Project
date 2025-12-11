@@ -16,6 +16,7 @@ from PySide6.QtGui import QFont
 
 from core.logger import get_logger
 from tts import TTSEngine, VoiceManager
+from ui.dialogs import ProviderSelectionDialog
 
 logger = get_logger("ui.tts_view")
 
@@ -266,11 +267,17 @@ class TTSView(QWidget):
         # Provider selector
         provider_layout = QHBoxLayout()
         provider_layout.addWidget(QLabel("Provider:"))
-        self.provider_combo = QComboBox()
-        # Will be populated by _load_providers()
-        provider_layout.addWidget(self.provider_combo)
+        self.provider_button = QPushButton("Select Provider...")
+        self.provider_button.clicked.connect(self._select_provider)
+        self.provider_status_label = QLabel("")
+        self.provider_status_label.setMinimumWidth(20)
+        provider_layout.addWidget(self.provider_button)
+        provider_layout.addWidget(self.provider_status_label)
         provider_layout.addStretch()
         voice_layout.addLayout(provider_layout)
+        
+        # Store selected provider
+        self.selected_provider: Optional[str] = None
         
         voice_select_layout = QHBoxLayout()
         voice_select_layout.addWidget(QLabel("Voice:"))
@@ -310,8 +317,7 @@ class TTSView(QWidget):
         self.pitch_note_label.setStyleSheet("color: gray; font-size: 9px;")
         pitch_layout.addWidget(self.pitch_note_label)
         voice_layout.addLayout(pitch_layout)
-        # Update note when provider changes
-        self.provider_combo.currentTextChanged.connect(self._update_pitch_note)
+        # Note: Pitch note will be updated when provider is selected via dialog
         
         # Volume slider
         volume_layout = QHBoxLayout()
@@ -386,7 +392,6 @@ class TTSView(QWidget):
         self.add_files_button.clicked.connect(self.add_files)
         self.add_folder_button.clicked.connect(self.add_folder)
         self.remove_button.clicked.connect(self.remove_selected_files)
-        self.provider_combo.currentTextChanged.connect(self._on_provider_changed)
         self.preview_button.clicked.connect(self.preview_voice)
         self.start_button.clicked.connect(self.start_conversion)
         self.pause_button.clicked.connect(self.pause_conversion)
@@ -418,39 +423,67 @@ class TTSView(QWidget):
             widget = widget.parent()
     
     def _load_providers(self):
-        """Load available providers into the combo box."""
+        """Load available providers and set default."""
         try:
             providers = self.voice_manager.get_providers()
             if not providers:
                 logger.warning("No TTS providers available")
-                self.provider_combo.addItems(["No providers available"])
-                self.provider_combo.setEnabled(False)
+                self.provider_button.setText("No Providers Available")
+                self.provider_button.setEnabled(False)
+                self.provider_status_label.setText("🔴")
                 return
             
-            # Add provider names with display labels
-            provider_labels = {
-                "edge_tts": "Edge TTS (Cloud)",
-                "pyttsx3": "pyttsx3 (Offline)"
-            }
-            
-            for provider in providers:
-                label = provider_labels.get(provider, provider)
-                self.provider_combo.addItem(label, provider)
-            
-            # Set default to first provider
+            # Set default to first available provider
             if providers:
-                self.provider_combo.setCurrentIndex(0)
+                self.selected_provider = providers[0]
+                self._update_provider_display()
         except Exception as e:
             logger.error(f"Error loading providers: {e}")
             # Fallback to Edge TTS
-            self.provider_combo.addItem("Edge TTS (Cloud)", "edge_tts")
+            self.selected_provider = "edge_tts"
+            self._update_provider_display()
     
-    def _on_provider_changed(self):
-        """Handle provider selection change."""
-        # Reload voices for the selected provider
-        self._load_voices()
-        # Update pitch note
-        self._update_pitch_note()
+    def _select_provider(self):
+        """Open provider selection dialog."""
+        dialog = ProviderSelectionDialog(self, current_provider=self.selected_provider)
+        if dialog.exec():
+            self.selected_provider = dialog.get_selected_provider()
+            self._update_provider_display()
+            # Reload voices for the selected provider
+            self._load_voices()
+            # Update pitch note
+            self._update_pitch_note()
+    
+    def _update_provider_display(self):
+        """Update provider button and status display."""
+        if not self.selected_provider:
+            self.provider_button.setText("Select Provider...")
+            self.provider_status_label.setText("")
+            return
+        
+        # Get provider info
+        provider_labels = {
+            "edge_tts": "Edge TTS 7.2.3",
+            "edge_tts_working": "Edge TTS 7.2.0 (Working)",
+            "pyttsx3": "pyttsx3 (Offline)"
+        }
+        
+        label = provider_labels.get(self.selected_provider, self.selected_provider)
+        self.provider_button.setText(f"Provider: {label}")
+        
+        # Check status and update indicator
+        try:
+            provider = self.tts_engine.provider_manager.get_provider(self.selected_provider)
+            if provider and provider.is_available():
+                self.provider_status_label.setText("🟢")
+                self.provider_status_label.setToolTip("Provider is active")
+            else:
+                self.provider_status_label.setText("🔴")
+                self.provider_status_label.setToolTip("Provider is unavailable")
+        except Exception as e:
+            logger.error(f"Error checking provider status: {e}")
+            self.provider_status_label.setText("🔴")
+            self.provider_status_label.setToolTip("Error checking status")
     
     def _update_pitch_note(self):
         """Update pitch note based on selected provider."""
@@ -466,10 +499,7 @@ class TTSView(QWidget):
     
     def _get_selected_provider(self) -> Optional[str]:
         """Get the currently selected provider name."""
-        current_index = self.provider_combo.currentIndex()
-        if current_index < 0:
-            return None
-        return self.provider_combo.itemData(current_index)
+        return self.selected_provider
     
     def _load_voices(self):
         """Load available voices into the combo box based on selected provider."""
@@ -480,12 +510,25 @@ class TTSView(QWidget):
             # Get selected provider
             provider = self._get_selected_provider()
             
+            if not provider:
+                self.voice_combo.addItems(["Please select a provider first"])
+                self.voice_combo.setEnabled(False)
+                return
+            
+            # Check if provider is available
+            provider_instance = self.tts_engine.provider_manager.get_provider(provider)
+            if not provider_instance or not provider_instance.is_available():
+                self.voice_combo.addItems(["Sorry, the provider you are trying to use is currently unavailable"])
+                self.voice_combo.setEnabled(False)
+                logger.warning(f"Provider '{provider}' is not available - voice selection disabled")
+                return
+            
             # Load voices for the selected provider (filtered to en-US only)
             voices = self.voice_manager.get_voice_list(locale="en-US", provider=provider)
             
             if not voices:
                 logger.warning(f"No voices available for provider: {provider}")
-                self.voice_combo.addItems(["No voices available"])
+                self.voice_combo.addItems(["No voices available for this provider"])
                 self.voice_combo.setEnabled(False)
                 return
             
@@ -497,8 +540,8 @@ class TTSView(QWidget):
                 self.voice_combo.setCurrentIndex(0)
         except Exception as e:
             logger.error(f"Error loading voices: {e}")
-            # Fallback to default voices
-            self.voice_combo.addItems(["en-US-AndrewNeural", "en-US-AriaNeural", "en-US-GuyNeural"])
+            self.voice_combo.addItems(["Error loading voices"])
+            self.voice_combo.setEnabled(False)
     
     def add_files(self):
         """Add text files via file dialog."""

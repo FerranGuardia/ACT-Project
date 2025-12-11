@@ -130,41 +130,29 @@ class TTSEngine:
         original_voice = voice
         voice = voice.strip()
         
+        # Check provider availability if specified
+        if provider:
+            provider_instance = self.provider_manager.get_provider(provider)
+            if not provider_instance or not provider_instance.is_available():
+                logger.error(f"Provider '{provider}' is not available")
+                return False
+        
         # Determine which provider to use for voice lookup
-        # If provider is specified, look up voice in that provider
+        # If provider is specified, look up voice in that provider only
         # Otherwise, search all providers
         voice_dict = self.voice_manager.get_voice_by_name(voice, provider=provider)
         if not voice_dict:
-            logger.warning(f"Voice '{voice}' not found, trying fallback...")
-            logger.info(f"Attempted voice name: '{original_voice}' (cleaned: '{voice}')")
-            
-            # Try default Edge TTS voice first
-            default_edge_voice = "en-US-AndrewNeural"
-            voice_dict = self.voice_manager.get_voice_by_name(default_edge_voice, provider=provider)
-            
-            # If Edge TTS voice not found, try to get any available voice from available providers
-            if not voice_dict:
-                logger.warning(f"Default Edge TTS voice '{default_edge_voice}' not found, trying available providers...")
-                
-                # Get available providers in priority order
-                available_providers = self.provider_manager.get_providers()
-                logger.info(f"Available providers: {available_providers}")
-                
-                # Try to get first available voice from any available provider
-                for provider_name in available_providers:
-                    provider_voices = self.voice_manager.get_voices(provider=provider_name)
-                    if provider_voices:
-                        voice_dict = provider_voices[0]  # Use first available voice
-                        voice = voice_dict.get("id") or voice_dict.get("name", voice)
-                        logger.info(f"Using fallback voice '{voice}' from provider '{provider_name}'")
-                        break
-                
-                if not voice_dict:
-                    logger.error(f"No voices found in any available provider!")
-                    return False
+            if provider:
+                # If provider is specified and voice not found, fail (no fallback)
+                logger.error(f"Voice '{voice}' not found in provider '{provider}'")
+                return False
             else:
-                logger.info(f"Using fallback voice: {default_edge_voice}")
-                voice = default_edge_voice
+                # If no provider specified, try to find voice in any provider
+                logger.warning(f"Voice '{voice}' not found, searching all providers...")
+                voice_dict = self.voice_manager.get_voice_by_name(voice, provider=None)
+                if not voice_dict:
+                    logger.error(f"Voice '{voice}' not found in any provider")
+                    return False
         
         # Get the voice ID (prefer id, then ShortName for backward compatibility)
         voice_id = voice_dict.get("id") or voice_dict.get("ShortName", voice)
@@ -239,17 +227,36 @@ class TTSEngine:
             logger.info(f"Text exceeds {MAX_BYTES} bytes ({text_bytes_size} bytes), chunking for Edge TTS...")
             return self._convert_with_chunking(text_to_convert, voice, output_path, rate, pitch, volume, provider)
         else:
-            # Use provider manager for conversion (with automatic fallback)
-            logger.info(f"Attempting conversion with provider manager (provider: {provider or 'auto'})")
-            return self.provider_manager.convert_with_fallback(
-                text=text_to_convert,
-                voice=voice,
-                output_path=output_path,
-                preferred_provider=provider,
-                rate=rate,
-                pitch=pitch,
-                volume=volume
-            )
+            # Use provider manager for conversion
+            # If provider is specified, use it directly (no fallback)
+            # If not specified, use fallback logic
+            if provider:
+                logger.info(f"Attempting conversion with provider '{provider}' (no fallback)")
+                provider_instance = self.provider_manager.get_provider(provider)
+                if not provider_instance or not provider_instance.is_available():
+                    logger.error(f"Provider '{provider}' is not available")
+                    return False
+                
+                return provider_instance.convert_text_to_speech(
+                    text=text_to_convert,
+                    voice=voice,
+                    output_path=output_path,
+                    rate=rate,
+                    pitch=pitch,
+                    volume=volume
+                )
+            else:
+                # No provider specified - use fallback logic
+                logger.info(f"Attempting conversion with provider manager (auto fallback)")
+                return self.provider_manager.convert_with_fallback(
+                    text=text_to_convert,
+                    voice=voice,
+                    output_path=output_path,
+                    preferred_provider=None,
+                    rate=rate,
+                    pitch=pitch,
+                    volume=volume
+                )
     def _convert_with_chunking(
         self,
         text: str,

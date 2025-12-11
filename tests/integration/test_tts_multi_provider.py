@@ -114,11 +114,11 @@ class TestTTSMultiProvider:
     @pytest.mark.slow
     @pytest.mark.network
     @pytest.mark.real
-    def test_tts_engine_automatic_fallback(self, real_tts_engine, temp_dir, sample_text):
-        """Test automatic fallback from Edge TTS to pyttsx3 if Edge TTS fails"""
-        output_path = temp_dir / "test_fallback_output.mp3"
+    def test_tts_engine_no_fallback_when_provider_specified(self, real_tts_engine, temp_dir, sample_text):
+        """Test that TTS engine does NOT fallback when provider is explicitly specified"""
+        output_path = temp_dir / "test_no_fallback_output.mp3"
         
-        # Try with Edge TTS first (should fallback to pyttsx3 if Edge TTS fails)
+        # Try with Edge TTS - should fail if Edge TTS is unavailable (no fallback)
         result = real_tts_engine.convert_text_to_speech(
             text=sample_text,
             output_path=output_path,
@@ -126,14 +126,14 @@ class TestTTSMultiProvider:
             provider="edge_tts"
         )
         
-        # If Edge TTS fails, it should automatically try pyttsx3
-        # This is handled by ProviderManager's fallback logic
+        # If Edge TTS is available, it should succeed
+        # If Edge TTS is unavailable, it should fail (no automatic fallback)
         if result:
-            assert output_path.exists(), "Output file should be created after fallback"
+            assert output_path.exists(), "Output file should be created"
             assert output_path.stat().st_size > 0, "Output file should not be empty"
         else:
-            # Both providers may have failed
-            pytest.skip("Both TTS providers unavailable")
+            # Edge TTS is unavailable - this is expected behavior (no fallback)
+            pytest.skip("Edge TTS provider unavailable - no fallback when provider is specified")
     
     @pytest.mark.slow
     @pytest.mark.network
