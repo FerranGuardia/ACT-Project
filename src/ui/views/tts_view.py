@@ -46,7 +46,26 @@ class ProviderStatusCheckThread(QThread):
                 self.status_checked.emit(self.provider_name, False)
                 return
             
-            test_voice = voices[0].get("id") or voices[0].get("name", "en-US-AndrewNeural")
+            # For edge_tts providers, try known working voices first
+            if self.provider_name in ["edge_tts", "edge_tts_working"]:
+                # Try known working voices from reference
+                preferred_voices = ["en-US-AriaNeural", "en-US-AndrewNeural", "en-US-GuyNeural"]
+                test_voice = None
+                for pref_voice in preferred_voices:
+                    for v in voices:
+                        voice_id = v.get("id", "")
+                        if pref_voice in voice_id or voice_id == pref_voice:
+                            test_voice = voice_id
+                            break
+                    if test_voice:
+                        break
+                # Fallback to first voice if none found
+                if not test_voice:
+                    test_voice = voices[0].get("id") or voices[0].get("name", "en-US-AndrewNeural")
+            else:
+                test_voice = voices[0].get("id") or voices[0].get("name", "en-US-AndrewNeural")
+            
+            logger.info(f"Testing {self.provider_name} with voice: {test_voice}")
             test_text = "Test"
             
             # Create temporary file
@@ -55,7 +74,6 @@ class ProviderStatusCheckThread(QThread):
             
             try:
                 # Test audio generation
-                # For pyttsx3, we need to wait longer as it's slower
                 success = provider.convert_text_to_speech(
                     text=test_text,
                     voice=test_voice,
@@ -65,16 +83,33 @@ class ProviderStatusCheckThread(QThread):
                     volume=None
                 )
                 
-                # For pyttsx3, also check if file exists even if convert_text_to_speech returned False
-                # (it might have created the file but returned False due to timeout)
-                if not success and self.provider_name == "pyttsx3":
-                    import time
-                    # Wait a bit more for pyttsx3
-                    for _ in range(5):
-                        time.sleep(1)
+                # IMPORTANT: Always verify file exists even if convert_text_to_speech returned False
+                # Some providers (especially pyttsx3) may create the file but return False due to timeout
+                # For slower providers, wait a bit and check again
+                import time
+                if not success:
+                    # Wait longer for pyttsx3 (it can take 5-10 seconds to create file)
+                    # Check more frequently for faster detection
+                    max_wait = 15 if self.provider_name == "pyttsx3" else 5
+                    check_interval = 0.5  # Check every 0.5 seconds
+                    waited = 0
+                    while waited < max_wait:
+                        time.sleep(check_interval)
+                        waited += check_interval
                         if temp_path.exists() and temp_path.stat().st_size > 0:
+                            logger.info(f"Provider {self.provider_name} created file after {waited:.1f}s (even though convert_text_to_speech returned False)")
                             success = True
                             break
+                
+                # Final verification: if file exists and has content, consider it successful
+                if temp_path.exists() and temp_path.stat().st_size > 0:
+                    if not success:
+                        logger.warning(f"Provider {self.provider_name} file exists but function returned False - marking as working")
+                        success = True
+                else:
+                    if success:
+                        logger.warning(f"Provider {self.provider_name} function returned True but no file created - marking as not working")
+                        success = False
                 
                 # Clean up
                 try:
@@ -83,6 +118,7 @@ class ProviderStatusCheckThread(QThread):
                 except Exception:
                     pass
                 
+                logger.info(f"Provider {self.provider_name} status check result: {'Working' if success else 'Not Working'}")
                 self.status_checked.emit(self.provider_name, success)
             except Exception as e:
                 # Clean up on error

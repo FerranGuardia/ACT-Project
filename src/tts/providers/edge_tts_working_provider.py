@@ -1,13 +1,14 @@
 """
-Edge TTS Working Provider (Based on Hugging Face Demo)
+Edge TTS Working Provider (Based on Hugging Face Demo Method)
 
-This provider uses the exact working implementation from the Hugging Face demo.
+This provider uses the working API method from the Hugging Face demo.
 Source: https://huggingface.co/spaces/innoai/Edge-TTS-Text-to-Speech
 
 Key differences from original edge_tts_provider:
-- Uses simpler direct edge_tts.Communicate() call
-- Uses edge-tts 7.2.0 format (rate="+0%", pitch="+0Hz")
+- Uses simpler direct edge_tts.Communicate() call with positional args
+- Uses edge-tts format (rate="+0%", pitch="+0Hz")
 - No complex message formatting
+- Standalone: uses system edge-tts installation, no external dependencies
 """
 
 import asyncio
@@ -172,34 +173,29 @@ class EdgeTTSWorkingProvider(TTSProvider):
             asyncio.set_event_loop(loop)
             
             try:
-                # Use Hugging Face demo's exact format
+                # Use Hugging Face demo's EXACT format - always pass rate and pitch
+                # Even if they're 0, we must pass them as "+0%" and "+0Hz"
+                # This matches the working reference: app.py line 18-20
+                
                 # Convert rate to their format: f"{rate:+d}%"
-                rate_str = None
-                if rate is not None:
-                    # Convert from our format (-50 to 50) to their format
-                    rate_int = int(round(rate))
-                    rate_str = f"{rate_int:+d}%"  # e.g., "+0%", "+25%", "-10%"
+                # Default to 0 if None (matching Hugging Face demo behavior)
+                rate_int = int(round(rate)) if rate is not None else 0
+                rate_str = f"{rate_int:+d}%"  # e.g., "+0%", "+25%", "-10%"
                 
                 # Convert pitch to their format: f"{pitch:+d}Hz"
-                pitch_str = None
-                if pitch is not None:
-                    # Convert from our format (-50 to 50) to their format
-                    pitch_int = int(round(pitch))
-                    pitch_str = f"{pitch_int:+d}Hz"  # e.g., "+0Hz", "+10Hz", "-5Hz"
+                # Default to 0 if None (matching Hugging Face demo behavior)
+                pitch_int = int(round(pitch)) if pitch is not None else 0
+                pitch_str = f"{pitch_int:+d}Hz"  # e.g., "+0Hz", "+10Hz", "-5Hz"
                 
-                # Use their exact method - simple direct call
-                # Only pass rate/pitch if they are not None (edge_tts doesn't accept None)
-                communicate_kwargs = {
-                    "text": text,
-                    "voice": voice
-                }
-                if rate_str is not None:
-                    communicate_kwargs["rate"] = rate_str
-                if pitch_str is not None:
-                    communicate_kwargs["pitch"] = pitch_str
-                # Note: Hugging Face demo doesn't use volume parameter
+                # Extract voice short name (in case voice has extra formatting like "voice - locale")
+                # This matches app.py line 17: voice_short_name = voice.split(" - ")[0]
+                voice_short_name = voice.split(" - ")[0].strip() if " - " in voice else voice.strip()
                 
-                communicate = edge_tts.Communicate(**communicate_kwargs)
+                # Use their EXACT method - positional args for text/voice, keyword for rate/pitch
+                # This matches app.py line 20: edge_tts.Communicate(text, voice_short_name, rate=rate_str, pitch=pitch_str)
+                # Log the exact parameters being used for debugging
+                logger.debug(f"Edge TTS Working: text='{text[:50]}...', voice='{voice_short_name}', rate='{rate_str}', pitch='{pitch_str}'")
+                communicate = edge_tts.Communicate(text, voice_short_name, rate=rate_str, pitch=pitch_str)
                 
                 # Save to file
                 output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -218,12 +214,25 @@ class EdgeTTSWorkingProvider(TTSProvider):
                 
         except Exception as e:
             error_msg = str(e)
-            logger.error(f"Error in Edge TTS Working conversion: {error_msg}")
+            error_type = type(e).__name__
+            logger.error(f"Error in Edge TTS Working conversion: {error_type}: {error_msg}")
+            logger.debug(f"Edge TTS Working conversion error details: voice={voice}, text_length={len(text)}")
+            
             # Provide helpful error messages
             if "no audio" in error_msg.lower() or "NoAudioReceived" in error_msg:
                 logger.error("Edge TTS Working returned no audio - service may be experiencing issues")
             elif "timeout" in error_msg.lower() or "connection" in error_msg.lower():
                 logger.error("Edge TTS Working connection timeout - check your internet connection")
+            elif "rate must be str" in error_msg.lower():
+                logger.error("Edge TTS Working: rate parameter must be a string (e.g., '+0%')")
+            elif "pitch must be str" in error_msg.lower():
+                logger.error("Edge TTS Working: pitch parameter must be a string (e.g., '+0Hz')")
+            
+            # Check if file was created despite the error
+            if output_path.exists() and output_path.stat().st_size > 0:
+                logger.warning(f"Edge TTS Working: Error occurred but file was created ({output_path.stat().st_size} bytes)")
+                return True
+            
             return False
     
     def supports_rate(self) -> bool:
