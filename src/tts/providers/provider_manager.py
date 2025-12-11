@@ -11,6 +11,7 @@ from typing import List, Dict, Optional
 from core.logger import get_logger
 from .base_provider import TTSProvider, ProviderType
 from .edge_tts_provider import EdgeTTSProvider
+from .edge_tts_working_provider import EdgeTTSWorkingProvider
 from .pyttsx3_provider import Pyttsx3Provider
 
 logger = get_logger("tts.providers.manager")
@@ -36,6 +37,17 @@ class TTSProviderManager:
                 logger.warning("Edge TTS provider not available")
         except Exception as e:
             logger.warning(f"Failed to initialize Edge TTS provider: {e}")
+        
+        # Initialize Edge TTS Working (from Hugging Face demo - fallback for broken edge_tts)
+        try:
+            edge_working_provider = EdgeTTSWorkingProvider()
+            if edge_working_provider.is_available():
+                self._providers["edge_tts_working"] = edge_working_provider
+                logger.info("Edge TTS Working provider initialized and available")
+            else:
+                logger.warning("Edge TTS Working provider not available")
+        except Exception as e:
+            logger.warning(f"Failed to initialize Edge TTS Working provider: {e}")
         
         # Initialize pyttsx3 (offline, fallback)
         try:
@@ -123,6 +135,12 @@ class TTSProviderManager:
             provider = self._providers["edge_tts"]
             if provider.is_available():
                 providers_to_try.append(("edge_tts", provider))
+        
+        # Edge TTS Working (Hugging Face method) as fallback (if not already added)
+        if "edge_tts_working" in self._providers and preferred_provider != "edge_tts_working":
+            provider = self._providers["edge_tts_working"]
+            if provider.is_available():
+                providers_to_try.append(("edge_tts_working", provider))
         
         # pyttsx3 as final fallback (if not already added)
         if "pyttsx3" in self._providers and preferred_provider != "pyttsx3":
