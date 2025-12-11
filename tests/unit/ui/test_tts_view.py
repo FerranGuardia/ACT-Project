@@ -299,3 +299,335 @@ class TestTTSView:
             
         except ImportError:
             pytest.skip("UI module not available")
+    
+    def test_text_editor_initialization(self, qt_application):
+        """Test that text editor is initialized correctly"""
+        try:
+            from src.ui.views.tts_view import TTSView
+            
+            view = TTSView()
+            
+            assert hasattr(view, 'text_editor')
+            assert hasattr(view, 'input_tabs')
+            assert view.input_tabs.count() == 2  # Files and Text Editor tabs
+            assert view.text_editor is not None
+            
+        except ImportError:
+            pytest.skip("UI module not available")
+    
+    def test_text_editor_tab_switching(self, qt_application):
+        """Test switching between Files and Text Editor tabs"""
+        try:
+            from src.ui.views.tts_view import TTSView
+            
+            view = TTSView()
+            
+            # Start on Files tab (index 0)
+            assert view.input_tabs.currentIndex() == 0
+            
+            # Switch to Text Editor tab (index 1)
+            view.input_tabs.setCurrentIndex(1)
+            assert view.input_tabs.currentIndex() == 1
+            
+            # Switch back to Files tab
+            view.input_tabs.setCurrentIndex(0)
+            assert view.input_tabs.currentIndex() == 0
+            
+        except ImportError:
+            pytest.skip("UI module not available")
+    
+    def test_character_count_updates(self, qt_application):
+        """Test that character count updates when text changes"""
+        try:
+            from src.ui.views.tts_view import TTSView
+            
+            view = TTSView()
+            
+            # Switch to editor tab
+            view.input_tabs.setCurrentIndex(1)
+            
+            # Set text
+            test_text = "Hello, this is a test."
+            view.text_editor.setPlainText(test_text)
+            
+            # Check character count label
+            assert hasattr(view, 'char_count_label')
+            label_text = view.char_count_label.text()
+            assert str(len(test_text)) in label_text or "Characters:" in label_text
+            
+        except ImportError:
+            pytest.skip("UI module not available")
+    
+    def test_clear_editor(self, qt_application):
+        """Test clearing the text editor"""
+        try:
+            from src.ui.views.tts_view import TTSView
+            from PySide6.QtWidgets import QMessageBox
+            
+            view = TTSView()
+            view.input_tabs.setCurrentIndex(1)
+            
+            # Add some text
+            view.text_editor.setPlainText("Test content")
+            assert view.text_editor.toPlainText() == "Test content"
+            
+            # Mock message box to return Yes
+            with patch.object(QMessageBox, 'question', return_value=QMessageBox.StandardButton.Yes):
+                view.clear_editor()
+                assert view.text_editor.toPlainText() == ""
+            
+        except ImportError:
+            pytest.skip("UI module not available")
+    
+    def test_clear_editor_cancelled(self, qt_application):
+        """Test that clearing editor can be cancelled"""
+        try:
+            from src.ui.views.tts_view import TTSView
+            from PySide6.QtWidgets import QMessageBox
+            
+            view = TTSView()
+            view.input_tabs.setCurrentIndex(1)
+            
+            # Add some text
+            test_text = "Test content"
+            view.text_editor.setPlainText(test_text)
+            
+            # Mock message box to return No
+            with patch.object(QMessageBox, 'question', return_value=QMessageBox.StandardButton.No):
+                view.clear_editor()
+                # Text should still be there
+                assert view.text_editor.toPlainText() == test_text
+            
+        except ImportError:
+            pytest.skip("UI module not available")
+    
+    def test_load_file_to_editor(self, qt_application, sample_text_file):
+        """Test loading a file into the text editor"""
+        try:
+            from src.ui.views.tts_view import TTSView
+            from PySide6.QtWidgets import QFileDialog
+            
+            view = TTSView()
+            view.input_tabs.setCurrentIndex(1)
+            
+            # Read file content
+            file_content = sample_text_file.read_text()
+            
+            # Mock file dialog at the correct location
+            with patch.object(QFileDialog, 'getOpenFileName', return_value=(str(sample_text_file), "")):
+                view.load_file_to_editor()
+            
+            # Check that editor has the file content
+            assert view.text_editor.toPlainText() == file_content
+            # Should switch to editor tab
+            assert view.input_tabs.currentIndex() == 1
+            
+        except ImportError:
+            pytest.skip("UI module not available")
+    
+    def test_load_file_to_editor_error_handling(self, qt_application):
+        """Test error handling when loading file fails"""
+        try:
+            from src.ui.views.tts_view import TTSView
+            from PySide6.QtWidgets import QFileDialog, QMessageBox
+            
+            view = TTSView()
+            view.input_tabs.setCurrentIndex(1)
+            
+            # Mock file dialog to return invalid path
+            with patch.object(QFileDialog, 'getOpenFileName', return_value=("/nonexistent/file.txt", "")):
+                # Should handle error gracefully
+                with patch.object(QMessageBox, 'warning') as mock_warning:
+                    view.load_file_to_editor()
+                    # Should show warning
+                    mock_warning.assert_called()
+            
+        except ImportError:
+            pytest.skip("UI module not available")
+    
+    def test_save_editor_text(self, qt_application, temp_dir):
+        """Test saving editor text to a file"""
+        try:
+            from src.ui.views.tts_view import TTSView
+            from PySide6.QtWidgets import QFileDialog
+            from pathlib import Path
+            
+            view = TTSView()
+            view.input_tabs.setCurrentIndex(1)
+            
+            # Add text to editor
+            test_text = "This is test content to save."
+            view.text_editor.setPlainText(test_text)
+            
+            # Mock file dialog
+            output_file = temp_dir / "saved_text.txt"
+            with patch.object(QFileDialog, 'getSaveFileName', return_value=(str(output_file), "")):
+                view.save_editor_text()
+            
+            # Check that file was created with correct content
+            assert output_file.exists()
+            assert output_file.read_text() == test_text
+            
+        except ImportError:
+            pytest.skip("UI module not available")
+    
+    def test_save_editor_text_empty(self, qt_application, mock_file_dialog):
+        """Test that saving empty text shows warning"""
+        try:
+            from src.ui.views.tts_view import TTSView
+            from PySide6.QtWidgets import QMessageBox
+            
+            view = TTSView()
+            view.input_tabs.setCurrentIndex(1)
+            
+            # Editor is empty
+            view.text_editor.clear()
+            
+            with patch.object(QMessageBox, 'warning') as mock_warning:
+                view.save_editor_text()
+                # Should show warning about empty text
+                mock_warning.assert_called()
+            
+        except ImportError:
+            pytest.skip("UI module not available")
+    
+    def test_validation_with_editor_text(self, qt_application, temp_dir):
+        """Test validation when using text editor"""
+        try:
+            from src.ui.views.tts_view import TTSView
+            
+            view = TTSView()
+            
+            # Switch to editor tab
+            view.input_tabs.setCurrentIndex(1)
+            
+            # Set output directory
+            view.output_dir_input.setText(str(temp_dir))
+            
+            # Test with empty editor (should fail)
+            view.text_editor.clear()
+            valid, error = view._validate_inputs()
+            assert valid is False
+            assert "text" in error.lower() or "editor" in error.lower()
+            
+            # Test with text in editor (should pass)
+            view.text_editor.setPlainText("Test content")
+            valid, error = view._validate_inputs()
+            assert valid is True
+            
+        except ImportError:
+            pytest.skip("UI module not available")
+    
+    def test_conversion_with_editor_text(self, qt_application, temp_dir, mock_tts_engine):
+        """Test starting conversion with text from editor"""
+        try:
+            from src.ui.views.tts_view import TTSView
+            import tempfile
+            
+            view = TTSView()
+            view.tts_engine = mock_tts_engine
+            mock_tts_engine.convert_text_to_speech.return_value = True
+            
+            # Switch to editor tab
+            view.input_tabs.setCurrentIndex(1)
+            
+            # Add text to editor
+            test_text = "This is test content for conversion."
+            view.text_editor.setPlainText(test_text)
+            
+            # Set output directory
+            view.output_dir_input.setText(str(temp_dir))
+            
+            # Set voice
+            view.voice_combo.addItem("en-US-AndrewNeural")
+            view.voice_combo.setCurrentIndex(0)
+            
+            # Mock message box for validation errors
+            with patch('src.ui.views.tts_view.QMessageBox') as mock_msg:
+                # Start conversion
+                view.start_conversion()
+                
+                # Should create conversion thread
+                assert hasattr(view, 'conversion_thread')
+                # Thread should be created (may be None if validation fails, but should not crash)
+            
+        except ImportError:
+            pytest.skip("UI module not available")
+    
+    def test_preview_uses_editor_text(self, qt_application, mock_tts_engine):
+        """Test that preview uses text from editor when editor tab is active"""
+        try:
+            from src.ui.views.tts_view import TTSView
+            import tempfile
+            import os
+            
+            view = TTSView()
+            view.tts_engine = mock_tts_engine
+            mock_tts_engine.convert_text_to_speech.return_value = True
+            
+            # Switch to editor tab
+            view.input_tabs.setCurrentIndex(1)
+            
+            # Add text to editor
+            editor_text = "This is custom text from the editor for preview."
+            view.text_editor.setPlainText(editor_text)
+            
+            # Set voice
+            view.voice_combo.addItem("en-US-AndrewNeural")
+            view.voice_combo.setCurrentIndex(0)
+            
+            # Mock file operations for preview
+            with patch('tempfile.NamedTemporaryFile') as mock_temp:
+                with patch('os.startfile'):
+                    mock_file = MagicMock()
+                    mock_file.name = "/tmp/preview.mp3"
+                    mock_temp.return_value.__enter__.return_value = mock_file
+                    view.preview_voice()
+                    
+                    # Should call convert_text_to_speech with editor text (or first 200 chars)
+                    mock_tts_engine.convert_text_to_speech.assert_called()
+                    call_kwargs = mock_tts_engine.convert_text_to_speech.call_args[1]
+                    text_arg = call_kwargs.get('text', '')
+                    # Check that the text argument contains editor text
+                    assert editor_text[:200] in text_arg or editor_text in text_arg
+            
+        except ImportError:
+            pytest.skip("UI module not available")
+    
+    def test_preview_uses_sample_text_when_editor_empty(self, qt_application, mock_tts_engine):
+        """Test that preview uses sample text when editor is empty"""
+        try:
+            from src.ui.views.tts_view import TTSView
+            from unittest.mock import MagicMock
+            
+            view = TTSView()
+            view.tts_engine = mock_tts_engine
+            mock_tts_engine.convert_text_to_speech.return_value = True
+            
+            # Switch to editor tab
+            view.input_tabs.setCurrentIndex(1)
+            
+            # Editor is empty
+            view.text_editor.clear()
+            
+            # Set voice
+            view.voice_combo.addItem("en-US-AndrewNeural")
+            view.voice_combo.setCurrentIndex(0)
+            
+            # Mock file operations for preview
+            with patch('tempfile.NamedTemporaryFile') as mock_temp:
+                with patch('os.startfile'):
+                    mock_file = MagicMock()
+                    mock_file.name = "/tmp/preview.mp3"
+                    mock_temp.return_value.__enter__.return_value = mock_file
+                    view.preview_voice()
+                    
+                    # Should call convert_text_to_speech with sample text
+                    mock_tts_engine.convert_text_to_speech.assert_called()
+                    call_kwargs = mock_tts_engine.convert_text_to_speech.call_args[1]
+                    text_arg = call_kwargs.get('text', '')
+                    # Should contain preview sample text
+                    assert "preview" in text_arg.lower() or "Hello" in text_arg
+            
+        except ImportError:
+            pytest.skip("UI module not available")

@@ -18,6 +18,22 @@ if src_path.exists():
     sys.path.insert(0, str(src_path))
 
 
+@pytest.fixture(scope="session")
+def qt_application():
+    """Create QApplication instance for UI tests (session-scoped)"""
+    try:
+        from PySide6.QtWidgets import QApplication
+        import sys
+        
+        # Check if QApplication already exists
+        app = QApplication.instance()
+        if app is None:
+            app = QApplication(sys.argv)
+        yield app
+    except ImportError:
+        pytest.skip("PySide6 not available")
+
+
 @pytest.fixture
 def temp_dir():
     """Create a temporary directory for test files"""
@@ -61,6 +77,44 @@ def mock_logger():
         mock_logger_obj = MagicMock()
         mock.return_value = mock_logger_obj
         yield mock_logger_obj
+
+
+@pytest.fixture
+def sample_text_file(temp_dir, sample_text):
+    """Create a sample text file for testing"""
+    file_path = temp_dir / "test_chapter.txt"
+    file_path.write_text(sample_text)
+    return file_path
+
+
+@pytest.fixture
+def mock_file_dialog():
+    """Mock QFileDialog for file operations"""
+    with patch('PySide6.QtWidgets.QFileDialog') as mock:
+        yield mock
+
+
+@pytest.fixture
+def mock_tts_engine():
+    """Mock TTSEngine for testing"""
+    mock_engine = MagicMock()
+    mock_engine.convert_text_to_speech.return_value = True
+    mock_engine.get_available_voices.return_value = [
+        {"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male"}
+    ]
+    return mock_engine
+
+
+@pytest.fixture
+def mock_voice_manager():
+    """Mock VoiceManager for testing"""
+    mock_manager = MagicMock()
+    mock_manager.get_voice_list.return_value = ["en-US-AndrewNeural - Male"]
+    mock_manager.get_voices.return_value = [
+        {"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male"}
+    ]
+    mock_manager.get_providers.return_value = ["edge_tts", "pyttsx3"]
+    return mock_manager
 
 
 # Register custom markers
