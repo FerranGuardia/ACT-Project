@@ -4,21 +4,84 @@ TTS Mode View - Convert text files to audio.
 
 import os
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFileDialog,
     QListWidget, QProgressBar, QGroupBox, QComboBox, QSlider, QSpinBox, QLineEdit,
     QMessageBox, QListWidgetItem, QTextEdit, QTabWidget, QPlainTextEdit
 )
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import Qt, QThread, Signal, QTimer
 from PySide6.QtGui import QFont
 
 from core.logger import get_logger
 from tts import TTSEngine, VoiceManager
-from ui.dialogs import ProviderSelectionDialog
+from tts.providers.provider_manager import TTSProviderManager
+import tempfile
 
 logger = get_logger("ui.tts_view")
+
+
+class ProviderStatusCheckThread(QThread):
+    """Thread for checking provider status by testing audio generation."""
+    
+    status_checked = Signal(str, bool)  # provider_name, is_working
+    
+    def __init__(self, provider_manager: TTSProviderManager, provider_name: str):
+        super().__init__()
+        self.provider_manager = provider_manager
+        self.provider_name = provider_name
+    
+    def run(self):
+        """Test provider by generating actual audio."""
+        try:
+            provider = self.provider_manager.get_provider(self.provider_name)
+            if provider is None or not provider.is_available():
+                self.status_checked.emit(self.provider_name, False)
+                return
+            
+            # Get a test voice
+            voices = provider.get_voices(locale="en-US")
+            if not voices:
+                self.status_checked.emit(self.provider_name, False)
+                return
+            
+            test_voice = voices[0].get("id") or voices[0].get("name", "en-US-AndrewNeural")
+            test_text = "Test"
+            
+            # Create temporary file
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tmp:
+                temp_path = Path(tmp.name)
+            
+            try:
+                # Test audio generation
+                success = provider.convert_text_to_speech(
+                    text=test_text,
+                    voice=test_voice,
+                    output_path=temp_path,
+                    rate=None,
+                    pitch=None,
+                    volume=None
+                )
+                
+                # Clean up
+                try:
+                    if temp_path.exists():
+                        temp_path.unlink()
+                except Exception:
+                    pass
+                
+                self.status_checked.emit(self.provider_name, success)
+            except Exception:
+                # Clean up on error
+                try:
+                    if temp_path.exists():
+                        temp_path.unlink()
+                except Exception:
+                    pass
+                self.status_checked.emit(self.provider_name, False)
+        except Exception:
+            self.status_checked.emit(self.provider_name, False)
 
 
 class TTSConversionThread(QThread):
@@ -147,10 +210,14 @@ class TTSView(QWidget):
         self.conversion_thread: Optional[TTSConversionThread] = None
         self.tts_engine = TTSEngine()
         self.voice_manager = VoiceManager()
+        # Initialize provider status tracking
+        self.provider_status: Dict[str, Optional[bool]] = {}
+        self.status_threads: Dict[str, ProviderStatusCheckThread] = {}
+        self.selected_provider: Optional[str] = None
         self.setup_ui()
         self._connect_handlers()
         self._load_providers()
-        self._load_voices()
+        # Voices will be loaded after provider status is checked
         # Update pitch note based on initial provider
         if hasattr(self, 'pitch_note_label'):
             self._update_pitch_note()
@@ -264,20 +331,19 @@ class TTSView(QWidget):
         voice_group = QGroupBox("Voice Settings")
         voice_layout = QVBoxLayout()
         
-        # Provider selector
+        # Provider selector - dropdown menu
         provider_layout = QHBoxLayout()
         provider_layout.addWidget(QLabel("Provider:"))
-        self.provider_button = QPushButton("Select Provider...")
-        self.provider_button.clicked.connect(self._select_provider)
-        self.provider_status_label = QLabel("")
-        self.provider_status_label.setMinimumWidth(20)
-        provider_layout.addWidget(self.provider_button)
-        provider_layout.addWidget(self.provider_status_label)
+        self.provider_combo = QComboBox()
+        self.provider_combo.currentIndexChanged.connect(self._on_provider_changed)
+        provider_layout.addWidget(self.provider_combo)
         provider_layout.addStretch()
         voice_layout.addLayout(provider_layout)
         
-        # Store selected provider
+        # Store selected provider and status
         self.selected_provider: Optional[str] = None
+        self.provider_status: Dict[str, bool] = {}  # {provider_name: is_working}
+        self.status_threads: Dict[str, ProviderStatusCheckThread] = {}
         
         voice_select_layout = QHBoxLayout()
         voice_select_layout.addWidget(QLabel("Voice:"))
@@ -423,70 +489,107 @@ class TTSView(QWidget):
             widget = widget.parent()
     
     def _load_providers(self):
-        """Load available providers and set default."""
+        """Load all providers into dropdown and start status checking."""
         try:
-            providers = self.voice_manager.get_providers()
-            if not providers:
-                logger.warning("No TTS providers available")
-                self.provider_button.setText("No Providers Available")
-                self.provider_button.setEnabled(False)
-                self.provider_status_label.setText("🔴")
-                return
+            # Clear combo box
+            self.provider_combo.clear()
             
-            # Set default to first available provider
-            if providers:
-                self.selected_provider = providers[0]
-                self._update_provider_display()
+            # Add all providers (we'll check status for all)
+            all_providers = ["edge_tts", "edge_tts_working", "pyttsx3"]
+            provider_labels = {
+                "edge_tts": "Edge TTS 7.2.3",
+                "edge_tts_working": "Edge TTS 7.2.0 (Working)",
+                "pyttsx3": "pyttsx3 (Offline)"
+            }
+            
+            for provider_name in all_providers:
+                label = provider_labels.get(provider_name, provider_name)
+                # Initially show as checking
+                display_text = f"🟡 {label} - Checking..."
+                self.provider_combo.addItem(display_text, provider_name)
+                self.provider_status[provider_name] = None  # None = checking, True = working, False = not working
+            
+            # Set default to first provider
+            if all_providers:
+                self.provider_combo.setCurrentIndex(0)
+                self.selected_provider = all_providers[0]
+            
+            # Start checking all providers automatically
+            self._check_all_providers()
+            
         except Exception as e:
             logger.error(f"Error loading providers: {e}")
-            # Fallback to Edge TTS
-            self.selected_provider = "edge_tts"
-            self._update_provider_display()
+            self.provider_combo.addItem("Error loading providers")
     
-    def _select_provider(self):
-        """Open provider selection dialog."""
-        dialog = ProviderSelectionDialog(self, current_provider=self.selected_provider)
-        if dialog.exec():
-            self.selected_provider = dialog.get_selected_provider()
-            self._update_provider_display()
-            # Reload voices for the selected provider
-            self._load_voices()
-            # Update pitch note
-            self._update_pitch_note()
-    
-    def _update_provider_display(self):
-        """Update provider button and status display."""
-        if not self.selected_provider:
-            self.provider_button.setText("Select Provider...")
-            self.provider_status_label.setText("")
-            return
+    def _check_all_providers(self):
+        """Start status checking for all providers."""
+        all_providers = ["edge_tts", "edge_tts_working", "pyttsx3"]
         
-        # Get provider info
+        for provider_name in all_providers:
+            thread = ProviderStatusCheckThread(self.tts_engine.provider_manager, provider_name)
+            thread.status_checked.connect(self._on_provider_status_checked)
+            self.status_threads[provider_name] = thread
+            thread.start()
+    
+    def _on_provider_status_checked(self, provider_name: str, is_working: bool):
+        """Handle provider status check result."""
+        self.provider_status[provider_name] = is_working
+        
+        # Update dropdown item
+        self._update_provider_item(provider_name)
+        
+        # If this is the currently selected provider, update voices
+        if provider_name == self.selected_provider:
+            self._load_voices()
+        
+        # Clean up thread
+        if provider_name in self.status_threads:
+            thread = self.status_threads[provider_name]
+            if thread.isFinished():
+                del self.status_threads[provider_name]
+    
+    def _update_provider_item(self, provider_name: str):
+        """Update provider item in dropdown with status."""
         provider_labels = {
             "edge_tts": "Edge TTS 7.2.3",
             "edge_tts_working": "Edge TTS 7.2.0 (Working)",
             "pyttsx3": "pyttsx3 (Offline)"
         }
         
-        label = provider_labels.get(self.selected_provider, self.selected_provider)
-        self.provider_button.setText(f"Provider: {label}")
+        label = provider_labels.get(provider_name, provider_name)
+        status = self.provider_status.get(provider_name)
         
-        # Check status and update indicator
-        # Note: This is a quick check. For accurate status, use the provider selection dialog.
-        try:
-            provider = self.tts_engine.provider_manager.get_provider(self.selected_provider)
-            if provider and provider.is_available():
-                # Quick check - but note that is_available() only checks library/voices, not audio generation
-                # For accurate status, user should use the provider selection dialog which tests audio
-                self.provider_status_label.setText("🟡")
-                self.provider_status_label.setToolTip("Provider library available - Use dialog to test audio generation")
-            else:
-                self.provider_status_label.setText("🔴")
-                self.provider_status_label.setToolTip("Provider is unavailable")
-        except Exception as e:
-            logger.error(f"Error checking provider status: {e}")
-            self.provider_status_label.setText("🔴")
-            self.provider_status_label.setToolTip("Error checking status")
+        if status is None:
+            # Still checking
+            display_text = f"🟡 {label} - Checking..."
+        elif status:
+            # Working
+            display_text = f"🟢 {label} - Active"
+        else:
+            # Not working
+            display_text = f"🔴 {label} - Unavailable"
+        
+        # Find and update the item
+        for i in range(self.provider_combo.count()):
+            if self.provider_combo.itemData(i) == provider_name:
+                self.provider_combo.setItemText(i, display_text)
+                break
+    
+    def _on_provider_changed(self):
+        """Handle provider selection change."""
+        current_index = self.provider_combo.currentIndex()
+        if current_index < 0:
+            return
+        
+        provider_name = self.provider_combo.itemData(current_index)
+        if not provider_name:
+            return
+        
+        self.selected_provider = provider_name
+        # Reload voices for the selected provider
+        self._load_voices()
+        # Update pitch note
+        self._update_pitch_note()
     
     def _update_pitch_note(self):
         """Update pitch note based on selected provider."""
@@ -502,7 +605,10 @@ class TTSView(QWidget):
     
     def _get_selected_provider(self) -> Optional[str]:
         """Get the currently selected provider name."""
-        return self.selected_provider
+        current_index = self.provider_combo.currentIndex()
+        if current_index < 0:
+            return None
+        return self.provider_combo.itemData(current_index)
     
     def _load_voices(self):
         """Load available voices into the combo box based on selected provider."""
