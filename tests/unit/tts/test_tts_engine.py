@@ -207,6 +207,53 @@ class TestTTSEngine:
             
         except ImportError:
             pytest.skip("TTS module not available")
+    
+    def test_format_chapter_intro(self):
+        """Test formatting chapter introduction with pauses"""
+        try:
+            from tts.tts_engine import format_chapter_intro
+            
+            # Test with pyttsx3 provider
+            result = format_chapter_intro("Chapter 1", "This is the content.", provider="pyttsx3")
+            
+            # Should include pauses and chapter title
+            assert "Chapter 1" in result
+            assert "This is the content." in result
+            assert "..." in result  # Should have ellipsis for pauses
+            assert result.startswith("...")  # Should start with pause
+            
+        except ImportError:
+            pytest.skip("TTS module not available")
+    
+    def test_format_chapter_intro_no_provider(self):
+        """Test formatting chapter introduction without provider (defaults to pyttsx3 format)"""
+        try:
+            from tts.tts_engine import format_chapter_intro
+            
+            result = format_chapter_intro("Chapter 2", "Content here.", provider=None)
+            
+            # Should format the same way as pyttsx3
+            assert "Chapter 2" in result
+            assert "Content here." in result
+            assert "..." in result
+            
+        except ImportError:
+            pytest.skip("TTS module not available")
+    
+    def test_format_chapter_intro_edge_tts(self):
+        """Test formatting chapter introduction for Edge TTS provider"""
+        try:
+            from tts.tts_engine import format_chapter_intro
+            
+            result = format_chapter_intro("Chapter 3", "More content.", provider="edge_tts")
+            
+            # Should still format with pauses (SSML breaks handled separately)
+            assert "Chapter 3" in result
+            assert "More content." in result
+            assert "..." in result
+            
+        except ImportError:
+            pytest.skip("TTS module not available")
 
 
 

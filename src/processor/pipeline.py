@@ -346,6 +346,16 @@ class ProcessingPipeline:
                     "Converting to audio"
                 )
             
+            # Format text with chapter title and pauses for TTS
+            # Import the formatting function
+            from tts.tts_engine import format_chapter_intro
+            
+            # Get chapter title (use scraped title or fallback to "Chapter X")
+            chapter_title = title if title else f"Chapter {chapter_num}"
+            
+            # Format text with pauses: 1s pause, chapter title, 1s pause, then content
+            formatted_text = format_chapter_intro(chapter_title, content, provider=self.provider)
+            
             # Create temporary audio file path
             import tempfile
             temp_dir = Path(tempfile.gettempdir())
@@ -356,7 +366,7 @@ class ProcessingPipeline:
             # Note: TTS conversion (especially pyttsx3) is blocking and cannot be interrupted
             # once started. Stop/pause flags are checked before starting conversion.
             success = self.tts_engine.convert_text_to_speech(
-                text=content,
+                text=formatted_text,
                 output_path=temp_audio_path,
                 voice=voice,
                 provider=self.provider

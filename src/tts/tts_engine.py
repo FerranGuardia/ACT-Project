@@ -19,6 +19,38 @@ from .providers.provider_manager import TTSProviderManager
 logger = get_logger("tts.tts_engine")
 
 
+def format_chapter_intro(chapter_title: str, content: str, provider: Optional[str] = None) -> str:
+    """
+    Format chapter text with introduction and pauses for TTS.
+    
+    Adds 1s pause, chapter title, 1s pause, then content.
+    Format varies by provider:
+    - pyttsx3: Uses ellipsis (...) to create natural pauses (approximately 1 second)
+    - edge_tts: Can use SSML break tags (handled separately)
+    - Other: Uses ellipsis for natural pauses
+    
+    Args:
+        chapter_title: Chapter title to announce
+        content: Chapter content
+        provider: TTS provider name (None for auto-detect)
+    
+    Returns:
+        Formatted text with chapter introduction and pauses
+    """
+    # For pyttsx3, use ellipsis (...) to create natural pauses
+    # Ellipsis creates approximately 1 second pause in pyttsx3
+    # Format: "... " (ellipsis space) creates pause, then title with period, then another pause
+    if provider == "pyttsx3" or provider is None:
+        # Use "..." (ellipsis) for approximately 1 second pause
+        # pyttsx3 interprets ellipsis as a pause, not as spoken "dot dot dot"
+        # Note: The text cleaner normalizes ". . ." to "...", so we use "..." directly
+        return f"... {chapter_title}. ... {content}"
+    else:
+        # For other providers (like Edge TTS), use similar format
+        # Edge TTS will handle SSML breaks if SSML is used elsewhere
+        return f"... {chapter_title}. ... {content}"
+
+
 class TTSEngine:
     """Main TTS engine for converting text to speech."""
 
