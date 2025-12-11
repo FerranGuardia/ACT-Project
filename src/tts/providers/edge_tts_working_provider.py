@@ -188,13 +188,18 @@ class EdgeTTSWorkingProvider(TTSProvider):
                     pitch_str = f"{pitch_int:+d}Hz"  # e.g., "+0Hz", "+10Hz", "-5Hz"
                 
                 # Use their exact method - simple direct call
-                communicate = edge_tts.Communicate(
-                    text=text,
-                    voice=voice,
-                    rate=rate_str,
-                    pitch=pitch_str
-                    # Note: Hugging Face demo doesn't use volume parameter
-                )
+                # Only pass rate/pitch if they are not None (edge_tts doesn't accept None)
+                communicate_kwargs = {
+                    "text": text,
+                    "voice": voice
+                }
+                if rate_str is not None:
+                    communicate_kwargs["rate"] = rate_str
+                if pitch_str is not None:
+                    communicate_kwargs["pitch"] = pitch_str
+                # Note: Hugging Face demo doesn't use volume parameter
+                
+                communicate = edge_tts.Communicate(**communicate_kwargs)
                 
                 # Save to file
                 output_path.parent.mkdir(parents=True, exist_ok=True)

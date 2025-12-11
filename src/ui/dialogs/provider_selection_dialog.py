@@ -91,10 +91,15 @@ class ProviderStatusThread(QThread):
             
             try:
                 # Try to convert - this is the real test
+                # Don't pass rate/pitch/volume - let provider use defaults
+                # This avoids parameter format issues during status check
                 success = provider.convert_text_to_speech(
                     text=test_text,
                     voice=test_voice,
-                    output_path=temp_path
+                    output_path=temp_path,
+                    rate=None,
+                    pitch=None,
+                    volume=None
                 )
                 
                 # Clean up temp file
@@ -121,6 +126,11 @@ class ProviderStatusThread(QThread):
                     self.status_checked.emit(self.provider_name, False, "Unavailable - Service not generating audio")
                 elif "timeout" in error_msg.lower() or "connection" in error_msg.lower():
                     self.status_checked.emit(self.provider_name, False, "Unavailable - Connection timeout")
+                elif "must be str" in error_msg.lower() or "rate must be" in error_msg.lower():
+                    # This is a parameter format error, not a service issue
+                    # Log it but don't mark as unavailable - it's a code issue
+                    logger.warning(f"Provider {self.provider_name} parameter error: {error_msg}")
+                    self.status_checked.emit(self.provider_name, False, f"Unavailable - Parameter error: {error_msg[:40]}")
                 else:
                     self.status_checked.emit(self.provider_name, False, f"Unavailable - {error_msg[:50]}")
                     

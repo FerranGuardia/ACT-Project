@@ -195,13 +195,19 @@ class EdgeTTSProvider(TTSProvider):
                         volume_str = f"+{volume_int}%" if volume_int >= 0 else f"{volume_int}%"
                 
                 # Create communicate object
-                communicate = edge_tts.Communicate(
-                    text=text,
-                    voice=voice,
-                    rate=rate_str,
-                    pitch=pitch_str,
-                    volume=volume_str
-                )
+                # Only pass rate/pitch/volume if they are not None (edge_tts doesn't accept None)
+                communicate_kwargs = {
+                    "text": text,
+                    "voice": voice
+                }
+                if rate_str is not None:
+                    communicate_kwargs["rate"] = rate_str
+                if pitch_str is not None:
+                    communicate_kwargs["pitch"] = pitch_str
+                if volume_str is not None:
+                    communicate_kwargs["volume"] = volume_str
+                
+                communicate = edge_tts.Communicate(**communicate_kwargs)
                 
                 # Save to file
                 output_path.parent.mkdir(parents=True, exist_ok=True)
