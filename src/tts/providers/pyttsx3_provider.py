@@ -231,6 +231,18 @@ class Pyttsx3Provider(TTSProvider):
             # If file exists and is stable after timeout, return success even if runAndWait() is still running
             # This handles the case where pyttsx3 writes the file but runAndWait() hangs
             
+            # Calculate reasonable timeout based on text length BEFORE defining monitor_progress
+            # This must be done before monitor_progress() is defined because it references estimated_time
+            # Calculate reasonable timeout based on text length
+            # pyttsx3 typically takes ~0.1-0.2 seconds per character
+            # For very short text (like "Test"), ensure minimum wait time
+            estimated_time = max(10, text_length / 50)  # Conservative estimate, minimum 10s
+            max_wait_time = min(300, estimated_time * 2)  # Max 5 minutes, or 2x estimated time
+            # For status checks with short text, ensure we wait at least 15 seconds
+            if text_length < 10:
+                max_wait_time = max(max_wait_time, 15)  # At least 15 seconds for short text
+            logger.info(f"Estimated conversion time: {estimated_time:.1f}s, max wait: {max_wait_time:.1f}s")
+
             # Monitor file creation during conversion (pyttsx3 writes file during runAndWait)
             # Check file size periodically to show progress
             run_and_wait_called = threading.Event()
@@ -281,16 +293,7 @@ class Pyttsx3Provider(TTSProvider):
             # Check file stability periodically - if file is stable for a few seconds, return success
             # This handles the case where pyttsx3 writes the file but runAndWait() hangs
             
-            # Calculate reasonable timeout based on text length
-            # pyttsx3 typically takes ~0.1-0.2 seconds per character
-            # For very short text (like "Test"), ensure minimum wait time
-            estimated_time = max(10, text_length / 50)  # Conservative estimate, minimum 10s
-            max_wait_time = min(300, estimated_time * 2)  # Max 5 minutes, or 2x estimated time
-            # For status checks with short text, ensure we wait at least 15 seconds
-            if text_length < 10:
-                max_wait_time = max(max_wait_time, 15)  # At least 15 seconds for short text
-            logger.info(f"Estimated conversion time: {estimated_time:.1f}s, max wait: {max_wait_time:.1f}s")
-            
+            # Note: estimated_time and max_wait_time are now calculated above, before monitor_progress()
             try:
                 # Run conversion in a thread so we can timeout
                 conversion_done = threading.Event()
