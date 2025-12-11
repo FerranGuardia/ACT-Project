@@ -9,7 +9,7 @@ from typing import Optional, List
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFileDialog,
     QListWidget, QProgressBar, QGroupBox, QComboBox, QSlider, QSpinBox, QLineEdit,
-    QMessageBox, QListWidgetItem
+    QMessageBox, QListWidgetItem, QTextEdit, QTabWidget, QPlainTextEdit
 )
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QFont
@@ -185,9 +185,16 @@ class TTSView(QWidget):
         back_button_layout.addStretch()
         main_layout.addLayout(back_button_layout)
         
-        # Input files
-        input_group = QGroupBox("Input Files")
+        # Input section with tabs (Files and Text Editor)
+        input_group = QGroupBox("Input")
         input_layout = QVBoxLayout()
+        
+        # Create tab widget for switching between file input and text editor
+        self.input_tabs = QTabWidget()
+        
+        # Tab 1: File Input
+        file_tab = QWidget()
+        file_tab_layout = QVBoxLayout()
         
         buttons_layout = QHBoxLayout()
         self.add_files_button = QPushButton("➕ Add Files")
@@ -198,14 +205,54 @@ class TTSView(QWidget):
         buttons_layout.addWidget(self.add_folder_button)
         buttons_layout.addWidget(self.remove_button)
         buttons_layout.addStretch()
-        input_layout.addLayout(buttons_layout)
+        file_tab_layout.addLayout(buttons_layout)
         
         self.files_list = QListWidget()
         self.files_list.itemSelectionChanged.connect(
             lambda: self.remove_button.setEnabled(len(self.files_list.selectedItems()) > 0)
         )
-        input_layout.addWidget(self.files_list)
+        file_tab_layout.addWidget(self.files_list)
         
+        file_tab.setLayout(file_tab_layout)
+        self.input_tabs.addTab(file_tab, "📁 Files")
+        
+        # Tab 2: Text Editor
+        editor_tab = QWidget()
+        editor_tab_layout = QVBoxLayout()
+        
+        # Editor toolbar
+        editor_toolbar = QHBoxLayout()
+        self.clear_editor_button = QPushButton("🗑️ Clear")
+        self.load_file_button = QPushButton("📂 Load File")
+        self.save_text_button = QPushButton("💾 Save Text")
+        editor_toolbar.addWidget(self.clear_editor_button)
+        editor_toolbar.addWidget(self.load_file_button)
+        editor_toolbar.addWidget(self.save_text_button)
+        editor_toolbar.addStretch()
+        editor_tab_layout.addLayout(editor_toolbar)
+        
+        # Text editor widget
+        self.text_editor = QPlainTextEdit()
+        self.text_editor.setPlaceholderText("Type or paste your text here...\n\nYou can write directly in this editor and convert it to audio.\nUse the buttons above to load from a file or save your text.")
+        self.text_editor.setMinimumHeight(300)
+        # Set monospace font for better text editing
+        font = QFont("Consolas", 10)
+        if not font.exactMatch():
+            font = QFont("Courier New", 10)
+        self.text_editor.setFont(font)
+        editor_tab_layout.addWidget(self.text_editor)
+        
+        # Character count label
+        self.char_count_label = QLabel("Characters: 0")
+        editor_tab_layout.addWidget(self.char_count_label)
+        
+        # Update character count when text changes
+        self.text_editor.textChanged.connect(self._update_char_count)
+        
+        editor_tab.setLayout(editor_tab_layout)
+        self.input_tabs.addTab(editor_tab, "✏️ Text Editor")
+        
+        input_layout.addWidget(self.input_tabs)
         input_group.setLayout(input_layout)
         main_layout.addWidget(input_group)
         
@@ -335,6 +382,10 @@ class TTSView(QWidget):
         self.pause_button.clicked.connect(self.pause_conversion)
         self.stop_button.clicked.connect(self.stop_conversion)
         self.browse_button.clicked.connect(self.browse_output_dir)
+        # Text editor handlers
+        self.clear_editor_button.clicked.connect(self.clear_editor)
+        self.load_file_button.clicked.connect(self.load_file_to_editor)
+        self.save_text_button.clicked.connect(self.save_editor_text)
     
     def _go_back(self):
         """Navigate back to landing page."""
@@ -493,8 +544,18 @@ class TTSView(QWidget):
         # Get selected provider
         provider = self._get_selected_provider()
         
-        # Sample text for preview
-        sample_text = "Hello, this is a preview of the selected voice."
+        # Use text from editor if available and editor tab is active, otherwise use sample text
+        current_tab = self.input_tabs.currentIndex()
+        if current_tab == 1:  # Text Editor tab
+            editor_text = self.text_editor.toPlainText().strip()
+            if editor_text:
+                # Use first 200 characters of editor text for preview
+                sample_text = editor_text[:200] + ("..." if len(editor_text) > 200 else "")
+            else:
+                sample_text = "Hello, this is a preview of the selected voice."
+        else:
+            # Sample text for preview
+            sample_text = "Hello, this is a preview of the selected voice."
         
         try:
             self.status_label.setText("Generating preview...")
@@ -540,10 +601,84 @@ class TTSView(QWidget):
             self.status_label.setText("Ready")
             logger.error(f"Preview error: {e}")
     
+    def _update_char_count(self):
+        """Update character count label when text changes."""
+        text = self.text_editor.toPlainText()
+        char_count = len(text)
+        word_count = len(text.split()) if text.strip() else 0
+        self.char_count_label.setText(f"Characters: {char_count:,} | Words: {word_count:,}")
+    
+    def clear_editor(self):
+        """Clear the text editor."""
+        reply = QMessageBox.question(
+            self,
+            "Clear Editor",
+            "Are you sure you want to clear all text?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self.text_editor.clear()
+            logger.info("Text editor cleared")
+    
+    def load_file_to_editor(self):
+        """Load a text file into the editor."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Load Text File",
+            "",
+            "Text Files (*.txt *.md);;All Files (*.*)"
+        )
+        
+        if file_path:
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                self.text_editor.setPlainText(content)
+                # Switch to editor tab
+                self.input_tabs.setCurrentIndex(1)
+                logger.info(f"Loaded file into editor: {file_path}")
+                QMessageBox.information(self, "File Loaded", f"Successfully loaded:\n{os.path.basename(file_path)}")
+            except Exception as e:
+                QMessageBox.warning(self, "Error", f"Failed to load file:\n{str(e)}")
+                logger.error(f"Error loading file to editor: {e}")
+    
+    def save_editor_text(self):
+        """Save the editor text to a file."""
+        text = self.text_editor.toPlainText()
+        if not text.strip():
+            QMessageBox.warning(self, "Empty Text", "There is no text to save.")
+            return
+        
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Text File",
+            "",
+            "Text Files (*.txt);;Markdown Files (*.md);;All Files (*.*)"
+        )
+        
+        if file_path:
+            try:
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(text)
+                logger.info(f"Saved editor text to: {file_path}")
+                QMessageBox.information(self, "File Saved", f"Successfully saved to:\n{file_path}")
+            except Exception as e:
+                QMessageBox.warning(self, "Error", f"Failed to save file:\n{str(e)}")
+                logger.error(f"Error saving editor text: {e}")
+    
     def _validate_inputs(self) -> tuple[bool, str]:
         """Validate user inputs."""
-        if not self.file_paths:
-            return False, "Please add at least one text file to convert"
+        # Check if using file input or text editor
+        current_tab = self.input_tabs.currentIndex()
+        
+        if current_tab == 0:  # Files tab
+            if not self.file_paths:
+                return False, "Please add at least one text file to convert, or switch to Text Editor tab"
+        else:  # Text Editor tab
+            text = self.text_editor.toPlainText().strip()
+            if not text:
+                return False, "Please enter some text in the editor to convert"
         
         output_dir = self.output_dir_input.text().strip()
         if not output_dir:
@@ -575,9 +710,29 @@ class TTSView(QWidget):
         file_format = self.format_combo.currentText()
         provider = self._get_selected_provider()
         
+        # Check which input mode is active
+        current_tab = self.input_tabs.currentIndex()
+        if current_tab == 1:  # Text Editor tab
+            # Create a temporary file from editor text for conversion
+            import tempfile
+            text_content = self.text_editor.toPlainText()
+            if not text_content.strip():
+                QMessageBox.warning(self, "Empty Text", "Please enter some text in the editor.")
+                return
+            
+            # Create temporary file
+            temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8')
+            temp_file.write(text_content)
+            temp_file.close()
+            
+            # Use temporary file for conversion
+            file_paths = [temp_file.name]
+        else:  # Files tab
+            file_paths = self.file_paths.copy()
+        
         # Create and start thread
         self.conversion_thread = TTSConversionThread(
-            self.file_paths.copy(),
+            file_paths,
             output_dir,
             voice,
             rate,
