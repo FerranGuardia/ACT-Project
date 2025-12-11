@@ -13,7 +13,8 @@ from unittest.mock import Mock, MagicMock, patch
 import types
 
 # Add ACT src to path before any imports
-act_src = Path(r"C:\Users\Nitropc\Desktop\ACT\src")
+# Use relative path from test file location
+act_src = Path(__file__).parent.parent.parent.parent / "src"
 if str(act_src) not in sys.path:
     sys.path.insert(0, str(act_src))
 

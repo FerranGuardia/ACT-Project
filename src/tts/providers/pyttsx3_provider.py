@@ -143,17 +143,6 @@ class Pyttsx3Provider(TTSProvider):
         Returns:
             True if conversion successful, False otherwise
         """
-        # #region agent log - FUNCTION ENTRY
-        try:
-            import time, json, os
-            log_path = r'c:\Users\Nitropc\Desktop\ACT\.cursor\debug.log'
-            os.makedirs(os.path.dirname(log_path), exist_ok=True)
-            with open(log_path, 'a', encoding='utf-8') as f:
-                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"ENTRY","location":"pyttsx3_provider.py:convert_text_to_speech","message":"FUNCTION ENTRY","data":{"text_length":len(text),"voice":voice,"output_path":str(output_path)},"timestamp":int(time.time()*1000)}) + '\n')
-        except Exception as e:
-            logger.error(f"Failed to write entry log: {e}")
-        # #endregion
-        
         if not self.is_available():
             logger.error("pyttsx3 provider is not available")
             return False
@@ -222,20 +211,8 @@ class Pyttsx3Provider(TTSProvider):
             logger.info(f"Estimated time: ~{text_length / 100:.1f} seconds (rough estimate)")
             
             import time
-            import json
             import threading
             start_time = time.time()
-            
-            # #region agent log
-            try:
-                import os
-                log_path = r'c:\Users\Nitropc\Desktop\ACT\.cursor\debug.log'
-                os.makedirs(os.path.dirname(log_path), exist_ok=True)
-                with open(log_path, 'a', encoding='utf-8') as f:
-                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"pyttsx3_provider.py:216","message":"BEFORE save_to_file","data":{"text_length":text_length,"output_path":str(output_path),"file_exists_before":output_path.exists()},"timestamp":int(time.time()*1000)}) + '\n')
-            except Exception as log_e:
-                logger.debug(f"Debug log write failed (BEFORE save_to_file): {log_e}")
-        # #endregion
             
             self._engine.save_to_file(text, str(output_path))
             
@@ -246,15 +223,6 @@ class Pyttsx3Provider(TTSProvider):
                 logger.debug("Engine stopped after save_to_file (Pattern 1)")
             except Exception as stop_error:
                 logger.warning(f"Failed to stop engine after save_to_file: {stop_error}")
-            
-            # #region agent log
-            try:
-                log_data = {"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"pyttsx3_provider.py:222","message":"AFTER save_to_file and stop() BEFORE runAndWait","data":{"file_exists_after_save":output_path.exists(),"file_size_after_save":output_path.stat().st_size if output_path.exists() else 0,"elapsed":time.time()-start_time},"timestamp":int(time.time()*1000)}
-                with open(r'c:\Users\Nitropc\Desktop\ACT\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                    f.write(json.dumps(log_data) + '\n')
-            except Exception as log_err:
-                logger.debug(f"Debug log write failed: {log_err}")
-            # #endregion
             
             # Log that we're waiting for conversion
             logger.info("TTS conversion in progress (this may take a while for long text)...")
@@ -287,14 +255,6 @@ class Pyttsx3Provider(TTSProvider):
                     
                     elapsed = time.time() - start_time
                     
-                    # #region agent log
-                    try:
-                        log_data = {"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"pyttsx3_provider.py:monitor","message":"Monitor check during runAndWait","data":{"elapsed":elapsed,"file_exists":output_path.exists(),"file_size":output_path.stat().st_size if output_path.exists() else 0,"run_and_wait_called":run_and_wait_called.is_set(),"run_and_wait_returned":run_and_wait_returned.is_set()},"timestamp":int(time.time()*1000)}
-                        with open(r'c:\Users\Nitropc\Desktop\ACT\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                            f.write(json.dumps(log_data) + '\n')
-                    except: pass
-                    # #endregion
-                    
                     if output_path.exists():
                         current_size = output_path.stat().st_size
                         if current_size > last_size:
@@ -315,14 +275,6 @@ class Pyttsx3Provider(TTSProvider):
             monitor_thread = threading.Thread(target=monitor_progress, daemon=True)
             monitor_thread.start()
             
-            # #region agent log
-            try:
-                log_data = {"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"pyttsx3_provider.py:254","message":"BEFORE runAndWait call","data":{"elapsed":time.time()-start_time},"timestamp":int(time.time()*1000)}
-                with open(r'c:\Users\Nitropc\Desktop\ACT\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                    f.write(json.dumps(log_data) + '\n')
-            except: pass
-            # #endregion
-            
             run_and_wait_called.set()
             
             # Simplified approach: Run runAndWait() in a thread with timeout
@@ -342,22 +294,7 @@ class Pyttsx3Provider(TTSProvider):
                 
                 def run_conversion():
                     try:
-                        # #region agent log
-                        try:
-                            with open(r'c:\Users\Nitropc\Desktop\ACT\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"pyttsx3_provider.py:run_conversion","message":"Starting runAndWait in thread","data":{"elapsed":time.time()-start_time},"timestamp":int(time.time()*1000)}) + '\n')
-                        except: pass
-                        # #endregion
-                        
                         self._engine.runAndWait()
-                        
-                        # #region agent log
-                        try:
-                            with open(r'c:\Users\Nitropc\Desktop\ACT\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"pyttsx3_provider.py:run_conversion","message":"runAndWait returned","data":{"elapsed":time.time()-start_time},"timestamp":int(time.time()*1000)}) + '\n')
-                        except: pass
-                        # #endregion
-                        
                         conversion_done.set()
                     except Exception as e:
                         conversion_exception[0] = e
@@ -374,26 +311,10 @@ class Pyttsx3Provider(TTSProvider):
                 file_stable_duration = 0
                 iteration_count = 0
                 
-                # #region agent log
-                try:
-                    initial_file_size = output_path.stat().st_size if output_path.exists() else 0
-                    log_data = {"sessionId":"debug-session","runId":"run1","hypothesisId":"H1","location":"pyttsx3_provider.py:loop_start","message":"Starting stability check loop","data":{"initial_file_size":initial_file_size,"file_exists":output_path.exists(),"elapsed":time.time()-start_time},"timestamp":int(time.time()*1000)}
-                    with open(r'c:\Users\Nitropc\Desktop\ACT\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                        f.write(json.dumps(log_data) + '\n')
-                except: pass
-                # #endregion
-                
                 while conversion_thread.is_alive():
                     iteration_count += 1
                     remaining_timeout = max_wait_time - (time.time() - wait_start)
                     if remaining_timeout <= 0:
-                        # #region agent log
-                        try:
-                            log_data = {"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"pyttsx3_provider.py:timeout","message":"Timeout reached","data":{"elapsed":time.time()-start_time,"file_exists":output_path.exists(),"file_size":output_path.stat().st_size if output_path.exists() else 0,"iterations":iteration_count},"timestamp":int(time.time()*1000)}
-                            with open(r'c:\Users\Nitropc\Desktop\ACT\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                                f.write(json.dumps(log_data) + '\n')
-                        except: pass
-                        # #endregion
                         break
                     
                     # Check file stability every iteration
@@ -402,44 +323,15 @@ class Pyttsx3Provider(TTSProvider):
                             current_size = output_path.stat().st_size
                             current_time = time.time()
                             
-                            # #region agent log
-                            try:
-                                log_data = {"sessionId":"debug-session","runId":"run1","hypothesisId":"H2","location":"pyttsx3_provider.py:file_check","message":"File size check","data":{"iteration":iteration_count,"current_size":current_size,"last_size":last_file_size,"last_stable_time":last_stable_time,"stable_duration":file_stable_duration,"elapsed":time.time()-start_time},"timestamp":int(time.time()*1000)}
-                                with open(r'c:\Users\Nitropc\Desktop\ACT\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                                    f.write(json.dumps(log_data) + '\n')
-                            except: pass
-                            # #endregion
-                            
                             if current_size > 1000:  # Reasonable minimum size
-                                if current_size == last_file_size and last_file_size > 0:
+                                    if current_size == last_file_size and last_file_size > 0:
                                     # Size hasn't changed - track stability duration
                                     if last_stable_time is None:
                                         # First time we see stability - start timer
                                         last_stable_time = current_time
-                                        # #region agent log
-                                        try:
-                                            log_data = {"sessionId":"debug-session","runId":"run1","hypothesisId":"H3","location":"pyttsx3_provider.py:stability_start","message":"Stability timer started","data":{"file_size":current_size,"elapsed":time.time()-start_time},"timestamp":int(time.time()*1000)}
-                                            with open(r'c:\Users\Nitropc\Desktop\ACT\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                                                f.write(json.dumps(log_data) + '\n')
-                                        except: pass
-                                        # #endregion
                                     else:
                                         file_stable_duration = current_time - last_stable_time
-                                        # #region agent log
-                                        try:
-                                            log_data = {"sessionId":"debug-session","runId":"run1","hypothesisId":"H4","location":"pyttsx3_provider.py:stability_check","message":"Stability duration check","data":{"file_size":current_size,"stable_duration":file_stable_duration,"elapsed":time.time()-start_time},"timestamp":int(time.time()*1000)}
-                                            with open(r'c:\Users\Nitropc\Desktop\ACT\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                                                f.write(json.dumps(log_data) + '\n')
-                                        except: pass
-                                        # #endregion
                                         if file_stable_duration >= 3.0:  # Stable for 3+ seconds
-                                            # #region agent log
-                                            try:
-                                                log_data = {"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"pyttsx3_provider.py:file_stable","message":"File stable detected","data":{"file_size":current_size,"stable_duration":file_stable_duration,"elapsed":time.time()-start_time,"iterations":iteration_count},"timestamp":int(time.time()*1000)}
-                                                with open(r'c:\Users\Nitropc\Desktop\ACT\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                                                    f.write(json.dumps(log_data) + '\n')
-                                            except: pass
-                                            # #endregion
                                             logger.info(f"File size stable at {current_size:,} bytes for {file_stable_duration:.1f}s - conversion complete")
                                             # Signal monitor thread to stop
                                             run_and_wait_returned.set()
@@ -452,45 +344,14 @@ class Pyttsx3Provider(TTSProvider):
                                             return True
                                 else:
                                     # Size changed - reset stability timer
-                                    if last_file_size != current_size:
-                                        # #region agent log
-                                        try:
-                                            log_data = {"sessionId":"debug-session","runId":"run1","hypothesisId":"H5","location":"pyttsx3_provider.py:size_changed","message":"File size changed","data":{"old_size":last_file_size,"new_size":current_size,"elapsed":time.time()-start_time},"timestamp":int(time.time()*1000)}
-                                            with open(r'c:\Users\Nitropc\Desktop\ACT\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                                                f.write(json.dumps(log_data) + '\n')
-                                        except: pass
-                                        # #endregion
                                     last_stable_time = None
                                     file_stable_duration = 0
                                 
                                 last_file_size = current_size
                         except Exception as stat_error:
-                            # #region agent log
-                            try:
-                                log_data = {"sessionId":"debug-session","runId":"run1","hypothesisId":"H6","location":"pyttsx3_provider.py:stat_error","message":"Error checking file size","data":{"error":str(stat_error),"elapsed":time.time()-start_time},"timestamp":int(time.time()*1000)}
-                                with open(r'c:\Users\Nitropc\Desktop\ACT\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                                    f.write(json.dumps(log_data) + '\n')
-                            except: pass
-                            # #endregion
                             logger.debug(f"Error checking file size: {stat_error}")
-                    else:
-                        # #region agent log
-                        try:
-                            log_data = {"sessionId":"debug-session","runId":"run1","hypothesisId":"H7","location":"pyttsx3_provider.py:file_not_exists","message":"File does not exist yet","data":{"iteration":iteration_count,"elapsed":time.time()-start_time},"timestamp":int(time.time()*1000)}
-                            with open(r'c:\Users\Nitropc\Desktop\ACT\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                                f.write(json.dumps(log_data) + '\n')
-                        except: pass
-                        # #endregion
                     
                     conversion_thread.join(timeout=check_interval)
-                
-                # #region agent log
-                try:
-                    log_data = {"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"pyttsx3_provider.py:after_loop","message":"After wait loop","data":{"thread_alive":conversion_thread.is_alive(),"file_exists":output_path.exists(),"file_size":output_path.stat().st_size if output_path.exists() else 0,"elapsed":time.time()-start_time},"timestamp":int(time.time()*1000)}
-                    with open(r'c:\Users\Nitropc\Desktop\ACT\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                        f.write(json.dumps(log_data) + '\n')
-                except: pass
-                # #endregion
                 
                 # If thread is still alive, check file one more time
                 if conversion_thread.is_alive():
@@ -503,13 +364,6 @@ class Pyttsx3Provider(TTSProvider):
                                 if output_path.exists():
                                     new_size = output_path.stat().st_size
                                     if new_size == file_size:
-                                        # #region agent log
-                                        try:
-                                            log_data = {"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"pyttsx3_provider.py:final_check","message":"Final stability check passed","data":{"file_size":file_size,"elapsed":time.time()-start_time},"timestamp":int(time.time()*1000)}
-                                            with open(r'c:\Users\Nitropc\Desktop\ACT\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                                                f.write(json.dumps(log_data) + '\n')
-                                        except: pass
-                                        # #endregion
                                         logger.warning(f"runAndWait() hanging, but file is stable ({file_size:,} bytes) - returning success")
                                         # Signal monitor thread to stop
                                         run_and_wait_returned.set()
@@ -535,20 +389,7 @@ class Pyttsx3Provider(TTSProvider):
                     raise conversion_exception[0]
                     
             except Exception as run_error:
-                # #region agent log
-                try:
-                    with open(r'c:\Users\Nitropc\Desktop\ACT\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"pyttsx3_provider.py:runAndWait","message":"Exception in runAndWait","data":{"error":str(run_error),"error_type":type(run_error).__name__,"elapsed":time.time()-start_time},"timestamp":int(time.time()*1000)}) + '\n')
-                except: pass
-                # #endregion
                 raise
-            
-            # #region agent log
-            try:
-                with open(r'c:\Users\Nitropc\Desktop\ACT\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"pyttsx3_provider.py:260","message":"AFTER runAndWait returned","data":{"elapsed":time.time()-start_time,"file_exists":output_path.exists(),"file_size":output_path.stat().st_size if output_path.exists() else 0},"timestamp":int(time.time()*1000)}) + '\n')
-            except: pass
-            # #endregion
             
             run_and_wait_returned.set()
             
@@ -562,13 +403,6 @@ class Pyttsx3Provider(TTSProvider):
             conversion_duration = time.time() - start_time
             
             # Verify file was created
-            # #region agent log
-            try:
-                with open(r'c:\Users\Nitropc\Desktop\ACT\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"pyttsx3_provider.py:265","message":"File verification","data":{"file_exists":output_path.exists(),"file_size":output_path.stat().st_size if output_path.exists() else 0,"conversion_duration":conversion_duration},"timestamp":int(time.time()*1000)}) + '\n')
-            except: pass
-            # #endregion
-            
             if output_path.exists() and output_path.stat().st_size > 0:
                 file_size = output_path.stat().st_size
                 logger.info(f"✓ pyttsx3 conversion completed in {conversion_duration:.1f}s ({file_size:,} bytes)")
@@ -578,13 +412,6 @@ class Pyttsx3Provider(TTSProvider):
                 return False
                 
         except Exception as e:
-            # #region agent log
-            try:
-                import time, json
-                with open(r'c:\Users\Nitropc\Desktop\ACT\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"pyttsx3_provider.py:except","message":"Exception in convert_text_to_speech","data":{"error":str(e),"error_type":type(e).__name__},"timestamp":int(time.time()*1000)}) + '\n')
-            except: pass
-            # #endregion
             logger.error(f"Error in pyttsx3 conversion: {e}")
             return False
     
