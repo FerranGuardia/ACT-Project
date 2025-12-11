@@ -62,6 +62,17 @@ class AudioMergerThread(QThread):
                 self.finished.emit(False, "pydub library not installed. Please install it: pip install pydub")
                 return
             
+            # Check if ffmpeg is available (required by pydub for MP3)
+            try:
+                from pydub.utils import which
+                ffmpeg_path = which("ffmpeg")
+                if not ffmpeg_path:
+                    self.finished.emit(False, "ffmpeg not found. pydub requires ffmpeg to process audio files.\nPlease install ffmpeg: https://ffmpeg.org/download.html")
+                    return
+            except Exception as e:
+                # If we can't check, try anyway - might work
+                logger.warning(f"Could not verify ffmpeg installation: {e}")
+            
             self.status.emit("Loading audio files...")
             combined = None
             
@@ -82,16 +93,21 @@ class AudioMergerThread(QThread):
                     self.status.emit(f"Processing {idx + 1}/{total}: {os.path.basename(file_path)}")
                     
                     # Normalize and verify file path exists
-                    normalized_path = os.path.normpath(file_path)
-                    if not os.path.exists(normalized_path):
+                    # Convert to Path object for better handling of special characters
+                    file_path_obj = Path(file_path)
+                    if not file_path_obj.exists():
                         # Try resolving as absolute path
-                        abs_path = os.path.abspath(normalized_path)
-                        if not os.path.exists(abs_path):
-                            raise FileNotFoundError(f"File not found: {file_path} (normalized: {normalized_path}, absolute: {abs_path})")
-                        normalized_path = abs_path
+                        abs_path = file_path_obj.resolve()
+                        if not abs_path.exists():
+                            raise FileNotFoundError(f"File not found: {file_path} (resolved: {abs_path})")
+                        file_path_obj = abs_path
                     
-                    # Load audio file
-                    audio = AudioSegment.from_file(normalized_path)
+                    # Use Path object directly - pydub handles Path objects better than strings with special chars
+                    # Convert to string only if needed, but use the resolved Path
+                    normalized_path = str(file_path_obj)
+                    
+                    # Load audio file - pydub can handle Path objects or properly encoded strings
+                    audio = AudioSegment.from_file(file_path_obj)
                     
                     # Normalize audio
                     audio = normalize(audio)
@@ -110,11 +126,25 @@ class AudioMergerThread(QThread):
                     self.progress.emit(progress)
                     
                 except FileNotFoundError as e:
+                    error_msg = str(e)
+                    # Check if this is actually an ffmpeg error (ffmpeg not found)
+                    if "ffmpeg" in error_msg.lower() or "avconv" in error_msg.lower() or "ffprobe" in error_msg.lower():
+                        logger.error(f"ffmpeg not found - cannot process audio files. Error: {e}")
+                        self.finished.emit(False, "ffmpeg not found. pydub requires ffmpeg to process audio files.\nPlease install ffmpeg: https://ffmpeg.org/download.html")
+                        return
                     logger.error(f"File not found {idx + 1}: {file_path} - {e}")
                     self.status.emit(f"File {idx + 1} not found: {os.path.basename(file_path)}")
                     # Continue with next file instead of stopping
                     continue
                 except Exception as e:
+                    error_msg = str(e)
+                    error_type = type(e).__name__
+                    # Check if this is an ffmpeg error
+                    if "ffmpeg" in error_msg.lower() or "avconv" in error_msg.lower() or "ffprobe" in error_msg.lower() or error_type == "FileNotFoundError":
+                        if "ffmpeg" in error_msg.lower() or "avconv" in error_msg.lower() or "ffprobe" in error_msg.lower():
+                            logger.error(f"ffmpeg not found - cannot process audio files. Error: {e}")
+                            self.finished.emit(False, "ffmpeg not found. pydub requires ffmpeg to process audio files.\nPlease install ffmpeg: https://ffmpeg.org/download.html")
+                            return
                     logger.error(f"Error processing file {idx + 1}: {file_path} - {e}")
                     self.status.emit(f"Error in file {idx + 1}: {str(e)}")
                     # Continue with next file instead of stopping
