@@ -283,8 +283,12 @@ class Pyttsx3Provider(TTSProvider):
             
             # Calculate reasonable timeout based on text length
             # pyttsx3 typically takes ~0.1-0.2 seconds per character
-            estimated_time = max(10, text_length / 50)  # Conservative estimate
+            # For very short text (like "Test"), ensure minimum wait time
+            estimated_time = max(10, text_length / 50)  # Conservative estimate, minimum 10s
             max_wait_time = min(300, estimated_time * 2)  # Max 5 minutes, or 2x estimated time
+            # For status checks with short text, ensure we wait at least 15 seconds
+            if text_length < 10:
+                max_wait_time = max(max_wait_time, 15)  # At least 15 seconds for short text
             logger.info(f"Estimated conversion time: {estimated_time:.1f}s, max wait: {max_wait_time:.1f}s")
             
             try:
@@ -323,7 +327,10 @@ class Pyttsx3Provider(TTSProvider):
                             current_size = output_path.stat().st_size
                             current_time = time.time()
                             
-                            if current_size > 1000:  # Reasonable minimum size
+                            # For very short text (like "Test" in status checks), accept smaller files
+                            # Normal conversions should be > 1000 bytes, but status checks use short text
+                            min_size_threshold = 100 if text_length < 10 else 1000
+                            if current_size > min_size_threshold:
                                 if current_size == last_file_size and last_file_size > 0:
                                     # Size hasn't changed - track stability duration
                                     if last_stable_time is None:
@@ -358,7 +365,9 @@ class Pyttsx3Provider(TTSProvider):
                     if output_path.exists():
                         try:
                             file_size = output_path.stat().st_size
-                            if file_size > 1000:  # Reasonable minimum size
+                            # For very short text (like "Test" in status checks), accept smaller files
+                            min_size_threshold = 100 if text_length < 10 else 1000
+                            if file_size > min_size_threshold:
                                 # Wait 2 seconds and check again for stability
                                 time.sleep(2.0)
                                 if output_path.exists():
@@ -403,12 +412,22 @@ class Pyttsx3Provider(TTSProvider):
             conversion_duration = time.time() - start_time
             
             # Verify file was created
-            if output_path.exists() and output_path.stat().st_size > 0:
+            # For very short text (like "Test" in status checks), accept smaller files (100+ bytes)
+            # For normal conversions, require larger files (1000+ bytes)
+            min_size_threshold = 100 if text_length < 10 else 1000
+            if output_path.exists():
                 file_size = output_path.stat().st_size
-                logger.info(f"✓ pyttsx3 conversion completed in {conversion_duration:.1f}s ({file_size:,} bytes)")
-                return True
+                if file_size > min_size_threshold:
+                    logger.info(f"✓ pyttsx3 conversion completed in {conversion_duration:.1f}s ({file_size:,} bytes)")
+                    return True
+                elif file_size > 0:
+                    logger.warning(f"pyttsx3 conversion created file but too small ({file_size} bytes < {min_size_threshold} bytes threshold)")
+                    return False
+                else:
+                    logger.error(f"pyttsx3 conversion failed: file is empty (duration: {conversion_duration:.1f}s)")
+                    return False
             else:
-                logger.error(f"pyttsx3 conversion failed: file not created or empty (duration: {conversion_duration:.1f}s)")
+                logger.error(f"pyttsx3 conversion failed: file not created (duration: {conversion_duration:.1f}s)")
                 return False
                 
         except Exception as e:
