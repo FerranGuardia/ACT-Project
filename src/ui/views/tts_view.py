@@ -472,11 +472,14 @@ class TTSView(QWidget):
         self.provider_button.setText(f"Provider: {label}")
         
         # Check status and update indicator
+        # Note: This is a quick check. For accurate status, use the provider selection dialog.
         try:
             provider = self.tts_engine.provider_manager.get_provider(self.selected_provider)
             if provider and provider.is_available():
-                self.provider_status_label.setText("🟢")
-                self.provider_status_label.setToolTip("Provider is active")
+                # Quick check - but note that is_available() only checks library/voices, not audio generation
+                # For accurate status, user should use the provider selection dialog which tests audio
+                self.provider_status_label.setText("🟡")
+                self.provider_status_label.setToolTip("Provider library available - Use dialog to test audio generation")
             else:
                 self.provider_status_label.setText("🔴")
                 self.provider_status_label.setToolTip("Provider is unavailable")

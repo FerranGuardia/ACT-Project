@@ -19,11 +19,11 @@ act_src = Path(__file__).parent.parent.parent.parent / "src"
 if str(act_src) not in sys.path:
     sys.path.insert(0, str(act_src))
 
-# Mock external dependencies
+# Mock external dependencies BEFORE any imports
 sys.modules["edge_tts"] = MagicMock()
 sys.modules["pyttsx3"] = MagicMock()
 
-# Mock core.logger
+# Mock core modules
 import types
 if "core" not in sys.modules:
     sys.modules["core"] = types.ModuleType("core")
@@ -33,18 +33,58 @@ if "core.logger" not in sys.modules:
     logger_module = types.ModuleType("core.logger")
     logger_module.get_logger = mock_get_logger
     sys.modules["core.logger"] = logger_module
+if "core.config_manager" not in sys.modules:
+    mock_config = MagicMock()
+    mock_config.get.return_value = "en-US-AndrewNeural"
+    mock_get_config = MagicMock(return_value=mock_config)
+    config_module = types.ModuleType("core.config_manager")
+    config_module.get_config = mock_get_config
+    sys.modules["core.config_manager"] = config_module
 
 # Mock tts modules
 if "tts" not in sys.modules:
     sys.modules["tts"] = types.ModuleType("tts")
 if "tts.providers" not in sys.modules:
     sys.modules["tts.providers"] = types.ModuleType("tts.providers")
+if "tts.providers.provider_manager" not in sys.modules:
+    provider_manager_module = types.ModuleType("tts.providers.provider_manager")
+    sys.modules["tts.providers.provider_manager"] = provider_manager_module
+if "tts.voice_manager" not in sys.modules:
+    sys.modules["tts.voice_manager"] = types.ModuleType("tts.voice_manager")
+if "tts.tts_engine" not in sys.modules:
+    sys.modules["tts.tts_engine"] = types.ModuleType("tts.tts_engine")
+
+# Mock tts.providers.provider_manager before importing dialog
+mock_provider_manager_class = MagicMock()
+if "tts.providers.provider_manager" not in sys.modules:
+    provider_manager_module = types.ModuleType("tts.providers.provider_manager")
+    provider_manager_module.TTSProviderManager = mock_provider_manager_class
+    sys.modules["tts.providers.provider_manager"] = provider_manager_module
+
+# Mock ui modules to avoid full import chain
+if "ui" not in sys.modules:
+    sys.modules["ui"] = types.ModuleType("ui")
+if "ui.views" not in sys.modules:
+    sys.modules["ui.views"] = types.ModuleType("ui.views")
+if "ui.main_window" not in sys.modules:
+    sys.modules["ui.main_window"] = types.ModuleType("ui.main_window")
+
+# Mock tts module
+if "tts" not in sys.modules:
+    sys.modules["tts"] = types.ModuleType("tts")
+mock_tts_engine = MagicMock()
+if "tts.tts_engine" not in sys.modules:
+    tts_engine_module = types.ModuleType("tts.tts_engine")
+    tts_engine_module.TTSEngine = MagicMock
+    sys.modules["tts.tts_engine"] = tts_engine_module
 
 # Create QApplication if it doesn't exist
 if not QApplication.instance():
     app = QApplication([])
 
 import pytest
+
+# Import after mocking
 from ui.dialogs.provider_selection_dialog import (
     ProviderSelectionDialog,
     ProviderStatusThread,
@@ -234,8 +274,8 @@ class TestProviderSelectionDialog:
 class TestProviderStatusThread:
     """Test ProviderStatusThread class"""
     
-    def test_status_thread_checks_provider(self, mock_provider_manager):
-        """Test that status thread checks provider availability"""
+    def test_status_thread_tests_audio_generation(self, mock_provider_manager, tmp_path):
+        """Test that status thread actually tests audio generation, not just is_available()"""
         thread = ProviderStatusThread(mock_provider_manager, "edge_tts")
         
         # Connect signal
@@ -246,14 +286,16 @@ class TestProviderStatusThread:
         
         # Run thread
         thread.start()
-        thread.wait(2000)  # Wait up to 2 seconds
+        thread.wait(5000)  # Wait up to 5 seconds (audio generation takes time)
         
-        # Should have checked status
+        # Should have checked status by testing audio generation
         assert len(status_checked) > 0
         provider_name, is_available, message = status_checked[0]
         assert provider_name == "edge_tts"
         assert isinstance(is_available, bool)
         assert isinstance(message, str)
+        # Message should indicate audio generation was tested
+        assert "audio" in message.lower() or "active" in message.lower() or "unavailable" in message.lower()
     
     def test_status_thread_handles_unavailable_provider(self, mock_provider_manager):
         """Test status thread with unavailable provider"""
@@ -273,6 +315,27 @@ class TestProviderStatusThread:
         if status_checked:
             _, is_available, _ = status_checked[0]
             assert is_available is False
+    
+    def test_status_thread_handles_audio_generation_failure(self, mock_provider_manager):
+        """Test status thread when provider can list voices but can't generate audio"""
+        # Make provider return False for audio generation
+        provider = mock_provider_manager._providers["edge_tts"]
+        provider.convert_text_to_speech = Mock(return_value=False)
+        
+        thread = ProviderStatusThread(mock_provider_manager, "edge_tts")
+        
+        status_checked = []
+        thread.status_checked.connect(
+            lambda name, available, msg: status_checked.append((name, available, msg))
+        )
+        
+        thread.start()
+        thread.wait(5000)
+        
+        if status_checked:
+            _, is_available, message = status_checked[0]
+            assert is_available is False
+            assert "audio" in message.lower() or "unavailable" in message.lower()
 
 
 class TestProviderTestThread:

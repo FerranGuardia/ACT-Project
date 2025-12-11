@@ -48,7 +48,11 @@ PROVIDER_INFO = {
 
 
 class ProviderStatusThread(QThread):
-    """Thread for checking provider status asynchronously."""
+    """Thread for checking provider status asynchronously.
+    
+    Actually tests audio generation, not just library installation.
+    This ensures we detect providers that can list voices but can't generate audio.
+    """
     
     status_checked = Signal(str, bool, str)  # provider_name, is_available, message
     
@@ -58,22 +62,71 @@ class ProviderStatusThread(QThread):
         self.provider_name = provider_name
     
     def run(self):
-        """Check provider status."""
+        """Check provider status by actually testing audio generation."""
         try:
             provider = self.provider_manager.get_provider(self.provider_name)
             if provider is None:
                 self.status_checked.emit(self.provider_name, False, "Provider not found")
                 return
             
-            # Check if available
-            is_available = provider.is_available()
-            if is_available:
-                self.status_checked.emit(self.provider_name, True, "Active")
-            else:
-                self.status_checked.emit(self.provider_name, False, "Unavailable - Library not installed or service not working")
+            # First check basic availability (library installed)
+            if not provider.is_available():
+                self.status_checked.emit(self.provider_name, False, "Unavailable - Library not installed")
+                return
+            
+            # Actually test audio generation (this is the real test)
+            # Get a test voice
+            voices = provider.get_voices(locale="en-US")
+            if not voices:
+                self.status_checked.emit(self.provider_name, False, "Unavailable - No voices available")
+                return
+            
+            test_voice = voices[0].get("id") or voices[0].get("name", "en-US-AndrewNeural")
+            test_text = "Test"  # Very short test text
+            
+            # Create temporary file for test
+            import tempfile
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tmp:
+                temp_path = Path(tmp.name)
+            
+            try:
+                # Try to convert - this is the real test
+                success = provider.convert_text_to_speech(
+                    text=test_text,
+                    voice=test_voice,
+                    output_path=temp_path
+                )
+                
+                # Clean up temp file
+                try:
+                    if temp_path.exists():
+                        temp_path.unlink()
+                except Exception:
+                    pass
+                
+                if success:
+                    self.status_checked.emit(self.provider_name, True, "Active - Audio generation working")
+                else:
+                    self.status_checked.emit(self.provider_name, False, "Unavailable - Cannot generate audio")
+            except Exception as e:
+                # Clean up temp file on error
+                try:
+                    if temp_path.exists():
+                        temp_path.unlink()
+                except Exception:
+                    pass
+                
+                error_msg = str(e)
+                if "no audio" in error_msg.lower() or "NoAudioReceived" in error_msg:
+                    self.status_checked.emit(self.provider_name, False, "Unavailable - Service not generating audio")
+                elif "timeout" in error_msg.lower() or "connection" in error_msg.lower():
+                    self.status_checked.emit(self.provider_name, False, "Unavailable - Connection timeout")
+                else:
+                    self.status_checked.emit(self.provider_name, False, f"Unavailable - {error_msg[:50]}")
+                    
         except Exception as e:
             logger.error(f"Error checking status for {self.provider_name}: {e}")
-            self.status_checked.emit(self.provider_name, False, f"Error: {str(e)}")
+            self.status_checked.emit(self.provider_name, False, f"Error: {str(e)[:50]}")
 
 
 class ProviderTestThread(QThread):
