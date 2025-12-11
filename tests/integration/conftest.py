@@ -49,13 +49,13 @@ def real_voice_manager():
 
 @pytest.fixture
 def real_provider_manager():
-    """Create a real ProviderManager instance for integration testing"""
+    """Create a real TTSProviderManager instance for integration testing"""
     try:
-        from tts.providers.provider_manager import ProviderManager
-        manager = ProviderManager()
+        from tts.providers.provider_manager import TTSProviderManager
+        manager = TTSProviderManager()
         yield manager
     except ImportError:
-        pytest.skip("ProviderManager not available")
+        pytest.skip("TTSProviderManager not available")
 
 
 @pytest.fixture

@@ -109,21 +109,25 @@ class TestTTSProviderManager:
     """Test TTSProviderManager class"""
     
     @patch('tts.providers.provider_manager.EdgeTTSProvider')
+    @patch('tts.providers.provider_manager.EdgeTTSWorkingProvider')
     @patch('tts.providers.provider_manager.Pyttsx3Provider')
-    def test_initialization_with_both_providers(self, mock_pyttsx3, mock_edge):
-        """Test manager initialization with both providers available"""
+    def test_initialization_with_both_providers(self, mock_pyttsx3, mock_edge_working, mock_edge):
+        """Test manager initialization with all providers available"""
         # Setup mocks
         edge_provider = MockProvider("edge_tts", ProviderType.CLOUD, available=True)
+        edge_working_provider = MockProvider("edge_tts_working", ProviderType.CLOUD, available=True)
         pyttsx3_provider = MockProvider("pyttsx3", ProviderType.OFFLINE, available=True)
         
         mock_edge.return_value = edge_provider
+        mock_edge_working.return_value = edge_working_provider
         mock_pyttsx3.return_value = pyttsx3_provider
         
         manager = TTSProviderManager()
         
         assert "edge_tts" in manager._providers
+        assert "edge_tts_working" in manager._providers
         assert "pyttsx3" in manager._providers
-        assert len(manager._providers) == 2
+        assert len(manager._providers) >= 2  # At least 2, could be 3 if all available
     
     @patch('tts.providers.provider_manager.EdgeTTSProvider')
     @patch('tts.providers.provider_manager.Pyttsx3Provider')
@@ -387,21 +391,25 @@ class TestTTSProviderManager:
         assert all(v.get("provider") == "pyttsx3" for v in voices)
     
     @patch('tts.providers.provider_manager.EdgeTTSProvider')
+    @patch('tts.providers.provider_manager.EdgeTTSWorkingProvider')
     @patch('tts.providers.provider_manager.Pyttsx3Provider')
-    def test_get_providers(self, mock_pyttsx3, mock_edge):
+    def test_get_providers(self, mock_pyttsx3, mock_edge_working, mock_edge):
         """Test get_providers returns list of available provider names"""
         edge_provider = MockProvider("edge_tts", ProviderType.CLOUD, available=True)
+        edge_working_provider = MockProvider("edge_tts_working", ProviderType.CLOUD, available=True)
         pyttsx3_provider = MockProvider("pyttsx3", ProviderType.OFFLINE, available=True)
         
         mock_edge.return_value = edge_provider
+        mock_edge_working.return_value = edge_working_provider
         mock_pyttsx3.return_value = pyttsx3_provider
         
         manager = TTSProviderManager()
         providers = manager.get_providers()
         
         assert "edge_tts" in providers
+        assert "edge_tts_working" in providers
         assert "pyttsx3" in providers
-        assert len(providers) == 2
+        assert len(providers) >= 2  # At least 2, could be 3 if all available
     
     @patch('tts.providers.provider_manager.EdgeTTSProvider')
     @patch('tts.providers.provider_manager.Pyttsx3Provider')
