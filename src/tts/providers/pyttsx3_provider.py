@@ -324,7 +324,7 @@ class Pyttsx3Provider(TTSProvider):
                             current_time = time.time()
                             
                             if current_size > 1000:  # Reasonable minimum size
-                                    if current_size == last_file_size and last_file_size > 0:
+                                if current_size == last_file_size and last_file_size > 0:
                                     # Size hasn't changed - track stability duration
                                     if last_stable_time is None:
                                         # First time we see stability - start timer
