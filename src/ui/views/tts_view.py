@@ -55,6 +55,7 @@ class ProviderStatusCheckThread(QThread):
             
             try:
                 # Test audio generation
+                # For pyttsx3, we need to wait longer as it's slower
                 success = provider.convert_text_to_speech(
                     text=test_text,
                     voice=test_voice,
@@ -64,6 +65,17 @@ class ProviderStatusCheckThread(QThread):
                     volume=None
                 )
                 
+                # For pyttsx3, also check if file exists even if convert_text_to_speech returned False
+                # (it might have created the file but returned False due to timeout)
+                if not success and self.provider_name == "pyttsx3":
+                    import time
+                    # Wait a bit more for pyttsx3
+                    for _ in range(5):
+                        time.sleep(1)
+                        if temp_path.exists() and temp_path.stat().st_size > 0:
+                            success = True
+                            break
+                
                 # Clean up
                 try:
                     if temp_path.exists():
@@ -72,15 +84,17 @@ class ProviderStatusCheckThread(QThread):
                     pass
                 
                 self.status_checked.emit(self.provider_name, success)
-            except Exception:
+            except Exception as e:
                 # Clean up on error
                 try:
                     if temp_path.exists():
                         temp_path.unlink()
                 except Exception:
                     pass
+                logger.error(f"Status check error for {self.provider_name}: {e}")
                 self.status_checked.emit(self.provider_name, False)
-        except Exception:
+        except Exception as e:
+            logger.error(f"Status check exception for {self.provider_name}: {e}")
             self.status_checked.emit(self.provider_name, False)
 
 
@@ -533,6 +547,7 @@ class TTSView(QWidget):
     
     def _on_provider_status_checked(self, provider_name: str, is_working: bool):
         """Handle provider status check result."""
+        logger.info(f"Provider {provider_name} status check result: {'Working' if is_working else 'Not working'}")
         self.provider_status[provider_name] = is_working
         
         # Update dropdown item
