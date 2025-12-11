@@ -34,13 +34,23 @@ class EdgeTTSProvider(TTSProvider):
             try:
                 voices = loop.run_until_complete(edge_tts.list_voices())
                 self._available = len(voices) > 0
+                if not self._available:
+                    logger.warning("Edge TTS service returned no voices - service may be down")
+                else:
+                    logger.info(f"Edge TTS service available with {len(voices)} voices")
             except Exception as e:
-                logger.warning(f"Edge TTS service check failed: {e}")
+                error_msg = str(e)
+                logger.warning(f"Edge TTS service check failed: {error_msg}")
+                # Check for common error patterns
+                if "timeout" in error_msg.lower() or "connection" in error_msg.lower():
+                    logger.warning("Edge TTS appears to be experiencing connectivity issues")
+                elif "no audio" in error_msg.lower() or "empty" in error_msg.lower():
+                    logger.warning("Edge TTS service may be experiencing outages (some voices may be down)")
                 self._available = False
             finally:
                 loop.close()
         except ImportError:
-            logger.warning("edge-tts not installed")
+            logger.warning("edge-tts not installed. Install with: pip install edge-tts")
             self._available = False
         except Exception as e:
             logger.warning(f"Error checking Edge TTS availability: {e}")
@@ -208,7 +218,17 @@ class EdgeTTSProvider(TTSProvider):
                 loop.close()
                 
         except Exception as e:
-            logger.error(f"Error in Edge TTS conversion: {e}")
+            error_msg = str(e)
+            logger.error(f"Error in Edge TTS conversion: {error_msg}")
+            # Provide more helpful error messages
+            if "no audio" in error_msg.lower() or "NoAudioReceived" in error_msg:
+                logger.error("Edge TTS returned no audio - service may be experiencing outages")
+                logger.info("This is a known issue with Edge TTS. Some voices may be temporarily unavailable.")
+                logger.info("The system will automatically fall back to pyttsx3 if available.")
+            elif "timeout" in error_msg.lower() or "connection" in error_msg.lower():
+                logger.error("Edge TTS connection timeout - check your internet connection")
+            elif "rate limit" in error_msg.lower():
+                logger.error("Edge TTS rate limit exceeded - too many requests")
             return False
     
     def supports_rate(self) -> bool:
