@@ -568,10 +568,20 @@ class TTSView(QWidget):
             
             for provider_name in all_providers:
                 label = provider_labels.get(provider_name, provider_name)
-                # Initially show as checking
-                display_text = f"🟡 {label} - Checking..."
+                # For pyttsx3, check availability immediately and show as active if available
+                if provider_name == "pyttsx3":
+                    provider = self.tts_engine.provider_manager.get_provider("pyttsx3")
+                    if provider and provider.is_available():
+                        display_text = f"🟢 {label} - Active"
+                        self.provider_status[provider_name] = True  # Always mark as running
+                    else:
+                        display_text = f"🔴 {label} - Unavailable"
+                        self.provider_status[provider_name] = False
+                else:
+                    # For online providers, initially show as checking
+                    display_text = f"🟡 {label} - Checking..."
+                    self.provider_status[provider_name] = None  # None = checking, True = working, False = not working
                 self.provider_combo.addItem(display_text, provider_name)
-                self.provider_status[provider_name] = None  # None = checking, True = working, False = not working
             
             # Set default to first provider
             if all_providers:
@@ -597,12 +607,7 @@ class TTSView(QWidget):
             self.status_threads[provider_name] = thread
             thread.start()
         
-        # For pyttsx3, just mark it as available if the provider exists (no actual test)
-        if "pyttsx3" in self.tts_engine.provider_manager._providers:
-            provider = self.tts_engine.provider_manager.get_provider("pyttsx3")
-            if provider and provider.is_available():
-                self.provider_status["pyttsx3"] = True  # Mark as available without testing
-                self._update_provider_item("pyttsx3")
+        # pyttsx3 status is already set in _load_providers() - no need to check again
     
     def _on_provider_status_checked(self, provider_name: str, is_working: bool):
         """Handle provider status check result."""
