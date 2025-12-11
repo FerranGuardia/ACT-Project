@@ -81,8 +81,17 @@ class AudioMergerThread(QThread):
                 try:
                     self.status.emit(f"Processing {idx + 1}/{total}: {os.path.basename(file_path)}")
                     
+                    # Normalize and verify file path exists
+                    normalized_path = os.path.normpath(file_path)
+                    if not os.path.exists(normalized_path):
+                        # Try resolving as absolute path
+                        abs_path = os.path.abspath(normalized_path)
+                        if not os.path.exists(abs_path):
+                            raise FileNotFoundError(f"File not found: {file_path} (normalized: {normalized_path}, absolute: {abs_path})")
+                        normalized_path = abs_path
+                    
                     # Load audio file
-                    audio = AudioSegment.from_file(file_path)
+                    audio = AudioSegment.from_file(normalized_path)
                     
                     # Normalize audio
                     audio = normalize(audio)
@@ -100,17 +109,28 @@ class AudioMergerThread(QThread):
                     progress = int((idx + 1) / total * 100)
                     self.progress.emit(progress)
                     
+                except FileNotFoundError as e:
+                    logger.error(f"File not found {idx + 1}: {file_path} - {e}")
+                    self.status.emit(f"File {idx + 1} not found: {os.path.basename(file_path)}")
+                    # Continue with next file instead of stopping
+                    continue
                 except Exception as e:
-                    logger.error(f"Error processing file {idx + 1}: {e}")
+                    logger.error(f"Error processing file {idx + 1}: {file_path} - {e}")
                     self.status.emit(f"Error in file {idx + 1}: {str(e)}")
+                    # Continue with next file instead of stopping
+                    continue
             
             if not self.should_stop and combined is not None:
                 self.status.emit("Saving merged audio...")
                 # Determine format from output path
                 output_format = Path(self.output_path).suffix[1:]  # Remove dot
+                # Ensure output directory exists
+                output_dir = os.path.dirname(self.output_path)
+                if output_dir and not os.path.exists(output_dir):
+                    os.makedirs(output_dir, exist_ok=True)
                 combined.export(self.output_path, format=output_format)
                 self.status.emit("Merging completed!")
-                self.finished.emit(True, f"Successfully merged {total} files")
+                self.finished.emit(True, f"Successfully merged audio files")
             elif self.should_stop:
                 self.finished.emit(False, "Merging stopped")
             else:
