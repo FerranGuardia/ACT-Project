@@ -88,10 +88,23 @@ def sample_text_file(temp_dir, sample_text):
 
 
 @pytest.fixture
+def sample_audio_file(temp_dir):
+    """Create a sample audio file for testing (empty file, just for path testing)"""
+    file_path = temp_dir / "test_audio.mp3"
+    file_path.touch()  # Create empty file
+    return file_path
+
+
+@pytest.fixture
 def mock_file_dialog():
-    """Mock QFileDialog for file operations"""
-    with patch('PySide6.QtWidgets.QFileDialog') as mock:
-        yield mock
+    """Mock QFileDialog for file operations - prevents real dialogs from opening"""
+    # Patch QFileDialog where it's imported in merger_view
+    with patch('src.ui.views.merger_view.QFileDialog') as mock_dialog:
+        # Set up static methods that the view uses
+        mock_dialog.getOpenFileNames = MagicMock(return_value=([], ""))
+        mock_dialog.getExistingDirectory = MagicMock(return_value="")
+        mock_dialog.getSaveFileName = MagicMock(return_value=("", ""))
+        yield mock_dialog
 
 
 @pytest.fixture
