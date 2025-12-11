@@ -88,24 +88,38 @@ class ProviderStatusCheckThread(QThread):
                 # For slower providers, wait a bit and check again
                 import time
                 if not success:
-                    # Wait longer for pyttsx3 (it can take 5-10 seconds to create file)
-                    # Check more frequently for faster detection
-                    max_wait = 15 if self.provider_name == "pyttsx3" else 5
+                    # Wait longer for pyttsx3 (it can take 10-20 seconds to create and stabilize file)
+                    # pyttsx3 has complex stability checks that may timeout, but file still gets created
+                    max_wait = 30 if self.provider_name == "pyttsx3" else 5
                     check_interval = 0.5  # Check every 0.5 seconds
                     waited = 0
                     while waited < max_wait:
                         time.sleep(check_interval)
                         waited += check_interval
-                        if temp_path.exists() and temp_path.stat().st_size > 0:
-                            logger.info(f"Provider {self.provider_name} created file after {waited:.1f}s (even though convert_text_to_speech returned False)")
-                            success = True
-                            break
+                        if temp_path.exists():
+                            file_size = temp_path.stat().st_size
+                            # For pyttsx3, accept smaller files (test text "Test" creates small files)
+                            # For other providers, require any content
+                            min_size = 100 if self.provider_name == "pyttsx3" else 0
+                            if file_size > min_size:
+                                logger.info(f"Provider {self.provider_name} created file ({file_size} bytes) after {waited:.1f}s (even though convert_text_to_speech returned False)")
+                                success = True
+                                break
                 
                 # Final verification: if file exists and has content, consider it successful
-                if temp_path.exists() and temp_path.stat().st_size > 0:
-                    if not success:
-                        logger.warning(f"Provider {self.provider_name} file exists but function returned False - marking as working")
-                        success = True
+                if temp_path.exists():
+                    file_size = temp_path.stat().st_size
+                    # For pyttsx3, accept smaller files (test text "Test" creates small files ~100-500 bytes)
+                    # For other providers, require any content
+                    min_size = 100 if self.provider_name == "pyttsx3" else 0
+                    if file_size > min_size:
+                        if not success:
+                            logger.warning(f"Provider {self.provider_name} file exists ({file_size} bytes) but function returned False - marking as working")
+                            success = True
+                    else:
+                        if success:
+                            logger.warning(f"Provider {self.provider_name} function returned True but file too small ({file_size} bytes) - marking as not working")
+                            success = False
                 else:
                     if success:
                         logger.warning(f"Provider {self.provider_name} function returned True but no file created - marking as not working")
