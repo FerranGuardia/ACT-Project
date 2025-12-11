@@ -156,20 +156,33 @@ class EdgeTTSProvider(TTSProvider):
             
             try:
                 # Convert rate, pitch, volume to Edge TTS format
+                # Edge TTS expects integer values, not floats
                 rate_str = None
                 if rate is not None:
-                    # Edge TTS expects: "+50%" or "-25%"
-                    rate_str = f"+{rate}%" if rate >= 0 else f"{rate}%"
+                    # Convert to integer and format: "+50%" or "-25%"
+                    rate_int = int(round(rate))
+                    if rate_int == 0:
+                        rate_str = "+0%"  # Edge TTS doesn't like "+0.0%"
+                    else:
+                        rate_str = f"+{rate_int}%" if rate_int >= 0 else f"{rate_int}%"
                 
                 pitch_str = None
                 if pitch is not None:
-                    # Edge TTS expects: "+10Hz" or "-5Hz"
-                    pitch_str = f"+{pitch}Hz" if pitch >= 0 else f"{pitch}Hz"
+                    # Convert to integer and format: "+10Hz" or "-5Hz"
+                    pitch_int = int(round(pitch))
+                    if pitch_int == 0:
+                        pitch_str = "+0Hz"  # Edge TTS doesn't like "+0.0Hz"
+                    else:
+                        pitch_str = f"+{pitch_int}Hz" if pitch_int >= 0 else f"{pitch_int}Hz"
                 
                 volume_str = None
                 if volume is not None:
-                    # Edge TTS expects: "+20%" or "-10%"
-                    volume_str = f"+{volume}%" if volume >= 0 else f"{volume}%"
+                    # Convert to integer and format: "+20%" or "-10%"
+                    volume_int = int(round(volume))
+                    if volume_int == 0:
+                        volume_str = "+0%"  # Edge TTS doesn't like "+0.0%"
+                    else:
+                        volume_str = f"+{volume_int}%" if volume_int >= 0 else f"{volume_int}%"
                 
                 # Create communicate object
                 communicate = edge_tts.Communicate(

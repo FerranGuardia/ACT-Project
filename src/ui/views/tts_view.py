@@ -150,6 +150,9 @@ class TTSView(QWidget):
         self._connect_handlers()
         self._load_providers()
         self._load_voices()
+        # Update pitch note based on initial provider
+        if hasattr(self, 'pitch_note_label'):
+            self._update_pitch_note()
         logger.info("TTS view initialized")
     
     def setup_ui(self):
@@ -293,7 +296,8 @@ class TTSView(QWidget):
         
         # Pitch slider
         pitch_layout = QHBoxLayout()
-        pitch_layout.addWidget(QLabel("Pitch:"))
+        pitch_label_widget = QLabel("Pitch:")
+        pitch_layout.addWidget(pitch_label_widget)
         self.pitch_slider = QSlider(Qt.Orientation.Horizontal)
         self.pitch_slider.setRange(-50, 50)
         self.pitch_slider.setValue(0)
@@ -301,7 +305,13 @@ class TTSView(QWidget):
         self.pitch_slider.valueChanged.connect(lambda v: self.pitch_label.setText(str(v)))
         pitch_layout.addWidget(self.pitch_slider)
         pitch_layout.addWidget(self.pitch_label)
+        # Note: Pitch doesn't work with pyttsx3 (system limitation)
+        self.pitch_note_label = QLabel("(Not supported by pyttsx3)")
+        self.pitch_note_label.setStyleSheet("color: gray; font-size: 9px;")
+        pitch_layout.addWidget(self.pitch_note_label)
         voice_layout.addLayout(pitch_layout)
+        # Update note when provider changes
+        self.provider_combo.currentTextChanged.connect(self._update_pitch_note)
         
         # Volume slider
         volume_layout = QHBoxLayout()
@@ -439,6 +449,20 @@ class TTSView(QWidget):
         """Handle provider selection change."""
         # Reload voices for the selected provider
         self._load_voices()
+        # Update pitch note
+        self._update_pitch_note()
+    
+    def _update_pitch_note(self):
+        """Update pitch note based on selected provider."""
+        provider = self._get_selected_provider()
+        if provider == "pyttsx3":
+            if hasattr(self, 'pitch_note_label'):
+                self.pitch_note_label.setText("(Not supported by pyttsx3)")
+                self.pitch_note_label.setStyleSheet("color: orange; font-size: 9px;")
+        else:
+            if hasattr(self, 'pitch_note_label'):
+                self.pitch_note_label.setText("")
+                self.pitch_note_label.setStyleSheet("")
     
     def _get_selected_provider(self) -> Optional[str]:
         """Get the currently selected provider name."""

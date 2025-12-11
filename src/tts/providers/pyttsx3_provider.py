@@ -275,7 +275,16 @@ class Pyttsx3Provider(TTSProvider):
                 no_change_count = 0
                 
                 while not run_and_wait_returned.is_set():
+                    # Check if we should stop before sleeping
+                    if run_and_wait_returned.is_set():
+                        break
+                    
                     time.sleep(check_interval)
+                    
+                    # Check again after sleep - if conversion is done, exit immediately
+                    if run_and_wait_returned.is_set():
+                        break
+                    
                     elapsed = time.time() - start_time
                     
                     # #region agent log
@@ -294,7 +303,9 @@ class Pyttsx3Provider(TTSProvider):
                             no_change_count = 0
                         else:
                             no_change_count += 1
-                            if no_change_count >= 3:  # 6 seconds with no change
+                            # Only log "still in progress" if we haven't detected completion
+                            # Don't log if file size is stable and we're past the expected completion time
+                            if no_change_count >= 3 and elapsed < estimated_time * 1.5:  # Only log if still within reasonable time
                                 logger.info(f"TTS conversion still in progress... (elapsed: {elapsed:.1f}s, file size: {current_size:,} bytes)")
                                 no_change_count = 0
                     else:
@@ -430,6 +441,8 @@ class Pyttsx3Provider(TTSProvider):
                                             except: pass
                                             # #endregion
                                             logger.info(f"File size stable at {current_size:,} bytes for {file_stable_duration:.1f}s - conversion complete")
+                                            # Signal monitor thread to stop
+                                            run_and_wait_returned.set()
                                             # Try to stop the engine
                                             try:
                                                 self._engine.stop()
@@ -498,6 +511,8 @@ class Pyttsx3Provider(TTSProvider):
                                         except: pass
                                         # #endregion
                                         logger.warning(f"runAndWait() hanging, but file is stable ({file_size:,} bytes) - returning success")
+                                        # Signal monitor thread to stop
+                                        run_and_wait_returned.set()
                                         try:
                                             self._engine.stop()
                                         except:
@@ -537,7 +552,13 @@ class Pyttsx3Provider(TTSProvider):
             
             run_and_wait_returned.set()
             
-            # Stop monitoring (thread will exit when daemon)
+            # Stop monitoring - set event so monitor thread exits
+            run_and_wait_returned.set()
+            
+            # Give monitor thread a moment to see the event and exit
+            # (it's daemon so it will be killed if main thread exits, but we want clean exit)
+            time.sleep(0.1)
+            
             conversion_duration = time.time() - start_time
             
             # Verify file was created
