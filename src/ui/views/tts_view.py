@@ -587,13 +587,22 @@ class TTSView(QWidget):
     
     def _check_all_providers(self):
         """Start status checking for all providers."""
-        all_providers = ["edge_tts", "edge_tts_working", "pyttsx3"]
+        # Only check online providers (edge_tts, edge_tts_working)
+        # Skip pyttsx3 - it's offline and status checks are unreliable
+        online_providers = ["edge_tts", "edge_tts_working"]
         
-        for provider_name in all_providers:
+        for provider_name in online_providers:
             thread = ProviderStatusCheckThread(self.tts_engine.provider_manager, provider_name)
             thread.status_checked.connect(self._on_provider_status_checked)
             self.status_threads[provider_name] = thread
             thread.start()
+        
+        # For pyttsx3, just mark it as available if the provider exists (no actual test)
+        if "pyttsx3" in self.tts_engine.provider_manager._providers:
+            provider = self.tts_engine.provider_manager.get_provider("pyttsx3")
+            if provider and provider.is_available():
+                self.provider_status["pyttsx3"] = True  # Mark as available without testing
+                self._update_provider_item("pyttsx3")
     
     def _on_provider_status_checked(self, provider_name: str, is_working: bool):
         """Handle provider status check result."""
