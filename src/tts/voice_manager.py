@@ -4,7 +4,6 @@ Voice manager for TTS module.
 Handles loading, caching, and managing TTS voices from multiple providers.
 """
 
-import asyncio
 import json
 import time
 from pathlib import Path
@@ -59,13 +58,15 @@ class VoiceManager:
             locale = "en-US"
         
         # If provider is specified, get voices from that provider only
+        # ProviderManager returns List[Dict] without type args, but we know it's List[Dict[str, Any]]
         if provider:
-            voices = self.provider_manager.get_voices_by_provider(provider, locale=locale)
+            voices = self.provider_manager.get_voices_by_provider(provider, locale=locale)  # type: ignore[assignment]
         else:
             # Get voices from all providers
-            voices = self.provider_manager.get_all_voices(locale=locale)
+            voices = self.provider_manager.get_all_voices(locale=locale)  # type: ignore[assignment]
         
-        return voices
+        # Cast to proper type since ProviderManager returns List[Dict] without type args
+        return voices  # type: ignore[return-value]
 
     def get_voice_list(self, locale: Optional[str] = None, provider: Optional[str] = None) -> List[str]:
         """
@@ -141,7 +142,8 @@ class VoiceManager:
         """
         if locale is None:
             locale = "en-US"
-        return self.provider_manager.get_voices_by_provider(provider, locale=locale)
+        # ProviderManager returns List[Dict] without type args, but we know it's List[Dict[str, Any]]
+        return self.provider_manager.get_voices_by_provider(provider, locale=locale)  # type: ignore[return-value]
 
     def _load_voices(self) -> None:
         """Load voices from cache or providers (legacy method for backward compatibility)."""
@@ -156,7 +158,8 @@ class VoiceManager:
         # Load from providers using ProviderManager
         logger.info("Loading voices from TTS providers...")
         try:
-            voices = self.provider_manager.get_all_voices(locale="en-US")
+            # ProviderManager returns List[Dict] without type args, but we know it's List[Dict[str, Any]]
+            voices = self.provider_manager.get_all_voices(locale="en-US")  # type: ignore[assignment]
             
             # Convert to legacy format for backward compatibility
             legacy_voices = []
@@ -188,7 +191,8 @@ class VoiceManager:
         """Refresh voices list from providers and update cache."""
         logger.info("Refreshing voices from TTS providers...")
         try:
-            voices = self.provider_manager.get_all_voices(locale="en-US")
+            # ProviderManager returns List[Dict] without type args, but we know it's List[Dict[str, Any]]
+            voices = self.provider_manager.get_all_voices(locale="en-US")  # type: ignore[assignment]
             
             # Convert to legacy format for backward compatibility
             legacy_voices = []
