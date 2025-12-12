@@ -12,32 +12,36 @@ Handles fetching chapter URLs from table of contents pages using multiple method
 import time
 import re
 import json
-from typing import Optional, List, Callable, Dict, Tuple
-from urllib.parse import urljoin, urlparse, parse_qs, urlencode, urlunparse
+from pathlib import Path
+from typing import Optional, List, Callable, Dict, Tuple, Any, Set
 
 try:
-    from bs4 import BeautifulSoup
-    HAS_BS4 = True
+    from bs4 import BeautifulSoup  # type: ignore[import-untyped]
+    HAS_BS4: bool = True  # type: ignore[constant-redefinition]
 except ImportError:
-    HAS_BS4 = False
+    BeautifulSoup = None  # type: ignore[assignment, misc]
+    HAS_BS4: bool = False  # type: ignore[constant-redefinition]
 
 try:
-    import requests
-    HAS_REQUESTS = True
+    import requests  # type: ignore[import-untyped]
+    HAS_REQUESTS: bool = True  # type: ignore[constant-redefinition]
 except ImportError:
-    HAS_REQUESTS = False
+    requests = None  # type: ignore[assignment, misc]
+    HAS_REQUESTS: bool = False  # type: ignore[constant-redefinition]
 
 try:
-    import cloudscraper
-    HAS_CLOUDSCRAPER = True
+    import cloudscraper  # type: ignore[import-untyped]
+    HAS_CLOUDSCRAPER: bool = True  # type: ignore[constant-redefinition]
 except ImportError:
-    HAS_CLOUDSCRAPER = False
+    cloudscraper = None  # type: ignore[assignment, misc]
+    HAS_CLOUDSCRAPER: bool = False  # type: ignore[constant-redefinition]
 
 try:
-    from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
-    HAS_PLAYWRIGHT = True
+    from playwright.sync_api import sync_playwright  # type: ignore[import-untyped]
+    HAS_PLAYWRIGHT: bool = True  # type: ignore[constant-redefinition]
 except ImportError:
-    HAS_PLAYWRIGHT = False
+    sync_playwright = None  # type: ignore[assignment, misc]
+    HAS_PLAYWRIGHT: bool = False  # type: ignore[constant-redefinition]
 
 from .chapter_parser import (
     extract_chapter_number,
@@ -53,7 +57,28 @@ from .config import REQUEST_TIMEOUT, REQUEST_DELAY
 logger = get_logger("scraper.url_fetcher")
 
 
-def retry_with_backoff(func, max_retries: int = 3, base_delay: float = 1.0, should_stop: Optional[Callable[[], bool]] = None):
+def _load_playwright_scroll_script() -> str:
+    """
+    Load the Playwright scroll script from external file.
+    
+    Returns:
+        JavaScript code as string, wrapped in async function call
+    """
+    script_path = Path(__file__).parent / "playwright_scroll_script.js"
+    try:
+        with open(script_path, "r", encoding="utf-8") as f:
+            script_content = f.read()
+        # Wrap in async function call for page.evaluate()
+        return f"async () => {{ {script_content} return await scrollAndCountChapters(); }}"
+    except FileNotFoundError:
+        logger.error(f"Playwright scroll script not found at {script_path}")
+        raise
+    except Exception as e:
+        logger.error(f"Error loading Playwright scroll script: {e}")
+        raise
+
+
+def retry_with_backoff(func: Callable[..., Any], max_retries: int = 3, base_delay: float = 1.0, should_stop: Optional[Callable[[], bool]] = None):
     """
     Retry a function with exponential backoff.
     
@@ -122,14 +147,14 @@ class ChapterUrlFetcher:
         self._last_request_time = 0.0
         self._min_request_delay = 0.5  # Minimum delay between requests (rate limiting)
 
-    def get_session(self):
+    def get_session(self):  # type: ignore[return-type]
         """Get or create a requests session."""
         if self._session is None:
-            if HAS_CLOUDSCRAPER:
-                self._session = cloudscraper.create_scraper()
-            elif HAS_REQUESTS:
-                self._session = requests.Session()
-                self._session.headers.update({
+            if HAS_CLOUDSCRAPER and cloudscraper is not None:
+                self._session = cloudscraper.create_scraper()  # type: ignore[attr-defined, assignment]
+            elif HAS_REQUESTS and requests is not None:
+                self._session = requests.Session()  # type: ignore[attr-defined, assignment]
+                self._session.headers.update({  # type: ignore[attr-defined]
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                 })
             else:
@@ -312,7 +337,7 @@ class ChapterUrlFetcher:
             # This works for sites like FanMTL where all chapters are listed
             # Extract all chapter numbers from links and use the maximum
             # Be conservative - only use if we're confident these are chapter numbers
-            chapter_numbers = []
+            chapter_numbers: List[int] = []
             
             # Pattern for "Chapter 423" or "第423章" or "/chapter-423" or similar
             # Focus on patterns that are clearly chapter-related
@@ -337,8 +362,8 @@ class ChapterUrlFetcher:
             
             if chapter_numbers:
                 # Get unique chapter numbers and sort
-                unique_chapters = sorted(set(chapter_numbers))
-                max_chapter = unique_chapters[-1]
+                unique_chapters: List[int] = sorted(set(chapter_numbers))
+                max_chapter: int = unique_chapters[-1]
                 
                 # Only use this fallback if:
                 # 1. We found a reasonable number of unique chapters (at least 10)
@@ -347,9 +372,9 @@ class ChapterUrlFetcher:
                 if len(unique_chapters) >= 10 and max_chapter >= 20:
                     # Check if we have a good distribution (not just scattered numbers)
                     # If we have at least 50% of chapters from 1 to max, it's likely the total
-                    expected_range = max_chapter
-                    found_in_range = len([n for n in unique_chapters if n <= max_chapter])
-                    coverage = found_in_range / expected_range if expected_range > 0 else 0
+                    expected_range: int = max_chapter
+                    found_in_range: int = len([n for n in unique_chapters if n <= max_chapter])
+                    coverage: float = found_in_range / expected_range if expected_range > 0 else 0.0
                     
                     # Only use if we have good coverage (at least 30% of chapters found)
                     # This helps avoid matching page numbers or other unrelated numbers
@@ -362,7 +387,7 @@ class ChapterUrlFetcher:
             logger.debug(f"Failed to extract chapter count from metadata: {e}")
             return None
 
-    def fetch(self, toc_url: str, should_stop: Optional[Callable[[], bool]] = None, use_reference: bool = False, min_chapter_number: Optional[int] = None, max_chapter_number: Optional[int] = None) -> Tuple[List[str], Dict[str, any]]:
+    def fetch(self, toc_url: str, should_stop: Optional[Callable[[], bool]] = None, use_reference: bool = False, min_chapter_number: Optional[int] = None, max_chapter_number: Optional[int] = None) -> Tuple[List[str], Dict[str, Any]]:
         """
         Fetch chapter URLs using failsafe methods.
         
@@ -388,7 +413,7 @@ class ChapterUrlFetcher:
         
         logger.info(f"Fetching chapter URLs from {toc_url}")
         
-        metadata = {
+        metadata: Dict[str, Any] = {
             "method_used": None,
             "urls_found": 0,
             "reference_count": None,
@@ -406,7 +431,7 @@ class ChapterUrlFetcher:
                 return True  # No specific requirement, or no URLs found
             
             # Extract all chapter numbers from found URLs
-            found_chapters = set()
+            found_chapters: Set[int] = set()
             for url in found_urls:
                 ch_num = extract_chapter_number(url)
                 if ch_num:
@@ -415,8 +440,8 @@ class ChapterUrlFetcher:
             if not found_chapters:
                 return False  # No valid chapter numbers found
             
-            max_found = max(found_chapters)
-            min_found = min(found_chapters)
+            max_found: int = max(found_chapters)  # type: ignore[arg-type]
+            min_found: int = min(found_chapters)  # type: ignore[arg-type]
             
             # Check if we have chapters up to the minimum needed
             if max_found < min_chapter_number:
@@ -426,9 +451,9 @@ class ChapterUrlFetcher:
             # If max_chapter_number is specified, check if we have all chapters in the range
             if max_chapter_number:
                 # Check how many chapters in the requested range we actually found
-                requested_range = set(range(min_chapter_number, max_chapter_number + 1))
-                found_in_range = requested_range.intersection(found_chapters)
-                coverage = len(found_in_range) / len(requested_range) if requested_range else 0
+                requested_range: Set[int] = set(range(min_chapter_number, max_chapter_number + 1))
+                found_in_range: Set[int] = requested_range.intersection(found_chapters)
+                coverage: float = len(found_in_range) / len(requested_range) if requested_range else 0
                 
                 # If we're missing more than 20% of chapters in the range, it's incomplete
                 if coverage < 0.8:
@@ -453,15 +478,15 @@ class ChapterUrlFetcher:
                 return True
             
             # Extract all chapter numbers for additional checks
-            chapter_numbers = []
+            chapter_numbers: List[int] = []
             for url in found_urls:
                 ch_num = extract_chapter_number(url)
                 if ch_num:
                     chapter_numbers.append(ch_num)
             
             if chapter_numbers:
-                max_ch = max(chapter_numbers)
-                min_ch = min(chapter_numbers)
+                max_ch: int = max(chapter_numbers)  # type: ignore[arg-type]
+                min_ch: int = min(chapter_numbers)  # type: ignore[arg-type]
                 
                 # Round numbers with matching count suggest pagination
                 if url_count in [50, 55, 100, 200] and max_ch in [50, 55, 100, 200] and url_count == max_ch:
@@ -557,7 +582,7 @@ class ChapterUrlFetcher:
         # Method 4: Try Playwright with scrolling (slow but gets all)
         if HAS_PLAYWRIGHT:
             logger.info("Trying method 4: Playwright with scrolling (this may take a while...)")
-            urls = self._try_playwright_with_scrolling(toc_url, should_stop=should_stop)
+            urls = self._try_playwright_with_scrolling(toc_url, should_stop=should_stop, min_chapter_number=min_chapter_number, max_chapter_number=max_chapter_number)
             metadata["methods_tried"]["playwright"] = len(urls) if urls else 0
             if urls:
                 logger.info(f"✓ Found {len(urls)} chapters via Playwright")
@@ -609,15 +634,15 @@ class ChapterUrlFetcher:
     def _try_ajax_endpoints(self, toc_url: str) -> List[str]:
         """Try to get chapter URLs via AJAX endpoints."""
         session = self.get_session()
-        if not session or not HAS_BS4:
+        if not session or not HAS_BS4 or BeautifulSoup is None:
             return []
         
         try:
-            response = session.get(toc_url, timeout=self.timeout)
-            if response.status_code != 200:
+            response = session.get(toc_url, timeout=self.timeout)  # type: ignore[attr-defined]
+            if response.status_code != 200:  # type: ignore[attr-defined]
                 return []
             
-            soup = BeautifulSoup(response.content, "html.parser")
+            soup = BeautifulSoup(response.content, "html.parser")  # type: ignore[arg-type, assignment]
             
             # Extract novel ID
             novel_id = extract_novel_id_from_html(response.text)
@@ -640,17 +665,28 @@ class ChapterUrlFetcher:
                     if ajax_response.status_code == 200:
                         # Try JSON
                         try:
-                            data = ajax_response.json()
-                            chapters = []
+                            data: Any = ajax_response.json()
+                            chapters: List[Any] = []
                             if isinstance(data, dict):
-                                chapters = data.get("chapters", data.get("data", data.get("list", [])))
+                                # Type: ignore for nested dict.get() calls - Pylance can't infer the type
+                                data_list: Any = data.get("data", [])  # type: ignore[arg-type]
+                                data_list_fallback: Any = data.get("list", [])  # type: ignore[arg-type]
+                                chapters_raw: Any = data.get("chapters", data_list)  # type: ignore[arg-type]
+                                if chapters_raw is None:
+                                    chapters_raw = data_list_fallback  # type: ignore[assignment]
+                                if isinstance(chapters_raw, list):
+                                    chapters: List[Any] = chapters_raw  # type: ignore[assignment]
+                                else:
+                                    chapters: List[Any] = []
                             elif isinstance(data, list):
-                                chapters = data
+                                chapters: List[Any] = data  # type: ignore[assignment]
                             
-                            urls = []
+                            urls: List[str] = []
                             for ch in chapters:
                                 if isinstance(ch, dict):
-                                    url = ch.get("url") or ch.get("href") or ch.get("link")
+                                    # Type: ignore for dict.get() - Pylance can't infer the type
+                                    url_raw: Any = ch.get("url") or ch.get("href") or ch.get("link")  # type: ignore[arg-type]
+                                    url: Optional[str] = str(url_raw) if url_raw is not None else None  # type: ignore[arg-type]
                                     if url:
                                         if not url.startswith("http"):
                                             url = normalize_url(url, self.base_url)
@@ -660,14 +696,17 @@ class ChapterUrlFetcher:
                                 return urls
                         except (json.JSONDecodeError, ValueError):
                             # Not JSON, try HTML parsing
-                            ajax_soup = BeautifulSoup(ajax_response.content, "html.parser")
-                            links = ajax_soup.find_all("a", href=re.compile(r"chapter", re.I))
-                            urls = []
-                            for link in links:
-                                href = link.get("href", "")
+                            ajax_soup = BeautifulSoup(ajax_response.content, "html.parser")  # type: ignore[arg-type, assignment]
+                            links = ajax_soup.find_all("a", href=re.compile(r"chapter", re.I))  # type: ignore[attr-defined]
+                            urls: List[str] = []
+                            for link in links:  # type: ignore[assignment]
+                                link_elem: Any = link  # type: ignore[assignment]
+                                href_raw: Any = link_elem.get("href", "")  # type: ignore[attr-defined, arg-type]
+                                href: str = str(href_raw) if href_raw else ""  # type: ignore[arg-type]
                                 if href:
-                                    full_url = normalize_url(href, self.base_url)
-                                    link_text = link.get_text(strip=True)
+                                    full_url: str = normalize_url(href, self.base_url)
+                                    link_text_raw: Any = link_elem.get_text(strip=True)  # type: ignore[attr-defined]
+                                    link_text: str = str(link_text_raw) if link_text_raw else ""  # type: ignore[arg-type]
                                     if self._is_chapter_url(full_url, link_text):
                                         urls.append(full_url)
                             if urls:
@@ -688,15 +727,15 @@ class ChapterUrlFetcher:
         including FanMTL-specific selectors.
         """
         session = self.get_session()
-        if not session or not HAS_BS4:
+        if not session or not HAS_BS4 or BeautifulSoup is None:
             return []
         
         try:
-            response = session.get(toc_url, timeout=self.timeout)
-            if response.status_code != 200:
+            response = session.get(toc_url, timeout=self.timeout)  # type: ignore[attr-defined]
+            if response.status_code != 200:  # type: ignore[attr-defined]
                 return []
             
-            soup = BeautifulSoup(response.content, "html.parser")
+            soup = BeautifulSoup(response.content, "html.parser")  # type: ignore[arg-type, assignment]
             
             # Try multiple selector patterns (including FanMTL, LightNovelPub, etc.)
             selectors_to_try = [
@@ -720,20 +759,23 @@ class ChapterUrlFetcher:
                 'a[href*="chapter"]',
             ]
             
-            chapter_urls = []
-            found_selectors = set()
+            chapter_urls: List[str] = []
+            found_selectors: Set[str] = set()
             
             for selector in selectors_to_try:
                 try:
-                    links = soup.select(selector)
+                    links = soup.select(selector)  # type: ignore[attr-defined]
                     if links:
                         found_selectors.add(selector)
-                        for link in links:
-                            href = link.get("href", "")
+                        for link in links:  # type: ignore[assignment]
+                            link_elem: Any = link  # type: ignore[assignment]
+                            href_raw: Any = link_elem.get("href", "")  # type: ignore[attr-defined, arg-type]
+                            href: str = str(href_raw) if href_raw else ""  # type: ignore[arg-type]
                             if href:
                                 # Normalize URL
-                                full_url = normalize_url(href, self.base_url)
-                                link_text = link.get_text(strip=True)
+                                full_url: str = normalize_url(href, self.base_url)
+                                link_text_raw: Any = link_elem.get_text(strip=True)  # type: ignore[attr-defined]
+                                link_text: str = str(link_text_raw) if link_text_raw else ""  # type: ignore[arg-type]
                                 
                                 # Use our flexible chapter detection method
                                 if self._is_chapter_url(full_url, link_text):
@@ -745,8 +787,8 @@ class ChapterUrlFetcher:
                 logger.debug(f"Found chapter links using selectors: {', '.join(found_selectors)}")
             
             # Remove duplicates while preserving order
-            seen = set()
-            unique_urls = []
+            seen: Set[str] = set()
+            unique_urls: List[str] = []
             for url in chapter_urls:
                 if url not in seen:
                     seen.add(url)
@@ -757,21 +799,21 @@ class ChapterUrlFetcher:
             logger.debug(f"HTML parsing failed: {e}")
             return []
 
-    def _try_playwright_with_scrolling(self, toc_url: str, should_stop: Optional[Callable[[], bool]] = None) -> List[str]:
+    def _try_playwright_with_scrolling(self, toc_url: str, should_stop: Optional[Callable[[], bool]] = None, min_chapter_number: Optional[int] = None, max_chapter_number: Optional[int] = None) -> List[str]:
         """
         Try to get chapter URLs using Playwright with scrolling for lazy loading.
         
         This is the most reliable method and serves as the "reference" method
         for getting the true chapter count.
         """
-        if not HAS_PLAYWRIGHT:
+        if not HAS_PLAYWRIGHT or sync_playwright is None:
             logger.warning("Playwright not available - install with: pip install playwright && playwright install chromium")
             return []
         
         try:
             logger.info("Using Playwright with scrolling to get all chapters...")
             logger.debug(f"Launching browser (headless=True) for {toc_url}")
-            with sync_playwright() as p:
+            with sync_playwright() as p:  # type: ignore[attr-defined]
                 browser = p.chromium.launch(headless=True)
                 try:
                     page = browser.new_page()
@@ -880,7 +922,7 @@ class ChapterUrlFetcher:
                     # Check for actual CAPTCHA (separate from Cloudflare) - only if blocking
                     # This is less common and usually only appears if there's suspicious activity
                     try:
-                        captcha_iframes = page.query_selector_all('iframe[src*="captcha"], iframe[src*="recaptcha"]')
+                        captcha_iframes = page.query_selector_all('iframe[src*="captcha"], iframe[src*="recaptcha"]')  # type: ignore[attr-defined]
                         if captcha_iframes:
                             logger.warning("⚠ CAPTCHA detected (separate from Cloudflare) - this may block scraping")
                             # Don't wait indefinitely for CAPTCHA - it requires human interaction
@@ -927,10 +969,10 @@ class ChapterUrlFetcher:
                         'a:has-text("3")',           # Links containing "3" (page 3)
                     ]
                     
-                    pagination_links = []
+                    pagination_links: List[Any] = []
                     for selector in pagination_selectors:
                         try:
-                            found = page.query_selector_all(selector)
+                            found = page.query_selector_all(selector)  # type: ignore[attr-defined]
                             if found:
                                 pagination_links.extend(found)
                                 logger.debug(f"Found {len(found)} pagination links using: {selector}")
@@ -941,15 +983,17 @@ class ChapterUrlFetcher:
                     # This catches cases where pagination doesn't have specific classes
                     # Pattern: /book/novel-name/2 or /book/novel-name/3 (LightNovelPub style)
                     try:
-                        all_links = page.query_selector_all('a[href]')
+                        all_links = page.query_selector_all('a[href]')  # type: ignore[attr-defined]
                         base_path = toc_url.rstrip('/')
                         # Remove trailing slash and any existing page number from base
                         if re.search(r'/\d+$', base_path):
                             base_path = re.sub(r'/\d+$', '', base_path)
                         
                         for link in all_links:
-                            href = link.get_attribute('href') or ''
-                            text = (link.inner_text() or '').strip()
+                            href_raw: Any = link.get_attribute('href')  # type: ignore[attr-defined]
+                            href: str = str(href_raw) if href_raw else ''
+                            text_raw: Any = link.inner_text()  # type: ignore[attr-defined]
+                            text: str = (str(text_raw) if text_raw else '').strip()
                             
                             if not href:
                                 continue
@@ -994,19 +1038,22 @@ class ChapterUrlFetcher:
                     
                     # Also check for "Next" and page number links in the page HTML directly
                     try:
-                        html = page.content()
-                        if HAS_BS4:
-                            soup = BeautifulSoup(html, "html.parser")
+                        html = page.content()  # type: ignore[attr-defined]
+                        if HAS_BS4 and BeautifulSoup is not None:
+                            soup = BeautifulSoup(html, "html.parser")  # type: ignore[arg-type, assignment]
                             base_path = toc_url.rstrip('/')
                             # Remove trailing slash and any existing page number from base
                             if re.search(r'/\d+$', base_path):
                                 base_path = re.sub(r'/\d+$', '', base_path)
                             
                             # Look for links that might be pagination
-                            potential_pagination = soup.find_all('a', href=True)
-                            for link in potential_pagination:
-                                href = link.get('href', '')
-                                text = link.get_text(strip=True)
+                            potential_pagination = soup.find_all('a', href=True)  # type: ignore[attr-defined]
+                            for link in potential_pagination:  # type: ignore[assignment]
+                                link_elem: Any = link  # type: ignore[assignment]
+                                href_raw: Any = link_elem.get('href', '')  # type: ignore[attr-defined, arg-type]
+                                href: str = str(href_raw) if href_raw else ""  # type: ignore[arg-type]
+                                text_raw: Any = link_elem.get_text(strip=True)  # type: ignore[attr-defined]
+                                text: str = str(text_raw) if text_raw else ""  # type: ignore[arg-type]
                                 
                                 if not href:
                                     continue
@@ -1021,7 +1068,7 @@ class ChapterUrlFetcher:
                                     if any(pattern in href_lower for pattern in ['page', 'p=', '?p', '&p', '/p/']):
                                         # This is likely a pagination link
                                         try:
-                                            playwright_link = page.query_selector(f'a[href*="{href.split("?")[0].split("#")[0]}"]')
+                                            playwright_link = page.query_selector(f'a[href*="{href.split("?")[0].split("#")[0]}"]')  # type: ignore[attr-defined]
                                             if playwright_link and playwright_link not in pagination_links:
                                                 pagination_links.append(playwright_link)
                                                 logger.debug(f"Found pagination link via HTML (query): {text} -> {normalized_href}")
@@ -1029,10 +1076,10 @@ class ChapterUrlFetcher:
                                             pass
                                     # Check for path-based patterns like /book/novel-name/2
                                     elif re.search(r'/\d+$', normalized_href):
-                                        href_base = re.sub(r'/\d+$', '', normalized_href.rstrip('/'))
+                                        href_base: str = re.sub(r'/\d+$', '', normalized_href.rstrip('/'))
                                         if href_base.lower() == base_path.lower() or href_base.lower() in base_path.lower():
                                             try:
-                                                playwright_link = page.query_selector(f'a[href*="{href.split("?")[0].split("#")[0]}"]')
+                                                playwright_link = page.query_selector(f'a[href*="{href.split("?")[0].split("#")[0]}"]')  # type: ignore[attr-defined]
                                                 if playwright_link and playwright_link not in pagination_links:
                                                     pagination_links.append(playwright_link)
                                                     logger.debug(f"Found pagination link via HTML (path): {text} -> {normalized_href}")
@@ -1041,14 +1088,14 @@ class ChapterUrlFetcher:
                                 
                                 # Pattern 2: Check if href ends with a number on same base path (even if text isn't just the number)
                                 if re.search(r'/\d+$', normalized_href):
-                                    href_base = re.sub(r'/\d+$', '', normalized_href.rstrip('/'))
+                                    href_base: str = re.sub(r'/\d+$', '', normalized_href.rstrip('/'))
                                     if href_base.lower() == base_path.lower() or (href_base.lower() in base_path.lower() and len(href_base) >= len(base_path) - 5):
                                         page_match = re.search(r'/(\d+)$', normalized_href)
                                         if page_match:
-                                            page_num = int(page_match.group(1))
+                                            page_num: int = int(page_match.group(1))
                                             if 1 <= page_num <= 999:
                                                 try:
-                                                    playwright_link = page.query_selector(f'a[href*="{href.split("?")[0].split("#")[0]}"]')
+                                                    playwright_link = page.query_selector(f'a[href*="{href.split("?")[0].split("#")[0]}"]')  # type: ignore[attr-defined]
                                                     if playwright_link and playwright_link not in pagination_links:
                                                         pagination_links.append(playwright_link)
                                                         logger.debug(f"Found pagination link via HTML (path, no text): page {page_num} -> {normalized_href}")
@@ -1058,22 +1105,26 @@ class ChapterUrlFetcher:
                         logger.debug(f"Error finding pagination via HTML: {e}")
                     
                     # Extract page URLs from pagination
-                    page_urls_to_visit = []
+                    page_urls_to_visit: List[str] = []
                     if pagination_links:
                         logger.info(f"Found {len(pagination_links)} pagination links - using page-based pagination")
                         # Collect actual pagination URLs from the links
-                        seen_page_urls = set()
-                        base_toc = toc_url.split('?')[0].split('#')[0]
+                        seen_page_urls: Set[str] = set()
+                        base_toc: str = toc_url.split('?')[0].split('#')[0]
                         
                         for link in pagination_links:
-                            href = link.get_attribute('href') or ''
-                            link_text = (link.inner_text() or '').strip()
+                            href_raw: Any = link.get_attribute('href')  # type: ignore[attr-defined]
+                            href: str = str(href_raw) if href_raw else ''
+                            link_text_raw: Any = link.inner_text()  # type: ignore[attr-defined]
+                            link_text: str = (str(link_text_raw) if link_text_raw else '').strip()
                             
                             # Also check data attributes for pagination
                             if not href:
-                                href = link.get_attribute('data-href') or ''
+                                href_raw2: Any = link.get_attribute('data-href')  # type: ignore[attr-defined]
+                                href = str(href_raw2) if href_raw2 else ''
                             if not href:
-                                data_page = link.get_attribute('data-page')
+                                data_page_raw: Any = link.get_attribute('data-page')  # type: ignore[attr-defined]
+                                data_page: str = str(data_page_raw) if data_page_raw else ''
                                 if data_page:
                                     # Try to construct URL from data-page attribute
                                     href = f"{base_toc}?page={data_page}"
@@ -1103,25 +1154,26 @@ class ChapterUrlFetcher:
                             
                             if href:
                                 # Normalize the pagination URL
-                                full_page_url = normalize_url(href, toc_url)
+                                full_page_url: str = normalize_url(href, toc_url)
                                 
                                 # CRITICAL: Filter out chapter URLs - they should not be treated as pagination
-                                link_text = (link.inner_text() or '').strip()
+                                link_text_raw2: Any = link.inner_text()  # type: ignore[attr-defined]
+                                link_text = (str(link_text_raw2) if link_text_raw2 else '').strip()
                                 if self._is_chapter_url(full_page_url, link_text):
                                     logger.debug(f"Filtered out chapter URL from pagination links: {full_page_url}")
                                     continue
                                 
                                 # Additional validation: Ensure it's actually a pagination URL
                                 # Pagination URLs typically have: ?page=, &page=, /page/, /p/, or are on same base path with just a number
-                                url_lower = full_page_url.lower()
-                                is_pagination_url = (
+                                url_lower: str = full_page_url.lower()
+                                is_pagination_url: bool = (
                                     '?page=' in url_lower or 
                                     '&page=' in url_lower or 
                                     '/page/' in url_lower or 
                                     '/p/' in url_lower or
-                                    re.search(r'[?&]p=\d+', url_lower) or
+                                    bool(re.search(r'[?&]p=\d+', url_lower)) or
                                     # Path-based pagination: same base path ending with just a number (not chapter)
-                                    (re.search(r'/\d+$', url_lower) and not self._is_chapter_url(full_page_url, link_text))
+                                    (bool(re.search(r'/\d+$', url_lower)) and not self._is_chapter_url(full_page_url, link_text))
                                 )
                                 
                                 if not is_pagination_url:
@@ -1141,58 +1193,63 @@ class ChapterUrlFetcher:
                             base_toc = toc_url.split('?')[0].split('#')[0]
                             
                             # First, try to extract from all pagination links
-                            extracted_page_nums = set()
+                            extracted_page_nums: Set[int] = set()
                             for link in pagination_links:
                                 # Try link text
-                                link_text = (link.inner_text() or '').strip()
+                                link_text_raw3: Any = link.inner_text()  # type: ignore[attr-defined]
+                                link_text: str = (str(link_text_raw3) if link_text_raw3 else '').strip()
                                 # Remove any non-digit characters and try to extract number
-                                link_text_clean = re.sub(r'[^\d]', '', link_text)
+                                link_text_clean: str = re.sub(r'[^\d]', '', link_text)
                                 if link_text_clean.isdigit() and 1 <= int(link_text_clean) <= 200:
                                     extracted_page_nums.add(int(link_text_clean))
                                 elif link_text.isdigit() and 1 <= int(link_text) <= 200:
                                     extracted_page_nums.add(int(link_text))
                                 
                                 # Try href extraction
-                                href = link.get_attribute('href') or ''
+                                href_raw3: Any = link.get_attribute('href')  # type: ignore[attr-defined]
+                                href: str = str(href_raw3) if href_raw3 else ''
                                 if href:
                                     # Normalize href first
-                                    normalized_href = normalize_url(href, toc_url).lower()
+                                    normalized_href: str = normalize_url(href, toc_url).lower()
                                     # Try to extract page number from href - multiple patterns
                                     page_match = re.search(
                                         r'[?&]page[=_](\d+)|/page[/-](\d+)|/p[/-](\d+)|page[=_](\d+)|p[=_](\d+)',
                                         normalized_href
                                     )
                                     if page_match:
-                                        page_num = int(page_match.group(1) or page_match.group(2) or page_match.group(3) or page_match.group(4) or page_match.group(5))
+                                        page_num: int = int(page_match.group(1) or page_match.group(2) or page_match.group(3) or page_match.group(4) or page_match.group(5))
                                         if 1 <= page_num <= 200:
                                             extracted_page_nums.add(page_num)
                             
                             # Also try to extract from HTML directly (more reliable for some sites)
                             try:
-                                html = page.content()
-                                if HAS_BS4:
-                                    soup = BeautifulSoup(html, "html.parser")
+                                html = page.content()  # type: ignore[attr-defined]
+                                if HAS_BS4 and BeautifulSoup is not None:
+                                    soup = BeautifulSoup(html, "html.parser")  # type: ignore[arg-type, assignment]
                                     # Find all pagination links in HTML
-                                    pagination_elements = soup.find_all(['a', 'button'], class_=re.compile(r'page|pagination|pager', re.I))
-                                    pagination_elements.extend(soup.find_all('a', href=re.compile(r'[?&]page=|/page/', re.I)))
+                                    pagination_elements = soup.find_all(['a', 'button'], class_=re.compile(r'page|pagination|pager', re.I))  # type: ignore[attr-defined]
+                                    pagination_elements.extend(soup.find_all('a', href=re.compile(r'[?&]page=|/page/', re.I)))  # type: ignore[attr-defined]
                                     
-                                    for elem in pagination_elements:
+                                    for elem in pagination_elements:  # type: ignore[assignment]
+                                        elem_any: Any = elem  # type: ignore[assignment]
                                         # Try text
-                                        text = elem.get_text(strip=True)
-                                        text_clean = re.sub(r'[^\d]', '', text)
+                                        text_raw: Any = elem_any.get_text(strip=True)  # type: ignore[attr-defined]
+                                        text: str = str(text_raw) if text_raw else ""  # type: ignore[arg-type]
+                                        text_clean: str = re.sub(r'[^\d]', '', text)
                                         if text_clean.isdigit() and 1 <= int(text_clean) <= 200:
                                             extracted_page_nums.add(int(text_clean))
                                         
                                         # Try href
-                                        href = elem.get('href', '')
+                                        href_raw4: Any = elem_any.get('href', '')  # type: ignore[attr-defined, arg-type]
+                                        href: str = str(href_raw4) if href_raw4 else ""  # type: ignore[arg-type]
                                         if href:
-                                            normalized_href = normalize_url(href, toc_url).lower()
+                                            normalized_href: str = normalize_url(href, toc_url).lower()
                                             page_match = re.search(
                                                 r'[?&]page[=_](\d+)|/page[/-](\d+)|/p[/-](\d+)',
                                                 normalized_href
                                             )
                                             if page_match:
-                                                page_num = int(page_match.group(1) or page_match.group(2) or page_match.group(3))
+                                                page_num: int = int(page_match.group(1) or page_match.group(2) or page_match.group(3))
                                                 if 1 <= page_num <= 200:
                                                     extracted_page_nums.add(page_num)
                             except Exception as e:
@@ -1214,12 +1271,12 @@ class ChapterUrlFetcher:
                             # NovelFull pagination shows: 1, 2, 3, 4, 5, 6, 7, ..., 12, 13, ..., 20, 21, etc.
                             # We need to fill in the missing pages (8, 9, 10, 11, 14-19, etc.)
                             if extracted_page_nums and len(extracted_page_nums) > 0:
-                                sorted_pages = sorted(extracted_page_nums)
-                                min_page = sorted_pages[0]
-                                max_page = sorted_pages[-1]
+                                sorted_pages: List[int] = sorted(extracted_page_nums)
+                                min_page: int = sorted_pages[0]
+                                max_page: int = sorted_pages[-1]
                                 
                                 # Check if there are gaps (more pages between min and max than we detected)
-                                expected_pages = max_page - min_page + 1
+                                expected_pages: int = max_page - min_page + 1
                                 if expected_pages > len(sorted_pages):
                                     logger.info(f"Detected gaps in pagination: pages {min_page} to {max_page} with {len(sorted_pages)} detected pages (expected {expected_pages}). Filling gaps...")
                                     
@@ -1238,29 +1295,33 @@ class ChapterUrlFetcher:
                             
                             # If we still have very few pages OR if max page is high but we're missing early pages, estimate total pages needed
                             # This is a last resort - construct pages 1-N based on estimated total
-                            max_detected_page = max(extracted_page_nums) if extracted_page_nums else 0
-                            if (len(page_urls_to_visit) < 15 and len(pagination_links) > 50) or (max_detected_page > 20 and min(extracted_page_nums) if extracted_page_nums else 0 > 1):
+                            max_detected_page: int = max(extracted_page_nums) if extracted_page_nums else 0  # type: ignore[arg-type]
+                            min_extracted: int = min(extracted_page_nums) if extracted_page_nums else 0  # type: ignore[arg-type]
+                            if (len(page_urls_to_visit) < 15 and len(pagination_links) > 50) or (max_detected_page > 20 and min_extracted > 1):
                                 logger.warning(f"Still have only {len(page_urls_to_visit)} pages after fallback. Trying to estimate total pages needed...")
                                 
                                 # Count chapters on first page to estimate pages needed
                                 try:
-                                    html = page.content()
-                                    if HAS_BS4:
-                                        soup = BeautifulSoup(html, "html.parser")
-                                        first_page_links = soup.find_all("a", href=True)
-                                        first_page_chapters = []
-                                        for link in first_page_links:
-                                            href = link.get("href", "")
+                                    html = page.content()  # type: ignore[attr-defined]
+                                    if HAS_BS4 and BeautifulSoup is not None:
+                                        soup = BeautifulSoup(html, "html.parser")  # type: ignore[arg-type, assignment]
+                                        first_page_links = soup.find_all("a", href=True)  # type: ignore[attr-defined]
+                                        first_page_chapters: List[str] = []
+                                        for link in first_page_links:  # type: ignore[assignment]
+                                            link_elem: Any = link  # type: ignore[assignment]
+                                            href_raw: Any = link_elem.get("href", "")  # type: ignore[attr-defined, arg-type]
+                                            href: str = str(href_raw) if href_raw else ""  # type: ignore[arg-type]
                                             if href:
-                                                full_url = normalize_url(href, self.base_url)
-                                                link_text = link.get_text(strip=True)
+                                                full_url: str = normalize_url(href, self.base_url)
+                                                link_text_raw: Any = link_elem.get_text(strip=True)  # type: ignore[attr-defined]
+                                                link_text: str = str(link_text_raw) if link_text_raw else ""  # type: ignore[arg-type]
                                                 if self._is_chapter_url(full_url, link_text):
                                                     first_page_chapters.append(full_url)
                                         
                                         if first_page_chapters:
                                             # Extract max and min chapter numbers from first page
-                                            max_ch_on_page = 0
-                                            min_ch_on_page = float('inf')
+                                            max_ch_on_page: int = 0
+                                            min_ch_on_page: float = float('inf')
                                             for url in first_page_chapters:
                                                 ch_num = extract_chapter_number(url)
                                                 if ch_num:
@@ -1271,8 +1332,8 @@ class ChapterUrlFetcher:
                                             
                                             if max_ch_on_page > 0:
                                                 # Estimate pages needed: max_chapter / chapters_per_page
-                                                chapters_per_page = len(first_page_chapters)
-                                                estimated_total_pages = (max_ch_on_page // chapters_per_page) + 2  # Add buffer
+                                                chapters_per_page: int = len(first_page_chapters)
+                                                estimated_total_pages: int = (max_ch_on_page // chapters_per_page) + 2  # Add buffer
                                                 # Cap at reasonable maximum (for very large novels)
                                                 estimated_total_pages = min(estimated_total_pages, 50)
                                                 
@@ -1294,7 +1355,7 @@ class ChapterUrlFetcher:
                                     logger.debug(f"Error estimating pages: {e}")
                             
                             # Re-sort after adding fallback URLs
-                            def extract_page_number(url):
+                            def extract_page_number(url: str) -> int:
                                 """Extract page number from URL for sorting."""
                                 match = re.search(r'/(\d+)$|[/?&]page[=_](\d+)|/page[/-](\d+)|/p[/-](\d+)|page(\d+)', url.lower())
                                 if match:
@@ -1304,7 +1365,7 @@ class ChapterUrlFetcher:
                             logger.info(f"After fallback construction: {len(page_urls_to_visit)} pagination pages to visit")
                         
                         # Sort page URLs to visit them in order (if they contain page numbers)
-                        def extract_page_number(url):
+                        def extract_page_number(url: str) -> int:
                             """Extract page number from URL for sorting."""
                             # Try multiple patterns:
                             # 1. /book/novel-name/3 (direct path with number at end)
@@ -1321,20 +1382,23 @@ class ChapterUrlFetcher:
                             logger.info(f"Detected pagination: {len(page_urls_to_visit)} additional pages to visit")
                             
                             # Collect chapters from all pages
-                            all_chapter_urls = []
+                            all_chapter_urls: List[str] = []
                             
                             # Page 1 (already loaded)
                             logger.debug("Collecting chapters from page 1...")
-                            html = page.content()
-                            if HAS_BS4:
-                                soup = BeautifulSoup(html, "html.parser")
+                            html = page.content()  # type: ignore[attr-defined]
+                            if HAS_BS4 and BeautifulSoup is not None:
+                                soup = BeautifulSoup(html, "html.parser")  # type: ignore[arg-type, assignment]
                                 # Get all links, not just those with "chapter" in href
-                                links = soup.find_all("a", href=True)
-                                for link in links:
-                                    href = link.get("href", "")
+                                links = soup.find_all("a", href=True)  # type: ignore[attr-defined]
+                                for link in links:  # type: ignore[assignment]
+                                    link_elem: Any = link  # type: ignore[assignment]
+                                    href_raw: Any = link_elem.get("href", "")  # type: ignore[attr-defined, arg-type]
+                                    href: str = str(href_raw) if href_raw else ""  # type: ignore[arg-type]
                                     if href:
-                                        full_url = normalize_url(href, self.base_url)
-                                        link_text = link.get_text(strip=True)
+                                        full_url: str = normalize_url(href, self.base_url)
+                                        link_text_raw: Any = link_elem.get_text(strip=True)  # type: ignore[attr-defined]
+                                        link_text: str = str(link_text_raw) if link_text_raw else ""  # type: ignore[arg-type]
                                         if self._is_chapter_url(full_url, link_text):
                                             all_chapter_urls.append(full_url)
                             
@@ -1345,13 +1409,13 @@ class ChapterUrlFetcher:
                                 logger.info(f"Visiting {max_pages_to_visit} additional pages to collect all chapters...")
                                 logger.info(f"(Total pagination links found: {len(page_urls_to_visit)}, visiting first {max_pages_to_visit})")
                                 
-                            total_pages = len(page_urls_to_visit[:max_pages_to_visit])
+                            total_pages: int = len(page_urls_to_visit[:max_pages_to_visit])
                             for idx, page_url in enumerate(page_urls_to_visit[:max_pages_to_visit], 1):
                                 if should_stop and should_stop():
                                     break
                                 
                                 # Progress tracking
-                                progress_pct = (idx / total_pages * 100) if total_pages > 0 else 0
+                                progress_pct: float = (idx / total_pages * 100) if total_pages > 0 else 0
                                 logger.info(f"Loading page {idx}/{total_pages} ({progress_pct:.1f}%): {page_url}")
                                 
                                 # Rate limiting between requests
@@ -1359,31 +1423,31 @@ class ChapterUrlFetcher:
                                 
                                 # Retry logic with exponential backoff for page loading
                                 def load_page():
-                                    page.goto(page_url, wait_until="domcontentloaded", timeout=30000)
+                                    page.goto(page_url, wait_until="domcontentloaded", timeout=30000)  # type: ignore[attr-defined]
                                     
                                     # Wait for page content to fully load using networkidle
                                     try:
-                                        page.wait_for_load_state("networkidle", timeout=10000)
+                                        page.wait_for_load_state("networkidle", timeout=10000)  # type: ignore[attr-defined]
                                     except Exception:
                                         # If networkidle times out, at least wait for DOM
                                         try:
-                                            page.wait_for_load_state("domcontentloaded", timeout=5000)
+                                            page.wait_for_load_state("domcontentloaded", timeout=5000)  # type: ignore[attr-defined]
                                         except Exception:
                                             pass
                                         logger.debug(f"Network idle timeout on page {idx}, continuing with DOM content...")
                                     
                                     # Check for Cloudflare challenge on pagination pages
-                                    page_title = page.title()
+                                    page_title: str = page.title()  # type: ignore[attr-defined]
                                     if "just a moment" in page_title.lower() or "checking your browser" in page_title.lower():
                                         logger.warning(f"⚠ Cloudflare challenge on page {idx}, waiting...")
                                         # Wait for Cloudflare to complete
-                                        max_wait = 10
-                                        waited = 0
+                                        max_wait: int = 10
+                                        waited: int = 0
                                         while waited < max_wait:
                                             time.sleep(1)
                                             waited += 1
                                             try:
-                                                current_title = page.title()
+                                                current_title: str = page.title()  # type: ignore[attr-defined]
                                                 if not ("just a moment" in current_title.lower() or "checking your browser" in current_title.lower()):
                                                     logger.debug(f"Cloudflare challenge completed after {waited}s")
                                                     break
@@ -1402,17 +1466,20 @@ class ChapterUrlFetcher:
                                     )
                                     
                                     # Extract chapters from this page
-                                    html = page.content()
-                                    if HAS_BS4:
-                                        soup = BeautifulSoup(html, "html.parser")
+                                    html = page.content()  # type: ignore[attr-defined]
+                                    if HAS_BS4 and BeautifulSoup is not None:
+                                        soup = BeautifulSoup(html, "html.parser")  # type: ignore[arg-type, assignment]
                                         # Get all links, not just those with "chapter" in href
-                                        links = soup.find_all("a", href=True)
-                                        page_chapters = []
-                                        for link in links:
-                                            href = link.get("href", "")
+                                        links = soup.find_all("a", href=True)  # type: ignore[attr-defined]
+                                        page_chapters: List[str] = []
+                                        for link in links:  # type: ignore[assignment]
+                                            link_elem: Any = link  # type: ignore[assignment]
+                                            href_raw: Any = link_elem.get("href", "")  # type: ignore[attr-defined, arg-type]
+                                            href: str = str(href_raw) if href_raw else ""  # type: ignore[arg-type]
                                             if href:
-                                                full_url = normalize_url(href, self.base_url)
-                                                link_text = link.get_text(strip=True)
+                                                full_url: str = normalize_url(href, self.base_url)
+                                                link_text_raw: Any = link_elem.get_text(strip=True)  # type: ignore[attr-defined]
+                                                link_text: str = str(link_text_raw) if link_text_raw else ""  # type: ignore[arg-type]
                                                 if self._is_chapter_url(full_url, link_text):
                                                     page_chapters.append(full_url)
                                         
@@ -1440,8 +1507,8 @@ class ChapterUrlFetcher:
                                     continue
                             
                             # Remove duplicates and return
-                            seen = set()
-                            unique_urls = []
+                            seen: Set[str] = set()
+                            unique_urls: List[str] = []
                             for url in all_chapter_urls:
                                 if url not in seen:
                                     seen.add(url)
@@ -1458,21 +1525,24 @@ class ChapterUrlFetcher:
                     
                     # Check if we should try constructing pagination URLs
                     # If we found ~40-50 chapters but need high chapters, try pagination
-                    html = page.content()
-                    if HAS_BS4:
-                        soup = BeautifulSoup(html, "html.parser")
+                    html = page.content()  # type: ignore[attr-defined]
+                    if HAS_BS4 and BeautifulSoup is not None:
+                        soup = BeautifulSoup(html, "html.parser")  # type: ignore[arg-type, assignment]
                         # Count chapters on current page
-                        current_page_links = soup.find_all("a", href=True)
-                        current_chapters = []
-                        for link in current_page_links:
-                            href = link.get("href", "")
+                        current_page_links = soup.find_all("a", href=True)  # type: ignore[attr-defined]
+                        current_chapters: List[str] = []
+                        for link in current_page_links:  # type: ignore[assignment]
+                            link_elem: Any = link  # type: ignore[assignment]
+                            href_raw: Any = link_elem.get("href", "")  # type: ignore[attr-defined, arg-type]
+                            href: str = str(href_raw) if href_raw else ""  # type: ignore[arg-type]
                             if href:
-                                full_url = normalize_url(href, self.base_url)
-                                link_text = link.get_text(strip=True)
+                                full_url: str = normalize_url(href, self.base_url)
+                                link_text_raw: Any = link_elem.get_text(strip=True)  # type: ignore[attr-defined]
+                                link_text: str = str(link_text_raw) if link_text_raw else ""  # type: ignore[arg-type]
                                 if self._is_chapter_url(full_url, link_text):
                                     current_chapters.append(full_url)
                         
-                        current_chapter_count = len(current_chapters)
+                        current_chapter_count: int = len(current_chapters)
                         logger.debug(f"Found {current_chapter_count} chapters on current page")
                         
                         # If we found ~40-50 chapters and need high chapters, try constructing pagination URLs
@@ -1481,12 +1551,12 @@ class ChapterUrlFetcher:
                             
                             # Try common pagination URL patterns for LightNovelPub/NovelLive
                             # Pattern: /book/novel-name/3 (direct path with page number)
-                            base_path = toc_url.rstrip('/')
+                            base_path: str = toc_url.rstrip('/')
                             # Remove trailing slash and any existing page number
                             if base_path.endswith('/1') or base_path.endswith('/0'):
                                 base_path = base_path[:-2]
                             
-                            pagination_patterns = [
+                            pagination_patterns: List[str] = [
                                 f"{base_path}/{{}}",              # /book/shadow-slave/3 (LightNovelPub/NovelLive pattern)
                                 f"{toc_url}/{{}}",                # Same but with original URL
                                 f"{toc_url}?page={{}}",           # Query parameter
@@ -1498,27 +1568,30 @@ class ChapterUrlFetcher:
                             ]
                             
                             # Estimate how many pages we need (assuming ~40 chapters per page)
-                            estimated_pages = max(10, (min_chapter_number // 40) + 2)  # Add buffer
+                            estimated_pages: int = max(10, (min_chapter_number // 40) + 2)  # Add buffer
                             estimated_pages = min(estimated_pages, 200)  # Cap at 200 pages
                             
-                            working_pattern = None
+                            working_pattern: Optional[str] = None
                             for pattern in pagination_patterns:
                                 try:
                                     # Try page 2 first to see if pattern works
-                                    test_url = pattern.format(2)
+                                    test_url: str = pattern.format(2)
                                     logger.debug(f"Testing pagination pattern: {test_url}")
-                                    test_response = page.goto(test_url, wait_until="domcontentloaded", timeout=10000)
-                                    if test_response and test_response.status == 200:
+                                    test_response = page.goto(test_url, wait_until="domcontentloaded", timeout=10000)  # type: ignore[attr-defined]
+                                    if test_response and test_response.status == 200:  # type: ignore[attr-defined]
                                         # Check if we got different chapters (not just redirected to page 1)
-                                        test_html = page.content()
-                                        test_soup = BeautifulSoup(test_html, "html.parser")
-                                        test_links = test_soup.find_all("a", href=True)
-                                        test_chapters = []
-                                        for link in test_links:
-                                            href = link.get("href", "")
+                                        test_html = page.content()  # type: ignore[attr-defined]
+                                        test_soup = BeautifulSoup(test_html, "html.parser")  # type: ignore[arg-type, assignment]
+                                        test_links = test_soup.find_all("a", href=True)  # type: ignore[attr-defined]
+                                        test_chapters: List[str] = []
+                                        for link in test_links:  # type: ignore[assignment]
+                                            link_elem: Any = link  # type: ignore[assignment]
+                                            href_raw: Any = link_elem.get("href", "")  # type: ignore[attr-defined, arg-type]
+                                            href: str = str(href_raw) if href_raw else ""  # type: ignore[arg-type]
                                             if href:
-                                                full_url = normalize_url(href, self.base_url)
-                                                link_text = link.get_text(strip=True)
+                                                full_url: str = normalize_url(href, self.base_url)
+                                                link_text_raw: Any = link_elem.get_text(strip=True)  # type: ignore[attr-defined]
+                                                link_text: str = str(link_text_raw) if link_text_raw else ""  # type: ignore[arg-type]
                                                 if self._is_chapter_url(full_url, link_text):
                                                     test_chapters.append(full_url)
                                         
@@ -1527,7 +1600,7 @@ class ChapterUrlFetcher:
                                             working_pattern = pattern
                                             logger.info(f"✓ Found working pagination pattern: {pattern} (page 2 has {len(test_chapters)} chapters)")
                                             # Go back to page 1
-                                            page.goto(toc_url, wait_until="domcontentloaded", timeout=30000)
+                                            page.goto(toc_url, wait_until="domcontentloaded", timeout=30000)  # type: ignore[attr-defined]
                                             break
                                 except Exception as e:
                                     logger.debug(f"Pagination pattern {pattern} failed: {e}")
@@ -1535,27 +1608,27 @@ class ChapterUrlFetcher:
                             
                             # If we found a working pattern, collect all pages
                             if working_pattern:
-                                page_urls_to_visit = []
+                                page_urls_to_visit: List[str] = []
                                 for page_num in range(2, estimated_pages + 1):
-                                    page_url = working_pattern.format(page_num)
+                                    page_url: str = working_pattern.format(page_num)
                                     page_urls_to_visit.append(page_url)
                                 
                                 logger.info(f"Constructed {len(page_urls_to_visit)} pagination URLs to visit")
                                 
                                 # Collect chapters from all pages
-                                all_chapter_urls = list(current_chapters)  # Start with page 1
+                                all_chapter_urls: List[str] = list(current_chapters)  # Start with page 1
                                 
                                 # Visit additional pages
-                                max_pages_to_visit = min(len(page_urls_to_visit), 200)
+                                max_pages_to_visit: int = min(len(page_urls_to_visit), 200)
                                 logger.info(f"Visiting {max_pages_to_visit} additional pages to collect all chapters...")
                                 
-                                total_pages_fallback = len(page_urls_to_visit[:max_pages_to_visit])
+                                total_pages_fallback: int = len(page_urls_to_visit[:max_pages_to_visit])
                                 for idx, page_url in enumerate(page_urls_to_visit[:max_pages_to_visit], 1):
                                     if should_stop and should_stop():
                                         break
                                     
                                     # Progress tracking
-                                    progress_pct = (idx / total_pages_fallback * 100) if total_pages_fallback > 0 else 0
+                                    progress_pct: float = (idx / total_pages_fallback * 100) if total_pages_fallback > 0 else 0
                                     logger.info(f"Loading page {idx}/{total_pages_fallback} ({progress_pct:.1f}%): {page_url}")
                                     
                                     # Rate limiting between requests
@@ -1563,31 +1636,31 @@ class ChapterUrlFetcher:
                                     
                                     # Retry logic with exponential backoff for page loading
                                     def load_page_fallback():
-                                        page.goto(page_url, wait_until="domcontentloaded", timeout=30000)
+                                        page.goto(page_url, wait_until="domcontentloaded", timeout=30000)  # type: ignore[attr-defined]
                                         
                                         # Wait for page content to fully load using networkidle
                                         try:
-                                            page.wait_for_load_state("networkidle", timeout=10000)
+                                            page.wait_for_load_state("networkidle", timeout=10000)  # type: ignore[attr-defined]
                                         except Exception:
                                             # If networkidle times out, at least wait for DOM
                                             try:
-                                                page.wait_for_load_state("domcontentloaded", timeout=5000)
+                                                page.wait_for_load_state("domcontentloaded", timeout=5000)  # type: ignore[attr-defined]
                                             except Exception:
                                                 pass
                                             logger.debug(f"Network idle timeout on page {idx}, continuing with DOM content...")
                                         
                                         # Check for Cloudflare challenge on pagination pages
-                                        page_title = page.title()
+                                        page_title: str = page.title()  # type: ignore[attr-defined]
                                         if "just a moment" in page_title.lower() or "checking your browser" in page_title.lower():
                                             logger.warning(f"⚠ Cloudflare challenge on page {idx}, waiting...")
                                             # Wait for Cloudflare to complete
-                                            max_wait = 10
-                                            waited = 0
+                                            max_wait: int = 10
+                                            waited: int = 0
                                             while waited < max_wait:
                                                 time.sleep(1)
                                                 waited += 1
                                                 try:
-                                                    current_title = page.title()
+                                                    current_title: str = page.title()  # type: ignore[attr-defined]
                                                     if not ("just a moment" in current_title.lower() or "checking your browser" in current_title.lower()):
                                                         logger.debug(f"Cloudflare challenge completed after {waited}s")
                                                         break
@@ -1606,16 +1679,19 @@ class ChapterUrlFetcher:
                                         )
                                         
                                         # Extract chapters from this page
-                                        html = page.content()
+                                        html = page.content()  # type: ignore[attr-defined]
                                         if HAS_BS4:
-                                            soup = BeautifulSoup(html, "html.parser")
-                                            links = soup.find_all("a", href=True)
-                                            page_chapters = []
-                                            for link in links:
-                                                href = link.get("href", "")
+                                            soup = BeautifulSoup(html, "html.parser")  # type: ignore[arg-type, assignment]
+                                            links = soup.find_all("a", href=True)  # type: ignore[attr-defined]
+                                            page_chapters: List[str] = []
+                                            for link in links:  # type: ignore[assignment]
+                                                link_elem: Any = link  # type: ignore[assignment]
+                                                href_raw: Any = link_elem.get("href", "")  # type: ignore[attr-defined, arg-type]
+                                                href: str = str(href_raw) if href_raw else ""  # type: ignore[arg-type]
                                                 if href:
-                                                    full_url = normalize_url(href, self.base_url)
-                                                    link_text = link.get_text(strip=True)
+                                                    full_url: str = normalize_url(href, self.base_url)
+                                                    link_text_raw: Any = link_elem.get_text(strip=True)  # type: ignore[attr-defined]
+                                                    link_text: str = str(link_text_raw) if link_text_raw else ""  # type: ignore[arg-type]
                                                     if self._is_chapter_url(full_url, link_text):
                                                         page_chapters.append(full_url)
                                             
@@ -1636,8 +1712,8 @@ class ChapterUrlFetcher:
                                         continue
                                 
                                 # Remove duplicates and return
-                                seen = set()
-                                unique_urls = []
+                                seen: Set[str] = set()
+                                unique_urls: List[str] = []
                                 for url in all_chapter_urls:
                                     if url not in seen:
                                         seen.add(url)
@@ -1653,293 +1729,8 @@ class ChapterUrlFetcher:
                     
                     # Scroll to load all chapters (for lazy loading sites)
                     logger.debug("Starting scroll to load chapters...")
-                    scroll_result = page.evaluate("""
-                        async () => {
-                            // Enhanced chapter detection function - matches Python _is_chapter_url() logic
-                            function isChapterLink(link) {
-                                if (!link || !link.href) return false;
-                                
-                                var href = link.href.toLowerCase();
-                                var text = (link.textContent || '').trim().toLowerCase();
-                                
-                                // Most important: Check if text contains "chapter" followed by a number
-                                // This catches cases where href doesn't have "chapter" but text does
-                                if (/^chapter\\s+\\d+/i.test(text) || /chapter\\s+\\d+/i.test(text)) {
-                                    return true;
-                                }
-                                
-                                // Standard patterns: /chapter/, chapter-123, ch_123, etc. in href
-                                if (/chapter|ch[_\\-\\s]?\\d+/.test(href) || /chapter|ch[_\\-\\s]?\\d+/.test(text)) {
-                                    return true;
-                                }
-                                
-                                // FanMTL pattern: novel-name_123.html or novel-name/123.html
-                                if (/\\d+\\.html/.test(href)) {
-                                    // Check if it's in a chapter list context
-                                    var parent = link.closest('.chapter-list, #chapters, [class*="chapter"], [id*="chapter"]');
-                                    if (parent) return true;
-                                    // Or if link text suggests it's a chapter
-                                    if (/chapter|第.*章|ch\\s*\\d+/i.test(text)) return true;
-                                }
-                                
-                                // LightNovelPub/NovelLive pattern: /book/novel-name/chapter-123 or /book/novel-name/123
-                                // Also match /book/novel-name/chapter/123 or similar variations
-                                if (/\\/book\\/[^\\/]+\\/(?:chapter[\\/\\-]?)?\\d+/.test(href)) {
-                                    return true;
-                                }
-                                
-                                // Generic pattern: URL contains numbers and link text suggests it's a chapter
-                                // This is more flexible - checks if text has "chapter" indicator
-                                if (/\\d+/.test(href)) {
-                                    // Check if text contains chapter indicators
-                                    if (/chapter|第.*章|ch\\s*\\d+/i.test(text)) {
-                                        // Also check if it's in a chapter list container
-                                        var parent = link.closest('.chapter-list, #chapters, .list-chapter, [class*="chapter"], [id*="chapter"], ul, ol, [role="list"]');
-                                        if (parent) {
-                                            // Additional check: see if parent or siblings have chapter-related content
-                                            var parentText = (parent.textContent || '').toLowerCase();
-                                            if (/chapter/i.test(parentText)) {
-                                                return true;
-                                            }
-                                        }
-                                        // If text clearly indicates chapter, trust it
-                                        if (/^chapter\\s+\\d+/i.test(text)) {
-                                            return true;
-                                        }
-                                    }
-                                }
-                                
-                                return false;
-                            }
-                            
-                            // Count chapter links using flexible detection
-                            function countChapterLinks() {
-                                var allLinks = Array.from(document.querySelectorAll('a[href]'));
-                                return allLinks.filter(isChapterLink).length;
-                            }
-                            
-                            var lastCount = 0;
-                            var currentCount = 0;
-                            var scrollAttempts = 0;
-                            var maxScrolls = 1000;  // Increased for thoroughness
-                            var noChangeCount = 0;
-                            var maxNoChange = 30;  // Increased to allow more time for lazy loading
-                            
-                            async function tryClickLoadMore() {
-                                // Try multiple strategies to find and click "Load More" buttons
-                                // Strategy 1: Try by text content (most reliable)
-                                var allClickable = Array.from(document.querySelectorAll('a, button, span, div, li, [role="button"], [onclick]'));
-                                for (var btn of allClickable) {
-                                    try {
-                                        var text = (btn.textContent || '').toLowerCase().trim();
-                                        var isVisible = btn.offsetParent !== null && 
-                                                       btn.offsetWidth > 0 && 
-                                                       btn.offsetHeight > 0;
-                                        
-                                        if (isVisible && (
-                                            text.includes('load more') || 
-                                            text.includes('show more') ||
-                                            text.includes('view more') || 
-                                            text.includes('see more') ||
-                                            text.includes('more chapters') || 
-                                            text.includes('next page') ||
-                                            text.includes('load all') ||
-                                            text.includes('show all') ||
-                                            text.includes('expand') ||
-                                            text === 'more' ||
-                                            text === 'load' ||
-                                            (text.includes('more') && text.length < 20)
-                                        )) {
-                                            // Scroll button into view first
-                                            btn.scrollIntoView({ behavior: 'auto', block: 'center' });
-                                            await new Promise(r => setTimeout(r, 200));
-                                            btn.click();
-                                            await new Promise(r => setTimeout(r, 500));
-                                            return true;
-                                        }
-                                    } catch(e) {}
-                                }
-                                
-                                // Strategy 2: Try by class/id patterns
-                                var patternSelectors = [
-                                    '[class*="load-more"]',
-                                    '[class*="loadmore"]',
-                                    '[id*="load-more"]',
-                                    '[id*="loadmore"]',
-                                    '[class*="show-more"]',
-                                    '[class*="expand"]',
-                                    '[class*="more-button"]',
-                                    '[class*="load-button"]',
-                                ];
-                                
-                                for (var selector of patternSelectors) {
-                                    try {
-                                        var elements = document.querySelectorAll(selector);
-                                        for (var el of elements) {
-                                            if (el.offsetParent !== null && el.offsetWidth > 0) {
-                                                el.scrollIntoView({ behavior: 'auto', block: 'center' });
-                                                await new Promise(r => setTimeout(r, 200));
-                                                el.click();
-                                                await new Promise(r => setTimeout(r, 500));
-                                                return true;
-                                            }
-                                        }
-                                    } catch(e) {}
-                                }
-                                
-                                return false;
-                            }
-                            
-                            // Try to find and scroll within chapter container
-                            var chapterContainer = document.querySelector('#chapters, .chapter-list, .list-chapter, [class*="chapter"], [id*="chapter"]');
-                            if (!chapterContainer) {
-                                chapterContainer = document.querySelector('main, .content, #content, .container');
-                            }
-                            if (!chapterContainer) {
-                                chapterContainer = document.body;
-                            }
-                            
-                            // Initial count
-                            currentCount = countChapterLinks();
-                            lastCount = currentCount;
-                            
-                            while (scrollAttempts < maxScrolls) {
-                                // Scroll container if it's not body
-                                if (chapterContainer !== document.body) {
-                                    var containerHeight = chapterContainer.scrollHeight;
-                                    var containerClient = chapterContainer.clientHeight;
-                                    var currentScroll = chapterContainer.scrollTop;
-                                    
-                                    if (currentScroll + 200 < containerHeight - containerClient) {
-                                        chapterContainer.scrollTop = currentScroll + 200;
-                                    } else {
-                                        chapterContainer.scrollTop = containerHeight;
-                                    }
-                                }
-                                
-                                // Also scroll window
-                                window.scrollTo(0, document.body.scrollHeight);
-                                
-                                // Wait for content to load
-                                await new Promise(resolve => setTimeout(resolve, 1000));  // Increased from 800
-                                
-                                // Try clicking "Load More" buttons more frequently and aggressively
-                                if (scrollAttempts % 2 === 0) {  // More frequent - every 2 scrolls
-                                    if (await tryClickLoadMore()) {
-                                        // Wait longer after clicking to allow content to load
-                                        await new Promise(resolve => setTimeout(resolve, 2000));  // Increased from 1000
-                                        // Recheck count after load more
-                                        currentCount = countChapterLinks();
-                                        if (currentCount > lastCount) {
-                                            console.log('Load More clicked! Found ' + currentCount + ' chapters (was ' + lastCount + ')');
-                                            lastCount = currentCount;
-                                            noChangeCount = 0;
-                                        }
-                                    }
-                                }
-                                
-                                // Scroll last chapter link into view to trigger lazy loading
-                                var allLinks = Array.from(document.querySelectorAll('a[href]'));
-                                var chapterLinks = allLinks.filter(isChapterLink);
-                                if (chapterLinks.length > 0) {
-                                    var lastLink = chapterLinks[chapterLinks.length - 1];
-                                    try {
-                                        lastLink.scrollIntoView({ behavior: 'auto', block: 'end', inline: 'nearest' });
-                                        await new Promise(resolve => setTimeout(resolve, 800));  // Increased wait
-                                    } catch(e) {}
-                                }
-                                
-                                // Also try scrolling past the last link to trigger infinite scroll
-                                if (chapterLinks.length > 0) {
-                                    try {
-                                        var lastLinkRect = chapterLinks[chapterLinks.length - 1].getBoundingClientRect();
-                                        window.scrollBy(0, lastLinkRect.height * 2);  // Scroll past last link
-                                        await new Promise(resolve => setTimeout(resolve, 500));
-                                    } catch(e) {}
-                                }
-                                
-                                // Recount chapter links
-                                currentCount = countChapterLinks();
-                                
-                                if (currentCount === lastCount) {
-                                    noChangeCount++;
-                                    if (noChangeCount >= maxNoChange) {
-                                        // Before giving up, try one more aggressive "Load More" attempt
-                                        console.log('No change detected, trying final aggressive Load More attempt...');
-                                        for (var attempt = 0; attempt < 5; attempt++) {
-                                            if (await tryClickLoadMore()) {
-                                                await new Promise(resolve => setTimeout(resolve, 3000));
-                                                currentCount = countChapterLinks();
-                                                if (currentCount > lastCount) {
-                                                    console.log('Final Load More successful! Found ' + currentCount + ' chapters');
-                                                    lastCount = currentCount;
-                                                    noChangeCount = 0;
-                                                    break;
-                                                }
-                                            }
-                                            await new Promise(resolve => setTimeout(resolve, 500));
-                                        }
-                                        
-                                        if (currentCount === lastCount) {
-                                            console.log('No more chapters loading after ' + noChangeCount + ' attempts, stopping scroll');
-                                            break;
-                                        }
-                                    }
-                                } else {
-                                    noChangeCount = 0;
-                                    console.log('Found ' + currentCount + ' chapters (was ' + lastCount + ')');
-                                }
-                                
-                                lastCount = currentCount;
-                                scrollAttempts++;
-                                
-                                if (scrollAttempts % 10 === 0) {
-                                    console.log('Progress: Scroll ' + scrollAttempts + ', Found ' + currentCount + ' chapters...');
-                                }
-                            }
-                            
-                            // Final aggressive scroll to ensure everything is loaded
-                            console.log('Starting final aggressive scroll phase...');
-                            for (var i = 0; i < 10; i++) {  // Increased from 5 to 10
-                                if (chapterContainer !== document.body) {
-                                    chapterContainer.scrollTop = chapterContainer.scrollHeight;
-                                }
-                                window.scrollTo(0, document.body.scrollHeight);
-                                
-                                // Try clicking load more multiple times
-                                for (var j = 0; j < 3; j++) {
-                                    if (await tryClickLoadMore()) {
-                                        await new Promise(resolve => setTimeout(resolve, 2000));
-                                        var newCount = countChapterLinks();
-                                        if (newCount > currentCount) {
-                                            console.log('Final scroll found more chapters: ' + newCount);
-                                            currentCount = newCount;
-                                        }
-                                    }
-                                }
-                                
-                                await new Promise(resolve => setTimeout(resolve, 1000));
-                                
-                                // Scroll past the last chapter to trigger infinite scroll
-                                var allLinks = Array.from(document.querySelectorAll('a[href]'));
-                                var chapterLinks = allLinks.filter(isChapterLink);
-                                if (chapterLinks.length > 0) {
-                                    var lastLink = chapterLinks[chapterLinks.length - 1];
-                                    try {
-                                        var lastLinkRect = lastLink.getBoundingClientRect();
-                                        window.scrollBy(0, lastLinkRect.height * 3);  // Scroll further past
-                                        await new Promise(resolve => setTimeout(resolve, 1500));
-                                    } catch(e) {}
-                                }
-                            }
-                            
-                            // Final count
-                            currentCount = countChapterLinks();
-                            console.log('Final chapter count: ' + currentCount);
-                            
-                            return currentCount;
-                        }
-                    """)
+                    scroll_script = _load_playwright_scroll_script()
+                    scroll_result = page.evaluate(scroll_script)  # type: ignore[attr-defined]
                     
                     logger.info(f"Scrolling complete. Found {scroll_result} chapter links in DOM.")
                     
@@ -1959,21 +1750,21 @@ class ChapterUrlFetcher:
                     
                     # Check if we need to navigate to other pages (NovelFull pagination)
                     # Look for page navigation links
-                    page_links = page.query_selector_all('.pagination a, .page-numbers a, a[href*="page"]')
+                    page_links = page.query_selector_all('.pagination a, .page-numbers a, a[href*="page"]')  # type: ignore[attr-defined]
                     if page_links and scroll_result <= 60:
                         logger.info(f"Detected pagination links ({len(page_links)} found). NovelFull uses page-based pagination.")
                         logger.info("Note: Current implementation scrolls one page. For full chapter list, may need page navigation.")
                     
                     # Extract all chapter URLs
                     logger.debug("Extracting chapter URLs from page HTML...")
-                    html = page.content()
-                    page.close()
+                    html = page.content()  # type: ignore[attr-defined]
+                    page.close()  # type: ignore[attr-defined]
                     
-                    if not HAS_BS4:
+                    if not HAS_BS4 or BeautifulSoup is None:
                         logger.warning("BeautifulSoup4 not available, cannot parse HTML")
                         return []
                     
-                    soup = BeautifulSoup(html, "html.parser")
+                    soup = BeautifulSoup(html, "html.parser")  # type: ignore[arg-type, assignment]
                     
                     # Try multiple selectors for different sites
                     # Start with most specific, then fall back to generic
@@ -2003,11 +1794,11 @@ class ChapterUrlFetcher:
                         'article a[href]',            # All links in article
                     ]
                     
-                    links = []
-                    found_selectors = set()
+                    links: List[Any] = []
+                    found_selectors: Set[str] = set()
                     for selector in selectors:
                         try:
-                            found = soup.select(selector)
+                            found = soup.select(selector)  # type: ignore[attr-defined]
                             if found:
                                 links.extend(found)
                                 found_selectors.add(selector)
@@ -2020,26 +1811,31 @@ class ChapterUrlFetcher:
                         logger.debug(f"Used selectors: {', '.join(found_selectors)}")
                     
                     # Remove duplicates by href
-                    seen_hrefs = set()
-                    unique_links = []
+                    seen_hrefs: Set[str] = set()
+                    unique_links: List[Any] = []
                     for link in links:
-                        href = link.get("href", "")
+                        link_elem: Any = link  # type: ignore[assignment]
+                        href_raw: Any = link_elem.get("href", "")  # type: ignore[attr-defined, arg-type]
+                        href: str = str(href_raw) if href_raw else ""
                         if href:
                             # Normalize href for comparison
-                            normalized = normalize_url(href, self.base_url)
+                            normalized: str = normalize_url(href, self.base_url)
                             if normalized not in seen_hrefs:
                                 seen_hrefs.add(normalized)
-                                unique_links.append(link)
+                                unique_links.append(link)  # type: ignore[arg-type]
                     
                     logger.debug(f"Found {len(unique_links)} unique links (before chapter filtering)")
                     
                     # Filter to only chapter URLs using our flexible detection
-                    chapter_urls = []
+                    chapter_urls: List[str] = []
                     for link in unique_links:
-                        href = link.get("href", "")
+                        link_elem: Any = link
+                        href_raw: Any = link_elem.get("href", "")  # type: ignore[attr-defined]
+                        href: str = str(href_raw) if href_raw else ""
                         if href:
-                            full_url = normalize_url(href, self.base_url)
-                            link_text = link.get_text(strip=True)
+                            full_url: str = normalize_url(href, self.base_url)
+                            link_text_raw: Any = link_elem.get_text(strip=True)  # type: ignore[attr-defined]
+                            link_text: str = str(link_text_raw) if link_text_raw else ""
                             
                             # Use our flexible chapter detection
                             if self._is_chapter_url(full_url, link_text):
@@ -2048,8 +1844,8 @@ class ChapterUrlFetcher:
                     logger.debug(f"Extracted {len(chapter_urls)} chapter URLs (after filtering)")
                     
                     # Remove duplicates
-                    seen = set()
-                    unique_urls = []
+                    seen: Set[str] = set()
+                    unique_urls: List[str] = []
                     for url in chapter_urls:
                         if url not in seen:
                             seen.add(url)
@@ -2081,12 +1877,12 @@ class ChapterUrlFetcher:
     def _try_follow_next_links(self, toc_url: str, max_chapters: int = 100, should_stop: Optional[Callable[[], bool]] = None) -> List[str]:
         """Try to get chapter URLs by following 'next' links."""
         session = self.get_session()
-        if not session or not HAS_BS4:
+        if not session or not HAS_BS4 or BeautifulSoup is None:
             return []
         
-        chapter_urls = []
-        current_url = toc_url
-        visited = set()
+        chapter_urls: List[str] = []
+        current_url: str = toc_url
+        visited: Set[str] = set()
         
         try:
             for _ in range(max_chapters):
@@ -2097,19 +1893,19 @@ class ChapterUrlFetcher:
                     break
                 visited.add(current_url)
                 
-                response = session.get(current_url, timeout=self.timeout)
-                if response.status_code != 200:
+                response = session.get(current_url, timeout=self.timeout)  # type: ignore[attr-defined]
+                if response.status_code != 200:  # type: ignore[attr-defined]
                     break
                 
-                soup = BeautifulSoup(response.content, "html.parser")
+                soup = BeautifulSoup(response.content, "html.parser")  # type: ignore[arg-type, assignment]
                 
                 # Add current URL if it's a chapter
                 if "chapter" in current_url.lower():
                     chapter_urls.append(current_url)
                 
                 # Find "next" link
-                next_link = None
-                next_selectors = [
+                next_link: Optional[str] = None
+                next_selectors: List[str] = [
                     "a.btn-next",
                     "a.next",
                     "a[rel='next']",
@@ -2117,20 +1913,25 @@ class ChapterUrlFetcher:
                 
                 for selector in next_selectors:
                     try:
-                        link = soup.select_one(selector)
+                        link = soup.select_one(selector)  # type: ignore[attr-defined]
                         if link:
-                            next_link = link.get("href")
+                            link_elem: Any = link
+                            href_raw: Any = link_elem.get("href")  # type: ignore[attr-defined]
+                            next_link = str(href_raw) if href_raw else None
                             break
                     except Exception:
                         continue
                 
                 # Also try text-based search
                 if not next_link:
-                    links = soup.find_all("a")
-                    for link in links:
-                        text = link.get_text(strip=True).lower()
+                    links = soup.find_all("a")  # type: ignore[attr-defined]
+                    for link in links:  # type: ignore[assignment]
+                        link_elem: Any = link  # type: ignore[assignment]
+                        text_raw: Any = link_elem.get_text(strip=True)  # type: ignore[attr-defined]
+                        text: str = str(text_raw).lower() if text_raw else ""  # type: ignore[arg-type]
                         if "next" in text and "chapter" in text:
-                            next_link = link.get("href")
+                            href_raw: Any = link_elem.get("href")  # type: ignore[attr-defined, arg-type]
+                            next_link = str(href_raw) if href_raw else None  # type: ignore[arg-type]
                             break
                 
                 if not next_link:

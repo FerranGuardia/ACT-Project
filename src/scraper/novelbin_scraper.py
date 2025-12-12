@@ -6,39 +6,40 @@ Handles scraping from NovelBin.com with support for JavaScript-heavy pages.
 
 import time
 import re
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Any
 from urllib.parse import urljoin
 
 try:
-    from bs4 import BeautifulSoup
-    HAS_BS4 = True
+    from bs4 import BeautifulSoup  # type: ignore[import-untyped]
+    HAS_BS4: bool = True
 except ImportError:
-    HAS_BS4 = False
+    HAS_BS4 = False  # type: ignore[constant-redefinition]
+    BeautifulSoup = None  # type: ignore[assignment, misc]
 
 try:
-    import requests
-    HAS_REQUESTS = True
+    import requests  # type: ignore[import-untyped]
+    HAS_REQUESTS: bool = True
 except ImportError:
-    HAS_REQUESTS = False
+    HAS_REQUESTS = False  # type: ignore[constant-redefinition]
+    requests = None  # type: ignore[assignment, misc]
 
 try:
-    import cloudscraper
-    HAS_CLOUDSCRAPER = True
+    import cloudscraper  # type: ignore[import-untyped]
+    HAS_CLOUDSCRAPER: bool = True
 except ImportError:
-    HAS_CLOUDSCRAPER = False
+    HAS_CLOUDSCRAPER = False  # type: ignore[constant-redefinition]
+    cloudscraper = None  # type: ignore[assignment, misc]
 
 try:
-    from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
-    HAS_PLAYWRIGHT = True
+    from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError  # type: ignore[import-untyped]
+    HAS_PLAYWRIGHT: bool = True
 except ImportError:
-    HAS_PLAYWRIGHT = False
+    HAS_PLAYWRIGHT = False  # type: ignore[constant-redefinition]
+    sync_playwright = None  # type: ignore[assignment, misc]
+    PlaywrightTimeoutError = None  # type: ignore[assignment, misc]
 
 from .base_scraper import BaseScraper
 from .config import (
-    REQUEST_TIMEOUT,
-    REQUEST_DELAY,
-    MAX_RETRIES,
-    RETRY_BACKOFF_BASE,
     TITLE_SELECTORS,
     CONTENT_SELECTORS,
     PLAYWRIGHT_TIMEOUT,
@@ -57,7 +58,7 @@ class NovelBinScraper(BaseScraper):
     Supports both simple requests and Playwright for JavaScript-heavy pages.
     """
 
-    def __init__(self, base_url: str = "https://novelbin.com", use_playwright: Optional[bool] = None, **kwargs):
+    def __init__(self, base_url: str = "https://novelbin.com", use_playwright: Optional[bool] = None, **kwargs: Any):
         """
         Initialize NovelBin scraper.
 
@@ -80,14 +81,14 @@ class NovelBinScraper(BaseScraper):
         if self.use_playwright and not HAS_PLAYWRIGHT:
             self.logger.warning("Playwright requested but not available, falling back to requests")
 
-    def get_session(self):
+    def get_session(self):  # type: ignore[return-type]
         """Get or create a requests session."""
         if self._session is None:
-            if HAS_CLOUDSCRAPER:
-                self._session = cloudscraper.create_scraper()
-            elif HAS_REQUESTS:
-                self._session = requests.Session()
-                self._session.headers.update({
+            if HAS_CLOUDSCRAPER and cloudscraper is not None:
+                self._session = cloudscraper.create_scraper()  # type: ignore[attr-defined, assignment]
+            elif HAS_REQUESTS and requests is not None:
+                self._session = requests.Session()  # type: ignore[attr-defined, assignment]
+                self._session.headers.update({  # type: ignore[attr-defined]
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                 })
             else:
@@ -95,18 +96,20 @@ class NovelBinScraper(BaseScraper):
                 return None
         return self._session
 
-    def _get_page(self):
+    def _get_page(self):  # type: ignore[return-type]
         """Get or create a Playwright page."""
         if not self.use_playwright:
             return None
 
         if self._page is None:
             if self._playwright is None:
-                self._playwright = sync_playwright().start()
+                if sync_playwright is None:
+                    return None
+                self._playwright = sync_playwright().start()  # type: ignore[attr-defined, assignment]
             if self._browser is None:
-                self._browser = self._playwright.chromium.launch(headless=PLAYWRIGHT_HEADLESS)
-            self._page = self._browser.new_page()
-            self._page.set_default_timeout(PLAYWRIGHT_TIMEOUT)
+                self._browser = self._playwright.chromium.launch(headless=PLAYWRIGHT_HEADLESS)  # type: ignore[attr-defined, assignment]
+            self._page = self._browser.new_page()  # type: ignore[attr-defined, assignment]
+            self._page.set_default_timeout(PLAYWRIGHT_TIMEOUT)  # type: ignore[attr-defined]
 
         return self._page
 
@@ -134,7 +137,7 @@ class NovelBinScraper(BaseScraper):
 
     def _scrape_with_requests(self, chapter_url: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         """Scrape using requests/BeautifulSoup."""
-        if not HAS_BS4:
+        if not HAS_BS4 or BeautifulSoup is None:
             return None, None, "BeautifulSoup4 not available"
 
         session = self.get_session()
@@ -149,13 +152,14 @@ class NovelBinScraper(BaseScraper):
             return None, None, "Stopped by user"
 
         # Make request
-        response = session.get(chapter_url, timeout=self.timeout, allow_redirects=True)
+        response = session.get(chapter_url, timeout=self.timeout, allow_redirects=True)  # type: ignore[attr-defined]
 
-        if response.status_code != 200:
+        if response.status_code != 200:  # type: ignore[attr-defined]
             return None, None, f"HTTP {response.status_code}"
 
         # Parse HTML
-        soup = BeautifulSoup(response.content, "html.parser")
+        html_content: bytes = response.content  # type: ignore[attr-defined]
+        soup = BeautifulSoup(html_content, "html.parser")  # type: ignore[arg-type, assignment]
 
         # Extract content and title
         content = self._extract_content(soup)
@@ -186,10 +190,10 @@ class NovelBinScraper(BaseScraper):
             html = page.content()
 
             # Parse with BeautifulSoup
-            if not HAS_BS4:
+            if not HAS_BS4 or BeautifulSoup is None:
                 return None, None, "BeautifulSoup4 not available"
 
-            soup = BeautifulSoup(html, "html.parser")
+            soup = BeautifulSoup(html, "html.parser")  # type: ignore[arg-type, assignment]
 
             # Extract content and title
             content = self._extract_content(soup)
@@ -203,18 +207,19 @@ class NovelBinScraper(BaseScraper):
 
             return cleaned_content, title, None
 
-        except PlaywrightTimeoutError:
-            return None, None, "Timeout waiting for page to load"
-        except Exception as e:
+        except Exception as e:  # type: ignore[misc]
+            if PlaywrightTimeoutError is not None and isinstance(e, PlaywrightTimeoutError):  # type: ignore[arg-type]
+                return None, None, "Timeout waiting for page to load"
             return None, None, f"Playwright error: {str(e)}"
 
-    def _extract_title(self, soup, chapter_url: str) -> str:
+    def _extract_title(self, soup: Any, chapter_url: str) -> str:
         """Extract chapter title from soup."""
         # Try selectors from config
         for selector in TITLE_SELECTORS:
-            title_elem = soup.select_one(selector)
+            title_elem = soup.select_one(selector)  # type: ignore[attr-defined]
             if title_elem:
-                title_text = title_elem.get_text(strip=True)
+                title_text_raw = title_elem.get_text(strip=True)  # type: ignore[attr-defined]
+                title_text: str = str(title_text_raw) if title_text_raw is not None else ""
                 # Clean title
                 title_text = re.sub(r"^(Chapter\s+\d+[:\s]*)?", "", title_text, flags=re.I)
                 title_text = re.sub(r"\s*-\s*.*novel.*$", "", title_text, flags=re.I)
@@ -229,33 +234,34 @@ class NovelBinScraper(BaseScraper):
 
         return "Chapter 1"
 
-    def _extract_content(self, soup) -> Optional[str]:
+    def _extract_content(self, soup: Any) -> Optional[str]:
         """Extract chapter content from soup."""
         # Try content selectors
-        content_elem = None
+        content_elem: Any = None
         for selector in CONTENT_SELECTORS:
-            content_elem = soup.select_one(selector)
+            content_elem = soup.select_one(selector)  # type: ignore[attr-defined]
             if content_elem:
                 break
 
         if not content_elem:
             # Fallback: find by class/id patterns
-            content_elem = soup.find("div", class_=re.compile("content|chapter|text", re.I))
+            content_elem = soup.find("div", class_=re.compile("content|chapter|text", re.I))  # type: ignore[attr-defined]
         if not content_elem:
-            content_elem = soup.find("article")
+            content_elem = soup.find("article")  # type: ignore[attr-defined]
         if not content_elem:
-            content_elem = soup.find("body")
+            content_elem = soup.find("body")  # type: ignore[attr-defined]
 
         if not content_elem:
             return None
 
         # Extract paragraphs
-        paragraphs = content_elem.find_all(["p", "div"])
-        text_parts = []
+        paragraphs = content_elem.find_all(["p", "div"])  # type: ignore[attr-defined]
+        text_parts: list[str] = []
         for p in paragraphs:
             if self.check_should_stop():
                 return None
-            text = p.get_text(strip=True)
+            text_raw = p.get_text(strip=True)  # type: ignore[attr-defined]
+            text: str = str(text_raw) if text_raw is not None else ""
             if text and len(text) > 20:
                 # Filter out navigation/UI elements
                 if not re.search(
@@ -267,9 +273,10 @@ class NovelBinScraper(BaseScraper):
 
         if not text_parts:
             # Fallback: get all text
-            text = content_elem.get_text(separator="\n", strip=True)
+            text_raw = content_elem.get_text(separator="\n", strip=True)  # type: ignore[attr-defined]
+            text = str(text_raw) if text_raw is not None else ""
             if text and len(text) > 50:
-                lines = [
+                lines: list[str] = [
                     line.strip()
                     for line in text.split("\n")
                     if line.strip() and len(line.strip()) > 20
@@ -302,7 +309,7 @@ class NovelBinScraper(BaseScraper):
 
     def _get_chapter_urls_requests(self, toc_url: str) -> List[str]:
         """Get chapter URLs using requests."""
-        if not HAS_BS4:
+        if not HAS_BS4 or BeautifulSoup is None:
             self.logger.error("BeautifulSoup4 not available")
             return []
 
@@ -310,25 +317,29 @@ class NovelBinScraper(BaseScraper):
         if not session:
             return []
 
-        response = session.get(toc_url, timeout=self.timeout)
-        if response.status_code != 200:
+        response = session.get(toc_url, timeout=self.timeout)  # type: ignore[attr-defined]
+        if response.status_code != 200:  # type: ignore[attr-defined]
             self.logger.error(f"Failed to fetch TOC: HTTP {response.status_code}")
             return []
 
-        soup = BeautifulSoup(response.content, "html.parser")
+        html_content: bytes = response.content  # type: ignore[attr-defined]
+        soup = BeautifulSoup(html_content, "html.parser")  # type: ignore[arg-type, assignment]
 
         # Find chapter links (common patterns)
-        links = soup.find_all("a", href=re.compile(r"chapter", re.I))
-        chapter_urls = []
+        links = soup.find_all("a", href=re.compile(r"chapter", re.I))  # type: ignore[attr-defined]
+        chapter_urls: list[str] = []
 
         for link in links:
-            href = link.get("href", "")
+            link_elem: Any = link  # BeautifulSoup Tag element
+            href_raw = link_elem.get("href", "")  # type: ignore[attr-defined]
+            href: str = str(href_raw) if href_raw is not None else ""
             if href:
-                full_url = urljoin(self.base_url, href)
+                full_url: str = urljoin(self.base_url, href)
                 if "chapter" in full_url.lower():
                     chapter_urls.append(full_url)
 
-        return list(set(chapter_urls))  # Remove duplicates
+        unique_urls: list[str] = list(set(chapter_urls))  # type: ignore[arg-type]
+        return unique_urls
 
     def _get_chapter_urls_playwright(self, toc_url: str) -> List[str]:
         """Get chapter URLs using Playwright."""
@@ -340,21 +351,24 @@ class NovelBinScraper(BaseScraper):
             page.goto(toc_url, wait_until="networkidle", timeout=PLAYWRIGHT_TIMEOUT)
             html = page.content()
 
-            if not HAS_BS4:
+            if not HAS_BS4 or BeautifulSoup is None:
                 return []
 
-            soup = BeautifulSoup(html, "html.parser")
-            links = soup.find_all("a", href=re.compile(r"chapter", re.I))
-            chapter_urls = []
+            soup = BeautifulSoup(html, "html.parser")  # type: ignore[arg-type, assignment]
+            links = soup.find_all("a", href=re.compile(r"chapter", re.I))  # type: ignore[attr-defined]
+            chapter_urls: list[str] = []
 
             for link in links:
-                href = link.get("href", "")
+                link_elem: Any = link  # BeautifulSoup Tag element
+                href_raw = link_elem.get("href", "")  # type: ignore[attr-defined]
+                href: str = str(href_raw) if href_raw is not None else ""
                 if href:
-                    full_url = urljoin(self.base_url, href)
+                    full_url: str = urljoin(self.base_url, href)
                     if "chapter" in full_url.lower():
                         chapter_urls.append(full_url)
 
-            return list(set(chapter_urls))  # Remove duplicates
+            unique_urls: list[str] = list(set(chapter_urls))  # type: ignore[arg-type]
+            return unique_urls
 
         except Exception as e:
             self.logger.error(f"Error getting chapter URLs with Playwright: {e}")
@@ -389,7 +403,7 @@ class NovelBinScraper(BaseScraper):
         """Context manager entry."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Context manager exit."""
         self.cleanup()
 
