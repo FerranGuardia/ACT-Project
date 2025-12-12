@@ -51,23 +51,25 @@ class Pyttsx3Provider(TTSProvider):
         """Get available system voices, filtered to English US only.
         
         Args:
-            locale: Locale filter (e.g., "en-US"). Defaults to "en-US" only.
+            locale: Locale filter (e.g., "en-US"). 
+                   pyttsx3 only supports en-US voices, so any other locale will return empty list.
+                   If None, returns all available en-US voices.
         
         Returns:
             List of voice dictionaries with id, name, language, gender, quality
         """
-        # Default to en-US only as per requirements
-        if locale is None:
-            locale = "en-US"
-        
         if not self.is_available():
             return []
         
-        # Return cached voices if available
+        # pyttsx3 only supports en-US voices
+        # If a non-en-US locale is requested, return empty list
+        if locale is not None and locale != "en-US":
+            logger.debug(f"pyttsx3 only supports en-US voices, requested locale '{locale}' not supported")
+            return []
+        
+        # Return cached voices if available (all cached voices are en-US)
         if self._voices_cache is not None:
-            if locale == "en-US":
-                return [v for v in self._voices_cache if v.get("language") == "en-US"]
-            return [v for v in self._voices_cache if v.get("language") == locale]
+            return self._voices_cache
         
         voices: List[Dict[str, Any]] = []
         try:
@@ -97,11 +99,12 @@ class Pyttsx3Provider(TTSProvider):
                     # Fallback: check name for English indicators
                     is_english = any(word in name_lower for word in ['english', 'en-us', 'en_us', 'us english'])
                 
-                if is_english or locale == "en-US":
+                # Only add English voices (pyttsx3 only supports en-US)
+                if is_english:
                     voices.append({
                         'id': voice_id,
                         'name': voice_name,
-                        'language': 'en-US',  # Default to en-US for English voices
+                        'language': 'en-US',  # pyttsx3 only supports en-US
                         'gender': gender,
                         'quality': 'low',
                         'provider': 'pyttsx3'
@@ -115,10 +118,7 @@ class Pyttsx3Provider(TTSProvider):
             logger.error(f"Error loading pyttsx3 voices: {e}")
             voices = []
         
-        # Filter by locale if specified
-        if locale and locale != "en-US":
-            return [v for v in voices if v.get("language") == locale]
-        
+        # All voices are en-US (hardcoded above), so just return them
         return voices
     
     def convert_text_to_speech(

@@ -28,7 +28,7 @@ logger = get_logger("ui.dialogs.provider_selection")
 PROVIDER_INFO = {
     "edge_tts": {
         "name": "Edge TTS",
-        "version": "7.2.3",
+        "version": "7.2.0",
         "type": "Cloud",
         "description": "Microsoft Edge TTS (current version). High quality cloud-based TTS with many voices."
     },
