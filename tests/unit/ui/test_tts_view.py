@@ -6,6 +6,7 @@ Tests file management, voice settings, controls, and backend integration
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 from PySide6.QtWidgets import QApplication
+from typing import Any, Optional
 
 
 class TestTTSView:
@@ -14,7 +15,7 @@ class TestTTSView:
     def test_tts_view_initialization(self, qt_application):
         """Test that TTS view initializes correctly"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             
             view = TTSView()
             
@@ -28,7 +29,7 @@ class TestTTSView:
     def test_add_files_dialog(self, qt_application, sample_text_file, mock_file_dialog):
         """Test adding files via file dialog"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             
             view = TTSView()
             mock_file_dialog.getOpenFileNames.return_value = ([str(sample_text_file)], "")
@@ -45,7 +46,7 @@ class TestTTSView:
     def test_add_folder_dialog(self, qt_application, temp_dir, mock_file_dialog):
         """Test adding folder with text files"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             
             view = TTSView()
             # Create test files in temp_dir
@@ -66,7 +67,7 @@ class TestTTSView:
     def test_remove_selected_files(self, qt_application):
         """Test removing selected files from list"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             
             view = TTSView()
             
@@ -87,7 +88,7 @@ class TestTTSView:
     def test_voice_dropdown_populates(self, qt_application, mock_voice_manager):
         """Test that voice dropdown populates with available voices"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             
             view = TTSView()
             if hasattr(view, 'voice_manager'):
@@ -105,7 +106,7 @@ class TestTTSView:
     def test_voice_selection(self, qt_application):
         """Test selecting a voice from dropdown"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             
             view = TTSView()
             
@@ -120,7 +121,7 @@ class TestTTSView:
     def test_rate_slider_updates_label(self, qt_application):
         """Test that rate slider updates the rate label"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             
             view = TTSView()
             
@@ -135,7 +136,7 @@ class TestTTSView:
     def test_pitch_slider_updates_label(self, qt_application):
         """Test that pitch slider updates the pitch label"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             
             view = TTSView()
             
@@ -150,7 +151,7 @@ class TestTTSView:
     def test_volume_slider_updates_label(self, qt_application):
         """Test that volume slider updates the volume label"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             
             view = TTSView()
             
@@ -165,7 +166,7 @@ class TestTTSView:
     def test_voice_preview_button(self, qt_application, mock_tts_engine):
         """Test that voice preview button generates preview"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             
             view = TTSView()
             if hasattr(view, 'tts_engine'):
@@ -182,7 +183,7 @@ class TestTTSView:
     def test_start_conversion_requires_files(self, qt_application):
         """Test that start conversion requires files to be added"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             
             view = TTSView()
             
@@ -198,7 +199,7 @@ class TestTTSView:
     def test_start_conversion_requires_output_dir(self, qt_application, sample_text_file):
         """Test that start conversion requires output directory"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             
             view = TTSView()
             
@@ -216,7 +217,7 @@ class TestTTSView:
     def test_start_conversion_initializes_thread(self, qt_application, mock_tts_engine, sample_text_file, temp_dir):
         """Test that starting conversion initializes worker thread"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             
             view = TTSView()
             if hasattr(view, 'tts_engine'):
@@ -240,7 +241,7 @@ class TestTTSView:
     def test_pause_button_pauses_conversion(self, qt_application, mock_tts_engine):
         """Test that pause button pauses the conversion"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             
             view = TTSView()
             if hasattr(view, 'tts_engine'):
@@ -256,7 +257,7 @@ class TestTTSView:
     def test_stop_button_stops_conversion(self, qt_application, mock_tts_engine):
         """Test that stop button stops the conversion"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             
             view = TTSView()
             if hasattr(view, 'tts_engine'):
@@ -272,7 +273,7 @@ class TestTTSView:
     def test_progress_bar_updates(self, qt_application):
         """Test that progress bar updates during conversion"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             
             view = TTSView()
             
@@ -287,7 +288,7 @@ class TestTTSView:
     def test_status_message_updates(self, qt_application):
         """Test that status message updates during conversion"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             
             view = TTSView()
             test_message = "Converting file 3 of 5..."
@@ -303,7 +304,7 @@ class TestTTSView:
     def test_text_editor_initialization(self, qt_application):
         """Test that text editor is initialized correctly"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             
             view = TTSView()
             
@@ -318,7 +319,7 @@ class TestTTSView:
     def test_text_editor_tab_switching(self, qt_application):
         """Test switching between Files and Text Editor tabs"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             
             view = TTSView()
             
@@ -339,7 +340,7 @@ class TestTTSView:
     def test_character_count_updates(self, qt_application):
         """Test that character count updates when text changes"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             
             view = TTSView()
             
@@ -361,7 +362,7 @@ class TestTTSView:
     def test_clear_editor(self, qt_application):
         """Test clearing the text editor"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             from PySide6.QtWidgets import QMessageBox
             
             view = TTSView()
@@ -382,7 +383,7 @@ class TestTTSView:
     def test_clear_editor_cancelled(self, qt_application):
         """Test that clearing editor can be cancelled"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             from PySide6.QtWidgets import QMessageBox
             
             view = TTSView()
@@ -404,7 +405,7 @@ class TestTTSView:
     def test_load_file_to_editor(self, qt_application, sample_text_file):
         """Test loading a file into the text editor"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             from PySide6.QtWidgets import QFileDialog
             
             view = TTSView()
@@ -428,7 +429,7 @@ class TestTTSView:
     def test_load_file_to_editor_error_handling(self, qt_application):
         """Test error handling when loading file fails"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             from PySide6.QtWidgets import QFileDialog, QMessageBox
             
             view = TTSView()
@@ -448,7 +449,7 @@ class TestTTSView:
     def test_save_editor_text(self, qt_application, temp_dir):
         """Test saving editor text to a file"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             from PySide6.QtWidgets import QFileDialog
             from pathlib import Path
             
@@ -474,7 +475,7 @@ class TestTTSView:
     def test_save_editor_text_empty(self, qt_application, mock_file_dialog):
         """Test that saving empty text shows warning"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             from PySide6.QtWidgets import QMessageBox
             
             view = TTSView()
@@ -494,7 +495,7 @@ class TestTTSView:
     def test_validation_with_editor_text(self, qt_application, temp_dir):
         """Test validation when using text editor"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             
             view = TTSView()
             
@@ -521,7 +522,7 @@ class TestTTSView:
     def test_conversion_with_editor_text(self, qt_application, temp_dir, mock_tts_engine):
         """Test starting conversion with text from editor"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             import tempfile
             
             view = TTSView()
@@ -543,7 +544,7 @@ class TestTTSView:
             view.voice_combo.setCurrentIndex(0)
             
             # Mock message box for validation errors
-            with patch('src.ui.views.tts_view.QMessageBox') as mock_msg:
+            with patch('ui.views.tts_view.QMessageBox') as mock_msg:
                 # Start conversion
                 view.start_conversion()
                 
@@ -557,7 +558,7 @@ class TestTTSView:
     def test_preview_uses_editor_text(self, qt_application, mock_tts_engine):
         """Test that preview uses text from editor when editor tab is active"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             import tempfile
             import os
             
@@ -597,7 +598,7 @@ class TestTTSView:
     def test_preview_uses_sample_text_when_editor_empty(self, qt_application, mock_tts_engine):
         """Test that preview uses sample text when editor is empty"""
         try:
-            from src.ui.views.tts_view import TTSView
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             from unittest.mock import MagicMock
             
             view = TTSView()

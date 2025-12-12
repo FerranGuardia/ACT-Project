@@ -15,7 +15,7 @@ class TestScraperView:
     def test_scraper_view_initialization(self, qt_application):
         """Test that scraper view initializes correctly"""
         try:
-            from src.ui.views.scraper_view import ScraperView
+            from ui.views.scraper_view import ScraperView  # type: ignore[import-untyped]
             
             view = ScraperView()
             
@@ -30,7 +30,7 @@ class TestScraperView:
     def test_url_validation_valid_url(self, qt_application):
         """Test URL validation with valid URL"""
         try:
-            from src.ui.views.scraper_view import ScraperView
+            from ui.views.scraper_view import ScraperView  # type: ignore[import-untyped]
             
             view = ScraperView()
             valid_url = "https://novelbin.me/b/test-novel"
@@ -48,7 +48,7 @@ class TestScraperView:
     def test_url_validation_invalid_url(self, qt_application):
         """Test URL validation with invalid URL"""
         try:
-            from src.ui.views.scraper_view import ScraperView
+            from ui.views.scraper_view import ScraperView  # type: ignore[import-untyped]
             
             view = ScraperView()
             invalid_url = "not-a-url"
@@ -66,7 +66,7 @@ class TestScraperView:
     def test_chapter_selection_all_chapters(self, qt_application):
         """Test selecting 'All chapters' option"""
         try:
-            from src.ui.views.scraper_view import ScraperView
+            from ui.views.scraper_view import ScraperView  # type: ignore[import-untyped]
             
             view = ScraperView()
             
@@ -81,7 +81,7 @@ class TestScraperView:
     def test_chapter_selection_range(self, qt_application):
         """Test selecting chapter range"""
         try:
-            from src.ui.views.scraper_view import ScraperView
+            from ui.views.scraper_view import ScraperView  # type: ignore[import-untyped]
             
             view = ScraperView()
             
@@ -100,7 +100,7 @@ class TestScraperView:
     def test_chapter_selection_specific(self, qt_application):
         """Test selecting specific chapters"""
         try:
-            from src.ui.views.scraper_view import ScraperView
+            from ui.views.scraper_view import ScraperView  # type: ignore[import-untyped]
             
             view = ScraperView()
             
@@ -116,7 +116,7 @@ class TestScraperView:
     def test_output_directory_selection(self, qt_application, temp_dir, mock_file_dialog):
         """Test output directory selection"""
         try:
-            from src.ui.views.scraper_view import ScraperView
+            from ui.views.scraper_view import ScraperView  # type: ignore[import-untyped]
             
             view = ScraperView()
             mock_file_dialog.getExistingDirectory.return_value = str(temp_dir)
@@ -133,7 +133,7 @@ class TestScraperView:
     def test_start_button_enabled_with_valid_input(self, qt_application):
         """Test that start button is enabled with valid input"""
         try:
-            from src.ui.views.scraper_view import ScraperView
+            from ui.views.scraper_view import ScraperView  # type: ignore[import-untyped]
             
             view = ScraperView()
             
@@ -150,7 +150,7 @@ class TestScraperView:
     def test_start_button_disabled_with_invalid_input(self, qt_application):
         """Test that start button is disabled with invalid input"""
         try:
-            from src.ui.views.scraper_view import ScraperView
+            from ui.views.scraper_view import ScraperView  # type: ignore[import-untyped]
             
             view = ScraperView()
             
@@ -167,7 +167,7 @@ class TestScraperView:
     def test_start_scraping_initializes_thread(self, qt_application, mock_scraper):
         """Test that starting scraping initializes worker thread"""
         try:
-            from src.ui.views.scraper_view import ScraperView
+            from ui.views.scraper_view import ScraperView  # type: ignore[import-untyped]
             
             view = ScraperView()
             
@@ -192,7 +192,7 @@ class TestScraperView:
     def test_pause_button_pauses_scraping(self, qt_application, mock_scraper):
         """Test that pause button pauses the scraping operation"""
         try:
-            from src.ui.views.scraper_view import ScraperView
+            from ui.views.scraper_view import ScraperView  # type: ignore[import-untyped]
             
             view = ScraperView()
             if hasattr(view, 'scraper'):
@@ -213,7 +213,7 @@ class TestScraperView:
     def test_stop_button_stops_scraping(self, qt_application, mock_scraper):
         """Test that stop button stops the scraping operation"""
         try:
-            from src.ui.views.scraper_view import ScraperView
+            from ui.views.scraper_view import ScraperView  # type: ignore[import-untyped]
             
             view = ScraperView()
             if hasattr(view, 'scraper'):
@@ -234,7 +234,7 @@ class TestScraperView:
     def test_progress_bar_updates(self, qt_application):
         """Test that progress bar updates during scraping"""
         try:
-            from src.ui.views.scraper_view import ScraperView
+            from ui.views.scraper_view import ScraperView  # type: ignore[import-untyped]
             
             view = ScraperView()
             
@@ -250,7 +250,7 @@ class TestScraperView:
     def test_status_message_updates(self, qt_application):
         """Test that status message updates during scraping"""
         try:
-            from src.ui.views.scraper_view import ScraperView
+            from ui.views.scraper_view import ScraperView  # type: ignore[import-untyped]
             
             view = ScraperView()
             test_message = "Scraping chapter 5 of 10..."
@@ -266,7 +266,7 @@ class TestScraperView:
     def test_output_files_list_updates(self, qt_application, temp_dir):
         """Test that output files list updates after scraping"""
         try:
-            from src.ui.views.scraper_view import ScraperView
+            from ui.views.scraper_view import ScraperView  # type: ignore[import-untyped]
             
             view = ScraperView()
             
@@ -284,7 +284,7 @@ class TestScraperView:
     def test_open_folder_button(self, qt_application, temp_dir):
         """Test that open folder button opens the output directory"""
         try:
-            from src.ui.views.scraper_view import ScraperView
+            from ui.views.scraper_view import ScraperView  # type: ignore[import-untyped]
             
             view = ScraperView()
             view.output_dir = str(temp_dir)
@@ -301,7 +301,7 @@ class TestScraperView:
     def test_ui_state_resets_after_stop(self, qt_application):
         """Test that UI state resets correctly after stopping"""
         try:
-            from src.ui.views.scraper_view import ScraperView
+            from ui.views.scraper_view import ScraperView  # type: ignore[import-untyped]
             
             view = ScraperView()
             

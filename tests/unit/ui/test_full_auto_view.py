@@ -14,7 +14,7 @@ class TestFullAutoView:
     def test_full_auto_view_initialization(self, qt_application):
         """Test that full auto view initializes correctly"""
         try:
-            from src.ui.views.full_auto_view import FullAutoView
+            from ui.views.full_auto_view import FullAutoView  # type: ignore[import-untyped]
             
             view = FullAutoView()
             
@@ -27,7 +27,7 @@ class TestFullAutoView:
     def test_add_to_queue_dialog(self, qt_application, sample_novel_url):
         """Test adding item to queue via dialog"""
         try:
-            from src.ui.views.full_auto_view import FullAutoView
+            from ui.views.full_auto_view import FullAutoView  # type: ignore[import-untyped]
             
             view = FullAutoView()
             
@@ -45,7 +45,7 @@ class TestFullAutoView:
     def test_queue_item_displays_correctly(self, qt_application, sample_novel_url):
         """Test that queue items display URL and title correctly"""
         try:
-            from src.ui.views.full_auto_view import FullAutoView
+            from ui.views.full_auto_view import FullAutoView  # type: ignore[import-untyped]
             
             view = FullAutoView()
             
@@ -62,7 +62,7 @@ class TestFullAutoView:
     def test_queue_item_status_display(self, qt_application, sample_novel_url):
         """Test that queue items show status (Pending, Processing, Completed, Failed)"""
         try:
-            from src.ui.views.full_auto_view import FullAutoView
+            from ui.views.full_auto_view import FullAutoView  # type: ignore[import-untyped]
             
             view = FullAutoView()
             
@@ -79,7 +79,7 @@ class TestFullAutoView:
     def test_move_queue_item_up(self, qt_application, sample_novel_url):
         """Test moving a queue item up"""
         try:
-            from src.ui.views.full_auto_view import FullAutoView
+            from ui.views.full_auto_view import FullAutoView  # type: ignore[import-untyped]
             
             view = FullAutoView()
             
@@ -104,7 +104,7 @@ class TestFullAutoView:
     def test_move_queue_item_down(self, qt_application):
         """Test moving a queue item down"""
         try:
-            from src.ui.views.full_auto_view import FullAutoView
+            from ui.views.full_auto_view import FullAutoView  # type: ignore[import-untyped]
             
             view = FullAutoView()
             
@@ -129,7 +129,7 @@ class TestFullAutoView:
     def test_remove_queue_item(self, qt_application):
         """Test removing a queue item"""
         try:
-            from src.ui.views.full_auto_view import FullAutoView
+            from ui.views.full_auto_view import FullAutoView  # type: ignore[import-untyped]
             
             view = FullAutoView()
             
@@ -152,7 +152,7 @@ class TestFullAutoView:
     def test_clear_queue(self, qt_application):
         """Test clearing all queue items"""
         try:
-            from src.ui.views.full_auto_view import FullAutoView
+            from ui.views.full_auto_view import FullAutoView  # type: ignore[import-untyped]
             
             view = FullAutoView()
             
@@ -173,7 +173,7 @@ class TestFullAutoView:
     def test_url_validation_in_add_dialog(self, qt_application):
         """Test URL validation in add queue dialog"""
         try:
-            from src.ui.views.full_auto_view import FullAutoView
+            from ui.views.full_auto_view import FullAutoView  # type: ignore[import-untyped]
             
             view = FullAutoView()
             
@@ -191,7 +191,7 @@ class TestFullAutoView:
     def test_start_processing_requires_queue_items(self, qt_application):
         """Test that start processing requires queue items"""
         try:
-            from src.ui.views.full_auto_view import FullAutoView
+            from ui.views.full_auto_view import FullAutoView  # type: ignore[import-untyped]
             
             view = FullAutoView()
             
@@ -207,7 +207,7 @@ class TestFullAutoView:
     def test_start_processing_initializes_pipeline(self, qt_application, sample_novel_url, mock_processing_pipeline):
         """Test that starting processing initializes pipeline"""
         try:
-            from src.ui.views.full_auto_view import FullAutoView
+            from ui.views.full_auto_view import FullAutoView  # type: ignore[import-untyped]
             
             view = FullAutoView()
             if hasattr(view, 'pipeline'):
@@ -229,7 +229,7 @@ class TestFullAutoView:
     def test_current_processing_display(self, qt_application, sample_novel_url):
         """Test that current processing section displays active item"""
         try:
-            from src.ui.views.full_auto_view import FullAutoView
+            from ui.views.full_auto_view import FullAutoView  # type: ignore[import-untyped]
             
             view = FullAutoView()
             
@@ -249,7 +249,7 @@ class TestFullAutoView:
     def test_progress_tracking_per_item(self, qt_application):
         """Test that progress is tracked per queue item"""
         try:
-            from src.ui.views.full_auto_view import FullAutoView
+            from ui.views.full_auto_view import FullAutoView  # type: ignore[import-untyped]
             
             view = FullAutoView()
             
@@ -265,7 +265,7 @@ class TestFullAutoView:
     def test_pause_all_button(self, qt_application, mock_processing_pipeline):
         """Test that pause all button pauses all processing"""
         try:
-            from src.ui.views.full_auto_view import FullAutoView
+            from ui.views.full_auto_view import FullAutoView  # type: ignore[import-untyped]
             
             view = FullAutoView()
             if hasattr(view, 'pipeline'):
@@ -281,7 +281,7 @@ class TestFullAutoView:
     def test_stop_all_button(self, qt_application, mock_processing_pipeline):
         """Test that stop all button stops all processing"""
         try:
-            from src.ui.views.full_auto_view import FullAutoView
+            from ui.views.full_auto_view import FullAutoView  # type: ignore[import-untyped]
             
             view = FullAutoView()
             if hasattr(view, 'pipeline'):
@@ -297,7 +297,7 @@ class TestFullAutoView:
     def test_auto_start_next_item(self, qt_application, sample_novel_url, mock_processing_pipeline):
         """Test that next item in queue auto-starts after completion"""
         try:
-            from src.ui.views.full_auto_view import FullAutoView
+            from ui.views.full_auto_view import FullAutoView  # type: ignore[import-untyped]
             
             view = FullAutoView()
             if hasattr(view, 'pipeline'):
@@ -320,7 +320,7 @@ class TestFullAutoView:
     def test_queue_item_status_updates(self, qt_application, sample_novel_url):
         """Test that queue item status updates correctly"""
         try:
-            from src.ui.views.full_auto_view import FullAutoView
+            from ui.views.full_auto_view import FullAutoView  # type: ignore[import-untyped]
             
             view = FullAutoView()
             
@@ -345,7 +345,7 @@ class TestFullAutoView:
     def test_error_handling_invalid_url(self, qt_application, mock_processing_pipeline):
         """Test error handling for invalid URL"""
         try:
-            from src.ui.views.full_auto_view import FullAutoView
+            from ui.views.full_auto_view import FullAutoView  # type: ignore[import-untyped]
             
             view = FullAutoView()
             if hasattr(view, 'pipeline'):
@@ -370,7 +370,7 @@ class TestFullAutoView:
     def test_global_progress_bar_updates(self, qt_application):
         """Test that global progress bar updates during processing"""
         try:
-            from src.ui.views.full_auto_view import FullAutoView
+            from ui.views.full_auto_view import FullAutoView  # type: ignore[import-untyped]
             
             view = FullAutoView()
             

@@ -12,14 +12,12 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, PropertyMock
+from unittest.mock import Mock, MagicMock, patch
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import Qt
+from typing import List, Tuple, Callable, Any
 
-# Add src to path
+# Path setup is handled by conftest.py
 act_src = Path(__file__).parent.parent.parent.parent / "src"
-if str(act_src) not in sys.path:
-    sys.path.insert(0, str(act_src))
 
 # Mock external dependencies BEFORE any imports
 sys.modules["edge_tts"] = MagicMock()
@@ -33,7 +31,7 @@ if "core.logger" not in sys.modules:
     mock_logger = MagicMock()
     mock_get_logger = MagicMock(return_value=mock_logger)
     logger_module = types.ModuleType("core.logger")
-    logger_module.get_logger = mock_get_logger
+    logger_module.get_logger = mock_get_logger  # type: ignore[attr-defined]
     sys.modules["core.logger"] = logger_module
 
 # Mock tts modules
@@ -59,7 +57,7 @@ if "core.config_manager" not in sys.modules:
     mock_config.get.return_value = "en-US-AndrewNeural"
     mock_get_config = MagicMock(return_value=mock_config)
     config_module = types.ModuleType("core.config_manager")
-    config_module.get_config = mock_get_config
+    config_module.get_config = mock_get_config  # type: ignore[attr-defined]
     sys.modules["core.config_manager"] = config_module
 
 # Import will be done in test methods with proper patching
@@ -68,28 +66,27 @@ if "core.config_manager" not in sys.modules:
 class TestProviderStatusCheck:
     """Test provider status checking functionality."""
     
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
-        if not QApplication.instance():
+        app_instance = QApplication.instance()
+        if not app_instance:
             self.app = QApplication([])
         else:
-            self.app = QApplication.instance()
+            self.app = app_instance
         
         # Create mock provider manager
         self.provider_manager = Mock()
     
     def test_pyttsx3_returns_false_but_file_exists(self):
         """Test that pyttsx3 status check succeeds even if convert_text_to_speech returns False but file exists."""
-        # Import with proper module setup
-        import importlib
         # First ensure the module can be imported
         with patch.dict('sys.modules', {
             'scraper': MagicMock(),
             'scraper.generic_scraper': MagicMock(),
             'scraper.base_scraper': MagicMock(),
         }):
-            from ui.views import tts_view
-            ProviderStatusCheckThread = tts_view.ProviderStatusCheckThread
+            from ui.views import tts_view  # type: ignore[import-untyped]
+            ProviderStatusCheckThread = tts_view.ProviderStatusCheckThread  # type: ignore[attr-defined]
         
         # Create a temporary file that will exist
         with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tmp:
@@ -114,8 +111,8 @@ class TestProviderStatusCheck:
                 mock_temp.return_value.__enter__.return_value.name = str(temp_path)
                 
                 # Capture the signal
-                status_results = []
-                def on_status_checked(provider_name, is_working):
+                status_results: List[Tuple[str, bool]] = []
+                def on_status_checked(provider_name: str, is_working: bool) -> None:
                     status_results.append((provider_name, is_working))
                 
                 thread.status_checked.connect(on_status_checked)
@@ -124,9 +121,11 @@ class TestProviderStatusCheck:
                 thread.run()
                 
                 # Wait a bit for async operations
-                self.app.processEvents()
+                if self.app:
+                    self.app.processEvents()
                 time.sleep(0.1)
-                self.app.processEvents()
+                if self.app:
+                    self.app.processEvents()
                 
                 # Verify that status was checked and file existence was verified
                 assert len(status_results) == 1
@@ -146,7 +145,7 @@ class TestProviderStatusCheck:
              patch('ui.views.tts_view.VoiceManager'), \
              patch('ui.views.tts_view.TTSProviderManager'), \
              patch('ui.views.tts_view.logger'):
-            from ui.views.tts_view import ProviderStatusCheckThread
+            from ui.views.tts_view import ProviderStatusCheckThread  # type: ignore[import-untyped]
         
         # Create a temporary file path that won't exist
         with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tmp:
@@ -171,8 +170,8 @@ class TestProviderStatusCheck:
             mock_temp.return_value.__enter__.return_value.name = str(temp_path)
             
             # Capture the signal
-            status_results = []
-            def on_status_checked(provider_name, is_working):
+            status_results: List[Tuple[str, bool]] = []
+            def on_status_checked(provider_name: str, is_working: bool) -> None:
                 status_results.append((provider_name, is_working))
             
             thread.status_checked.connect(on_status_checked)
@@ -181,9 +180,11 @@ class TestProviderStatusCheck:
             thread.run()
             
             # Wait a bit for async operations
-            self.app.processEvents()
+            if self.app:
+                self.app.processEvents()
             time.sleep(0.1)
-            self.app.processEvents()
+            if self.app:
+                self.app.processEvents()
             
             # Verify that status was checked and marked as not working
             assert len(status_results) == 1
@@ -199,7 +200,7 @@ class TestProviderStatusCheck:
              patch('ui.views.tts_view.VoiceManager'), \
              patch('ui.views.tts_view.TTSProviderManager'), \
              patch('ui.views.tts_view.logger'):
-            from ui.views.tts_view import ProviderStatusCheckThread
+            from ui.views.tts_view import ProviderStatusCheckThread  # type: ignore[import-untyped]
         
         # Create a temporary file with content
         with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tmp:
@@ -223,8 +224,8 @@ class TestProviderStatusCheck:
                 mock_temp.return_value.__enter__.return_value.name = str(temp_path)
                 
                 # Capture the signal
-                status_results = []
-                def on_status_checked(provider_name, is_working):
+                status_results: List[Tuple[str, bool]] = []
+                def on_status_checked(provider_name: str, is_working: bool) -> None:
                     status_results.append((provider_name, is_working))
                 
                 thread.status_checked.connect(on_status_checked)
@@ -233,9 +234,11 @@ class TestProviderStatusCheck:
                 thread.run()
                 
                 # Wait a bit
-                self.app.processEvents()
+                if self.app:
+                    self.app.processEvents()
                 time.sleep(0.1)
-                self.app.processEvents()
+                if self.app:
+                    self.app.processEvents()
                 
                 # Verify
                 assert len(status_results) == 1
@@ -262,7 +265,7 @@ class TestProviderStatusCheck:
              patch('ui.views.tts_view.VoiceManager'), \
              patch('ui.views.tts_view.TTSProviderManager'), \
              patch('ui.views.tts_view.logger'):
-            from ui.views.tts_view import ProviderStatusCheckThread
+            from ui.views.tts_view import ProviderStatusCheckThread  # type: ignore[import-untyped]
         
         # Create mock provider that is not available
         mock_provider = Mock()
@@ -274,8 +277,8 @@ class TestProviderStatusCheck:
         thread = ProviderStatusCheckThread(self.provider_manager, "edge_tts")
         
         # Capture the signal
-        status_results = []
-        def on_status_checked(provider_name, is_working):
+        status_results: List[Tuple[str, bool]] = []
+        def on_status_checked(provider_name: str, is_working: bool) -> None:
             status_results.append((provider_name, is_working))
         
         thread.status_checked.connect(on_status_checked)
@@ -284,9 +287,11 @@ class TestProviderStatusCheck:
         thread.run()
         
         # Wait a bit
-        self.app.processEvents()
+        if self.app:
+            self.app.processEvents()
         time.sleep(0.1)
-        self.app.processEvents()
+        if self.app:
+            self.app.processEvents()
         
         # Verify
         assert len(status_results) == 1
@@ -305,7 +310,7 @@ class TestProviderStatusCheck:
              patch('ui.views.tts_view.VoiceManager'), \
              patch('ui.views.tts_view.TTSProviderManager'), \
              patch('ui.views.tts_view.logger'):
-            from ui.views.tts_view import ProviderStatusCheckThread
+            from ui.views.tts_view import ProviderStatusCheckThread  # type: ignore[import-untyped]
         
         # Create mock provider with no voices
         mock_provider = Mock()
@@ -318,8 +323,8 @@ class TestProviderStatusCheck:
         thread = ProviderStatusCheckThread(self.provider_manager, "edge_tts")
         
         # Capture the signal
-        status_results = []
-        def on_status_checked(provider_name, is_working):
+        status_results: List[Tuple[str, bool]] = []
+        def on_status_checked(provider_name: str, is_working: bool) -> None:
             status_results.append((provider_name, is_working))
         
         thread.status_checked.connect(on_status_checked)
@@ -328,9 +333,11 @@ class TestProviderStatusCheck:
         thread.run()
         
         # Wait a bit
-        self.app.processEvents()
+        if self.app:
+            self.app.processEvents()
         time.sleep(0.1)
-        self.app.processEvents()
+        if self.app:
+            self.app.processEvents()
         
         # Verify
         assert len(status_results) == 1
@@ -348,7 +355,7 @@ class TestProviderStatusCheck:
              patch('ui.views.tts_view.VoiceManager'), \
              patch('ui.views.tts_view.TTSProviderManager'), \
              patch('ui.views.tts_view.logger'):
-            from ui.views.tts_view import ProviderStatusCheckThread
+            from ui.views.tts_view import ProviderStatusCheckThread  # type: ignore[import-untyped]
         
         # Create mock provider that raises exception
         mock_provider = Mock()
@@ -389,7 +396,7 @@ class TestProviderStatusCheck:
              patch('ui.views.tts_view.VoiceManager'), \
              patch('ui.views.tts_view.TTSProviderManager'), \
              patch('ui.views.tts_view.logger'):
-            from ui.views.tts_view import ProviderStatusCheckThread
+            from ui.views.tts_view import ProviderStatusCheckThread  # type: ignore[import-untyped]
         
         # Create a temporary file path
         with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tmp:
@@ -412,8 +419,8 @@ class TestProviderStatusCheck:
                 mock_temp.return_value.__enter__.return_value.name = str(temp_path)
                 
                 # Capture the signal
-                status_results = []
-                def on_status_checked(provider_name, is_working):
+                status_results: List[Tuple[str, bool]] = []
+                def on_status_checked(provider_name: str, is_working: bool) -> None:
                     status_results.append((provider_name, is_working))
                 
                 thread.status_checked.connect(on_status_checked)
@@ -431,9 +438,11 @@ class TestProviderStatusCheck:
                 thread_obj.join(timeout=15)
                 
                 # Process events
-                self.app.processEvents()
+                if self.app:
+                    self.app.processEvents()
                 time.sleep(0.1)
-                self.app.processEvents()
+                if self.app:
+                    self.app.processEvents()
                 
                 # Verify that file existence was detected
                 assert len(status_results) == 1

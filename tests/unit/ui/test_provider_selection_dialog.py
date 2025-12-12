@@ -10,14 +10,14 @@ Tests the provider selection dialog functionality including:
 
 import sys
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, PropertyMock
+from unittest.mock import Mock, MagicMock, patch
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt
+from typing import List, Tuple, Callable, Any, Optional
 
 # Add src to path
+# Path setup is handled by conftest.py
 act_src = Path(__file__).parent.parent.parent.parent / "src"
-if str(act_src) not in sys.path:
-    sys.path.insert(0, str(act_src))
 
 # Mock external dependencies BEFORE any imports
 sys.modules["edge_tts"] = MagicMock()
@@ -31,14 +31,14 @@ if "core.logger" not in sys.modules:
     mock_logger = MagicMock()
     mock_get_logger = MagicMock(return_value=mock_logger)
     logger_module = types.ModuleType("core.logger")
-    logger_module.get_logger = mock_get_logger
+    logger_module.get_logger = mock_get_logger  # type: ignore[attr-defined]
     sys.modules["core.logger"] = logger_module
 if "core.config_manager" not in sys.modules:
     mock_config = MagicMock()
     mock_config.get.return_value = "en-US-AndrewNeural"
     mock_get_config = MagicMock(return_value=mock_config)
     config_module = types.ModuleType("core.config_manager")
-    config_module.get_config = mock_get_config
+    config_module.get_config = mock_get_config  # type: ignore[attr-defined]
     sys.modules["core.config_manager"] = config_module
 
 # Mock tts modules
@@ -58,7 +58,7 @@ if "tts.tts_engine" not in sys.modules:
 mock_provider_manager_class = MagicMock()
 if "tts.providers.provider_manager" not in sys.modules:
     provider_manager_module = types.ModuleType("tts.providers.provider_manager")
-    provider_manager_module.TTSProviderManager = mock_provider_manager_class
+    provider_manager_module.TTSProviderManager = mock_provider_manager_class  # type: ignore[attr-defined]
     sys.modules["tts.providers.provider_manager"] = provider_manager_module
 
 # Mock ui modules to avoid full import chain
@@ -79,13 +79,14 @@ if "tts.tts_engine" not in sys.modules:
     sys.modules["tts.tts_engine"] = tts_engine_module
 
 # Create QApplication if it doesn't exist
-if not QApplication.instance():
+app_instance: Optional[QApplication] = QApplication.instance()
+if app_instance is None:
     app = QApplication([])
 
 import pytest
 
 # Import after mocking
-from ui.dialogs.provider_selection_dialog import (
+from ui.dialogs.provider_selection_dialog import (  # type: ignore[import-untyped]
     ProviderSelectionDialog,
     ProviderStatusThread,
     ProviderTestThread,
@@ -279,10 +280,10 @@ class TestProviderStatusThread:
         thread = ProviderStatusThread(mock_provider_manager, "edge_tts")
         
         # Connect signal
-        status_checked = []
-        thread.status_checked.connect(
-            lambda name, available, msg: status_checked.append((name, available, msg))
-        )
+        status_checked: List[Tuple[str, bool, str]] = []
+        def on_status_checked(name: str, available: bool, msg: str) -> None:
+            status_checked.append((name, available, msg))
+        thread.status_checked.connect(on_status_checked)
         
         # Run thread
         thread.start()
@@ -348,10 +349,10 @@ class TestProviderTestThread:
         
         thread = ProviderTestThread(mock_provider_manager, "edge_tts")
         
-        test_result = []
-        thread.test_result.connect(
-            lambda name, success, msg: test_result.append((name, success, msg))
-        )
+        test_result: List[Tuple[str, bool, str]] = []
+        def on_test_result(name: str, success: bool, msg: str) -> None:
+            test_result.append((name, success, msg))
+        thread.test_result.connect(on_test_result)
         
         thread.start()
         thread.wait(3000)  # Wait up to 3 seconds
@@ -370,10 +371,10 @@ class TestProviderTestThread:
         
         thread = ProviderTestThread(mock_provider_manager, "edge_tts")
         
-        test_result = []
-        thread.test_result.connect(
-            lambda name, success, msg: test_result.append((name, success, msg))
-        )
+        test_result: List[Tuple[str, bool, str]] = []
+        def on_test_result(name: str, success: bool, msg: str) -> None:
+            test_result.append((name, success, msg))
+        thread.test_result.connect(on_test_result)
         
         thread.start()
         thread.wait(2000)

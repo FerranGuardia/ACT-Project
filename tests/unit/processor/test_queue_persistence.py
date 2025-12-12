@@ -13,11 +13,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
-# Add ACT project to path
-import sys
-act_project = Path(__file__).parent.parent.parent.parent.parent.parent / "ACT"
-if str(act_project / "src") not in sys.path:
-    sys.path.insert(0, str(act_project / "src"))
+# Path setup is handled by conftest.py
 
 
 class TestQueuePersistence:

@@ -14,7 +14,7 @@ class TestAddQueueDialogVoiceChapterSelection:
     def test_dialog_has_voice_selection(self, qt_application):
         """Test that AddQueueDialog includes voice selection dropdown"""
         try:
-            from src.ui.views.full_auto_view import AddQueueDialog
+            from ui.views.full_auto_view import AddQueueDialog  # type: ignore[import-untyped]
             
             dialog = AddQueueDialog()
             
@@ -28,7 +28,7 @@ class TestAddQueueDialogVoiceChapterSelection:
     def test_dialog_has_chapter_selection_all(self, qt_application):
         """Test that AddQueueDialog includes 'All chapters' option"""
         try:
-            from src.ui.views.full_auto_view import AddQueueDialog
+            from ui.views.full_auto_view import AddQueueDialog  # type: ignore[import-untyped]
             
             dialog = AddQueueDialog()
             
@@ -41,7 +41,7 @@ class TestAddQueueDialogVoiceChapterSelection:
     def test_dialog_has_chapter_selection_range(self, qt_application):
         """Test that AddQueueDialog includes range selection"""
         try:
-            from src.ui.views.full_auto_view import AddQueueDialog
+            from ui.views.full_auto_view import AddQueueDialog  # type: ignore[import-untyped]
             
             dialog = AddQueueDialog()
             
@@ -57,7 +57,7 @@ class TestAddQueueDialogVoiceChapterSelection:
     def test_dialog_has_chapter_selection_specific(self, qt_application):
         """Test that AddQueueDialog includes specific chapters selection"""
         try:
-            from src.ui.views.full_auto_view import AddQueueDialog
+            from ui.views.full_auto_view import AddQueueDialog  # type: ignore[import-untyped]
             
             dialog = AddQueueDialog()
             
@@ -75,7 +75,7 @@ class TestAddQueueDialogVoiceChapterSelection:
     def test_dialog_get_data_returns_voice(self, qt_application):
         """Test that get_data() returns voice selection"""
         try:
-            from src.ui.views.full_auto_view import AddQueueDialog
+            from ui.views.full_auto_view import AddQueueDialog  # type: ignore[import-untyped]
             
             dialog = AddQueueDialog()
             dialog.url_input.setText("https://example.com/novel")
@@ -93,7 +93,7 @@ class TestAddQueueDialogVoiceChapterSelection:
     def test_dialog_get_data_returns_all_chapters(self, qt_application):
         """Test that get_data() returns 'all' chapter selection"""
         try:
-            from src.ui.views.full_auto_view import AddQueueDialog
+            from ui.views.full_auto_view import AddQueueDialog  # type: ignore[import-untyped]
             
             dialog = AddQueueDialog()
             dialog.url_input.setText("https://example.com/novel")
@@ -109,7 +109,7 @@ class TestAddQueueDialogVoiceChapterSelection:
     def test_dialog_get_data_returns_range_selection(self, qt_application):
         """Test that get_data() returns range chapter selection"""
         try:
-            from src.ui.views.full_auto_view import AddQueueDialog
+            from ui.views.full_auto_view import AddQueueDialog  # type: ignore[import-untyped]
             
             dialog = AddQueueDialog()
             dialog.url_input.setText("https://example.com/novel")
@@ -129,7 +129,7 @@ class TestAddQueueDialogVoiceChapterSelection:
     def test_dialog_get_data_returns_specific_selection(self, qt_application):
         """Test that get_data() returns specific chapter selection"""
         try:
-            from src.ui.views.full_auto_view import AddQueueDialog
+            from ui.views.full_auto_view import AddQueueDialog  # type: ignore[import-untyped]
             
             dialog = AddQueueDialog()
             dialog.url_input.setText("https://example.com/novel")
@@ -147,7 +147,7 @@ class TestAddQueueDialogVoiceChapterSelection:
     def test_dialog_get_data_handles_invalid_specific_chapters(self, qt_application):
         """Test that get_data() handles invalid specific chapter input"""
         try:
-            from src.ui.views.full_auto_view import AddQueueDialog
+            from ui.views.full_auto_view import AddQueueDialog  # type: ignore[import-untyped]
             
             dialog = AddQueueDialog()
             dialog.url_input.setText("https://example.com/novel")
@@ -165,9 +165,9 @@ class TestAddQueueDialogVoiceChapterSelection:
     def test_dialog_loads_voices(self, qt_application):
         """Test that dialog loads available voices"""
         try:
-            from src.ui.views.full_auto_view import AddQueueDialog
+            from ui.views.full_auto_view import AddQueueDialog  # type: ignore[import-untyped]
             
-            with patch('src.ui.views.full_auto_view.VoiceManager') as mock_vm:
+            with patch('ui.views.full_auto_view.VoiceManager') as mock_vm:
                 mock_manager = MagicMock()
                 mock_manager.get_voice_list.return_value = [
                     "en-US-AndrewNeural",
@@ -190,7 +190,7 @@ class TestFullAutoViewVoiceChapterIntegration:
     def test_add_to_queue_stores_voice(self, qt_application, sample_novel_url):
         """Test that adding to queue stores voice selection"""
         try:
-            from src.ui.views.full_auto_view import FullAutoView, AddQueueDialog
+            from ui.views.full_auto_view import FullAutoView, AddQueueDialog  # type: ignore[import-untyped]
             
             view = FullAutoView()
             
@@ -220,12 +220,12 @@ class TestFullAutoViewVoiceChapterIntegration:
     def test_add_to_queue_stores_chapter_selection(self, qt_application, sample_novel_url):
         """Test that adding to queue stores chapter selection"""
         try:
-            from src.ui.views.full_auto_view import FullAutoView
+            from ui.views.full_auto_view import FullAutoView  # type: ignore[import-untyped]
             
             view = FullAutoView()
             
             # Mock dialog to return chapter selection
-            with patch('src.ui.views.full_auto_view.AddQueueDialog') as mock_dialog_class:
+            with patch('ui.views.full_auto_view.AddQueueDialog') as mock_dialog_class:
                 mock_dialog = MagicMock()
                 mock_dialog.exec.return_value = 1
                 mock_dialog.get_data.return_value = (
@@ -251,12 +251,12 @@ class TestFullAutoViewVoiceChapterIntegration:
     def test_add_to_queue_validates_range(self, qt_application, sample_novel_url):
         """Test that adding to queue validates chapter range"""
         try:
-            from src.ui.views.full_auto_view import FullAutoView
+            from ui.views.full_auto_view import FullAutoView  # type: ignore[import-untyped]
             
             view = FullAutoView()
             
             # Mock dialog with invalid range
-            with patch('src.ui.views.full_auto_view.AddQueueDialog') as mock_dialog_class:
+            with patch('ui.views.full_auto_view.AddQueueDialog') as mock_dialog_class:
                 mock_dialog = MagicMock()
                 mock_dialog.exec.return_value = 1
                 mock_dialog.get_data.return_value = (
@@ -267,7 +267,7 @@ class TestFullAutoViewVoiceChapterIntegration:
                 )
                 mock_dialog_class.return_value = mock_dialog
                 
-                with patch('src.ui.views.full_auto_view.QMessageBox') as mock_msg:
+                with patch('ui.views.full_auto_view.QMessageBox') as mock_msg:
                     view.add_to_queue()
                     
                     # Should show validation error
@@ -279,7 +279,7 @@ class TestFullAutoViewVoiceChapterIntegration:
     def test_processing_thread_receives_voice(self, qt_application, sample_novel_url):
         """Test that ProcessingThread receives voice parameter"""
         try:
-            from src.ui.views.full_auto_view import ProcessingThread
+            from ui.views.full_auto_view import ProcessingThread  # type: ignore[import-untyped]
             
             thread = ProcessingThread(
                 url=sample_novel_url,
@@ -297,7 +297,7 @@ class TestFullAutoViewVoiceChapterIntegration:
     def test_processing_thread_receives_chapter_selection(self, qt_application, sample_novel_url):
         """Test that ProcessingThread receives chapter selection"""
         try:
-            from src.ui.views.full_auto_view import ProcessingThread
+            from ui.views.full_auto_view import ProcessingThread  # type: ignore[import-untyped]
             
             chapter_selection = {'type': 'range', 'from': 1, 'to': 10}
             thread = ProcessingThread(
@@ -315,7 +315,7 @@ class TestFullAutoViewVoiceChapterIntegration:
     def test_start_processing_passes_voice_to_thread(self, qt_application, sample_novel_url):
         """Test that start_processing passes voice to ProcessingThread"""
         try:
-            from src.ui.views.full_auto_view import FullAutoView
+            from ui.views.full_auto_view import FullAutoView  # type: ignore[import-untyped]
             
             view = FullAutoView()
             
@@ -330,7 +330,7 @@ class TestFullAutoViewVoiceChapterIntegration:
             }
             view.queue_items.append(queue_item)
             
-            with patch('src.ui.views.full_auto_view.ProcessingThread') as mock_thread_class:
+            with patch('ui.views.full_auto_view.ProcessingThread') as mock_thread_class:
                 mock_thread = MagicMock()
                 mock_thread_class.return_value = mock_thread
                 
@@ -347,7 +347,7 @@ class TestFullAutoViewVoiceChapterIntegration:
     def test_start_processing_passes_chapter_selection_to_thread(self, qt_application, sample_novel_url):
         """Test that start_processing passes chapter selection to ProcessingThread"""
         try:
-            from src.ui.views.full_auto_view import FullAutoView
+            from ui.views.full_auto_view import FullAutoView  # type: ignore[import-untyped]
             
             view = FullAutoView()
             
@@ -362,7 +362,7 @@ class TestFullAutoViewVoiceChapterIntegration:
             }
             view.queue_items.append(queue_item)
             
-            with patch('src.ui.views.full_auto_view.ProcessingThread') as mock_thread_class:
+            with patch('ui.views.full_auto_view.ProcessingThread') as mock_thread_class:
                 mock_thread = MagicMock()
                 mock_thread_class.return_value = mock_thread
                 
@@ -378,7 +378,7 @@ class TestFullAutoViewVoiceChapterIntegration:
     def test_processing_thread_calculates_range_parameters(self, qt_application, sample_novel_url):
         """Test that ProcessingThread calculates start_from and max_chapters from range"""
         try:
-            from src.ui.views.full_auto_view import ProcessingThread
+            from ui.views.full_auto_view import ProcessingThread  # type: ignore[import-untyped]
             
             chapter_selection = {'type': 'range', 'from': 5, 'to': 15}
             thread = ProcessingThread(
@@ -389,7 +389,7 @@ class TestFullAutoViewVoiceChapterIntegration:
             )
             
             # Mock pipeline
-            with patch('src.ui.views.full_auto_view.ProcessingPipeline') as mock_pipeline_class:
+            with patch('ui.views.full_auto_view.ProcessingPipeline') as mock_pipeline_class:
                 mock_pipeline = MagicMock()
                 mock_pipeline.run_full_pipeline.return_value = {'success': True}
                 mock_pipeline_class.return_value = mock_pipeline
@@ -406,7 +406,7 @@ class TestFullAutoViewVoiceChapterIntegration:
     def test_processing_thread_handles_specific_chapters(self, qt_application, sample_novel_url):
         """Test that ProcessingThread handles specific chapter selection"""
         try:
-            from src.ui.views.full_auto_view import ProcessingThread
+            from ui.views.full_auto_view import ProcessingThread  # type: ignore[import-untyped]
             
             chapter_selection = {'type': 'specific', 'chapters': [1, 3, 5, 7, 9]}
             thread = ProcessingThread(

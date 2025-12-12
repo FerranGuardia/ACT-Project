@@ -14,7 +14,7 @@ class TestMergerView:
     def test_merger_view_initialization(self, qt_application):
         """Test that merger view initializes correctly"""
         try:
-            from src.ui.views.merger_view import MergerView
+            from ui.views.merger_view import MergerView  # type: ignore[import-untyped]
             
             view = MergerView()
             
@@ -27,7 +27,7 @@ class TestMergerView:
     def test_add_files_dialog(self, qt_application, sample_audio_file, mock_file_dialog):
         """Test adding audio files via file dialog"""
         try:
-            from src.ui.views.merger_view import MergerView
+            from ui.views.merger_view import MergerView  # type: ignore[import-untyped]
             
             view = MergerView()
             mock_file_dialog.getOpenFileNames.return_value = ([str(sample_audio_file)], "")
@@ -44,7 +44,7 @@ class TestMergerView:
     def test_add_folder_dialog(self, qt_application, temp_dir, mock_file_dialog):
         """Test adding folder with audio files"""
         try:
-            from src.ui.views.merger_view import MergerView
+            from ui.views.merger_view import MergerView  # type: ignore[import-untyped]
             
             view = MergerView()
             # Create test audio files in temp_dir
@@ -65,7 +65,7 @@ class TestMergerView:
     def test_file_list_displays_with_indices(self, qt_application):
         """Test that file list displays files with indices"""
         try:
-            from src.ui.views.merger_view import MergerView
+            from ui.views.merger_view import MergerView  # type: ignore[import-untyped]
             
             view = MergerView()
             
@@ -85,7 +85,7 @@ class TestMergerView:
     def test_move_file_up(self, qt_application):
         """Test moving a file up in the list"""
         try:
-            from src.ui.views.merger_view import MergerView
+            from ui.views.merger_view import MergerView  # type: ignore[import-untyped]
             
             view = MergerView()
             
@@ -110,7 +110,7 @@ class TestMergerView:
     def test_move_file_down(self, qt_application):
         """Test moving a file down in the list"""
         try:
-            from src.ui.views.merger_view import MergerView
+            from ui.views.merger_view import MergerView  # type: ignore[import-untyped]
             
             view = MergerView()
             
@@ -135,7 +135,7 @@ class TestMergerView:
     def test_remove_file(self, qt_application):
         """Test removing a file from the list"""
         try:
-            from src.ui.views.merger_view import MergerView
+            from ui.views.merger_view import MergerView  # type: ignore[import-untyped]
             
             view = MergerView()
             
@@ -158,7 +158,7 @@ class TestMergerView:
     def test_auto_sort_by_filename(self, qt_application):
         """Test auto-sorting files by filename"""
         try:
-            from src.ui.views.merger_view import MergerView
+            from ui.views.merger_view import MergerView  # type: ignore[import-untyped]
             
             view = MergerView()
             
@@ -182,7 +182,7 @@ class TestMergerView:
     def test_output_file_selection(self, qt_application, temp_dir, mock_file_dialog):
         """Test output file selection"""
         try:
-            from src.ui.views.merger_view import MergerView
+            from ui.views.merger_view import MergerView  # type: ignore[import-untyped]
             
             view = MergerView()
             output_file = str(temp_dir / "merged_output.mp3")
@@ -200,7 +200,7 @@ class TestMergerView:
     def test_silence_duration_setting(self, qt_application):
         """Test setting silence duration between files"""
         try:
-            from src.ui.views.merger_view import MergerView
+            from ui.views.merger_view import MergerView  # type: ignore[import-untyped]
             
             view = MergerView()
             
@@ -214,7 +214,7 @@ class TestMergerView:
     def test_start_merging_requires_files(self, qt_application):
         """Test that start merging requires files to be added"""
         try:
-            from src.ui.views.merger_view import MergerView
+            from ui.views.merger_view import MergerView  # type: ignore[import-untyped]
             
             view = MergerView()
             
@@ -230,7 +230,7 @@ class TestMergerView:
     def test_start_merging_requires_output_file(self, qt_application, sample_audio_file):
         """Test that start merging requires output file"""
         try:
-            from src.ui.views.merger_view import MergerView
+            from ui.views.merger_view import MergerView  # type: ignore[import-untyped]
             
             view = MergerView()
             
@@ -248,7 +248,7 @@ class TestMergerView:
     def test_start_merging_initializes_thread(self, qt_application, sample_audio_file, temp_dir):
         """Test that starting merging initializes worker thread"""
         try:
-            from src.ui.views.merger_view import MergerView
+            from ui.views.merger_view import MergerView  # type: ignore[import-untyped]
             
             view = MergerView()
             
@@ -270,7 +270,7 @@ class TestMergerView:
     def test_pause_button_pauses_merging(self, qt_application):
         """Test that pause button pauses the merging operation"""
         try:
-            from src.ui.views.merger_view import MergerView
+            from ui.views.merger_view import MergerView  # type: ignore[import-untyped]
             
             view = MergerView()
             
@@ -284,7 +284,7 @@ class TestMergerView:
     def test_stop_button_stops_merging(self, qt_application):
         """Test that stop button stops the merging operation"""
         try:
-            from src.ui.views.merger_view import MergerView
+            from ui.views.merger_view import MergerView  # type: ignore[import-untyped]
             
             view = MergerView()
             
@@ -298,7 +298,7 @@ class TestMergerView:
     def test_progress_bar_updates(self, qt_application):
         """Test that progress bar updates during merging"""
         try:
-            from src.ui.views.merger_view import MergerView
+            from ui.views.merger_view import MergerView  # type: ignore[import-untyped]
             
             view = MergerView()
             
@@ -313,7 +313,7 @@ class TestMergerView:
     def test_status_message_updates(self, qt_application):
         """Test that status message updates during merging"""
         try:
-            from src.ui.views.merger_view import MergerView
+            from ui.views.merger_view import MergerView  # type: ignore[import-untyped]
             
             view = MergerView()
             test_message = "Merging files 3 of 5..."
@@ -329,7 +329,7 @@ class TestMergerView:
     def test_pydub_dependency_check(self, qt_application):
         """Test that view validates pydub dependency"""
         try:
-            from src.ui.views.merger_view import MergerView, AudioMergerThread
+            from ui.views.merger_view import MergerView, AudioMergerThread  # type: ignore[import-untyped]
             
             view = MergerView()
             

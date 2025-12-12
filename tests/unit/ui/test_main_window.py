@@ -14,7 +14,7 @@ class TestMainWindow:
     def test_main_window_initialization(self, qt_application):
         """Test that main window initializes correctly"""
         try:
-            from src.ui.main_window import MainWindow
+            from ui.main_window import MainWindow  # type: ignore[import-untyped]
             
             window = MainWindow()
             
@@ -30,7 +30,7 @@ class TestMainWindow:
     def test_initial_view_is_landing_page(self, qt_application):
         """Test that initial view is the landing page"""
         try:
-            from src.ui.main_window import MainWindow
+            from ui.main_window import MainWindow  # type: ignore[import-untyped]
             
             window = MainWindow()
             
@@ -44,7 +44,7 @@ class TestMainWindow:
     def test_back_button_hidden_on_landing_page(self, qt_application):
         """Test that back button is hidden when on landing page"""
         try:
-            from src.ui.main_window import MainWindow
+            from ui.main_window import MainWindow  # type: ignore[import-untyped]
             
             window = MainWindow()
             
@@ -60,7 +60,7 @@ class TestMainWindow:
     def test_back_button_shown_on_other_views(self, qt_application):
         """Test that back button is shown when navigating to other views"""
         try:
-            from src.ui.main_window import MainWindow
+            from ui.main_window import MainWindow  # type: ignore[import-untyped]
             
             window = MainWindow()
             
@@ -78,7 +78,7 @@ class TestMainWindow:
     def test_navigate_to_scraper_view(self, qt_application):
         """Test navigation to scraper view"""
         try:
-            from src.ui.main_window import MainWindow
+            from ui.main_window import MainWindow  # type: ignore[import-untyped]
             
             window = MainWindow()
             
@@ -94,7 +94,7 @@ class TestMainWindow:
     def test_navigate_to_tts_view(self, qt_application):
         """Test navigation to TTS view"""
         try:
-            from src.ui.main_window import MainWindow
+            from ui.main_window import MainWindow  # type: ignore[import-untyped]
             
             window = MainWindow()
             
@@ -109,7 +109,7 @@ class TestMainWindow:
     def test_navigate_to_merger_view(self, qt_application):
         """Test navigation to merger view"""
         try:
-            from src.ui.main_window import MainWindow
+            from ui.main_window import MainWindow  # type: ignore[import-untyped]
             
             window = MainWindow()
             
@@ -124,7 +124,7 @@ class TestMainWindow:
     def test_navigate_to_full_auto_view(self, qt_application):
         """Test navigation to full auto view"""
         try:
-            from src.ui.main_window import MainWindow
+            from ui.main_window import MainWindow  # type: ignore[import-untyped]
             
             window = MainWindow()
             
@@ -139,7 +139,7 @@ class TestMainWindow:
     def test_back_button_navigates_to_landing(self, qt_application):
         """Test that back button navigates back to landing page"""
         try:
-            from src.ui.main_window import MainWindow
+            from ui.main_window import MainWindow  # type: ignore[import-untyped]
             
             window = MainWindow()
             
@@ -159,7 +159,7 @@ class TestMainWindow:
     def test_all_views_initialized(self, qt_application):
         """Test that all views are initialized in the stacked widget"""
         try:
-            from src.ui.main_window import MainWindow
+            from ui.main_window import MainWindow  # type: ignore[import-untyped]
             
             window = MainWindow()
             

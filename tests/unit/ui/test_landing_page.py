@@ -14,7 +14,7 @@ class TestLandingPage:
     def test_landing_page_initialization(self, qt_application):
         """Test that landing page initializes correctly"""
         try:
-            from src.ui.landing_page import LandingPage
+            from ui.landing_page import LandingPage  # type: ignore[import-untyped]
             
             page = LandingPage()
             
@@ -31,7 +31,7 @@ class TestLandingPage:
     def test_landing_page_has_four_cards(self, qt_application):
         """Test that landing page displays 4 mode cards"""
         try:
-            from src.ui.landing_page import LandingPage
+            from ui.landing_page import LandingPage  # type: ignore[import-untyped]
             
             page = LandingPage()
             
@@ -46,7 +46,7 @@ class TestLandingPage:
     def test_card_click_emits_signal(self, qt_application):
         """Test that clicking a card emits navigation signal"""
         try:
-            from src.ui.landing_page import LandingPage
+            from ui.landing_page import LandingPage  # type: ignore[import-untyped]
             from PySide6.QtCore import QSignalSpy
             
             page = LandingPage()
@@ -66,7 +66,7 @@ class TestLandingPage:
     def test_scraper_card_navigation(self, qt_application):
         """Test that Scraper card triggers navigation to scraper view"""
         try:
-            from src.ui.landing_page import LandingPage
+            from ui.landing_page import LandingPage  # type: ignore[import-untyped]
             
             page = LandingPage()
             callback = Mock()
@@ -86,7 +86,7 @@ class TestLandingPage:
     def test_tts_card_navigation(self, qt_application):
         """Test that TTS card triggers navigation to TTS view"""
         try:
-            from src.ui.landing_page import LandingPage
+            from ui.landing_page import LandingPage  # type: ignore[import-untyped]
             
             page = LandingPage()
             assert page is not None
@@ -97,7 +97,7 @@ class TestLandingPage:
     def test_merger_card_navigation(self, qt_application):
         """Test that Merger card triggers navigation to merger view"""
         try:
-            from src.ui.landing_page import LandingPage
+            from ui.landing_page import LandingPage  # type: ignore[import-untyped]
             
             page = LandingPage()
             assert page is not None
@@ -108,7 +108,7 @@ class TestLandingPage:
     def test_full_auto_card_navigation(self, qt_application):
         """Test that Full Auto card triggers navigation to full auto view"""
         try:
-            from src.ui.landing_page import LandingPage
+            from ui.landing_page import LandingPage  # type: ignore[import-untyped]
             
             page = LandingPage()
             assert page is not None
