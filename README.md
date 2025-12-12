@@ -12,7 +12,7 @@ A complete and modular Python tool for creating audiobooks from webnovels using 
 
 - 🔍 **Automated Scraping**: Extracts content from webnovel sites (NovelFull, NovelBin, etc.)
 - 🎤 **Multi-Provider Text-to-Speech**: Converts text to audio using:
-  - **Edge TTS** (Cloud, high quality, free)
+  - **Edge TTS** (Cloud, high quality, free) - Standard and alternative methods
   - **pyttsx3** (Offline, system voices, fallback)
 - 🔄 **Automatic Fallback**: Seamlessly switches between TTS providers when needed
 - ⚙️ **Complete Pipeline**: Automated workflow from novel URL to finished audiobook
@@ -234,7 +234,7 @@ pytest tests/integration/
 - **Block 5 (Processor)**: ✅ Complete
 - **Block 6 (UI)**: ✅ Complete
 
-**Status**: ✅ MVP Complete (2025-12-10)
+**Status**: ✅ MVP Complete (2025-12-12)
 
 ## License
 
@@ -260,4 +260,4 @@ If you find this project helpful, consider supporting its development:
 ---
 
 **Version**: 0.1.0  
-**Last Updated**: 2025-12-10
+**Last Updated**: 2025-12-12
