@@ -7,8 +7,8 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
-from tts.providers.edge_tts_provider import EdgeTTSProvider
-from tts.providers.edge_tts_working_provider import EdgeTTSWorkingProvider
+from src.tts.providers.edge_tts_provider import EdgeTTSProvider  # type: ignore
+from src.tts.providers.edge_tts_working_provider import EdgeTTSWorkingProvider  # type: ignore
 
 async def test_providers():
     """Test both providers independently - both use system edge-tts but different API methods"""

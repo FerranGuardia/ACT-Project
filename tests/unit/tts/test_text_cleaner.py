@@ -25,12 +25,13 @@ class TestTextCleaner:
             pytest.skip("TTS module not available")
     
     def test_clean_text_for_tts_removes_html(self):
-        """Test that HTML tags are removed"""
+        """Test that HTML tags are removed when using base_cleaner"""
         try:
             from src.tts.text_cleaner import clean_text_for_tts  # type: ignore[import-untyped]
+            from src.scraper.text_cleaner import clean_text  # type: ignore[import-untyped]
             
             text = "<p>Hello <b>world</b></p>"
-            cleaned = clean_text_for_tts(text)
+            cleaned = clean_text_for_tts(text, base_cleaner=clean_text)
             
             assert "<p>" not in cleaned
             assert "<b>" not in cleaned

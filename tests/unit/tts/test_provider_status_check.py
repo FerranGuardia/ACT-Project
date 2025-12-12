@@ -85,7 +85,7 @@ class TestProviderStatusCheck:
             'scraper.generic_scraper': MagicMock(),
             'scraper.base_scraper': MagicMock(),
         }):
-            from ui.views import tts_view  # type: ignore[import-untyped]
+            from src.ui.views import tts_view  # type: ignore[import-untyped]
             ProviderStatusCheckThread = tts_view.ProviderStatusCheckThread  # type: ignore[attr-defined]
         
         # Create a temporary file that will exist
@@ -107,7 +107,7 @@ class TestProviderStatusCheck:
             thread = ProviderStatusCheckThread(self.provider_manager, "pyttsx3")
             
             # Mock tempfile to return our existing file
-            with patch('ui.views.tts_view.tempfile.NamedTemporaryFile') as mock_temp:
+            with patch('src.ui.views.tts_view.tempfile.NamedTemporaryFile') as mock_temp:
                 mock_temp.return_value.__enter__.return_value.name = str(temp_path)
                 
                 # Capture the signal
@@ -141,10 +141,10 @@ class TestProviderStatusCheck:
     def test_provider_returns_true_but_no_file(self):
         """Test that status check fails if convert_text_to_speech returns True but no file exists."""
         # Import here with proper patching
-        with patch('ui.views.tts_view.TTSEngine'), \
-             patch('ui.views.tts_view.VoiceManager'), \
-             patch('ui.views.tts_view.TTSProviderManager'), \
-             patch('ui.views.tts_view.logger'):
+        with patch('src.ui.views.tts_view.TTSEngine'), \
+             patch('src.ui.views.tts_view.VoiceManager'), \
+             patch('src.ui.views.tts_view.TTSProviderManager'), \
+             patch('src.ui.views.tts_view.logger'):
             from ui.views.tts_view import ProviderStatusCheckThread  # type: ignore[import-untyped]
         
         # Create a temporary file path that won't exist
@@ -166,7 +166,7 @@ class TestProviderStatusCheck:
         thread = ProviderStatusCheckThread(self.provider_manager, "edge_tts")
         
         # Mock tempfile to return our non-existent file path
-        with patch('ui.views.tts_view.tempfile.NamedTemporaryFile') as mock_temp:
+        with patch('src.ui.views.tts_view.tempfile.NamedTemporaryFile') as mock_temp:
             mock_temp.return_value.__enter__.return_value.name = str(temp_path)
             
             # Capture the signal
@@ -196,10 +196,10 @@ class TestProviderStatusCheck:
     def test_edge_tts_working_status_check(self):
         """Test status check for edge_tts_working provider."""
         # Import here with proper patching
-        with patch('ui.views.tts_view.TTSEngine'), \
-             patch('ui.views.tts_view.VoiceManager'), \
-             patch('ui.views.tts_view.TTSProviderManager'), \
-             patch('ui.views.tts_view.logger'):
+        with patch('src.ui.views.tts_view.TTSEngine'), \
+             patch('src.ui.views.tts_view.VoiceManager'), \
+             patch('src.ui.views.tts_view.TTSProviderManager'), \
+             patch('src.ui.views.tts_view.logger'):
             from ui.views.tts_view import ProviderStatusCheckThread  # type: ignore[import-untyped]
         
         # Create a temporary file with content
@@ -220,7 +220,7 @@ class TestProviderStatusCheck:
             thread = ProviderStatusCheckThread(self.provider_manager, "edge_tts_working")
             
             # Mock tempfile
-            with patch('ui.views.tts_view.tempfile.NamedTemporaryFile') as mock_temp:
+            with patch('src.ui.views.tts_view.tempfile.NamedTemporaryFile') as mock_temp:
                 mock_temp.return_value.__enter__.return_value.name = str(temp_path)
                 
                 # Capture the signal
@@ -261,10 +261,10 @@ class TestProviderStatusCheck:
     def test_provider_unavailable(self):
         """Test status check when provider is unavailable."""
         # Import here with proper patching
-        with patch('ui.views.tts_view.TTSEngine'), \
-             patch('ui.views.tts_view.VoiceManager'), \
-             patch('ui.views.tts_view.TTSProviderManager'), \
-             patch('ui.views.tts_view.logger'):
+        with patch('src.ui.views.tts_view.TTSEngine'), \
+             patch('src.ui.views.tts_view.VoiceManager'), \
+             patch('src.ui.views.tts_view.TTSProviderManager'), \
+             patch('src.ui.views.tts_view.logger'):
             from ui.views.tts_view import ProviderStatusCheckThread  # type: ignore[import-untyped]
         
         # Create mock provider that is not available
@@ -306,10 +306,10 @@ class TestProviderStatusCheck:
     def test_provider_no_voices(self):
         """Test status check when provider has no voices."""
         # Import here with proper patching
-        with patch('ui.views.tts_view.TTSEngine'), \
-             patch('ui.views.tts_view.VoiceManager'), \
-             patch('ui.views.tts_view.TTSProviderManager'), \
-             patch('ui.views.tts_view.logger'):
+        with patch('src.ui.views.tts_view.TTSEngine'), \
+             patch('src.ui.views.tts_view.VoiceManager'), \
+             patch('src.ui.views.tts_view.TTSProviderManager'), \
+             patch('src.ui.views.tts_view.logger'):
             from ui.views.tts_view import ProviderStatusCheckThread  # type: ignore[import-untyped]
         
         # Create mock provider with no voices
@@ -351,10 +351,10 @@ class TestProviderStatusCheck:
     def test_provider_exception_handling(self):
         """Test status check exception handling."""
         # Import here with proper patching
-        with patch('ui.views.tts_view.TTSEngine'), \
-             patch('ui.views.tts_view.VoiceManager'), \
-             patch('ui.views.tts_view.TTSProviderManager'), \
-             patch('ui.views.tts_view.logger'):
+        with patch('src.ui.views.tts_view.TTSEngine'), \
+             patch('src.ui.views.tts_view.VoiceManager'), \
+             patch('src.ui.views.tts_view.TTSProviderManager'), \
+             patch('src.ui.views.tts_view.logger'):
             from ui.views.tts_view import ProviderStatusCheckThread  # type: ignore[import-untyped]
         
         # Create mock provider that raises exception
@@ -392,10 +392,10 @@ class TestProviderStatusCheck:
     def test_pyttsx3_delayed_file_creation(self):
         """Test that pyttsx3 status check waits for file creation."""
         # Import here with proper patching
-        with patch('ui.views.tts_view.TTSEngine'), \
-             patch('ui.views.tts_view.VoiceManager'), \
-             patch('ui.views.tts_view.TTSProviderManager'), \
-             patch('ui.views.tts_view.logger'):
+        with patch('src.ui.views.tts_view.TTSEngine'), \
+             patch('src.ui.views.tts_view.VoiceManager'), \
+             patch('src.ui.views.tts_view.TTSProviderManager'), \
+             patch('src.ui.views.tts_view.logger'):
             from ui.views.tts_view import ProviderStatusCheckThread  # type: ignore[import-untyped]
         
         # Create a temporary file path
@@ -415,7 +415,7 @@ class TestProviderStatusCheck:
             thread = ProviderStatusCheckThread(self.provider_manager, "pyttsx3")
             
             # Mock tempfile
-            with patch('ui.views.tts_view.tempfile.NamedTemporaryFile') as mock_temp:
+            with patch('src.ui.views.tts_view.tempfile.NamedTemporaryFile') as mock_temp:
                 mock_temp.return_value.__enter__.return_value.name = str(temp_path)
                 
                 # Capture the signal

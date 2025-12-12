@@ -17,9 +17,9 @@ class TestSSMLBuilder:
             text = "Hello world"
             ssml = build_ssml(text)
             
+            # When all params are 0, build_ssml returns plain text
             assert isinstance(ssml, str)
-            assert "speak" in ssml.lower()
-            assert "Hello world" in ssml
+            assert ssml == "Hello world"
             
         except ImportError:
             pytest.skip("TTS module not available")

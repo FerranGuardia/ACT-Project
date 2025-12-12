@@ -13,7 +13,7 @@ class TestVoiceManager:
     def test_voice_manager_initialization(self):
         """Test that VoiceManager initializes correctly"""
         try:
-            from tts.voice_manager import VoiceManager
+            from src.tts.voice_manager import VoiceManager  # type: ignore
             
             manager = VoiceManager()
             
@@ -26,7 +26,7 @@ class TestVoiceManager:
     def test_get_voices(self):
         """Test getting all voices"""
         try:
-            from tts.voice_manager import VoiceManager
+            from src.tts.voice_manager import VoiceManager  # type: ignore
             
             manager = VoiceManager()
             voices = manager.get_voices()
@@ -47,7 +47,7 @@ class TestVoiceManager:
     def test_get_voices_by_locale(self):
         """Test filtering voices by locale"""
         try:
-            from tts.voice_manager import VoiceManager
+            from src.tts.voice_manager import VoiceManager  # type: ignore
             
             manager = VoiceManager()
             english_voices = manager.get_voices(locale="en-US")
@@ -65,7 +65,7 @@ class TestVoiceManager:
     def test_get_voice_by_name(self):
         """Test getting a specific voice by name"""
         try:
-            from tts.voice_manager import VoiceManager
+            from src.tts.voice_manager import VoiceManager  # type: ignore
             
             manager = VoiceManager()
             voice = manager.get_voice_by_name("en-US-AndrewNeural")
@@ -84,7 +84,7 @@ class TestVoiceManager:
     def test_get_voice_by_name_not_found(self):
         """Test getting non-existent voice"""
         try:
-            from tts.voice_manager import VoiceManager
+            from src.tts.voice_manager import VoiceManager  # type: ignore
             
             manager = VoiceManager()
             voice = manager.get_voice_by_name("nonexistent-voice-12345")
@@ -97,7 +97,7 @@ class TestVoiceManager:
     def test_get_voice_list(self):
         """Test getting formatted voice list"""
         try:
-            from tts.voice_manager import VoiceManager
+            from src.tts.voice_manager import VoiceManager  # type: ignore
             
             manager = VoiceManager()
             voice_list = manager.get_voice_list()
@@ -115,7 +115,7 @@ class TestVoiceManager:
     def test_get_voice_list_by_locale(self):
         """Test getting formatted voice list filtered by locale"""
         try:
-            from tts.voice_manager import VoiceManager
+            from src.tts.voice_manager import VoiceManager  # type: ignore
             
             manager = VoiceManager()
             voice_list = manager.get_voice_list(locale="en-US")

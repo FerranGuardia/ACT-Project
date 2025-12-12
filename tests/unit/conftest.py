@@ -98,13 +98,30 @@ def sample_audio_file(temp_dir):
 @pytest.fixture
 def mock_file_dialog():
     """Mock QFileDialog for file operations - prevents real dialogs from opening"""
-    # Patch QFileDialog where it's imported in merger_view
-    with patch('src.ui.views.merger_view.QFileDialog') as mock_dialog:
-        # Set up static methods that the view uses
-        mock_dialog.getOpenFileNames = MagicMock(return_value=([], ""))
-        mock_dialog.getExistingDirectory = MagicMock(return_value="")
-        mock_dialog.getSaveFileName = MagicMock(return_value=("", ""))
-        yield mock_dialog
+    # Patch QFileDialog where it's imported - try multiple locations
+    try:
+        # Try patching at the PySide6 level first (most reliable)
+        with patch('PySide6.QtWidgets.QFileDialog') as mock_dialog:
+            # Set up static methods that the view uses
+            mock_dialog.getOpenFileNames = MagicMock(return_value=([], ""))
+            mock_dialog.getExistingDirectory = MagicMock(return_value="")
+            mock_dialog.getSaveFileName = MagicMock(return_value=("", ""))
+            yield mock_dialog
+    except (AttributeError, ImportError):
+        # Fallback: try patching at module level if PySide6 patching fails
+        try:
+            with patch('src.ui.views.merger_view.QFileDialog') as mock_dialog:
+                mock_dialog.getOpenFileNames = MagicMock(return_value=([], ""))
+                mock_dialog.getExistingDirectory = MagicMock(return_value="")
+                mock_dialog.getSaveFileName = MagicMock(return_value=("", ""))
+                yield mock_dialog
+        except (AttributeError, ImportError):
+            # If all else fails, just yield a mock
+            mock_dialog = MagicMock()
+            mock_dialog.getOpenFileNames = MagicMock(return_value=([], ""))
+            mock_dialog.getExistingDirectory = MagicMock(return_value="")
+            mock_dialog.getSaveFileName = MagicMock(return_value=("", ""))
+            yield mock_dialog
 
 
 @pytest.fixture

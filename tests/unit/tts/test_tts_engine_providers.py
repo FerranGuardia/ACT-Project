@@ -71,6 +71,15 @@ pyttsx3_module = importlib.util.module_from_spec(spec_pyttsx3)
 sys.modules["tts.providers.pyttsx3_provider"] = pyttsx3_module
 spec_pyttsx3.loader.exec_module(pyttsx3_module)
 
+# Load edge_tts_working_provider (required by provider_manager)
+edge_tts_working_path = act_src / "tts" / "providers" / "edge_tts_working_provider.py"
+spec_edge_working = importlib.util.spec_from_file_location("tts.providers.edge_tts_working_provider", edge_tts_working_path)
+if spec_edge_working is None or spec_edge_working.loader is None:
+    raise ImportError(f"Could not load spec for edge_tts_working_provider from {edge_tts_working_path}")
+edge_tts_working_module = importlib.util.module_from_spec(spec_edge_working)
+sys.modules["tts.providers.edge_tts_working_provider"] = edge_tts_working_module
+spec_edge_working.loader.exec_module(edge_tts_working_module)
+
 # Load provider_manager
 provider_manager_path = act_src / "tts" / "providers" / "provider_manager.py"
 spec = importlib.util.spec_from_file_location("tts.providers.provider_manager", provider_manager_path)
@@ -220,12 +229,19 @@ class TestTTSEngineProviders:
     @patch('tts.tts_engine.VoiceManager')
     def test_convert_text_to_speech_without_provider(self, mock_vm_class, mock_pm_class):
         """Test convert_text_to_speech without provider (uses fallback)"""
+        mock_provider = MagicMock()
+        mock_provider.is_available.return_value = True
+        mock_provider.convert_text_to_speech.return_value = True
+        
         mock_pm = MagicMock()
+        # When provider is extracted from voice metadata, get_provider is called
+        mock_pm.get_provider.return_value = mock_provider
         mock_pm.convert_with_fallback.return_value = True
         mock_pm_class.return_value = mock_pm
         
         mock_vm = MagicMock()
-        mock_voice = {"id": "voice1", "name": "Voice 1", "provider": "edge_tts"}
+        # Voice without provider in metadata to test fallback path
+        mock_voice = {"id": "voice1", "name": "Voice 1"}
         mock_vm.get_voice_by_name.return_value = mock_voice
         mock_vm_class.return_value = mock_vm
         
@@ -279,8 +295,12 @@ class TestTTSEngineProviders:
     @patch('tts.tts_engine.VoiceManager')
     def test_convert_file_to_speech_with_provider(self, mock_vm_class, mock_pm_class):
         """Test convert_file_to_speech with provider parameter"""
+        mock_provider = MagicMock()
+        mock_provider.is_available.return_value = True
+        mock_provider.convert_text_to_speech.return_value = True
+        
         mock_pm = MagicMock()
-        mock_pm.convert_with_fallback.return_value = True
+        mock_pm.get_provider.return_value = mock_provider
         mock_pm_class.return_value = mock_pm
         
         mock_vm = MagicMock()
@@ -303,5 +323,6 @@ class TestTTSEngineProviders:
             )
         
         assert result is True
-        mock_pm.convert_with_fallback.assert_called_once()
+        mock_pm.get_provider.assert_called_with("edge_tts")
+        mock_provider.convert_text_to_speech.assert_called_once()
 
