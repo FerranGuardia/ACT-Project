@@ -1,6 +1,6 @@
 # Block 2: Scraper Module
 
-**Status**: ✅ **COMPLETE** (with ongoing improvements)  
+**Status**: **COMPLETE** (with ongoing improvements)  
 **Last Updated**: 2025-12-12  
 **Location**: `src/scraper/`
 
@@ -38,11 +38,11 @@ Web scraping module for extracting novel content from various webnovel sites. Su
      5. Follow "next" links (slow but reliable)
    - Failsafe fallback strategy
    - **Recent Improvements** (2025-01-27):
-     - ✅ Retry logic with exponential backoff for transient errors
-     - ✅ Rate limiting between requests (reduces blocking risk)
-     - ✅ Network idle waiting (replaces fixed delays, more reliable)
-     - ✅ Progress tracking for pagination visits
-     - ✅ Enhanced Cloudflare challenge handling
+     -  Retry logic with exponential backoff for transient errors
+     -  Rate limiting between requests (reduces blocking risk)
+     -  Network idle waiting (replaces fixed delays, more reliable)
+     -  Progress tracking for pagination visits
+     -  Enhanced Cloudflare challenge handling
 
 5. **`ContentScraper`** (`content_scraper.py`)
    - Scrapes chapter content and titles
@@ -72,14 +72,14 @@ content = scraper.scrape_chapter(chapter_url)
 ## Testing
 
 **Test Location**: `tests/unit/`
-- ✅ `test_text_cleaner.py` - Text cleaner tests
-- ✅ `test_chapter_parser.py` - Chapter parser tests
+-  `test_text_cleaner.py` - Text cleaner tests
+-  `test_chapter_parser.py` - Chapter parser tests
 
 **Playwright Integration Tests**: `ACT REFERENCES/TESTS/TEST_SCRIPTS/`
-- ✅ `test_playwright_novelfull_full.py` - Full chapter fetch test for NovelFull
-- ✅ `test_playwright_simple.py` - Basic Playwright functionality test
-- ✅ `test_playwright_quick.py` - Quick Playwright test
-- ✅ `test_playwright_novelfull.py` - NovelFull-specific Playwright test
+-  `test_playwright_novelfull_full.py` - Full chapter fetch test for NovelFull
+-  `test_playwright_simple.py` - Basic Playwright functionality test
+-  `test_playwright_quick.py` - Quick Playwright test
+-  `test_playwright_novelfull.py` - NovelFull-specific Playwright test
 
 ---
 

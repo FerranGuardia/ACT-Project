@@ -1,25 +1,25 @@
-# 🎙️ ACT - Audiobook Creator Tools
+# ACT - Audiobook Creator Tools
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-MVP%20Complete-success)](https://github.com/FerranGuardia/ACT-Project)
+[![Status](https://img.shields.io/badge/Status-v1.0.0-success)](https://github.com/FerranGuardia/ACT-Project)
 
 A complete and modular Python tool for creating audiobooks from webnovels using AI voices. Transform your favorite web novels into high-quality audiobooks with automated scraping, multi-provider text-to-speech, and a modern GUI.
 
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/ferrangp)
 
-## ✨ Features
+## Features
 
-- 🔍 **Automated Scraping**: Extracts content from webnovel sites (NovelFull, NovelBin, etc.)
-- 🎤 **Multi-Provider Text-to-Speech**: Converts text to audio using:
+- **Automated Scraping**: Extracts content from webnovel sites (NovelFull, NovelBin, etc.)
+- **Multi-Provider Text-to-Speech**: Converts text to audio using:
   - **Edge TTS** (Cloud, high quality, free) - Standard and alternative methods
   - **pyttsx3** (Offline, system voices, fallback)
-- 🔄 **Automatic Fallback**: Seamlessly switches between TTS providers when needed
-- ⚙️ **Complete Pipeline**: Automated workflow from novel URL to finished audiobook
-- 🖥️ **Modern GUI**: PySide6-based interface with 4 operational modes
-- 💾 **Project Management**: Save, load, and resume projects
-- 📋 **Queue System**: Process multiple novels in sequence
-- 📊 **Progress Tracking**: Real-time progress updates and status monitoring
+- **Automatic Fallback**: Seamlessly switches between TTS providers when needed
+- **Complete Pipeline**: Automated workflow from novel URL to finished audiobook
+- **Modern GUI**: PySide6-based interface with 4 operational modes
+- **Project Management**: Save, load, and resume projects
+- **Queue System**: Process multiple novels in sequence
+- **Progress Tracking**: Real-time progress updates and status monitoring
 
 ## Requirements
 
@@ -227,29 +227,29 @@ pytest tests/integration/
 
 ### Project Status
 
-- **Block 1 (Core)**: ✅ Complete
-- **Block 2 (Scraper)**: ✅ Complete
-- **Block 3 (TTS)**: ✅ Complete (Multi-provider with fallback)
-- **Block 4 (Editor)**: ⚠️ Optional, not implemented
-- **Block 5 (Processor)**: ✅ Complete
-- **Block 6 (UI)**: ✅ Complete
+- **Block 1 (Core)**: Complete
+- **Block 2 (Scraper)**: Complete
+- **Block 3 (TTS)**: Complete (Multi-provider with fallback)
+- **Block 4 (Editor)**: Optional, not implemented
+- **Block 5 (Processor)**: Complete
+- **Block 6 (UI)**: Complete
 
-**Status**: ✅ MVP Complete (2025-12-12)
+**Status**: v1.0.0 Complete
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
 
-## 🐛 Issues & Support
+## Issues & Support
 
 For issues, questions, or feature requests, please open an issue on the [GitHub Issues](https://github.com/FerranGuardia/ACT-Project/issues) page.
 
-## ☕ Support This Project
+## Support This Project
 
 If you find this project helpful, consider supporting its development:
 
@@ -259,5 +259,5 @@ If you find this project helpful, consider supporting its development:
 
 ---
 
-**Version**: 0.1.0  
+**Version**: 1.0.0  
 **Last Updated**: 2025-12-12

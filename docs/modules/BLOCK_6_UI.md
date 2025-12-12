@@ -1,6 +1,6 @@
 # Block 6: UI Module
 
-**Status**: ✅ **COMPLETE & TESTED**  
+**Status**: **COMPLETE & TESTED**  
 **Last Updated**: 2025-12-12  
 **Location**: `src/ui/`  
 **Technology**: PySide6 (migrated from PyQt6 for MIT license compatibility)
@@ -12,8 +12,8 @@
 Complete graphical user interface for ACT with 4 operational modes and a queue-based full automation system.
 
 ### Test Status
-- **Unit Tests**: 88 tests, all passing ✅
-- **Integration Tests**: 18 tests created ✅
+- **Unit Tests**: 88 tests, all passing
+- **Integration Tests**: 18 tests created
 - **Test Location**: `ACT REFERENCES/TESTS/unit/ui/` and `ACT REFERENCES/TESTS/integration/ui/`
 
 ---
@@ -163,7 +163,7 @@ src/ui/
 
 ### Unit Tests
 **Location**: `ACT REFERENCES/TESTS/unit/ui/`  
-**Status**: ✅ 88 tests, all passing
+**Status**:  88 tests, all passing
 
 **Coverage**:
 - Landing Page (7 tests)
@@ -175,7 +175,7 @@ src/ui/
 
 ### Integration Tests
 **Location**: `ACT REFERENCES/TESTS/integration/ui/`  
-**Status**: ✅ 18 tests created
+**Status**:  18 tests created
 
 **Coverage**:
 - Scraper View with real GenericScraper
