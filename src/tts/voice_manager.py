@@ -8,7 +8,7 @@ import asyncio
 import json
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 from core.config_manager import get_config
 from core.logger import get_logger
@@ -39,10 +39,10 @@ class VoiceManager:
         cache_dir.mkdir(parents=True, exist_ok=True)
         self.cache_file = cache_dir / "voices_cache.json"
         
-        self._voices: List[Dict] = []
+        self._voices: List[Dict[str, Any]] = []
         self._voices_loaded = False
 
-    def get_voices(self, locale: Optional[str] = None, provider: Optional[str] = None) -> List[Dict]:
+    def get_voices(self, locale: Optional[str] = None, provider: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Get available voices, optionally filtered by locale and provider.
 
@@ -88,7 +88,7 @@ class VoiceManager:
             result.append(f"{name} - {gender}")
         return result
 
-    def get_voice_by_name(self, voice_name: str, provider: Optional[str] = None) -> Optional[Dict]:
+    def get_voice_by_name(self, voice_name: str, provider: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         Get voice dictionary by name or ID.
 
@@ -128,7 +128,7 @@ class VoiceManager:
         """
         return self.provider_manager.get_providers()
     
-    def get_voices_by_provider(self, provider: str, locale: Optional[str] = None) -> List[Dict]:
+    def get_voices_by_provider(self, provider: str, locale: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Get voices from a specific provider.
 
@@ -214,7 +214,7 @@ class VoiceManager:
         except Exception as e:
             logger.error(f"Error refreshing voices: {e}")
 
-    def _load_cache(self) -> Optional[List[Dict]]:
+    def _load_cache(self) -> Optional[List[Dict[str, Any]]]:
         """Load voices from cache if valid."""
         try:
             if not self.cache_file.exists():
@@ -234,7 +234,7 @@ class VoiceManager:
             logger.warning(f"Error loading voice cache: {e}")
             return None
 
-    def _save_cache(self, voices: List[Dict]) -> None:
+    def _save_cache(self, voices: List[Dict[str, Any]]) -> None:
         """Save voices to cache."""
         try:
             cache_data = {
