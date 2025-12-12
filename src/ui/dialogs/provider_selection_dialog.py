@@ -28,15 +28,19 @@ logger = get_logger("ui.dialogs.provider_selection")
 PROVIDER_INFO = {
     "edge_tts": {
         "name": "Edge TTS",
-        "version": "7.2.0",
+        "version": "Library: 7.2.0",
         "type": "Cloud",
-        "description": "Microsoft Edge TTS (current version). High quality cloud-based TTS with many voices."
+        "description": "Microsoft Edge TTS using standard API method. Preferred implementation when working. Uses edge-tts library 7.2.0.",
+        "implementation": "standard",
+        "priority": 1  # Higher priority (preferred)
     },
     "edge_tts_working": {
-        "name": "Edge TTS (Working)",
-        "version": "7.2.0",
+        "name": "Edge TTS",
+        "version": "Library: 7.2.0",
         "type": "Cloud",
-        "description": "Edge TTS using Hugging Face demo method. Alternative implementation that may work when standard Edge TTS fails."
+        "description": "Edge TTS using Hugging Face demo method. Alternative implementation that may work when standard method fails. Uses same edge-tts library 7.2.0.",
+        "implementation": "alternative",
+        "priority": 2  # Lower priority (fallback)
     },
     "pyttsx3": {
         "name": "pyttsx3",
@@ -331,6 +335,19 @@ class ProviderSelectionDialog(QDialog):
             "tested": False
         }
         
+        # NEW: If both edge_tts implementations work, mark the preferred one
+        if provider_name in ["edge_tts", "edge_tts_working"]:
+            edge_tts_available = self.provider_status.get("edge_tts", {}).get("available", False)
+            edge_tts_working_available = self.provider_status.get("edge_tts_working", {}).get("available", False)
+            
+            # If both work, prefer edge_tts (standard method, priority 1)
+            if edge_tts_available and edge_tts_working_available:
+                # Update both items to show they're available
+                self._update_provider_item("edge_tts")
+                self._update_provider_item("edge_tts_working")
+                # Mark edge_tts as preferred
+                self._mark_preferred_provider("edge_tts")
+        
         # Update list item
         self._update_provider_item(provider_name)
         
@@ -351,6 +368,7 @@ class ProviderSelectionDialog(QDialog):
         name = info.get("name", provider_name)
         version = info.get("version", "")
         type_str = info.get("type", "")
+        implementation = info.get("implementation", "")
         
         status = self.provider_status.get(provider_name, {})
         is_available = status.get("available", False)
@@ -369,11 +387,23 @@ class ProviderSelectionDialog(QDialog):
             else:
                 indicator = "🔴"
         
+        # Add implementation indicator for edge_tts variants
+        impl_indicator = ""
+        if implementation == "standard":
+            impl_indicator = " (Standard Method)"
+        elif implementation == "alternative":
+            impl_indicator = " (Alternative Method)"
+        
+        # Check if this is the preferred provider (when both work)
+        preferred_marker = ""
+        if provider_name in ["edge_tts", "edge_tts_working"]:
+            edge_tts_available = self.provider_status.get("edge_tts", {}).get("available", False)
+            edge_tts_working_available = self.provider_status.get("edge_tts_working", {}).get("available", False)
+            if edge_tts_available and edge_tts_working_available and provider_name == "edge_tts":
+                preferred_marker = " ⭐"  # Preferred when both work
+        
         # Build item text
-        if tested:
-            item_text = f"{indicator} {name} {version} ({type_str}) - {message}"
-        else:
-            item_text = f"{indicator} {name} {version} ({type_str}) - {message}"
+        item_text = f"{indicator}{preferred_marker} {name}{impl_indicator} {version} ({type_str}) - {message}"
         
         # Find and update item
         for i in range(self.provider_list.count()):
@@ -381,6 +411,12 @@ class ProviderSelectionDialog(QDialog):
             if item.data(Qt.ItemDataRole.UserRole) == provider_name:
                 item.setText(item_text)
                 break
+    
+    def _mark_preferred_provider(self, provider_name: str):
+        """Mark a provider as preferred (when multiple work)."""
+        # The preferred marker is already added in _update_provider_item
+        # This method is kept for potential future enhancements
+        pass
     
     def _select_provider_by_name(self, provider_name: str):
         """Select a provider by name in the list."""
@@ -412,6 +448,17 @@ class ProviderSelectionDialog(QDialog):
         details = f"<b>{info.get('name', provider_name)}</b><br>"
         details += f"Version: {info.get('version', 'Unknown')}<br>"
         details += f"Type: {info.get('type', 'Unknown')}<br>"
+        
+        # Add implementation note for edge_tts variants
+        if provider_name in ["edge_tts", "edge_tts_working"]:
+            other_name = "edge_tts_working" if provider_name == "edge_tts" else "edge_tts"
+            other_status = self.provider_status.get(other_name, {})
+            if other_status.get("available", False):
+                other_info = PROVIDER_INFO.get(other_name, {})
+                other_impl = other_info.get("implementation", "")
+                impl_label = "Standard Method" if other_impl == "standard" else "Alternative Method"
+                details += f"<br><i>Note: Both Edge TTS implementations are available. You can switch between them by selecting the other one.</i><br>"
+        
         details += f"<br>{info.get('description', 'No description available')}<br>"
         details += f"<br><b>Status:</b> {status.get('message', 'Unknown')}"
         
@@ -449,6 +496,19 @@ class ProviderSelectionDialog(QDialog):
             self.provider_status[provider_name]["available"] = success
             self.provider_status[provider_name]["message"] = message
             self.provider_status[provider_name]["tested"] = True
+        
+        # NEW: If both edge_tts implementations work after testing, mark the preferred one
+        if provider_name in ["edge_tts", "edge_tts_working"]:
+            edge_tts_available = self.provider_status.get("edge_tts", {}).get("available", False)
+            edge_tts_working_available = self.provider_status.get("edge_tts_working", {}).get("available", False)
+            
+            # If both work, prefer edge_tts (standard method, priority 1)
+            if edge_tts_available and edge_tts_working_available:
+                # Update both items to show they're available
+                self._update_provider_item("edge_tts")
+                self._update_provider_item("edge_tts_working")
+                # Mark edge_tts as preferred
+                self._mark_preferred_provider("edge_tts")
         
         # Update UI
         self._update_provider_item(provider_name)
