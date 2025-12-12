@@ -6,25 +6,28 @@ Handles scraping chapter content and titles from individual chapter pages.
 
 import re
 import time
-from typing import Optional, Tuple, Callable
+from typing import Optional, Tuple, Callable, Any
 
 try:
-    from bs4 import BeautifulSoup
-    HAS_BS4 = True
+    from bs4 import BeautifulSoup  # type: ignore[import-untyped]
+    HAS_BS4: bool = True
 except ImportError:
-    HAS_BS4 = False
+    HAS_BS4 = False  # type: ignore[constant-redefinition]
+    BeautifulSoup = None  # type: ignore[assignment, misc]
 
 try:
-    import requests
-    HAS_REQUESTS = True
+    import requests  # type: ignore[import-untyped]
+    HAS_REQUESTS: bool = True
 except ImportError:
-    HAS_REQUESTS = False
+    HAS_REQUESTS = False  # type: ignore[constant-redefinition]
+    requests = None  # type: ignore[assignment, misc]
 
 try:
-    import cloudscraper
-    HAS_CLOUDSCRAPER = True
+    import cloudscraper  # type: ignore[import-untyped]
+    HAS_CLOUDSCRAPER: bool = True
 except ImportError:
-    HAS_CLOUDSCRAPER = False
+    HAS_CLOUDSCRAPER = False  # type: ignore[constant-redefinition]
+    cloudscraper = None  # type: ignore[assignment, misc]
 
 from .chapter_parser import extract_chapter_number
 from .text_cleaner import clean_text
@@ -61,14 +64,14 @@ class ContentScraper:
         self.delay = delay
         self._session = None
 
-    def get_session(self):
+    def get_session(self):  # type: ignore[return-type]
         """Get or create a requests session."""
         if self._session is None:
-            if HAS_CLOUDSCRAPER:
-                self._session = cloudscraper.create_scraper()
-            elif HAS_REQUESTS:
-                self._session = requests.Session()
-                self._session.headers.update({
+            if HAS_CLOUDSCRAPER and cloudscraper is not None:
+                self._session = cloudscraper.create_scraper()  # type: ignore[attr-defined, assignment]
+            elif HAS_REQUESTS and requests is not None:
+                self._session = requests.Session()  # type: ignore[attr-defined, assignment]
+                self._session.headers.update({  # type: ignore[attr-defined]
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                 })
             else:
@@ -101,7 +104,7 @@ class ContentScraper:
 
     def _scrape_with_requests(self, chapter_url: str, should_stop: Optional[Callable[[], bool]] = None) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         """Scrape using requests/BeautifulSoup."""
-        if not HAS_BS4:
+        if not HAS_BS4 or BeautifulSoup is None:
             return None, None, "BeautifulSoup4 not available"
         
         session = self.get_session()
@@ -116,13 +119,15 @@ class ContentScraper:
             return None, None, "Stopped by user"
         
         # Make request
-        response = session.get(chapter_url, timeout=self.timeout, allow_redirects=True)
+        response = session.get(chapter_url, timeout=self.timeout, allow_redirects=True)  # type: ignore[attr-defined]
         
-        if response.status_code != 200:
+        if response.status_code != 200:  # type: ignore[attr-defined]
             return None, None, f"HTTP {response.status_code}"
         
         # Parse HTML
-        soup = BeautifulSoup(response.content, "html.parser")
+        # response.content is bytes, BeautifulSoup accepts bytes
+        html_content: bytes = response.content  # type: ignore[attr-defined]
+        soup = BeautifulSoup(html_content, "html.parser")  # type: ignore[arg-type, assignment]
         
         # Extract content and title
         content = self._extract_content(soup, should_stop)
@@ -136,7 +141,7 @@ class ContentScraper:
         
         return cleaned_content, title, None
 
-    def _extract_title(self, soup, chapter_url: str) -> str:
+    def _extract_title(self, soup: Any, chapter_url: str) -> str:
         """
         Extract chapter title from soup, trying all selectors.
         
@@ -149,9 +154,10 @@ class ContentScraper:
         """
         # Try selectors from config
         for selector in TITLE_SELECTORS:
-            title_elem = soup.select_one(selector)
+            title_elem = soup.select_one(selector)  # type: ignore[attr-defined]
             if title_elem:
-                title_text = title_elem.get_text(strip=True)
+                title_text_raw = title_elem.get_text(strip=True)  # type: ignore[attr-defined]
+                title_text: str = str(title_text_raw) if title_text_raw is not None else ""
                 # Clean title
                 title_text = re.sub(r"^(Chapter\s+\d+[:\s]*)?", "", title_text, flags=re.I)
                 title_text = re.sub(r"\s*-\s*.*novel.*$", "", title_text, flags=re.I)
@@ -166,7 +172,7 @@ class ContentScraper:
         
         return "Chapter 1"
 
-    def _extract_content(self, soup, should_stop: Optional[Callable[[], bool]] = None) -> Optional[str]:
+    def _extract_content(self, soup: Any, should_stop: Optional[Callable[[], bool]] = None) -> Optional[str]:
         """
         Extract chapter content from soup, trying all selectors.
         
@@ -178,30 +184,31 @@ class ContentScraper:
             Extracted content text, or None if not found
         """
         # Try content selectors
-        content_elem = None
+        content_elem: Any = None
         for selector in CONTENT_SELECTORS:
-            content_elem = soup.select_one(selector)
+            content_elem = soup.select_one(selector)  # type: ignore[attr-defined]
             if content_elem:
                 break
         
         if not content_elem:
             # Fallback: find by class/id patterns
-            content_elem = soup.find("div", class_=re.compile("content|chapter|text", re.I))
+            content_elem = soup.find("div", class_=re.compile("content|chapter|text", re.I))  # type: ignore[attr-defined]
         if not content_elem:
-            content_elem = soup.find("article")
+            content_elem = soup.find("article")  # type: ignore[attr-defined]
         if not content_elem:
-            content_elem = soup.find("body")
+            content_elem = soup.find("body")  # type: ignore[attr-defined]
         
         if not content_elem:
             return None
         
         # Extract paragraphs
-        paragraphs = content_elem.find_all(["p", "div"])
-        text_parts = []
+        paragraphs = content_elem.find_all(["p", "div"])  # type: ignore[attr-defined]
+        text_parts: list[str] = []
         for p in paragraphs:
             if should_stop and should_stop():
                 return None
-            text = p.get_text(strip=True)
+            text_raw = p.get_text(strip=True)  # type: ignore[attr-defined]
+            text: str = str(text_raw) if text_raw is not None else ""
             if text and len(text) > 20:
                 # Filter out navigation/UI elements
                 if not re.search(
@@ -213,9 +220,10 @@ class ContentScraper:
         
         if not text_parts:
             # Fallback: get all text
-            text = content_elem.get_text(separator="\n", strip=True)
+            text_raw = content_elem.get_text(separator="\n", strip=True)  # type: ignore[attr-defined]
+            text = str(text_raw) if text_raw is not None else ""
             if text and len(text) > 50:
-                lines = [
+                lines: list[str] = [
                     line.strip()
                     for line in text.split("\n")
                     if line.strip() and len(line.strip()) > 20

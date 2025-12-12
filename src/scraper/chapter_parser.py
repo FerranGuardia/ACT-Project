@@ -6,7 +6,7 @@ and analyze chapter numbering patterns.
 """
 
 import re
-from typing import Optional, List, Dict, Callable
+from typing import Optional, List, Dict, Any
 from urllib.parse import urljoin
 
 from .config import CHAPTER_URL_PATTERN, NOVEL_ID_PATTERNS
@@ -154,7 +154,7 @@ def extract_novel_id(url: str) -> Optional[str]:
     return None
 
 
-def analyze_chapter_numbering(chapter_urls: List[str]) -> Dict:
+def analyze_chapter_numbering(chapter_urls: List[str]) -> Dict[str, Any]:
     """
     Analyze chapter numbering pattern to detect weird formats.
 
@@ -170,12 +170,12 @@ def analyze_chapter_numbering(chapter_urls: List[str]) -> Dict:
     if not chapter_urls:
         return {
             "pattern": "standard",
-            "normalizer": lambda x: x,
+            "normalizer": lambda x: x,  # type: ignore[return-value]
             "examples": [],
         }
 
     # Extract raw chapter numbers
-    raw_numbers = []
+    raw_numbers: List[str] = []
     for url in chapter_urls[:20]:  # Sample first 20
         raw = extract_raw_chapter_number(url)
         if raw:
@@ -184,33 +184,34 @@ def analyze_chapter_numbering(chapter_urls: List[str]) -> Dict:
     if not raw_numbers:
         return {
             "pattern": "standard",
-            "normalizer": lambda x: x,
+            "normalizer": lambda x: x,  # type: ignore[return-value]
             "examples": [],
         }
 
     # Check for weird patterns (contains dash or underscore)
-    weird_count = sum(1 for num in raw_numbers if "-" in str(num) or "_" in str(num))
+    # raw_numbers is List[str], so num is str
+    weird_count = sum(1 for num in raw_numbers if "-" in num or "_" in num)
     total = len(raw_numbers)
 
     if weird_count == 0:
         # Standard numbering
         return {
             "pattern": "standard",
-            "normalizer": lambda x: extract_chapter_number(x) if isinstance(x, str) else x,
+            "normalizer": lambda x: extract_chapter_number(x) if isinstance(x, str) else x,  # type: ignore[return-value]
             "examples": raw_numbers[:5],
         }
     elif weird_count == total:
         # All weird
         return {
             "pattern": "weird",
-            "normalizer": lambda x: extract_chapter_number(x) if isinstance(x, str) else x,
+            "normalizer": lambda x: extract_chapter_number(x) if isinstance(x, str) else x,  # type: ignore[return-value]
             "examples": raw_numbers[:5],
         }
     else:
         # Mixed
         return {
             "pattern": "mixed",
-            "normalizer": lambda x: extract_chapter_number(x) if isinstance(x, str) else x,
+            "normalizer": lambda x: extract_chapter_number(x) if isinstance(x, str) else x,  # type: ignore[return-value]
             "examples": raw_numbers[:5],
         }
 
@@ -245,7 +246,7 @@ def extract_chapters_from_javascript(html: str, base_url: str) -> List[str]:
     import re
     from urllib.parse import urljoin
     
-    urls = []
+    urls: List[str] = []
     
     # Look for common JavaScript patterns with chapter URLs
     patterns = [
@@ -264,10 +265,12 @@ def extract_chapters_from_javascript(html: str, base_url: str) -> List[str]:
             for url_match in url_matches:
                 url = url_match.group(1)
                 if 'chapter' in url.lower():
-                    full_url = urljoin(base_url, url)
+                    full_url: str = urljoin(base_url, url)
                     urls.append(full_url)
     
-    return list(set(urls))  # Remove duplicates
+    # Remove duplicates - set() and list() work fine with List[str]
+    unique_urls: List[str] = list(set(urls))  # type: ignore[arg-type]
+    return unique_urls
 
 
 def extract_novel_id_from_html(html: str) -> Optional[str]:
@@ -283,8 +286,8 @@ def extract_novel_id_from_html(html: str) -> Optional[str]:
     import re
     
     try:
-        from bs4 import BeautifulSoup
-        soup = BeautifulSoup(html, 'html.parser')
+        from bs4 import BeautifulSoup  # type: ignore[import-untyped]
+        soup = BeautifulSoup(html, 'html.parser')  # type: ignore[assignment]
         
         # Try data attributes
         selectors = [
@@ -295,23 +298,25 @@ def extract_novel_id_from_html(html: str) -> Optional[str]:
         ]
         
         for selector in selectors:
-            tag = soup.select_one(selector)
+            tag = soup.select_one(selector)  # type: ignore[attr-defined]
             if tag:
-                novel_id = tag.get('data-novel-id') or tag.get('data-book-id') or tag.get('data-id')
+                novel_id: Optional[str] = tag.get('data-novel-id') or tag.get('data-book-id') or tag.get('data-id')  # type: ignore[attr-defined, assignment]
                 if novel_id:
                     return str(novel_id).strip()
         
         # Try JavaScript variables
-        scripts = soup.find_all('script')
+        scripts = soup.find_all('script')  # type: ignore[attr-defined]
         for script in scripts:
-            if script.string:
+            script_string_raw = script.string  # type: ignore[attr-defined]
+            if script_string_raw:
+                script_string: str = str(script_string_raw)
                 patterns = [
                     r'novelId["\']?\s*[:=]\s*["\']?([^"\']+)',
                     r'novel_id["\']?\s*[:=]\s*["\']?([^"\']+)',
                     r'bookId["\']?\s*[:=]\s*["\']?([^"\']+)',
                 ]
                 for pattern in patterns:
-                    match = re.search(pattern, script.string, re.IGNORECASE)
+                    match = re.search(pattern, script_string, re.IGNORECASE)
                     if match:
                         return match.group(1).strip().strip('"\'')
     except ImportError:
@@ -337,26 +342,28 @@ def discover_ajax_endpoints(html: str, base_url: str, novel_id: Optional[str] = 
     import re
     from urllib.parse import urljoin
     
-    endpoints = []
+    endpoints: List[str] = []
     base_url = base_url.rstrip('/')
     
     try:
-        from bs4 import BeautifulSoup
-        soup = BeautifulSoup(html, 'html.parser')
+        from bs4 import BeautifulSoup  # type: ignore[import-untyped]
+        soup = BeautifulSoup(html, 'html.parser')  # type: ignore[assignment]
         
         # Method 1: Check JavaScript variables
-        scripts = soup.find_all('script')
+        scripts = soup.find_all('script')  # type: ignore[attr-defined]
         for script in scripts:
-            if script.string:
+            script_string_raw = script.string  # type: ignore[attr-defined]
+            if script_string_raw:
+                script_string: str = str(script_string_raw)
                 patterns = [
                     r'ajaxChapterOptionUrl["\']?\s*[:=]\s*["\']?([^"\']+)',
                     r'chapterApiUrl["\']?\s*[:=]\s*["\']?([^"\']+)',
                     r'ajaxUrl["\']?\s*[:=]\s*["\']?([^"\']+)',
                 ]
                 for pattern in patterns:
-                    match = re.search(pattern, script.string, re.IGNORECASE)
+                    match = re.search(pattern, script_string, re.IGNORECASE)
                     if match:
-                        url = match.group(1)
+                        url: str = match.group(1)
                         if novel_id:
                             url = url.replace('{novelId}', novel_id).replace('{id}', novel_id)
                         if url.startswith('/'):
@@ -371,7 +378,7 @@ def discover_ajax_endpoints(html: str, base_url: str, novel_id: Optional[str] = 
     
     # Method 2: Common patterns (if novel_id provided)
     if novel_id:
-        common_patterns = [
+        common_patterns: List[str] = [
             f"{base_url}/ajax-chapter-option?novelId={novel_id}",
             f"{base_url}/ajax/chapter-archive?novelId={novel_id}",
             f"{base_url}/api/chapters?novel_id={novel_id}",
@@ -379,5 +386,6 @@ def discover_ajax_endpoints(html: str, base_url: str, novel_id: Optional[str] = 
         ]
         endpoints.extend(common_patterns)
     
-    # Remove duplicates
-    return list(dict.fromkeys(endpoints))
+    # Remove duplicates - dict.fromkeys preserves order and works with List[str]
+    unique_endpoints: List[str] = list(dict.fromkeys(endpoints))  # type: ignore[arg-type]
+    return unique_endpoints

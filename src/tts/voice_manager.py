@@ -89,8 +89,8 @@ class VoiceManager:
             name = str(name_raw) if name_raw is not None else "Unknown"
             gender_raw = v.get("gender", "") or v.get("Gender", "")  # type: ignore[arg-type]
             gender = str(gender_raw).capitalize() if gender_raw else ""
-            result.append(f"{name} - {gender}")  # type: ignore[arg-type]
-        return result  # type: ignore[return-value]
+            result.append(f"{name} - {gender}")
+        return result
 
     def get_voice_by_name(self, voice_name: str, provider: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
@@ -166,12 +166,13 @@ class VoiceManager:
             
             # Convert to legacy format for backward compatibility
             legacy_voices: List[Dict[str, Any]] = []
-            for voice in voices:
-                # Type ignore because voice is Dict[str, Any] but Pylance sees Dict[Unknown, Unknown]
-                id_raw = voice.get("id", "")  # type: ignore[arg-type]
-                name_raw = voice.get("name", "")  # type: ignore[arg-type]
-                language_raw = voice.get("language", "en-US")  # type: ignore[arg-type]
-                gender_raw = voice.get("gender", "neutral")  # type: ignore[arg-type]
+            # Type cast voices to help Pylance understand the structure
+            voices_typed: List[Dict[str, Any]] = voices  # type: ignore[assignment]
+            for voice in voices_typed:
+                id_raw = voice.get("id", "")
+                name_raw = voice.get("name", "")
+                language_raw = voice.get("language", "en-US")
+                gender_raw = voice.get("gender", "neutral")
                 
                 legacy_voice: Dict[str, Any] = {
                     "ShortName": str(id_raw) if id_raw is not None else "",
@@ -180,15 +181,15 @@ class VoiceManager:
                     "Gender": str(gender_raw).capitalize() if gender_raw else "Neutral",
                     "Name": str(name_raw) if name_raw is not None else "",
                 }
-                legacy_voices.append(legacy_voice)  # type: ignore[arg-type]
+                legacy_voices.append(legacy_voice)
             
             # Sort by ShortName
-            legacy_voices.sort(key=lambda x: str(x.get("ShortName", "")) if isinstance(x, dict) else "")  # type: ignore[arg-type, misc]
+            legacy_voices.sort(key=lambda x: str(x.get("ShortName", "")) if isinstance(x, dict) else "")
             self._voices = legacy_voices
             self._voices_loaded = True
             
             # Save to cache
-            self._save_cache(legacy_voices)  # type: ignore[arg-type]
+            self._save_cache(legacy_voices)
             
             logger.info(f"Loaded {len(legacy_voices)} voices from providers")
         except Exception as e:
@@ -205,12 +206,13 @@ class VoiceManager:
             
             # Convert to legacy format for backward compatibility
             legacy_voices: List[Dict[str, Any]] = []
-            for voice in voices:
-                # Type ignore because voice is Dict[str, Any] but Pylance sees Dict[Unknown, Unknown]
-                id_raw = voice.get("id", "")  # type: ignore[arg-type]
-                name_raw = voice.get("name", "")  # type: ignore[arg-type]
-                language_raw = voice.get("language", "en-US")  # type: ignore[arg-type]
-                gender_raw = voice.get("gender", "neutral")  # type: ignore[arg-type]
+            # Type cast voices to help Pylance understand the structure
+            voices_typed: List[Dict[str, Any]] = voices  # type: ignore[assignment]
+            for voice in voices_typed:
+                id_raw = voice.get("id", "")
+                name_raw = voice.get("name", "")
+                language_raw = voice.get("language", "en-US")
+                gender_raw = voice.get("gender", "neutral")
                 
                 legacy_voice: Dict[str, Any] = {
                     "ShortName": str(id_raw) if id_raw is not None else "",
@@ -219,15 +221,15 @@ class VoiceManager:
                     "Gender": str(gender_raw).capitalize() if gender_raw else "Neutral",
                     "Name": str(name_raw) if name_raw is not None else "",
                 }
-                legacy_voices.append(legacy_voice)  # type: ignore[arg-type]
+                legacy_voices.append(legacy_voice)
             
             # Sort by ShortName
-            legacy_voices.sort(key=lambda x: str(x.get("ShortName", "")) if isinstance(x, dict) else "")  # type: ignore[arg-type, misc]
+            legacy_voices.sort(key=lambda x: str(x.get("ShortName", "")) if isinstance(x, dict) else "")
             self._voices = legacy_voices
             self._voices_loaded = True
             
             # Update cache
-            self._save_cache(legacy_voices)  # type: ignore[arg-type]
+            self._save_cache(legacy_voices)
             
             logger.info(f"Refreshed {len(legacy_voices)} voices")
         except Exception as e:
@@ -240,12 +242,13 @@ class VoiceManager:
                 return None
 
             with open(self.cache_file, "r", encoding="utf-8") as f:
-                cached_data = json.load(f)
-                cache_time = cached_data.get("timestamp", 0)
+                cached_data: Dict[str, Any] = json.load(f)  # type: ignore[assignment]
+                cache_time: float = cached_data.get("timestamp", 0)  # type: ignore[assignment]
                 
                 # Check if cache is still valid
                 if time.time() - cache_time < self.cache_duration:
-                    return cached_data.get("voices", [])
+                    voices: List[Dict[str, Any]] = cached_data.get("voices", [])  # type: ignore[assignment]
+                    return voices
                 
                 logger.debug("Voice cache expired")
                 return None

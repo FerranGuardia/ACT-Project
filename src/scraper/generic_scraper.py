@@ -6,12 +6,11 @@ a unified interface for webnovel scraping.
 Works for most webnovel sites without site-specific code.
 """
 
-from typing import Optional, Tuple, List, Callable
+from typing import Optional, Tuple, List, Any
 
 from .base_scraper import BaseScraper
 from .url_fetcher import ChapterUrlFetcher
 from .content_scraper import ContentScraper
-from .config import REQUEST_TIMEOUT, REQUEST_DELAY
 from core.logger import get_logger
 
 logger = get_logger("scraper.generic_scraper")
@@ -26,7 +25,7 @@ class GenericScraper(BaseScraper):
     approaches in order of speed.
     """
 
-    def __init__(self, base_url: str, **kwargs):
+    def __init__(self, base_url: str, **kwargs: Any):
         """
         Initialize generic scraper.
         
@@ -67,12 +66,14 @@ class GenericScraper(BaseScraper):
         Returns:
             List of chapter URLs, sorted by chapter number
         """
-        urls, _ = self.url_fetcher.fetch(
+        result = self.url_fetcher.fetch(
             toc_url, 
-            should_stop=self.check_should_stop,
+            should_stop=self.check_should_stop,  # type: ignore[arg-type]
             min_chapter_number=min_chapter_number,
             max_chapter_number=max_chapter_number
         )
+        urls: List[str] = result[0]
+        _: Any = result[1]  # Metadata dict, unused
         return urls
 
 
@@ -92,5 +93,5 @@ class GenericScraper(BaseScraper):
             - title: Chapter title
             - error_message: Error message if scraping failed, None otherwise
         """
-        return self.content_scraper.scrape(chapter_url, should_stop=self.check_should_stop)
+        return self.content_scraper.scrape(chapter_url, should_stop=self.check_should_stop)  # type: ignore[arg-type]
 
