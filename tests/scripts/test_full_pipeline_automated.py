@@ -43,9 +43,9 @@ else:
     print(f"Expected structure: {act_src_path} should exist")
 
 try:
-    from processor.pipeline import ProcessingPipeline
-    from processor.progress_tracker import ProcessingStatus
-    from core.logger import get_logger
+    from src.processor.pipeline import ProcessingPipeline  # type: ignore
+    from src.processor.progress_tracker import ProcessingStatus  # type: ignore
+    from src.core.logger import get_logger  # type: ignore
     print("✓ Successfully imported ACT modules")
 except ImportError as e:
     print(f"\n✗ Error importing ACT modules: {e}")
@@ -173,7 +173,13 @@ class FullPipelineTester:
             # Track progress
             chapter_statuses = {}
             
-            def on_chapter_update(chapter_num: int, status: ProcessingStatus, message: str):
+            def on_chapter_update(chapter_num: int, status_str: str, message: str):
+                # Convert string status back to enum for comparison
+                try:
+                    status = ProcessingStatus(status_str)
+                except ValueError:
+                    status = ProcessingStatus.PENDING
+                
                 chapter_statuses[chapter_num] = (status, message)
                 if status == ProcessingStatus.SCRAPED:
                     result.chapters_scraped += 1
@@ -183,7 +189,7 @@ class FullPipelineTester:
                     result.chapters_failed += 1
                     result.errors.append(f"Chapter {chapter_num}: {message}")
             
-            pipeline.on_chapter_update = on_chapter_update
+            pipeline.on_chapter_update = on_chapter_update  # type: ignore[assignment]
             
             # Run full pipeline
             print(f"Starting pipeline for {title}...")
@@ -199,6 +205,10 @@ class FullPipelineTester:
             
             # Get chapter count
             chapter_manager = pipeline.project_manager.get_chapter_manager()
+            if chapter_manager is None:
+                result.errors.append("Chapter manager is None")
+                result.duration = time.time() - start_time
+                return result
             all_chapters = chapter_manager.get_all_chapters()
             result.chapters_found = len(all_chapters)
             
@@ -234,8 +244,8 @@ class FullPipelineTester:
             
             # Count files created
             file_manager = pipeline.file_manager
-            text_dir = file_manager.get_text_directory()
-            audio_dir = file_manager.get_audio_directory()
+            text_dir = file_manager.get_text_dir()
+            audio_dir = file_manager.get_audio_dir()
             
             if text_dir.exists():
                 result.text_files_created = len(list(text_dir.glob("*.txt")))

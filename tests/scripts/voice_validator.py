@@ -1,7 +1,7 @@
 """Utility to validate and find working Edge-TTS voices."""
 import asyncio
 import edge_tts
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 
 # Reliable voice alternatives in order of preference
 RELIABLE_VOICES = [
@@ -17,11 +17,11 @@ RELIABLE_VOICES = [
     "en-US-NancyNeural",     # Female - alternative
 ]
 
-async def get_available_voices() -> List[Dict]:
+async def get_available_voices() -> List[Dict[str, Any]]:
     """Get all available voices from Edge-TTS."""
     try:
-        voices = await edge_tts.list_voices()
-        return voices
+        voices = await edge_tts.list_voices()  # type: ignore[assignment]
+        return voices  # type: ignore[return-value]
     except Exception as e:
         print(f"Error fetching voices: {e}")
         return []
