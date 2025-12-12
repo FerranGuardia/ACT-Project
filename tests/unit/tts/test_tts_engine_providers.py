@@ -26,7 +26,7 @@ if "core.logger" not in sys.modules:
     mock_logger = MagicMock()
     mock_get_logger = MagicMock(return_value=mock_logger)
     logger_module = types.ModuleType("core.logger")
-    logger_module.get_logger = mock_get_logger
+    setattr(logger_module, "get_logger", mock_get_logger)  # type: ignore[attr-defined]
     sys.modules["core.logger"] = logger_module
 
 # Mock core.config_manager
@@ -35,7 +35,7 @@ if "core.config_manager" not in sys.modules:
     mock_config.get.return_value = "en-US-AndrewNeural"  # Default voice
     mock_get_config = MagicMock(return_value=mock_config)
     config_module = types.ModuleType("core.config_manager")
-    config_module.get_config = mock_get_config
+    setattr(config_module, "get_config", mock_get_config)  # type: ignore[attr-defined]
     sys.modules["core.config_manager"] = config_module
 
 # Set up package structure
@@ -47,6 +47,8 @@ if "tts.providers" not in sys.modules:
 # Load base_provider
 base_provider_path = act_src / "tts" / "providers" / "base_provider.py"
 spec_base = importlib.util.spec_from_file_location("tts.providers.base_provider", base_provider_path)
+if spec_base is None or spec_base.loader is None:
+    raise ImportError(f"Could not load spec for base_provider from {base_provider_path}")
 base_provider_module = importlib.util.module_from_spec(spec_base)
 sys.modules["tts.providers.base_provider"] = base_provider_module
 spec_base.loader.exec_module(base_provider_module)
@@ -55,12 +57,16 @@ ProviderType = base_provider_module.ProviderType
 # Load edge_tts_provider and pyttsx3_provider
 edge_tts_path = act_src / "tts" / "providers" / "edge_tts_provider.py"
 spec_edge = importlib.util.spec_from_file_location("tts.providers.edge_tts_provider", edge_tts_path)
+if spec_edge is None or spec_edge.loader is None:
+    raise ImportError(f"Could not load spec for edge_tts_provider from {edge_tts_path}")
 edge_tts_module = importlib.util.module_from_spec(spec_edge)
 sys.modules["tts.providers.edge_tts_provider"] = edge_tts_module
 spec_edge.loader.exec_module(edge_tts_module)
 
 pyttsx3_path = act_src / "tts" / "providers" / "pyttsx3_provider.py"
 spec_pyttsx3 = importlib.util.spec_from_file_location("tts.providers.pyttsx3_provider", pyttsx3_path)
+if spec_pyttsx3 is None or spec_pyttsx3.loader is None:
+    raise ImportError(f"Could not load spec for pyttsx3_provider from {pyttsx3_path}")
 pyttsx3_module = importlib.util.module_from_spec(spec_pyttsx3)
 sys.modules["tts.providers.pyttsx3_provider"] = pyttsx3_module
 spec_pyttsx3.loader.exec_module(pyttsx3_module)
@@ -68,6 +74,8 @@ spec_pyttsx3.loader.exec_module(pyttsx3_module)
 # Load provider_manager
 provider_manager_path = act_src / "tts" / "providers" / "provider_manager.py"
 spec = importlib.util.spec_from_file_location("tts.providers.provider_manager", provider_manager_path)
+if spec is None or spec.loader is None:
+    raise ImportError(f"Could not load spec for provider_manager from {provider_manager_path}")
 provider_manager_module = importlib.util.module_from_spec(spec)
 sys.modules["tts.providers.provider_manager"] = provider_manager_module
 spec.loader.exec_module(provider_manager_module)
@@ -76,6 +84,8 @@ TTSProviderManager = provider_manager_module.TTSProviderManager
 # Load voice_manager
 voice_manager_path = act_src / "tts" / "voice_manager.py"
 spec_vm = importlib.util.spec_from_file_location("tts.voice_manager", voice_manager_path)
+if spec_vm is None or spec_vm.loader is None:
+    raise ImportError(f"Could not load spec for voice_manager from {voice_manager_path}")
 voice_manager_module = importlib.util.module_from_spec(spec_vm)
 sys.modules["tts.voice_manager"] = voice_manager_module
 spec_vm.loader.exec_module(voice_manager_module)
@@ -83,20 +93,22 @@ spec_vm.loader.exec_module(voice_manager_module)
 # Mock text_cleaner and ssml_builder
 if "tts.text_cleaner" not in sys.modules:
     text_cleaner_module = types.ModuleType("tts.text_cleaner")
-    text_cleaner_module.clean_text_for_tts = lambda text, base_cleaner=None: text
+    setattr(text_cleaner_module, "clean_text_for_tts", lambda text, base_cleaner=None: text)  # type: ignore[attr-defined]
     sys.modules["tts.text_cleaner"] = text_cleaner_module
 
 if "tts.ssml_builder" not in sys.modules:
     ssml_builder_module = types.ModuleType("tts.ssml_builder")
-    ssml_builder_module.build_ssml = lambda text, rate=None, pitch=None, volume=None: text
-    ssml_builder_module.parse_rate = lambda s: 0.0
-    ssml_builder_module.parse_pitch = lambda s: 0.0
-    ssml_builder_module.parse_volume = lambda s: 0.0
+    setattr(ssml_builder_module, "build_ssml", lambda text, rate=None, pitch=None, volume=None: text)  # type: ignore[attr-defined]
+    setattr(ssml_builder_module, "parse_rate", lambda s: 0.0)  # type: ignore[attr-defined]
+    setattr(ssml_builder_module, "parse_pitch", lambda s: 0.0)  # type: ignore[attr-defined]
+    setattr(ssml_builder_module, "parse_volume", lambda s: 0.0)  # type: ignore[attr-defined]
     sys.modules["tts.ssml_builder"] = ssml_builder_module
 
 # Load tts_engine
 tts_engine_path = act_src / "tts" / "tts_engine.py"
 spec_engine = importlib.util.spec_from_file_location("tts.tts_engine", tts_engine_path)
+if spec_engine is None or spec_engine.loader is None:
+    raise ImportError(f"Could not load spec for tts_engine from {tts_engine_path}")
 tts_engine_module = importlib.util.module_from_spec(spec_engine)
 sys.modules["tts.tts_engine"] = tts_engine_module
 spec_engine.loader.exec_module(tts_engine_module)

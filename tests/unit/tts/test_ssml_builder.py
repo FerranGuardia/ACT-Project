@@ -12,7 +12,7 @@ class TestSSMLBuilder:
     def test_build_ssml_basic(self):
         """Test building basic SSML"""
         try:
-            from tts.ssml_builder import build_ssml
+            from src.tts.ssml_builder import build_ssml  # type: ignore[import-untyped]
             
             text = "Hello world"
             ssml = build_ssml(text)
@@ -27,7 +27,7 @@ class TestSSMLBuilder:
     def test_build_ssml_with_rate(self):
         """Test building SSML with rate parameter"""
         try:
-            from tts.ssml_builder import build_ssml
+            from src.tts.ssml_builder import build_ssml  # type: ignore[import-untyped]
             
             text = "Hello world"
             ssml = build_ssml(text, rate=50)
@@ -41,7 +41,7 @@ class TestSSMLBuilder:
     def test_build_ssml_with_pitch(self):
         """Test building SSML with pitch parameter"""
         try:
-            from tts.ssml_builder import build_ssml
+            from src.tts.ssml_builder import build_ssml  # type: ignore[import-untyped]
             
             text = "Hello world"
             ssml = build_ssml(text, pitch=10)
@@ -55,7 +55,7 @@ class TestSSMLBuilder:
     def test_build_ssml_with_volume(self):
         """Test building SSML with volume parameter"""
         try:
-            from tts.ssml_builder import build_ssml
+            from src.tts.ssml_builder import build_ssml  # type: ignore[import-untyped]
             
             text = "Hello world"
             ssml = build_ssml(text, volume=80)
@@ -69,7 +69,7 @@ class TestSSMLBuilder:
     def test_build_ssml_with_all_params(self):
         """Test building SSML with all parameters"""
         try:
-            from tts.ssml_builder import build_ssml
+            from src.tts.ssml_builder import build_ssml  # type: ignore[import-untyped]
             
             text = "Hello world"
             ssml = build_ssml(text, rate=50, pitch=10, volume=80)
@@ -83,7 +83,7 @@ class TestSSMLBuilder:
     def test_parse_rate(self):
         """Test parsing rate string"""
         try:
-            from tts.ssml_builder import parse_rate
+            from src.tts.ssml_builder import parse_rate  # type: ignore[import-untyped]
             
             assert parse_rate("+0%") == 0.0
             assert parse_rate("+50%") == 50.0
@@ -95,7 +95,7 @@ class TestSSMLBuilder:
     def test_parse_pitch(self):
         """Test parsing pitch string"""
         try:
-            from tts.ssml_builder import parse_pitch
+            from src.tts.ssml_builder import parse_pitch  # type: ignore[import-untyped]
             
             assert parse_pitch("+0Hz") == 0.0
             assert parse_pitch("+10Hz") == 10.0
@@ -107,7 +107,7 @@ class TestSSMLBuilder:
     def test_parse_volume(self):
         """Test parsing volume string"""
         try:
-            from tts.ssml_builder import parse_volume
+            from src.tts.ssml_builder import parse_volume  # type: ignore[import-untyped]
             
             assert parse_volume("+0%") == 0.0
             assert parse_volume("+50%") == 50.0

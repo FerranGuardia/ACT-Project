@@ -15,7 +15,7 @@ class TestTTSEngine:
     def test_tts_engine_initialization(self, mock_config):
         """Test that TTSEngine initializes correctly"""
         try:
-            from tts.tts_engine import TTSEngine
+            from src.tts.tts_engine import TTSEngine  # type: ignore
             
             engine = TTSEngine()
             
@@ -29,7 +29,7 @@ class TestTTSEngine:
     def test_get_available_voices(self, mock_config):
         """Test getting available voices"""
         try:
-            from tts.tts_engine import TTSEngine
+            from src.tts.tts_engine import TTSEngine  # type: ignore
             
             engine = TTSEngine()
             voices = engine.get_available_voices()
@@ -44,7 +44,7 @@ class TestTTSEngine:
     def test_get_voices_by_locale(self, mock_config):
         """Test filtering voices by locale"""
         try:
-            from tts.tts_engine import TTSEngine
+            from src.tts.tts_engine import TTSEngine  # type: ignore
             
             engine = TTSEngine()
             english_voices = engine.get_available_voices(locale="en-US")
@@ -61,7 +61,7 @@ class TestTTSEngine:
     def test_convert_text_to_speech_success(self, temp_dir, mock_config, sample_text):
         """Test successful text-to-speech conversion"""
         try:
-            from tts.tts_engine import TTSEngine
+            from src.tts.tts_engine import TTSEngine  # type: ignore
             
             engine = TTSEngine()
             output_path = temp_dir / "test_output.mp3"
@@ -84,7 +84,7 @@ class TestTTSEngine:
     def test_convert_text_to_speech_empty_text(self, temp_dir, mock_config):
         """Test conversion with empty text"""
         try:
-            from tts.tts_engine import TTSEngine
+            from src.tts.tts_engine import TTSEngine  # type: ignore
             
             engine = TTSEngine()
             output_path = temp_dir / "test_output.mp3"
@@ -104,7 +104,7 @@ class TestTTSEngine:
     def test_convert_text_to_speech_invalid_voice(self, temp_dir, mock_config, sample_text):
         """Test conversion with invalid voice falls back to default"""
         try:
-            from tts.tts_engine import TTSEngine
+            from src.tts.tts_engine import TTSEngine  # type: ignore
             
             engine = TTSEngine()
             output_path = temp_dir / "test_output.mp3"
@@ -125,7 +125,7 @@ class TestTTSEngine:
     def test_convert_file_to_speech(self, temp_dir, mock_config, sample_text):
         """Test converting text file to speech"""
         try:
-            from tts.tts_engine import TTSEngine
+            from src.tts.tts_engine import TTSEngine  # type: ignore
             
             engine = TTSEngine()
             input_file = temp_dir / "input.txt"
@@ -148,7 +148,7 @@ class TestTTSEngine:
     def test_convert_file_to_speech_nonexistent_file(self, temp_dir, mock_config):
         """Test converting non-existent file"""
         try:
-            from tts.tts_engine import TTSEngine
+            from src.tts.tts_engine import TTSEngine  # type: ignore
             
             engine = TTSEngine()
             input_file = temp_dir / "nonexistent.txt"
@@ -167,7 +167,7 @@ class TestTTSEngine:
     def test_text_chunking(self, mock_config):
         """Test text chunking for long text"""
         try:
-            from tts.tts_engine import TTSEngine
+            from src.tts.tts_engine import TTSEngine  # type: ignore
             
             engine = TTSEngine()
             long_text = " ".join(["Sentence {}.".format(i) for i in range(200)])
@@ -188,7 +188,7 @@ class TestTTSEngine:
     def test_merge_audio_chunks_no_pydub(self, temp_dir, mock_config):
         """Test audio merging without pydub (should use ffmpeg or fail gracefully)"""
         try:
-            from tts.tts_engine import TTSEngine
+            from src.tts.tts_engine import TTSEngine  # type: ignore
             
             engine = TTSEngine()
             
@@ -211,7 +211,7 @@ class TestTTSEngine:
     def test_format_chapter_intro(self):
         """Test formatting chapter introduction with pauses"""
         try:
-            from tts.tts_engine import format_chapter_intro
+            from src.tts.tts_engine import format_chapter_intro  # type: ignore
             
             # Test with pyttsx3 provider
             result = format_chapter_intro("Chapter 1", "This is the content.", provider="pyttsx3")
@@ -228,7 +228,7 @@ class TestTTSEngine:
     def test_format_chapter_intro_no_provider(self):
         """Test formatting chapter introduction without provider (defaults to pyttsx3 format)"""
         try:
-            from tts.tts_engine import format_chapter_intro
+            from src.tts.tts_engine import format_chapter_intro  # type: ignore
             
             result = format_chapter_intro("Chapter 2", "Content here.", provider=None)
             
@@ -243,7 +243,7 @@ class TestTTSEngine:
     def test_format_chapter_intro_edge_tts(self):
         """Test formatting chapter introduction for Edge TTS provider"""
         try:
-            from tts.tts_engine import format_chapter_intro
+            from src.tts.tts_engine import format_chapter_intro  # type: ignore
             
             result = format_chapter_intro("Chapter 3", "More content.", provider="edge_tts")
             

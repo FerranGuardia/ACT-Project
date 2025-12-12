@@ -13,6 +13,8 @@ from pathlib import Path
 act_src = Path(__file__).parent.parent.parent.parent / "src"
 base_provider_path = act_src / "tts" / "providers" / "base_provider.py"
 spec = importlib.util.spec_from_file_location("base_provider", base_provider_path)
+if spec is None or spec.loader is None:
+    raise ImportError(f"Could not load spec for base_provider from {base_provider_path}")
 base_provider_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(base_provider_module)
 

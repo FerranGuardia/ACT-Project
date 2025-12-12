@@ -18,6 +18,8 @@ act_src = Path(__file__).parent.parent.parent.parent / "src"
 # Import base provider first (same pattern as test_base_provider.py)
 base_provider_path = act_src / "tts" / "providers" / "base_provider.py"
 base_spec = importlib.util.spec_from_file_location("base_provider", base_provider_path)
+if base_spec is None or base_spec.loader is None:
+    raise ImportError(f"Could not load spec for base_provider from {base_provider_path}")
 base_provider_module = importlib.util.module_from_spec(base_spec)
 base_provider_module.__package__ = "tts.providers"
 base_provider_module.__name__ = "tts.providers.base_provider"
@@ -29,6 +31,8 @@ base_spec.loader.exec_module(base_provider_module)
 # Import edge provider
 edge_provider_path = act_src / "tts" / "providers" / "edge_tts_provider.py"
 edge_spec = importlib.util.spec_from_file_location("edge_tts_provider", edge_provider_path)
+if edge_spec is None or edge_spec.loader is None:
+    raise ImportError(f"Could not load spec for edge_tts_provider from {edge_provider_path}")
 edge_provider_module = importlib.util.module_from_spec(edge_spec)
 edge_provider_module.__package__ = "tts.providers"
 edge_provider_module.__name__ = "tts.providers.edge_tts_provider"

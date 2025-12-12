@@ -27,7 +27,7 @@ if "core.logger" not in sys.modules:
     mock_logger = MagicMock()
     mock_get_logger = MagicMock(return_value=mock_logger)
     logger_module = types.ModuleType("core.logger")
-    logger_module.get_logger = mock_get_logger
+    setattr(logger_module, "get_logger", mock_get_logger)  # type: ignore[attr-defined]
     sys.modules["core.logger"] = logger_module
 
 # Create tts package modules
@@ -39,6 +39,8 @@ if "tts.providers" not in sys.modules:
 # Load base_provider first (no relative imports)
 base_provider_path = act_src / "tts" / "providers" / "base_provider.py"
 spec_base = importlib.util.spec_from_file_location("tts.providers.base_provider", base_provider_path)
+if spec_base is None or spec_base.loader is None:
+    raise ImportError(f"Could not load spec for base_provider from {base_provider_path}")
 base_provider_module = importlib.util.module_from_spec(spec_base)
 sys.modules["tts.providers.base_provider"] = base_provider_module
 spec_base.loader.exec_module(base_provider_module)
@@ -47,12 +49,16 @@ ProviderType = base_provider_module.ProviderType
 # Load edge_tts_provider and pyttsx3_provider (they have relative imports)
 edge_tts_path = act_src / "tts" / "providers" / "edge_tts_provider.py"
 spec_edge = importlib.util.spec_from_file_location("tts.providers.edge_tts_provider", edge_tts_path)
+if spec_edge is None or spec_edge.loader is None:
+    raise ImportError(f"Could not load spec for edge_tts_provider from {edge_tts_path}")
 edge_tts_module = importlib.util.module_from_spec(spec_edge)
 sys.modules["tts.providers.edge_tts_provider"] = edge_tts_module
 spec_edge.loader.exec_module(edge_tts_module)
 
 pyttsx3_path = act_src / "tts" / "providers" / "pyttsx3_provider.py"
 spec_pyttsx3 = importlib.util.spec_from_file_location("tts.providers.pyttsx3_provider", pyttsx3_path)
+if spec_pyttsx3 is None or spec_pyttsx3.loader is None:
+    raise ImportError(f"Could not load spec for pyttsx3_provider from {pyttsx3_path}")
 pyttsx3_module = importlib.util.module_from_spec(spec_pyttsx3)
 sys.modules["tts.providers.pyttsx3_provider"] = pyttsx3_module
 spec_pyttsx3.loader.exec_module(pyttsx3_module)
@@ -60,6 +66,8 @@ spec_pyttsx3.loader.exec_module(pyttsx3_module)
 # Now load provider_manager (it uses relative imports to the above)
 provider_manager_path = act_src / "tts" / "providers" / "provider_manager.py"
 spec = importlib.util.spec_from_file_location("tts.providers.provider_manager", provider_manager_path)
+if spec is None or spec.loader is None:
+    raise ImportError(f"Could not load spec for provider_manager from {provider_manager_path}")
 provider_manager_module = importlib.util.module_from_spec(spec)
 sys.modules["tts.providers.provider_manager"] = provider_manager_module
 spec.loader.exec_module(provider_manager_module)
