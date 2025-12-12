@@ -4,148 +4,20 @@ TTS Mode View - Convert text files to audio.
 
 import os
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Optional, List
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFileDialog,
     QListWidget, QProgressBar, QGroupBox, QComboBox, QSlider, QSpinBox, QLineEdit,
-    QMessageBox, QListWidgetItem, QTextEdit, QTabWidget, QPlainTextEdit
+    QMessageBox, QListWidgetItem
 )
-from PySide6.QtCore import Qt, QThread, Signal, QTimer
+from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QFont
 
 from core.logger import get_logger
 from tts import TTSEngine, VoiceManager
-from tts.providers.provider_manager import TTSProviderManager
-import tempfile
 
 logger = get_logger("ui.tts_view")
-
-
-class ProviderStatusCheckThread(QThread):
-    """Thread for checking provider status by testing audio generation."""
-    
-    status_checked = Signal(str, bool)  # provider_name, is_working
-    
-    def __init__(self, provider_manager: TTSProviderManager, provider_name: str):
-        super().__init__()
-        self.provider_manager = provider_manager
-        self.provider_name = provider_name
-    
-    def run(self):
-        """Test provider by generating actual audio."""
-        try:
-            provider = self.provider_manager.get_provider(self.provider_name)
-            if provider is None or not provider.is_available():
-                self.status_checked.emit(self.provider_name, False)
-                return
-            
-            # Get a test voice
-            voices = provider.get_voices(locale="en-US")
-            if not voices:
-                self.status_checked.emit(self.provider_name, False)
-                return
-            
-            # For edge_tts providers, try known working voices first
-            if self.provider_name in ["edge_tts", "edge_tts_working"]:
-                # Try known working voices from reference
-                preferred_voices = ["en-US-AriaNeural", "en-US-AndrewNeural", "en-US-GuyNeural"]
-                test_voice = None
-                for pref_voice in preferred_voices:
-                    for v in voices:
-                        voice_id = v.get("id", "")
-                        if pref_voice in voice_id or voice_id == pref_voice:
-                            test_voice = voice_id
-                            break
-                    if test_voice:
-                        break
-                # Fallback to first voice if none found
-                if not test_voice:
-                    test_voice = voices[0].get("id") or voices[0].get("name", "en-US-AndrewNeural")
-            else:
-                test_voice = voices[0].get("id") or voices[0].get("name", "en-US-AndrewNeural")
-            
-            logger.info(f"Testing {self.provider_name} with voice: {test_voice}")
-            test_text = "Test"
-            
-            # Create temporary file
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tmp:
-                temp_path = Path(tmp.name)
-            
-            try:
-                # Test audio generation
-                success = provider.convert_text_to_speech(
-                    text=test_text,
-                    voice=test_voice,
-                    output_path=temp_path,
-                    rate=None,
-                    pitch=None,
-                    volume=None
-                )
-                
-                # IMPORTANT: Always verify file exists even if convert_text_to_speech returned False
-                # Some providers (especially pyttsx3) may create the file but return False due to timeout
-                # For slower providers, wait a bit and check again
-                import time
-                if not success:
-                    # Wait longer for pyttsx3 (it can take 10-20 seconds to create and stabilize file)
-                    # pyttsx3 has complex stability checks that may timeout, but file still gets created
-                    max_wait = 30 if self.provider_name == "pyttsx3" else 5
-                    check_interval = 0.5  # Check every 0.5 seconds
-                    waited = 0
-                    while waited < max_wait:
-                        time.sleep(check_interval)
-                        waited += check_interval
-                        if temp_path.exists():
-                            file_size = temp_path.stat().st_size
-                            # For pyttsx3, accept smaller files (test text "Test" creates small files)
-                            # For other providers, require any content
-                            min_size = 100 if self.provider_name == "pyttsx3" else 0
-                            if file_size > min_size:
-                                logger.info(f"Provider {self.provider_name} created file ({file_size} bytes) after {waited:.1f}s (even though convert_text_to_speech returned False)")
-                                success = True
-                                break
-                
-                # Final verification: if file exists and has content, consider it successful
-                if temp_path.exists():
-                    file_size = temp_path.stat().st_size
-                    # For pyttsx3, accept smaller files (test text "Test" creates small files ~100-500 bytes)
-                    # For other providers, require any content
-                    min_size = 100 if self.provider_name == "pyttsx3" else 0
-                    if file_size > min_size:
-                        if not success:
-                            logger.warning(f"Provider {self.provider_name} file exists ({file_size} bytes) but function returned False - marking as working")
-                            success = True
-                    else:
-                        if success:
-                            logger.warning(f"Provider {self.provider_name} function returned True but file too small ({file_size} bytes) - marking as not working")
-                            success = False
-                else:
-                    if success:
-                        logger.warning(f"Provider {self.provider_name} function returned True but no file created - marking as not working")
-                        success = False
-                
-                # Clean up
-                try:
-                    if temp_path.exists():
-                        temp_path.unlink()
-                except Exception:
-                    pass
-                
-                logger.info(f"Provider {self.provider_name} status check result: {'Working' if success else 'Not Working'}")
-                self.status_checked.emit(self.provider_name, success)
-            except Exception as e:
-                # Clean up on error
-                try:
-                    if temp_path.exists():
-                        temp_path.unlink()
-                except Exception:
-                    pass
-                logger.error(f"Status check error for {self.provider_name}: {e}")
-                self.status_checked.emit(self.provider_name, False)
-        except Exception as e:
-            logger.error(f"Status check exception for {self.provider_name}: {e}")
-            self.status_checked.emit(self.provider_name, False)
 
 
 class TTSConversionThread(QThread):
@@ -274,17 +146,10 @@ class TTSView(QWidget):
         self.conversion_thread: Optional[TTSConversionThread] = None
         self.tts_engine = TTSEngine()
         self.voice_manager = VoiceManager()
-        # Initialize provider status tracking
-        self.provider_status: Dict[str, Optional[bool]] = {}
-        self.status_threads: Dict[str, ProviderStatusCheckThread] = {}
-        self.selected_provider: Optional[str] = None
         self.setup_ui()
         self._connect_handlers()
         self._load_providers()
-        # Voices will be loaded after provider status is checked
-        # Update pitch note based on initial provider
-        if hasattr(self, 'pitch_note_label'):
-            self._update_pitch_note()
+        self._load_voices()
         logger.info("TTS view initialized")
     
     def setup_ui(self):
@@ -320,16 +185,9 @@ class TTSView(QWidget):
         back_button_layout.addStretch()
         main_layout.addLayout(back_button_layout)
         
-        # Input section with tabs (Files and Text Editor)
-        input_group = QGroupBox("Input")
+        # Input files
+        input_group = QGroupBox("Input Files")
         input_layout = QVBoxLayout()
-        
-        # Create tab widget for switching between file input and text editor
-        self.input_tabs = QTabWidget()
-        
-        # Tab 1: File Input
-        file_tab = QWidget()
-        file_tab_layout = QVBoxLayout()
         
         buttons_layout = QHBoxLayout()
         self.add_files_button = QPushButton("➕ Add Files")
@@ -340,54 +198,14 @@ class TTSView(QWidget):
         buttons_layout.addWidget(self.add_folder_button)
         buttons_layout.addWidget(self.remove_button)
         buttons_layout.addStretch()
-        file_tab_layout.addLayout(buttons_layout)
+        input_layout.addLayout(buttons_layout)
         
         self.files_list = QListWidget()
         self.files_list.itemSelectionChanged.connect(
             lambda: self.remove_button.setEnabled(len(self.files_list.selectedItems()) > 0)
         )
-        file_tab_layout.addWidget(self.files_list)
+        input_layout.addWidget(self.files_list)
         
-        file_tab.setLayout(file_tab_layout)
-        self.input_tabs.addTab(file_tab, "📁 Files")
-        
-        # Tab 2: Text Editor
-        editor_tab = QWidget()
-        editor_tab_layout = QVBoxLayout()
-        
-        # Editor toolbar
-        editor_toolbar = QHBoxLayout()
-        self.clear_editor_button = QPushButton("🗑️ Clear")
-        self.load_file_button = QPushButton("📂 Load File")
-        self.save_text_button = QPushButton("💾 Save Text")
-        editor_toolbar.addWidget(self.clear_editor_button)
-        editor_toolbar.addWidget(self.load_file_button)
-        editor_toolbar.addWidget(self.save_text_button)
-        editor_toolbar.addStretch()
-        editor_tab_layout.addLayout(editor_toolbar)
-        
-        # Text editor widget
-        self.text_editor = QPlainTextEdit()
-        self.text_editor.setPlaceholderText("Type or paste your text here...\n\nYou can write directly in this editor and convert it to audio.\nUse the buttons above to load from a file or save your text.")
-        self.text_editor.setMinimumHeight(300)
-        # Set monospace font for better text editing
-        font = QFont("Consolas", 10)
-        if not font.exactMatch():
-            font = QFont("Courier New", 10)
-        self.text_editor.setFont(font)
-        editor_tab_layout.addWidget(self.text_editor)
-        
-        # Character count label
-        self.char_count_label = QLabel("Characters: 0")
-        editor_tab_layout.addWidget(self.char_count_label)
-        
-        # Update character count when text changes
-        self.text_editor.textChanged.connect(self._update_char_count)
-        
-        editor_tab.setLayout(editor_tab_layout)
-        self.input_tabs.addTab(editor_tab, "✏️ Text Editor")
-        
-        input_layout.addWidget(self.input_tabs)
         input_group.setLayout(input_layout)
         main_layout.addWidget(input_group)
         
@@ -395,19 +213,14 @@ class TTSView(QWidget):
         voice_group = QGroupBox("Voice Settings")
         voice_layout = QVBoxLayout()
         
-        # Provider selector - dropdown menu
+        # Provider selector
         provider_layout = QHBoxLayout()
         provider_layout.addWidget(QLabel("Provider:"))
         self.provider_combo = QComboBox()
-        self.provider_combo.currentIndexChanged.connect(self._on_provider_changed)
+        # Will be populated by _load_providers()
         provider_layout.addWidget(self.provider_combo)
         provider_layout.addStretch()
         voice_layout.addLayout(provider_layout)
-        
-        # Store selected provider and status
-        self.selected_provider: Optional[str] = None
-        self.provider_status: Dict[str, bool] = {}  # {provider_name: is_working}
-        self.status_threads: Dict[str, ProviderStatusCheckThread] = {}
         
         voice_select_layout = QHBoxLayout()
         voice_select_layout.addWidget(QLabel("Voice:"))
@@ -433,8 +246,7 @@ class TTSView(QWidget):
         
         # Pitch slider
         pitch_layout = QHBoxLayout()
-        pitch_label_widget = QLabel("Pitch:")
-        pitch_layout.addWidget(pitch_label_widget)
+        pitch_layout.addWidget(QLabel("Pitch:"))
         self.pitch_slider = QSlider(Qt.Orientation.Horizontal)
         self.pitch_slider.setRange(-50, 50)
         self.pitch_slider.setValue(0)
@@ -442,12 +254,7 @@ class TTSView(QWidget):
         self.pitch_slider.valueChanged.connect(lambda v: self.pitch_label.setText(str(v)))
         pitch_layout.addWidget(self.pitch_slider)
         pitch_layout.addWidget(self.pitch_label)
-        # Note: Pitch doesn't work with pyttsx3 (system limitation)
-        self.pitch_note_label = QLabel("(Not supported by pyttsx3)")
-        self.pitch_note_label.setStyleSheet("color: gray; font-size: 9px;")
-        pitch_layout.addWidget(self.pitch_note_label)
         voice_layout.addLayout(pitch_layout)
-        # Note: Pitch note will be updated when provider is selected via dialog
         
         # Volume slider
         volume_layout = QHBoxLayout()
@@ -522,15 +329,12 @@ class TTSView(QWidget):
         self.add_files_button.clicked.connect(self.add_files)
         self.add_folder_button.clicked.connect(self.add_folder)
         self.remove_button.clicked.connect(self.remove_selected_files)
+        self.provider_combo.currentTextChanged.connect(self._on_provider_changed)
         self.preview_button.clicked.connect(self.preview_voice)
         self.start_button.clicked.connect(self.start_conversion)
         self.pause_button.clicked.connect(self.pause_conversion)
         self.stop_button.clicked.connect(self.stop_conversion)
         self.browse_button.clicked.connect(self.browse_output_dir)
-        # Text editor handlers
-        self.clear_editor_button.clicked.connect(self.clear_editor)
-        self.load_file_button.clicked.connect(self.load_file_to_editor)
-        self.save_text_button.clicked.connect(self.save_editor_text)
     
     def _go_back(self):
         """Navigate back to landing page."""
@@ -553,138 +357,37 @@ class TTSView(QWidget):
             widget = widget.parent()
     
     def _load_providers(self):
-        """Load all providers into dropdown and start status checking."""
+        """Load available providers into the combo box."""
         try:
-            # Clear combo box
-            self.provider_combo.clear()
+            providers = self.voice_manager.get_providers()
+            if not providers:
+                logger.warning("No TTS providers available")
+                self.provider_combo.addItems(["No providers available"])
+                self.provider_combo.setEnabled(False)
+                return
             
-            # Add all providers (we'll check status for all)
-            all_providers = ["edge_tts", "edge_tts_working", "pyttsx3"]
+            # Add provider names with display labels
             provider_labels = {
-                "edge_tts": "Edge TTS 7.2.3",
-                "edge_tts_working": "Edge TTS 7.2.0 (Working)",
+                "edge_tts": "Edge TTS (Cloud)",
                 "pyttsx3": "pyttsx3 (Offline)"
             }
             
-            for provider_name in all_providers:
-                label = provider_labels.get(provider_name, provider_name)
-                # For pyttsx3, check availability immediately and show as active if available
-                if provider_name == "pyttsx3":
-                    provider = self.tts_engine.provider_manager.get_provider("pyttsx3")
-                    if provider and provider.is_available():
-                        display_text = f"🟢 {label} - Active"
-                        self.provider_status[provider_name] = True  # Always mark as running
-                    else:
-                        display_text = f"🔴 {label} - Unavailable"
-                        self.provider_status[provider_name] = False
-                else:
-                    # For online providers, initially show as checking
-                    display_text = f"🟡 {label} - Checking..."
-                    self.provider_status[provider_name] = None  # None = checking, True = working, False = not working
-                self.provider_combo.addItem(display_text, provider_name)
+            for provider in providers:
+                label = provider_labels.get(provider, provider)
+                self.provider_combo.addItem(label, provider)
             
             # Set default to first provider
-            if all_providers:
+            if providers:
                 self.provider_combo.setCurrentIndex(0)
-                self.selected_provider = all_providers[0]
-            
-            # Start checking all providers automatically
-            self._check_all_providers()
-            
         except Exception as e:
             logger.error(f"Error loading providers: {e}")
-            self.provider_combo.addItem("Error loading providers")
-    
-    def _check_all_providers(self):
-        """Start status checking for all providers."""
-        # Only check online providers (edge_tts, edge_tts_working)
-        # Skip pyttsx3 - it's offline and status checks are unreliable
-        online_providers = ["edge_tts", "edge_tts_working"]
-        
-        for provider_name in online_providers:
-            thread = ProviderStatusCheckThread(self.tts_engine.provider_manager, provider_name)
-            thread.status_checked.connect(self._on_provider_status_checked)
-            self.status_threads[provider_name] = thread
-            thread.start()
-        
-        # pyttsx3 status is already set in _load_providers() - no need to check again
-    
-    def _on_provider_status_checked(self, provider_name: str, is_working: bool):
-        """Handle provider status check result."""
-        logger.info(f"Provider {provider_name} status check result: {'Working' if is_working else 'Not working'}")
-        self.provider_status[provider_name] = is_working
-        
-        # Update dropdown item
-        self._update_provider_item(provider_name)
-        
-        # If this is the currently selected provider, update voices
-        if provider_name == self.selected_provider:
-            self._load_voices()
-        
-        # Clean up thread
-        if provider_name in self.status_threads:
-            thread = self.status_threads[provider_name]
-            if thread.isFinished():
-                del self.status_threads[provider_name]
-    
-    def _update_provider_item(self, provider_name: str):
-        """Update provider item in dropdown with status."""
-        provider_labels = {
-            "edge_tts": "Edge TTS 7.2.3",
-            "edge_tts_working": "Edge TTS 7.2.0 (Working)",
-            "pyttsx3": "pyttsx3 (Offline)"
-        }
-        
-        label = provider_labels.get(provider_name, provider_name)
-        status = self.provider_status.get(provider_name)
-        
-        if status is None:
-            # Still checking
-            display_text = f"🟡 {label} - Checking..."
-        elif status:
-            # Working
-            display_text = f"🟢 {label} - Active"
-        else:
-            # Not working
-            display_text = f"🔴 {label} - Unavailable"
-        
-        # Find and update the item
-        for i in range(self.provider_combo.count()):
-            if self.provider_combo.itemData(i) == provider_name:
-                current_text = self.provider_combo.itemText(i)
-                self.provider_combo.setItemText(i, display_text)
-                logger.debug(f"Updated provider {provider_name} display: {current_text} -> {display_text}")
-                # Force UI update
-                self.provider_combo.update()
-                break
+            # Fallback to Edge TTS
+            self.provider_combo.addItem("Edge TTS (Cloud)", "edge_tts")
     
     def _on_provider_changed(self):
         """Handle provider selection change."""
-        current_index = self.provider_combo.currentIndex()
-        if current_index < 0:
-            return
-        
-        provider_name = self.provider_combo.itemData(current_index)
-        if not provider_name:
-            return
-        
-        self.selected_provider = provider_name
         # Reload voices for the selected provider
         self._load_voices()
-        # Update pitch note
-        self._update_pitch_note()
-    
-    def _update_pitch_note(self):
-        """Update pitch note based on selected provider."""
-        provider = self._get_selected_provider()
-        if provider == "pyttsx3":
-            if hasattr(self, 'pitch_note_label'):
-                self.pitch_note_label.setText("(Not supported by pyttsx3)")
-                self.pitch_note_label.setStyleSheet("color: orange; font-size: 9px;")
-        else:
-            if hasattr(self, 'pitch_note_label'):
-                self.pitch_note_label.setText("")
-                self.pitch_note_label.setStyleSheet("")
     
     def _get_selected_provider(self) -> Optional[str]:
         """Get the currently selected provider name."""
@@ -702,25 +405,12 @@ class TTSView(QWidget):
             # Get selected provider
             provider = self._get_selected_provider()
             
-            if not provider:
-                self.voice_combo.addItems(["Please select a provider first"])
-                self.voice_combo.setEnabled(False)
-                return
-            
-            # Check if provider is available
-            provider_instance = self.tts_engine.provider_manager.get_provider(provider)
-            if not provider_instance or not provider_instance.is_available():
-                self.voice_combo.addItems(["Sorry, the provider you are trying to use is currently unavailable"])
-                self.voice_combo.setEnabled(False)
-                logger.warning(f"Provider '{provider}' is not available - voice selection disabled")
-                return
-            
             # Load voices for the selected provider (filtered to en-US only)
             voices = self.voice_manager.get_voice_list(locale="en-US", provider=provider)
             
             if not voices:
                 logger.warning(f"No voices available for provider: {provider}")
-                self.voice_combo.addItems(["No voices available for this provider"])
+                self.voice_combo.addItems(["No voices available"])
                 self.voice_combo.setEnabled(False)
                 return
             
@@ -732,8 +422,8 @@ class TTSView(QWidget):
                 self.voice_combo.setCurrentIndex(0)
         except Exception as e:
             logger.error(f"Error loading voices: {e}")
-            self.voice_combo.addItems(["Error loading voices"])
-            self.voice_combo.setEnabled(False)
+            # Fallback to default voices
+            self.voice_combo.addItems(["en-US-AndrewNeural", "en-US-AriaNeural", "en-US-GuyNeural"])
     
     def add_files(self):
         """Add text files via file dialog."""
@@ -803,18 +493,8 @@ class TTSView(QWidget):
         # Get selected provider
         provider = self._get_selected_provider()
         
-        # Use text from editor if available and editor tab is active, otherwise use sample text
-        current_tab = self.input_tabs.currentIndex()
-        if current_tab == 1:  # Text Editor tab
-            editor_text = self.text_editor.toPlainText().strip()
-            if editor_text:
-                # Use first 200 characters of editor text for preview
-                sample_text = editor_text[:200] + ("..." if len(editor_text) > 200 else "")
-            else:
-                sample_text = "Hello, this is a preview of the selected voice."
-        else:
-            # Sample text for preview
-            sample_text = "Hello, this is a preview of the selected voice."
+        # Sample text for preview
+        sample_text = "Hello, this is a preview of the selected voice."
         
         try:
             self.status_label.setText("Generating preview...")
@@ -860,84 +540,10 @@ class TTSView(QWidget):
             self.status_label.setText("Ready")
             logger.error(f"Preview error: {e}")
     
-    def _update_char_count(self):
-        """Update character count label when text changes."""
-        text = self.text_editor.toPlainText()
-        char_count = len(text)
-        word_count = len(text.split()) if text.strip() else 0
-        self.char_count_label.setText(f"Characters: {char_count:,} | Words: {word_count:,}")
-    
-    def clear_editor(self):
-        """Clear the text editor."""
-        reply = QMessageBox.question(
-            self,
-            "Clear Editor",
-            "Are you sure you want to clear all text?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
-        )
-        if reply == QMessageBox.StandardButton.Yes:
-            self.text_editor.clear()
-            logger.info("Text editor cleared")
-    
-    def load_file_to_editor(self):
-        """Load a text file into the editor."""
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Load Text File",
-            "",
-            "Text Files (*.txt *.md);;All Files (*.*)"
-        )
-        
-        if file_path:
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                self.text_editor.setPlainText(content)
-                # Switch to editor tab
-                self.input_tabs.setCurrentIndex(1)
-                logger.info(f"Loaded file into editor: {file_path}")
-                QMessageBox.information(self, "File Loaded", f"Successfully loaded:\n{os.path.basename(file_path)}")
-            except Exception as e:
-                QMessageBox.warning(self, "Error", f"Failed to load file:\n{str(e)}")
-                logger.error(f"Error loading file to editor: {e}")
-    
-    def save_editor_text(self):
-        """Save the editor text to a file."""
-        text = self.text_editor.toPlainText()
-        if not text.strip():
-            QMessageBox.warning(self, "Empty Text", "There is no text to save.")
-            return
-        
-        file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Save Text File",
-            "",
-            "Text Files (*.txt);;Markdown Files (*.md);;All Files (*.*)"
-        )
-        
-        if file_path:
-            try:
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    f.write(text)
-                logger.info(f"Saved editor text to: {file_path}")
-                QMessageBox.information(self, "File Saved", f"Successfully saved to:\n{file_path}")
-            except Exception as e:
-                QMessageBox.warning(self, "Error", f"Failed to save file:\n{str(e)}")
-                logger.error(f"Error saving editor text: {e}")
-    
     def _validate_inputs(self) -> tuple[bool, str]:
         """Validate user inputs."""
-        # Check if using file input or text editor
-        current_tab = self.input_tabs.currentIndex()
-        
-        if current_tab == 0:  # Files tab
-            if not self.file_paths:
-                return False, "Please add at least one text file to convert, or switch to Text Editor tab"
-        else:  # Text Editor tab
-            text = self.text_editor.toPlainText().strip()
-            if not text:
-                return False, "Please enter some text in the editor to convert"
+        if not self.file_paths:
+            return False, "Please add at least one text file to convert"
         
         output_dir = self.output_dir_input.text().strip()
         if not output_dir:
@@ -969,29 +575,9 @@ class TTSView(QWidget):
         file_format = self.format_combo.currentText()
         provider = self._get_selected_provider()
         
-        # Check which input mode is active
-        current_tab = self.input_tabs.currentIndex()
-        if current_tab == 1:  # Text Editor tab
-            # Create a temporary file from editor text for conversion
-            import tempfile
-            text_content = self.text_editor.toPlainText()
-            if not text_content.strip():
-                QMessageBox.warning(self, "Empty Text", "Please enter some text in the editor.")
-                return
-            
-            # Create temporary file
-            temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8')
-            temp_file.write(text_content)
-            temp_file.close()
-            
-            # Use temporary file for conversion
-            file_paths = [temp_file.name]
-        else:  # Files tab
-            file_paths = self.file_paths.copy()
-        
         # Create and start thread
         self.conversion_thread = TTSConversionThread(
-            file_paths,
+            self.file_paths.copy(),
             output_dir,
             voice,
             rate,

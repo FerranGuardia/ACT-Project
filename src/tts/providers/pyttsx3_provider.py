@@ -5,9 +5,9 @@ Offline TTS provider using system TTS engines.
 Works on Windows (SAPI5), Linux (espeak), macOS (NSSpeechSynthesizer).
 """
 
-import pyttsx3
+import pyttsx3  # type: ignore[import-untyped]
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 
 from core.logger import get_logger
 from .base_provider import TTSProvider, ProviderType
@@ -20,15 +20,15 @@ class Pyttsx3Provider(TTSProvider):
     
     def __init__(self):
         """Initialize pyttsx3 provider"""
-        self._engine = None
+        self._engine: Any = None
         self._available = False
-        self._voices_cache: Optional[List[Dict]] = None
+        self._voices_cache: Optional[List[Dict[str, Any]]] = None
         self._initialize()
     
     def _initialize(self) -> None:
         """Initialize pyttsx3 engine"""
         try:
-            self._engine = pyttsx3.init()
+            self._engine = pyttsx3.init()  # type: ignore[assignment]
             self._available = True
             logger.info("pyttsx3 provider initialized successfully")
         except Exception as e:
@@ -47,7 +47,7 @@ class Pyttsx3Provider(TTSProvider):
         """Check if provider is available"""
         return self._available and self._engine is not None
     
-    def get_voices(self, locale: Optional[str] = None) -> List[Dict]:
+    def get_voices(self, locale: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get available system voices, filtered to English US only.
         
         Args:
@@ -69,12 +69,12 @@ class Pyttsx3Provider(TTSProvider):
                 return [v for v in self._voices_cache if v.get("language") == "en-US"]
             return [v for v in self._voices_cache if v.get("language") == locale]
         
-        voices = []
+        voices: List[Dict[str, Any]] = []
         try:
-            system_voices = self._engine.getProperty('voices')
-            for idx, voice in enumerate(system_voices):
-                voice_id = voice.id if hasattr(voice, 'id') else str(idx)
-                voice_name = voice.name if hasattr(voice, 'name') else f"Voice {idx}"
+            system_voices = self._engine.getProperty('voices')  # type: ignore[attr-defined]
+            for idx, voice in enumerate(system_voices):  # type: ignore[arg-type]
+                voice_id = voice.id if hasattr(voice, 'id') else str(idx)  # type: ignore[attr-defined]
+                voice_name = voice.name if hasattr(voice, 'name') else f"Voice {idx}"  # type: ignore[attr-defined]
                 
                 # Try to determine gender from name
                 gender = 'neutral'
@@ -89,9 +89,9 @@ class Pyttsx3Provider(TTSProvider):
                 # For Windows SAPI5, English voices typically have "en-US" or "English" in name
                 # We'll include voices that appear to be English
                 is_english = False
-                if hasattr(voice, 'languages'):
+                if hasattr(voice, 'languages'):  # type: ignore[arg-type]
                     # Check if voice supports English
-                    langs = voice.languages if isinstance(voice.languages, list) else [voice.languages]
+                    langs = voice.languages if isinstance(voice.languages, list) else [voice.languages]  # type: ignore[attr-defined]
                     is_english = any('en' in str(lang).lower() or 'english' in str(lang).lower() for lang in langs)
                 else:
                     # Fallback: check name for English indicators
@@ -150,28 +150,28 @@ class Pyttsx3Provider(TTSProvider):
         try:
             # Set voice
             voices = self.get_voices()
-            voice_obj = None
+            voice_obj: Any = None
             for v in voices:
                 if v['id'] == voice or v['name'] == voice:
                     # Find the actual voice object
-                    system_voices = self._engine.getProperty('voices')
-                    for sys_voice in system_voices:
-                        sys_voice_id = sys_voice.id if hasattr(sys_voice, 'id') else str(system_voices.index(sys_voice))
+                    system_voices = self._engine.getProperty('voices')  # type: ignore[attr-defined]
+                    for sys_voice in system_voices:  # type: ignore[arg-type]
+                        sys_voice_id = sys_voice.id if hasattr(sys_voice, 'id') else str(system_voices.index(sys_voice))  # type: ignore[attr-defined,arg-type]
                         if sys_voice_id == v['id']:
                             voice_obj = sys_voice
                             break
                     break
             
             if voice_obj:
-                self._engine.setProperty('voice', voice_obj.id if hasattr(voice_obj, 'id') else voice_obj)
+                self._engine.setProperty('voice', voice_obj.id if hasattr(voice_obj, 'id') else voice_obj)  # type: ignore[attr-defined,arg-type]
             elif voices:
                 # Use first available voice as fallback
                 first_voice_id = voices[0]['id']
-                system_voices = self._engine.getProperty('voices')
-                for sys_voice in system_voices:
-                    sys_voice_id = sys_voice.id if hasattr(sys_voice, 'id') else str(system_voices.index(sys_voice))
+                system_voices = self._engine.getProperty('voices')  # type: ignore[attr-defined]
+                for sys_voice in system_voices:  # type: ignore[arg-type]
+                    sys_voice_id = sys_voice.id if hasattr(sys_voice, 'id') else str(system_voices.index(sys_voice))  # type: ignore[attr-defined,arg-type]
                     if sys_voice_id == first_voice_id:
-                        self._engine.setProperty('voice', sys_voice.id if hasattr(sys_voice, 'id') else sys_voice)
+                        self._engine.setProperty('voice', sys_voice.id if hasattr(sys_voice, 'id') else sys_voice)  # type: ignore[attr-defined,arg-type]
                         break
             
             # Set rate (words per minute, pyttsx3 uses 0-200, default ~200)
@@ -187,7 +187,7 @@ class Pyttsx3Provider(TTSProvider):
                     # Positive rate = faster
                     pyttsx3_rate = int(200 + (rate / 100) * 200)  # Map 0-100 to 200-400, cap at 200
                 pyttsx3_rate = max(50, min(400, pyttsx3_rate))  # Clamp to reasonable range
-                self._engine.setProperty('rate', pyttsx3_rate)
+                self._engine.setProperty('rate', pyttsx3_rate)  # type: ignore[attr-defined]
             
             # Set volume (0.0 to 1.0)
             if volume is not None:
@@ -198,239 +198,20 @@ class Pyttsx3Provider(TTSProvider):
                     pyttsx3_volume = max(0.0, 1.0 + (volume / 50))  # Map -50 to 0.0
                 else:
                     pyttsx3_volume = min(1.0, 1.0 + (volume / 50))  # Map 0-50 to 1.0-2.0, cap at 1.0
-                self._engine.setProperty('volume', pyttsx3_volume)
+                self._engine.setProperty('volume', pyttsx3_volume)  # type: ignore[attr-defined]
             
             # Note: pyttsx3 doesn't support pitch directly, so we ignore it
             
             # Save to file
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            # Log conversion start
-            text_length = len(text)
-            logger.info(f"Starting pyttsx3 conversion: {text_length} characters to {output_path.name}")
-            logger.info(f"Estimated time: ~{text_length / 100:.1f} seconds (rough estimate)")
-            
-            import time
-            import threading
-            start_time = time.time()
-            
-            self._engine.save_to_file(text, str(output_path))
-            
-            # Pattern 1: Stop engine immediately after save_to_file to prevent hang
-            # This is a common pattern found in working pyttsx3 implementations
-            try:
-                self._engine.stop()
-                logger.debug("Engine stopped after save_to_file (Pattern 1)")
-            except Exception as stop_error:
-                logger.warning(f"Failed to stop engine after save_to_file: {stop_error}")
-            
-            # Log that we're waiting for conversion
-            logger.info("TTS conversion in progress (this may take a while for long text)...")
-            
-            # Simple approach: Run runAndWait() in a thread with a timeout
-            # If file exists and is stable after timeout, return success even if runAndWait() is still running
-            # This handles the case where pyttsx3 writes the file but runAndWait() hangs
-            
-            # Calculate reasonable timeout based on text length BEFORE defining monitor_progress
-            # This must be done before monitor_progress() is defined because it references estimated_time
-            # Calculate reasonable timeout based on text length
-            # pyttsx3 typically takes ~0.1-0.2 seconds per character
-            # For very short text (like "Test"), ensure minimum wait time
-            estimated_time = max(10, text_length / 50)  # Conservative estimate, minimum 10s
-            max_wait_time = min(300, estimated_time * 2)  # Max 5 minutes, or 2x estimated time
-            # For status checks with short text, ensure we wait at least 15 seconds
-            if text_length < 10:
-                max_wait_time = max(max_wait_time, 15)  # At least 15 seconds for short text
-            logger.info(f"Estimated conversion time: {estimated_time:.1f}s, max wait: {max_wait_time:.1f}s")
-
-            # Monitor file creation during conversion (pyttsx3 writes file during runAndWait)
-            # Check file size periodically to show progress
-            run_and_wait_called = threading.Event()
-            run_and_wait_returned = threading.Event()
-            
-            def monitor_progress():
-                """Monitor output file size during conversion"""
-                check_interval = 2.0  # Check every 2 seconds
-                last_size = 0
-                no_change_count = 0
-                
-                while not run_and_wait_returned.is_set():
-                    # Check if we should stop before sleeping
-                    if run_and_wait_returned.is_set():
-                        break
-                    
-                    time.sleep(check_interval)
-                    
-                    # Check again after sleep - if conversion is done, exit immediately
-                    if run_and_wait_returned.is_set():
-                        break
-                    
-                    elapsed = time.time() - start_time
-                    
-                    if output_path.exists():
-                        current_size = output_path.stat().st_size
-                        if current_size > last_size:
-                            logger.info(f"TTS conversion progress: {current_size:,} bytes written (elapsed: {elapsed:.1f}s)")
-                            last_size = current_size
-                            no_change_count = 0
-                        else:
-                            no_change_count += 1
-                            # Only log "still in progress" if we haven't detected completion
-                            # Don't log if file size is stable and we're past the expected completion time
-                            if no_change_count >= 3 and elapsed < estimated_time * 1.5:  # Only log if still within reasonable time
-                                logger.info(f"TTS conversion still in progress... (elapsed: {elapsed:.1f}s, file size: {current_size:,} bytes)")
-                                no_change_count = 0
-                    else:
-                        logger.debug(f"TTS conversion in progress... (elapsed: {elapsed:.1f}s, file not created yet)")
-            
-            # Start monitoring thread
-            monitor_thread = threading.Thread(target=monitor_progress, daemon=True)
-            monitor_thread.start()
-            
-            run_and_wait_called.set()
-            
-            # Simplified approach: Run runAndWait() in a thread with timeout
-            # Check file stability periodically - if file is stable for a few seconds, return success
-            # This handles the case where pyttsx3 writes the file but runAndWait() hangs
-            
-            # Note: estimated_time and max_wait_time are now calculated above, before monitor_progress()
-            try:
-                # Run conversion in a thread so we can timeout
-                conversion_done = threading.Event()
-                conversion_exception = [None]
-                
-                def run_conversion():
-                    try:
-                        self._engine.runAndWait()
-                        conversion_done.set()
-                    except Exception as e:
-                        conversion_exception[0] = e
-                        conversion_done.set()
-                
-                conversion_thread = threading.Thread(target=run_conversion, daemon=False)
-                conversion_thread.start()
-                
-                # Wait for either completion, timeout, or file stability
-                wait_start = time.time()
-                check_interval = 1.0
-                last_file_size = 0
-                last_stable_time = None
-                file_stable_duration = 0
-                iteration_count = 0
-                
-                while conversion_thread.is_alive():
-                    iteration_count += 1
-                    remaining_timeout = max_wait_time - (time.time() - wait_start)
-                    if remaining_timeout <= 0:
-                        break
-                    
-                    # Check file stability every iteration
-                    if output_path.exists():
-                        try:
-                            current_size = output_path.stat().st_size
-                            current_time = time.time()
-                            
-                            # For very short text (like "Test" in status checks), accept smaller files
-                            # Normal conversions should be > 1000 bytes, but status checks use short text
-                            min_size_threshold = 100 if text_length < 10 else 1000
-                            if current_size > min_size_threshold:
-                                if current_size == last_file_size and last_file_size > 0:
-                                    # Size hasn't changed - track stability duration
-                                    if last_stable_time is None:
-                                        # First time we see stability - start timer
-                                        last_stable_time = current_time
-                                    else:
-                                        file_stable_duration = current_time - last_stable_time
-                                        if file_stable_duration >= 3.0:  # Stable for 3+ seconds
-                                            logger.info(f"File size stable at {current_size:,} bytes for {file_stable_duration:.1f}s - conversion complete")
-                                            # Signal monitor thread to stop
-                                            run_and_wait_returned.set()
-                                            # Try to stop the engine
-                                            try:
-                                                self._engine.stop()
-                                            except:
-                                                pass
-                                            # Return success immediately - don't wait for runAndWait()
-                                            return True
-                                else:
-                                    # Size changed - reset stability timer
-                                    last_stable_time = None
-                                    file_stable_duration = 0
-                                
-                                last_file_size = current_size
-                        except Exception as stat_error:
-                            logger.debug(f"Error checking file size: {stat_error}")
-                    
-                    conversion_thread.join(timeout=check_interval)
-                
-                # If thread is still alive, check file one more time
-                if conversion_thread.is_alive():
-                    if output_path.exists():
-                        try:
-                            file_size = output_path.stat().st_size
-                            # For very short text (like "Test" in status checks), accept smaller files
-                            min_size_threshold = 100 if text_length < 10 else 1000
-                            if file_size > min_size_threshold:
-                                # Wait 2 seconds and check again for stability
-                                time.sleep(2.0)
-                                if output_path.exists():
-                                    new_size = output_path.stat().st_size
-                                    if new_size == file_size:
-                                        logger.warning(f"runAndWait() hanging, but file is stable ({file_size:,} bytes) - returning success")
-                                        # Signal monitor thread to stop
-                                        run_and_wait_returned.set()
-                                        try:
-                                            self._engine.stop()
-                                        except:
-                                            pass
-                                        return True
-                        except Exception as check_error:
-                            logger.debug(f"Error in final file check: {check_error}")
-                    
-                    # File doesn't exist or is too small
-                    logger.error("runAndWait() hanging and file not created or too small - conversion may have failed")
-                    try:
-                        self._engine.stop()
-                    except:
-                        pass
-                    conversion_thread.join(timeout=2.0)
-                    return False
-                
-                # Thread finished - check for exceptions
-                if conversion_exception[0]:
-                    raise conversion_exception[0]
-                    
-            except Exception as run_error:
-                raise
-            
-            run_and_wait_returned.set()
-            
-            # Stop monitoring - set event so monitor thread exits
-            run_and_wait_returned.set()
-            
-            # Give monitor thread a moment to see the event and exit
-            # (it's daemon so it will be killed if main thread exits, but we want clean exit)
-            time.sleep(0.1)
-            
-            conversion_duration = time.time() - start_time
+            self._engine.save_to_file(text, str(output_path))  # type: ignore[attr-defined]
+            self._engine.runAndWait()  # type: ignore[attr-defined]
             
             # Verify file was created
-            # For very short text (like "Test" in status checks), accept smaller files (100+ bytes)
-            # For normal conversions, require larger files (1000+ bytes)
-            min_size_threshold = 100 if text_length < 10 else 1000
-            if output_path.exists():
-                file_size = output_path.stat().st_size
-                if file_size > min_size_threshold:
-                    logger.info(f"✓ pyttsx3 conversion completed in {conversion_duration:.1f}s ({file_size:,} bytes)")
-                    return True
-                elif file_size > 0:
-                    logger.warning(f"pyttsx3 conversion created file but too small ({file_size} bytes < {min_size_threshold} bytes threshold)")
-                    return False
-                else:
-                    logger.error(f"pyttsx3 conversion failed: file is empty (duration: {conversion_duration:.1f}s)")
-                    return False
+            if output_path.exists() and output_path.stat().st_size > 0:
+                return True
             else:
-                logger.error(f"pyttsx3 conversion failed: file not created (duration: {conversion_duration:.1f}s)")
+                logger.error(f"pyttsx3 conversion failed: file not created or empty")
                 return False
                 
         except Exception as e:
@@ -448,5 +229,4 @@ class Pyttsx3Provider(TTSProvider):
     def supports_volume(self) -> bool:
         """pyttsx3 supports volume adjustment"""
         return True
-
 

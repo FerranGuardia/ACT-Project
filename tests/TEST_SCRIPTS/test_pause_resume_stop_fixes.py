@@ -14,14 +14,13 @@ Run from ACT project root:
 
 import sys
 from pathlib import Path
-import time
-import threading
 from typing import Optional
 
-# Add project root to path
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
-sys.path.insert(0, str(project_root / "src"))
+# Add ACT src to path before any imports
+# Use relative path from test file location
+act_src = Path(__file__).parent.parent.parent / "src"
+if str(act_src) not in sys.path:
+    sys.path.insert(0, str(act_src))
 
 # Now import modules
 from processor.pipeline import ProcessingPipeline
@@ -215,7 +214,7 @@ class TestPauseResumeStop:
             ]
             
             print("✓ Testing dot spacing patterns...")
-            for input_text, expected_pattern in test_cases:
+            for input_text, _ in test_cases:
                 cleaned = clean_text(input_text)
                 # Check that problematic patterns are normalized
                 assert ". .." not in cleaned, f"Pattern '. ..' should be normalized in: {input_text}"

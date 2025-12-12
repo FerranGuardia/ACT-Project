@@ -112,6 +112,19 @@ automatically fall back to other providers if the selected provider fails.**
 4. **Better Testing**: Users can test providers before using them
 5. **Predictable Behavior**: Selected provider is used exactly as chosen
 
+## Code Quality Fixes
+
+### Linting and Type Checking
+- Fixed unused imports in `tests/TEST_SCRIPTS/test_pause_resume_stop_fixes.py`:
+  - Removed unused `time` and `threading` imports
+  - Fixed unused variable in test loop
+  - Standardized path setup to match other test files
+- Fixed type checking warnings in `src/tts/providers/pyttsx3_provider.py`:
+  - Added proper type annotations with `Dict[str, Any]` and `List[Dict[str, Any]]`
+  - Added `# type: ignore` comments for pyttsx3 operations (library lacks type stubs)
+  - Added `Any` type annotation for `_engine` attribute
+  - All Pylance warnings resolved
+
 ## Migration Notes
 
 For existing code that specifies providers:
@@ -123,4 +136,5 @@ For existing code that specifies providers:
 ---
 
 Co-authored-by: ACT Development Team
+
 
