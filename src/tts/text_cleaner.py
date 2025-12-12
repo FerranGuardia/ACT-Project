@@ -6,14 +6,14 @@ removing symbols and elements that TTS engines read incorrectly.
 """
 
 import re
-from typing import Optional
+from typing import Optional, Callable
 
 from core.logger import get_logger
 
 logger = get_logger("tts.text_cleaner")
 
 
-def clean_text_for_tts(text: str, base_cleaner: Optional[callable] = None) -> str:
+def clean_text_for_tts(text: str, base_cleaner: Optional[Callable[[str], str]] = None) -> str:
     """
     Clean text for TTS conversion.
     
@@ -33,7 +33,12 @@ def clean_text_for_tts(text: str, base_cleaner: Optional[callable] = None) -> st
     # First, apply base cleaner if provided (removes UI elements, etc.)
     if base_cleaner:
         try:
-            text = base_cleaner(text)
+            cleaned = base_cleaner(text)
+            # Ensure result is a string
+            if not isinstance(cleaned, str):
+                logger.warning(f"Base cleaner returned non-string type: {type(cleaned)}, using original text")
+                cleaned = str(cleaned) if cleaned is not None else ""
+            text = cleaned
         except Exception as e:
             logger.warning(f"Error applying base cleaner: {e}")
     

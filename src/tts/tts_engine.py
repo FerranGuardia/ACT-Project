@@ -6,7 +6,7 @@ Handles conversion of text to audio files using Edge-TTS.
 
 import asyncio
 from pathlib import Path
-from typing import Optional, Callable
+from typing import Optional, Callable, List, Dict, Any
 
 from core.config_manager import get_config
 from core.logger import get_logger
@@ -69,7 +69,7 @@ class TTSEngine:
         self.voice_manager = VoiceManager(provider_manager=self.provider_manager)
         self.base_text_cleaner = base_text_cleaner
 
-    def get_available_voices(self, locale: Optional[str] = None, provider: Optional[str] = None) -> list:
+    def get_available_voices(self, locale: Optional[str] = None, provider: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Get list of available voices.
 
@@ -80,9 +80,11 @@ class TTSEngine:
         Returns:
             List of voice dictionaries
         """
-        return self.voice_manager.get_voices(locale=locale, provider=provider)
+        # VoiceManager returns List[Dict] without type args, but we know it's List[Dict[str, Any]]
+        # Suppress warnings about partially unknown types from VoiceManager
+        return self.voice_manager.get_voices(locale=locale, provider=provider)  # type: ignore[return-value, arg-type]
 
-    def get_voice_list(self, locale: Optional[str] = None, provider: Optional[str] = None) -> list:
+    def get_voice_list(self, locale: Optional[str] = None, provider: Optional[str] = None) -> List[str]:
         """
         Get formatted list of voices for display.
 
@@ -93,7 +95,9 @@ class TTSEngine:
         Returns:
             List of formatted voice strings
         """
-        return self.voice_manager.get_voice_list(locale=locale, provider=provider)
+        # VoiceManager returns List[str]
+        # Suppress warnings about partially unknown types from VoiceManager
+        return self.voice_manager.get_voice_list(locale=locale, provider=provider)  # type: ignore[return-value, arg-type]
 
     def convert_text_to_speech(
         self,
@@ -127,8 +131,10 @@ class TTSEngine:
             voice = self.config.get("tts.voice", "en-US-AndrewNeural")
         
         # Clean voice name (remove any extra formatting)
-        original_voice = voice
-        voice = voice.strip()
+        if voice is not None:
+            voice = voice.strip()
+        else:
+            voice = "en-US-AndrewNeural"  # Fallback if config returns None
         
         # Check provider availability if specified
         if provider:
@@ -137,10 +143,16 @@ class TTSEngine:
                 logger.error(f"Provider '{provider}' is not available")
                 return False
         
+        # Ensure voice is a string at this point
+        if not isinstance(voice, str):
+            logger.error(f"Invalid voice type: {type(voice)}")
+            return False
+        
         # Determine which provider to use for voice lookup
         # If provider is specified, look up voice in that provider only
         # Otherwise, search all providers
-        voice_dict = self.voice_manager.get_voice_by_name(voice, provider=provider)
+        # Suppress warnings about partially unknown return type from VoiceManager
+        voice_dict: Optional[Dict[str, Any]] = self.voice_manager.get_voice_by_name(voice, provider=provider)  # type: ignore[assignment]
         if not voice_dict:
             if provider:
                 # If provider is specified and voice not found, fail (no fallback)
@@ -149,23 +161,34 @@ class TTSEngine:
             else:
                 # If no provider specified, try to find voice in any provider
                 logger.warning(f"Voice '{voice}' not found, searching all providers...")
-                voice_dict = self.voice_manager.get_voice_by_name(voice, provider=None)
+                # Suppress warnings about partially unknown return type from VoiceManager
+                voice_dict = self.voice_manager.get_voice_by_name(voice, provider=None)  # type: ignore[assignment]
                 if not voice_dict:
                     logger.error(f"Voice '{voice}' not found in any provider")
                     return False
         
         # Get the voice ID (prefer id, then ShortName for backward compatibility)
-        voice_id = voice_dict.get("id") or voice_dict.get("ShortName", voice)
+        # Type ignore because voice_dict is Dict[str, Any] but Pylance sees Dict[Unknown, Unknown]
+        voice_id_raw = voice_dict.get("id") or voice_dict.get("ShortName", voice)  # type: ignore[arg-type]
+        voice_id: str = str(voice_id_raw) if voice_id_raw is not None else voice
         if voice_id != voice:
             logger.info(f"Using voice ID '{voice_id}' instead of '{voice}'")
             voice = voice_id
         
         # If provider wasn't specified, try to determine it from voice_dict
         if provider is None and "provider" in voice_dict:
-            provider = voice_dict.get("provider")
-            logger.info(f"Using provider '{provider}' from voice metadata")
+            provider_value = voice_dict.get("provider")  # type: ignore[arg-type]
+            if isinstance(provider_value, str):
+                provider = provider_value
+                logger.info(f"Using provider '{provider}' from voice metadata")
         
-        logger.info(f"Voice '{voice}' validated successfully (Locale: {voice_dict.get('language') or voice_dict.get('Locale', 'unknown')}, Gender: {voice_dict.get('gender') or voice_dict.get('Gender', 'unknown')})")
+        # Get locale and gender for logging
+        # Type ignore because voice_dict is Dict[str, Any] but Pylance sees Dict[Unknown, Unknown]
+        locale_raw = voice_dict.get('language') or voice_dict.get('Locale', 'unknown')  # type: ignore[arg-type]
+        gender_raw = voice_dict.get('gender') or voice_dict.get('Gender', 'unknown')  # type: ignore[arg-type]
+        locale_value: str = str(locale_raw) if locale_raw is not None else 'unknown'
+        gender_value: str = str(gender_raw) if gender_raw is not None else 'unknown'
+        logger.info(f"Voice '{voice}' validated successfully (Locale: {locale_value}, Gender: {gender_value})")
 
         # Get rate, pitch, volume from config if not provided
         if rate is None:
@@ -198,7 +221,7 @@ class TTSEngine:
 
         # Build SSML (only for Edge TTS, other providers may not support it)
         # For now, we'll use SSML if provider is Edge TTS or not specified (backward compatibility)
-        use_ssml_for_provider = (provider is None or provider == "edge_tts")
+        use_ssml_for_provider: bool = bool(provider is None or provider == "edge_tts")
         if use_ssml_for_provider:
             ssml_text = build_ssml(cleaned_text, rate=rate, pitch=pitch, volume=volume)
             use_ssml = ssml_text != cleaned_text
@@ -220,10 +243,14 @@ class TTSEngine:
         logger.info(f"Text size: {text_bytes_size} bytes")
 
         # Check if we need chunking (only for Edge TTS)
-        needs_chunking = (provider is None or provider == "edge_tts") and text_bytes_size > MAX_BYTES
+        needs_chunking: bool = bool((provider is None or provider == "edge_tts") and text_bytes_size > MAX_BYTES)
         
         if needs_chunking:
             # Use chunking for Edge TTS (legacy behavior)
+            # Ensure voice is a string
+            if not isinstance(voice, str):
+                logger.error(f"Voice must be a string, got {type(voice)}")
+                return False
             logger.info(f"Text exceeds {MAX_BYTES} bytes ({text_bytes_size} bytes), chunking for Edge TTS...")
             return self._convert_with_chunking(text_to_convert, voice, output_path, rate, pitch, volume, provider)
         else:
@@ -232,9 +259,17 @@ class TTSEngine:
             # If not specified, use fallback logic
             if provider:
                 logger.info(f"Attempting conversion with provider '{provider}' (no fallback)")
+                if not isinstance(provider, str):
+                    logger.error(f"Provider must be a string, got {type(provider)}")
+                    return False
                 provider_instance = self.provider_manager.get_provider(provider)
                 if not provider_instance or not provider_instance.is_available():
                     logger.error(f"Provider '{provider}' is not available")
+                    return False
+                
+                # Ensure voice is a string
+                if not isinstance(voice, str):
+                    logger.error(f"Voice must be a string, got {type(voice)}")
                     return False
                 
                 return provider_instance.convert_text_to_speech(
@@ -247,6 +282,10 @@ class TTSEngine:
                 )
             else:
                 # No provider specified - use fallback logic
+                # Ensure voice is a string
+                if not isinstance(voice, str):
+                    logger.error(f"Voice must be a string, got {type(voice)}")
+                    return False
                 logger.info(f"Attempting conversion with provider manager (auto fallback)")
                 return self.provider_manager.convert_with_fallback(
                     text=text_to_convert,
@@ -305,7 +344,7 @@ class TTSEngine:
         import tempfile
         import time
         temp_dir = Path(tempfile.gettempdir())
-        chunk_files = []
+        chunk_files: List[Path] = []
         
         try:
             for i, chunk in enumerate(chunks):
@@ -355,7 +394,8 @@ class TTSEngine:
                 
                 file_size = chunk_path.stat().st_size
                 logger.info(f"✓ Chunk {i+1} converted successfully ({file_size} bytes)")
-                chunk_files.append(chunk_path)
+                # chunk_path is Path, chunk_files is List[Path]
+                chunk_files.append(chunk_path)  # type: ignore[arg-type]
                 
                 # Delay between chunks to avoid rate limiting
                 if i < len(chunks) - 1:
@@ -367,12 +407,14 @@ class TTSEngine:
                 logger.error("Failed to merge audio chunks")
                 # Clean up partial chunks
                 for cf in chunk_files:
-                    if cf.exists():
+                    if isinstance(cf, Path) and cf.exists():
                         cf.unlink()
                 return False
             
             # Clean up chunk files
             for cf in chunk_files:
+                if not isinstance(cf, Path):
+                    continue
                 try:
                     if cf.exists():
                         cf.unlink()
@@ -400,6 +442,8 @@ class TTSEngine:
             
             # Clean up partial chunks
             for cf in chunk_files:
+                if not isinstance(cf, Path):
+                    continue
                 try:
                     if cf.exists():
                         cf.unlink()
@@ -408,7 +452,7 @@ class TTSEngine:
             
             return False
 
-    def _chunk_text(self, text: str, max_bytes: int) -> list[str]:
+    def _chunk_text(self, text: str, max_bytes: int) -> List[str]:
         """
         Split text into chunks that don't exceed max_bytes when UTF-8 encoded.
         
@@ -419,7 +463,7 @@ class TTSEngine:
         Returns:
             List of text chunks
         """
-        chunks = []
+        chunks: List[str] = []
         current_chunk = ""
         current_bytes = 0
         
@@ -429,7 +473,7 @@ class TTSEngine:
         sentences = re.split(r'([.!?]\s+)', text)
         
         # Recombine sentences with their punctuation
-        combined_sentences = []
+        combined_sentences: List[str] = []
         for i in range(0, len(sentences) - 1, 2):
             if i + 1 < len(sentences):
                 combined_sentences.append(sentences[i] + sentences[i + 1])
@@ -441,6 +485,9 @@ class TTSEngine:
             combined_sentences = text.split(' ')
         
         for sentence in combined_sentences:
+            # Ensure sentence is a string (it should be from List[str])
+            if not isinstance(sentence, str):
+                continue
             # Ensure sentence has trailing space if it's not the last one
             if sentence != combined_sentences[-1] and not sentence.endswith((' ', '.', '!', '?')):
                 sentence += ' '
@@ -480,8 +527,10 @@ class TTSEngine:
             chunks.append(current_chunk.strip())
         
         # Verify all chunks are within limit
-        verified_chunks = []
+        verified_chunks: List[str] = []
         for chunk in chunks:
+            if not isinstance(chunk, str):
+                continue
             chunk_bytes = len(chunk.encode('utf-8'))
             if chunk_bytes > max_bytes:
                 logger.warning(f"Chunk exceeds limit ({chunk_bytes} > {max_bytes} bytes), splitting further...")
@@ -493,7 +542,7 @@ class TTSEngine:
         
         return verified_chunks
 
-    def _merge_audio_chunks(self, chunk_files: list[Path], output_path: Path) -> bool:
+    def _merge_audio_chunks(self, chunk_files: List[Path], output_path: Path) -> bool:
         """
         Merge multiple audio files into one.
         
@@ -507,14 +556,14 @@ class TTSEngine:
         try:
             # Try using pydub if available
             try:
-                from pydub import AudioSegment
+                from pydub import AudioSegment  # type: ignore[import-untyped]
                 
-                combined = AudioSegment.empty()
+                combined = AudioSegment.empty()  # type: ignore[attr-defined]
                 for chunk_file in chunk_files:
-                    audio = AudioSegment.from_mp3(str(chunk_file))
-                    combined += audio
+                    audio = AudioSegment.from_mp3(str(chunk_file))  # type: ignore[attr-defined]
+                    combined += audio  # type: ignore[assignment]
                 
-                combined.export(str(output_path), format="mp3")
+                combined.export(str(output_path), format="mp3")  # type: ignore[attr-defined]
                 logger.info(f"✓ Merged {len(chunk_files)} audio chunks using pydub")
                 return True
             except ImportError:
