@@ -89,8 +89,8 @@ class VoiceManager:
             name = str(name_raw) if name_raw is not None else "Unknown"
             gender_raw = v.get("gender", "") or v.get("Gender", "")  # type: ignore[arg-type]
             gender = str(gender_raw).capitalize() if gender_raw else ""
-            result.append(f"{name} - {gender}")
-        return result
+            result.append(f"{name} - {gender}")  # type: ignore[arg-type]
+        return result  # type: ignore[return-value]
 
     def get_voice_by_name(self, voice_name: str, provider: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
@@ -180,15 +180,15 @@ class VoiceManager:
                     "Gender": str(gender_raw).capitalize() if gender_raw else "Neutral",
                     "Name": str(name_raw) if name_raw is not None else "",
                 }
-                legacy_voices.append(legacy_voice)
+                legacy_voices.append(legacy_voice)  # type: ignore[arg-type]
             
             # Sort by ShortName
-            legacy_voices.sort(key=lambda x: str(x.get("ShortName", "")) if isinstance(x, dict) else "")  # type: ignore[arg-type]
+            legacy_voices.sort(key=lambda x: str(x.get("ShortName", "")) if isinstance(x, dict) else "")  # type: ignore[arg-type, misc]
             self._voices = legacy_voices
             self._voices_loaded = True
             
             # Save to cache
-            self._save_cache(legacy_voices)
+            self._save_cache(legacy_voices)  # type: ignore[arg-type]
             
             logger.info(f"Loaded {len(legacy_voices)} voices from providers")
         except Exception as e:
@@ -219,15 +219,15 @@ class VoiceManager:
                     "Gender": str(gender_raw).capitalize() if gender_raw else "Neutral",
                     "Name": str(name_raw) if name_raw is not None else "",
                 }
-                legacy_voices.append(legacy_voice)
+                legacy_voices.append(legacy_voice)  # type: ignore[arg-type]
             
             # Sort by ShortName
-            legacy_voices.sort(key=lambda x: str(x.get("ShortName", "")) if isinstance(x, dict) else "")  # type: ignore[arg-type]
+            legacy_voices.sort(key=lambda x: str(x.get("ShortName", "")) if isinstance(x, dict) else "")  # type: ignore[arg-type, misc]
             self._voices = legacy_voices
             self._voices_loaded = True
             
             # Update cache
-            self._save_cache(legacy_voices)
+            self._save_cache(legacy_voices)  # type: ignore[arg-type]
             
             logger.info(f"Refreshed {len(legacy_voices)} voices")
         except Exception as e:
