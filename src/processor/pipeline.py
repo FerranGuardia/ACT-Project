@@ -15,7 +15,7 @@ from scraper.generic_scraper import GenericScraper
 from tts import TTSEngine
 
 from .project_manager import ProjectManager
-from .chapter_manager import ChapterManager, Chapter, ChapterStatus
+from .chapter_manager import Chapter
 from .file_manager import FileManager
 from .progress_tracker import ProgressTracker, ProcessingStatus
 
@@ -139,7 +139,7 @@ class ProcessingPipeline:
     def initialize_project(
         self,
         novel_url: Optional[str] = None,
-        toc_url: str = None,
+        toc_url: Optional[str] = None,
         novel_title: Optional[str] = None,
         novel_author: Optional[str] = None
     ) -> bool:
@@ -570,7 +570,7 @@ class ProcessingPipeline:
         if self.progress_tracker:
             progress_percentage = self.progress_tracker.get_progress_percentage()
         
-        result = {
+        result: Dict[str, Any] = {
             "success": True,
             "total": len(chapters_to_process),
             "completed": completed,

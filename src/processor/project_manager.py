@@ -305,7 +305,7 @@ class ProjectManager:
         if not base_projects_dir.exists():
             return []
         
-        projects = []
+        projects: List[Dict[str, Any]] = []
         for project_dir in base_projects_dir.iterdir():
             if not project_dir.is_dir():
                 continue

@@ -13,16 +13,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
-# Note: These tests need to be run from the ACT project root
-# with the src directory in the Python path
-import sys
-from pathlib import Path
-
-# Add ACT project to path
-act_project = Path(__file__).parent.parent.parent.parent.parent.parent / "ACT"
-if str(act_project / "src") not in sys.path:
-    sys.path.insert(0, str(act_project / "src"))
-
+# Path setup is handled by conftest.py
 from processor.pipeline import ProcessingPipeline
 
 

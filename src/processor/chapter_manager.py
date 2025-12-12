@@ -5,8 +5,8 @@ Manages chapter data structures, sequencing, and metadata
 throughout the processing workflow.
 """
 
-from typing import List, Dict, Optional, Tuple
-from dataclasses import dataclass, field
+from typing import List, Dict, Optional, Any
+from dataclasses import dataclass
 from enum import Enum
 
 from core.logger import get_logger
@@ -47,7 +47,7 @@ class Chapter:
     scraped_at: Optional[str] = None
     converted_at: Optional[str] = None
     
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert chapter to dictionary for serialization."""
         return {
             "number": self.number,
@@ -62,7 +62,7 @@ class Chapter:
         }
     
     @classmethod
-    def from_dict(cls, data: Dict) -> "Chapter":
+    def from_dict(cls, data: Dict[str, Any]) -> "Chapter":
         """Create chapter from dictionary."""
         chapter = cls(
             number=data["number"],
@@ -325,14 +325,14 @@ class ChapterManager:
             summary[status.value] = len(self.get_chapters_by_status(status))
         return summary
     
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert chapter manager to dictionary for serialization."""
         return {
             "chapters": [ch.to_dict() for ch in self.chapters]
         }
     
     @classmethod
-    def from_dict(cls, data: Dict) -> "ChapterManager":
+    def from_dict(cls, data: Dict[str, Any]) -> "ChapterManager":
         """Create chapter manager from dictionary."""
         chapters = [Chapter.from_dict(ch_data) for ch_data in data.get("chapters", [])]
         return cls(chapters=chapters)
