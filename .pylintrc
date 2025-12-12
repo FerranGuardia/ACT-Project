@@ -1,0 +1,71 @@
+[MASTER]
+# Use multiple processes to speed up Pylint
+jobs=0
+
+# Python code to execute, usually for sys.path manipulation
+init-hook='import sys; sys.path.insert(0, "src")'
+
+[MESSAGES CONTROL]
+# Disable specific warnings that are too noisy for our use case
+disable=
+    missing-module-docstring,
+    missing-class-docstring,
+    missing-function-docstring,
+    too-few-public-methods,
+    too-many-arguments,
+    too-many-locals,
+    too-many-branches,
+    too-many-statements,
+    too-many-instance-attributes,
+    too-many-public-methods,
+    too-many-return-statements,
+    too-many-boolean-expressions,
+    import-outside-toplevel,
+    consider-using-f-string,
+    fixme,
+    duplicate-code
+
+# Enable important checks
+enable=
+    unused-import,
+    unused-variable,
+    unused-argument,
+    redefined-outer-name,
+    undefined-variable,
+    import-error,
+    no-name-in-module,
+    wrong-import-order,
+    wrong-import-position
+
+[FORMAT]
+# Maximum number of characters on a single line
+max-line-length=120
+
+# Regexp for a line that is allowed to be longer than the limit
+ignore-long-lines=^\s*(# )?<?https?://\S+>?$
+
+[TYPECHECK]
+# List of members which are set dynamically and missed by pylint
+# Generate members
+generated-members=*
+
+# Ignore imports that cannot be resolved
+ignored-modules=
+    PySide6,
+    edge_tts,
+    pyttsx3,
+    playwright
+
+# Ignore classes that are dynamically generated
+ignored-classes=optparse.Values,thread._local,_thread._local
+
+[BASIC]
+# Good variable names which should always be accepted
+good-names=i,j,k,ex,Run,_,id,pk,db,qs
+
+[IMPORTS]
+# Allow wildcard imports in tests
+allow-wildcard-with-all=yes
+
+# Ignore import errors for test files
+ignore-imports=yes

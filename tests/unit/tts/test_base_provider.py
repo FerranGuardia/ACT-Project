@@ -8,13 +8,9 @@ import sys
 import importlib.util
 from pathlib import Path
 
-# Add ACT src to path before any imports
-# Use relative path from test file location
+# Path setup is handled by conftest.py
+# Direct import using importlib for module loading
 act_src = Path(__file__).parent.parent.parent.parent / "src"
-if str(act_src) not in sys.path:
-    sys.path.insert(0, str(act_src))
-
-# Direct import using importlib to ensure path is set
 base_provider_path = act_src / "tts" / "providers" / "base_provider.py"
 spec = importlib.util.spec_from_file_location("base_provider", base_provider_path)
 base_provider_module = importlib.util.module_from_spec(spec)

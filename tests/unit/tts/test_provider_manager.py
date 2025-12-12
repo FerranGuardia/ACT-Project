@@ -9,11 +9,8 @@ import importlib.util
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
-# Path setup should be handled by conftest.py, but ensure it's set
-# Use relative path from test file location
+# Path setup is handled by conftest.py
 act_src = Path(__file__).parent.parent.parent.parent / "src"
-if str(act_src) not in sys.path:
-    sys.path.insert(0, str(act_src))
 
 # Set up package structure for relative imports
 import types
