@@ -344,6 +344,7 @@ class QueueItemWidget(QWidget):
         info_layout.addWidget(url_label)
         
         self.status_label = QLabel(f"Status: {self.status}")
+        self.status_label.setStyleSheet("color: white;")
         info_layout.addWidget(self.status_label)
         
         # Progress bar (always show, but may be hidden)
@@ -565,7 +566,7 @@ class FullAutoView(QWidget):
         self.current_progress.setValue(0)
         self.current_progress.hide()
         self.current_status = QLabel("No active processing")
-        self.current_status.setStyleSheet(f"color: {COLORS['text_primary']};")
+        self.current_status.setStyleSheet("color: white;")
         self.current_eta = QLabel("")
         self.current_eta.setStyleSheet(f"color: {COLORS['text_secondary']};")
         self.current_eta.hide()

@@ -4,10 +4,11 @@ Landing page for ACT - Mode selection screen.
 This is the first page users see, with cards for each tool/mode.
 """
 
+from pathlib import Path
 from typing import Optional, Callable
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGridLayout
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont, QMouseEvent
+from PySide6.QtGui import QFont, QMouseEvent, QPixmap
 
 from core.logger import get_logger
 from ui.styles import get_card_style, COLORS, FONT_FAMILY
@@ -60,9 +61,9 @@ class ModeCard(QWidget):
         # Description
         desc_label = QLabel(description)
         desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        desc_label.setFont(QFont(FONT_FAMILY, 10))
+        desc_label.setFont(QFont(FONT_FAMILY, 11, QFont.Weight.Medium))
         desc_label.setWordWrap(True)
-        desc_label.setStyleSheet(f"color: {COLORS['text_secondary']};")
+        desc_label.setStyleSheet("color: white;")
         layout.addWidget(desc_label)
         
         self.setLayout(layout)
@@ -105,6 +106,56 @@ class LandingPage(QWidget):
                 background-color: {COLORS['bg_dark']};
             }}
         """)
+        
+        # Logo - add at the top
+        # Try multiple possible filenames and paths
+        possible_filenames = ["logo atc 1.png", "logo.png", "logo_atc_1.png"]
+        possible_paths = [
+            Path(__file__).parent / "images",  # Relative to this file
+            Path(__file__).parent.parent.parent / "src" / "ui" / "images",  # From project root
+        ]
+        
+        logo_path = None
+        for base_path in possible_paths:
+            for filename in possible_filenames:
+                path = base_path / filename
+                if path.exists():
+                    logo_path = path
+                    break
+            if logo_path:
+                break
+        
+        if logo_path and logo_path.exists():
+            logo_label = QLabel()
+            pixmap = QPixmap(str(logo_path))
+            if not pixmap.isNull():
+                # Scale logo to reasonable size (max 200px height, maintain aspect ratio)
+                original_height = pixmap.height()
+                original_width = pixmap.width()
+                
+                if original_height > 200:
+                    pixmap = pixmap.scaledToHeight(200, Qt.TransformationMode.SmoothTransformation)
+                elif original_width > 400:
+                    pixmap = pixmap.scaledToWidth(400, Qt.TransformationMode.SmoothTransformation)
+                
+                logo_label.setPixmap(pixmap)
+                logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                logo_label.setStyleSheet("background: transparent; padding: 20px;")
+                logo_label.setScaledContents(False)  # We handle scaling manually
+                logo_label.setMinimumHeight(pixmap.height() + 40)  # Ensure space for logo
+                logo_label.setMinimumWidth(pixmap.width() + 40)
+                logo_label.show()  # Explicitly show the label
+                main_layout.addWidget(logo_label)
+                logger.info(f"✓ Loaded logo from {logo_path.absolute()} (original: {original_width}x{original_height}, displayed: {pixmap.width()}x{pixmap.height()})")
+            else:
+                logger.error(f"✗ Failed to load logo pixmap from {logo_path.absolute()} - pixmap is null")
+        else:
+            # Log all attempted paths for debugging
+            logger.warning(f"✗ Logo not found. Tried paths:")
+            for path in possible_paths:
+                abs_path = path.absolute()
+                exists = path.exists()
+                logger.warning(f"  - {abs_path} (exists: {exists})")
         
         # Title
         title_label = QLabel("Choose Your Mode")

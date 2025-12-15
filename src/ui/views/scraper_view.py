@@ -286,7 +286,7 @@ class ScraperView(QWidget):
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self.status_label = QLabel("Ready")
-        self.status_label.setStyleSheet(f"color: {COLORS['text_primary']};")
+        self.status_label.setStyleSheet("color: white;")
         progress_layout.addWidget(self.progress_bar)
         progress_layout.addWidget(self.status_label)
         progress_group.setLayout(progress_layout)
