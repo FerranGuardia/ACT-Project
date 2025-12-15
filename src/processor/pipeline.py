@@ -350,8 +350,9 @@ class ProcessingPipeline:
             # Import the formatting function
             from tts.tts_engine import format_chapter_intro
             
-            # Get chapter title (use scraped title or fallback to "Chapter X")
-            chapter_title = title if title else f"Chapter {chapter_num}"
+            # Always use "Chapter X" format for TTS (not the scraped title which might be novel title)
+            # The scraped title is used for filename, but TTS should always say "Chapter 09", etc.
+            chapter_title = f"Chapter {chapter_num}"
             
             # Format text with pauses: 1s pause, chapter title, 1s pause, then content
             formatted_text = format_chapter_intro(chapter_title, content, provider=self.provider)
