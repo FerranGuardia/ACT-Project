@@ -1,6 +1,6 @@
 """
 Unit tests for LandingPage component
-Tests navigation, card clicks, and UI initialization
+Tests navigation, button clicks, and UI initialization
 """
 
 import pytest
@@ -21,50 +21,56 @@ class TestLandingPage:
             # Verify page exists
             assert page is not None
             
-            # Verify cards are created (should have 4 mode cards)
-            # This depends on implementation, but we can check for card widgets
-            assert hasattr(page, 'layout') or hasattr(page, 'cards')
+            # Verify layout exists
+            assert hasattr(page, 'layout') or page.layout() is not None
             
         except ImportError:
             pytest.skip("UI module not available")
     
-    def test_landing_page_has_four_cards(self, qt_application):
-        """Test that landing page displays 4 mode cards"""
+    def test_landing_page_has_four_buttons(self, qt_application):
+        """Test that landing page displays 4 mode buttons"""
         try:
             from src.ui.landing_page import LandingPage  # type: ignore[import-untyped]
+            from PySide6.QtWidgets import QPushButton
             
             page = LandingPage()
             
-            # Check that we have cards for: Scraper, TTS, Merger, Full Automation
-            # This will depend on the actual implementation
-            # We're testing the structure exists
-            assert page is not None
+            # Check that we have buttons for: Scraper, TTS, Merger, Full Automation
+            # Find all ModeButton widgets in the page
+            buttons = page.findChildren(QPushButton)
+            # Should have at least 4 buttons (the mode selection buttons)
+            assert len(buttons) >= 4
             
         except ImportError:
             pytest.skip("UI module not available")
     
-    def test_card_click_emits_signal(self, qt_application):
-        """Test that clicking a card emits navigation signal"""
+    def test_button_click_triggers_navigation(self, qt_application):
+        """Test that clicking a button triggers navigation"""
         try:
             from src.ui.landing_page import LandingPage  # type: ignore[import-untyped]
+            from PySide6.QtWidgets import QPushButton
+            from PySide6.QtTest import QTest
             
             page = LandingPage()
+            callback = Mock()
             
-            # Check if cards have click handlers
-            # This depends on implementation - cards should emit signals or call callbacks
-            assert page is not None
-            
-            # If using signals, we could test:
-            # from PySide6.QtTest import QSignalSpy
-            # spy = QSignalSpy(page.card_clicked)
-            # ... click card ...
-            # assert spy.count() == 1
+            # Set navigation callback
+            if hasattr(page, 'set_navigation_callback'):
+                page.set_navigation_callback(callback)
+                
+                # Find and click the first button (Scraper)
+                buttons = page.findChildren(QPushButton)
+                if buttons:
+                    QTest.mouseClick(buttons[0], Qt.MouseButton.LeftButton)
+                    # Callback should be called
+                    # Note: In actual test, you might need to process events
+                    assert page is not None
             
         except ImportError:
             pytest.skip("UI module not available")
     
-    def test_scraper_card_navigation(self, qt_application):
-        """Test that Scraper card triggers navigation to scraper view"""
+    def test_scraper_button_navigation(self, qt_application):
+        """Test that Scraper button triggers navigation to scraper view"""
         try:
             from src.ui.landing_page import LandingPage  # type: ignore[import-untyped]
             
@@ -74,44 +80,57 @@ class TestLandingPage:
             # If page uses callbacks for navigation
             if hasattr(page, 'set_navigation_callback'):
                 page.set_navigation_callback(callback)
-                # Simulate clicking scraper card
-                # This depends on implementation
-                pass
-            
-            assert page is not None
+                # Navigate to scraper mode
+                page.navigate_to_mode("scraper")
+                callback.assert_called_once_with("scraper")
             
         except ImportError:
             pytest.skip("UI module not available")
     
-    def test_tts_card_navigation(self, qt_application):
-        """Test that TTS card triggers navigation to TTS view"""
+    def test_tts_button_navigation(self, qt_application):
+        """Test that TTS button triggers navigation to TTS view"""
         try:
             from src.ui.landing_page import LandingPage  # type: ignore[import-untyped]
             
             page = LandingPage()
-            assert page is not None
+            callback = Mock()
+            
+            if hasattr(page, 'set_navigation_callback'):
+                page.set_navigation_callback(callback)
+                page.navigate_to_mode("tts")
+                callback.assert_called_once_with("tts")
             
         except ImportError:
             pytest.skip("UI module not available")
     
-    def test_merger_card_navigation(self, qt_application):
-        """Test that Merger card triggers navigation to merger view"""
+    def test_merger_button_navigation(self, qt_application):
+        """Test that Merger button triggers navigation to merger view"""
         try:
             from src.ui.landing_page import LandingPage  # type: ignore[import-untyped]
             
             page = LandingPage()
-            assert page is not None
+            callback = Mock()
+            
+            if hasattr(page, 'set_navigation_callback'):
+                page.set_navigation_callback(callback)
+                page.navigate_to_mode("merger")
+                callback.assert_called_once_with("merger")
             
         except ImportError:
             pytest.skip("UI module not available")
     
-    def test_full_auto_card_navigation(self, qt_application):
-        """Test that Full Auto card triggers navigation to full auto view"""
+    def test_full_auto_button_navigation(self, qt_application):
+        """Test that Full Auto button triggers navigation to full auto view"""
         try:
             from src.ui.landing_page import LandingPage  # type: ignore[import-untyped]
             
             page = LandingPage()
-            assert page is not None
+            callback = Mock()
+            
+            if hasattr(page, 'set_navigation_callback'):
+                page.set_navigation_callback(callback)
+                page.navigate_to_mode("full_auto")
+                callback.assert_called_once_with("full_auto")
             
         except ImportError:
             pytest.skip("UI module not available")

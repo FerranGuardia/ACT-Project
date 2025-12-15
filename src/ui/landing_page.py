@@ -1,83 +1,104 @@
 """
 Landing page for ACT - Mode selection screen.
 
-This is the first page users see, with cards for each tool/mode.
+This is the first page users see, with buttons for each tool/mode.
 """
 
 from pathlib import Path
 from typing import Optional, Callable
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGridLayout
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont, QMouseEvent, QPixmap
+from PySide6.QtGui import QFont, QPixmap
 
 from core.logger import get_logger
-from ui.styles import get_card_style, COLORS, FONT_FAMILY
+from ui.styles import COLORS, FONT_FAMILY
 
 logger = get_logger("ui.landing_page")
 
 
-class ModeCard(QWidget):
+class ModeButton(QPushButton):
     """
-    A card widget representing a mode/tool option.
+    Large button for mode selection with title and description.
     
-    Each card has:
-    - Icon/emoji
+    Each button has:
     - Title
     - Description
     - Click action
     """
     
-    def __init__(self, icon: str, title: str, description: str, callback: Optional[Callable[[], None]] = None, parent: Optional[QWidget] = None):
+    def __init__(self, title: str, description: str, callback: Optional[Callable[[], None]] = None, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.title = title
         self.callback = callback
-        self.setup_ui(icon, title, description)
+        self.setup_ui(title, description)
     
-    def mousePressEvent(self, event: QMouseEvent) -> None:
-        """Handle mouse click on card."""
-        if self.callback:
-            self.callback()
-        super().mousePressEvent(event)
-    
-    def setup_ui(self, icon: str, title: str, description: str):
-        """Set up the card UI."""
-        layout = QVBoxLayout()
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.setSpacing(10)
-        
-        # Icon
-        icon_label = QLabel(icon)
-        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_label.setFont(QFont(FONT_FAMILY, 32))
-        layout.addWidget(icon_label)
+    def setup_ui(self, title: str, description: str):
+        """Set up the button UI."""
+        # Create custom layout for button content
+        button_layout = QVBoxLayout()
+        button_layout.setSpacing(5)
+        button_layout.setContentsMargins(20, 15, 20, 15)
         
         # Title
         title_label = QLabel(title)
-        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title_label.setFont(QFont(FONT_FAMILY, 14, QFont.Weight.Bold))
-        title_label.setStyleSheet(f"color: {COLORS['text_primary']};")
-        layout.addWidget(title_label)
+        title_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        title_label.setFont(QFont(FONT_FAMILY, 16, QFont.Weight.Bold))
+        title_label.setStyleSheet("color: white; background: transparent;")
         
         # Description
         desc_label = QLabel(description)
-        desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        desc_label.setFont(QFont(FONT_FAMILY, 11, QFont.Weight.Medium))
+        desc_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        desc_label.setFont(QFont(FONT_FAMILY, 11))
+        desc_label.setStyleSheet("color: rgb(200, 200, 200); background: transparent;")
         desc_label.setWordWrap(True)
-        desc_label.setStyleSheet("color: white;")
-        layout.addWidget(desc_label)
         
+        button_layout.addWidget(title_label)
+        button_layout.addWidget(desc_label)
+        
+        # Create container widget
+        container = QWidget()
+        container.setLayout(button_layout)
+        container.setStyleSheet("background: transparent;")
+        
+        # Set button properties
+        self.setMinimumHeight(100)
+        self.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['bg_medium']};
+                border: 2px solid {COLORS['bg_light']};
+                border-radius: 8px;
+                text-align: left;
+                padding: 0px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['bg_light']};
+                border: 2px solid {COLORS['accent']};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLORS['accent']};
+                border: 2px solid {COLORS['accent_hover']};
+            }}
+        """)
+        
+        # Set the container as button content
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(container)
         self.setLayout(layout)
-        self.setMinimumSize(200, 180)
         
-        # Apply card styling
-        self.setStyleSheet(get_card_style())
+        self.clicked.connect(self._on_clicked)
+    
+    def _on_clicked(self):
+        """Handle button click."""
+        if self.callback:
+            self.callback()
 
 
 class LandingPage(QWidget):
     """
-    Landing page with mode selection cards.
+    Landing page with mode selection buttons.
     
-    Displays cards for:
+    Displays buttons for:
     - Scraper
     - TTS
     - Audio Merger
@@ -164,32 +185,39 @@ class LandingPage(QWidget):
         title_label.setStyleSheet(f"color: {COLORS['text_primary']};")
         main_layout.addWidget(title_label)
         
-        # Mode cards grid
-        cards_layout = QGridLayout()
-        cards_layout.setSpacing(20)
-        cards_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # Mode buttons - vertical list
+        buttons_layout = QVBoxLayout()
+        buttons_layout.setSpacing(15)
+        buttons_layout.setContentsMargins(100, 20, 100, 20)
         
-        # Row 1: Scraper, TTS, Merger
-        scraper_card = ModeCard("📥", "Scraper", "Extract text content\nfrom webnovels", 
-                               callback=lambda: self.navigate_to_mode("scraper"))
-        tts_card = ModeCard("🔊", "Text-to-Speech", "Convert text files\nto audio",
-                           callback=lambda: self.navigate_to_mode("tts"))
-        merger_card = ModeCard("🔗", "Audio Merger", "Combine multiple\naudio files into one",
-                              callback=lambda: self.navigate_to_mode("merger"))
+        scraper_btn = ModeButton(
+            "Scraper",
+            "Extract text content from webnovels",
+            callback=lambda: self.navigate_to_mode("scraper")
+        )
+        tts_btn = ModeButton(
+            "Text-to-Speech",
+            "Convert text files to audio",
+            callback=lambda: self.navigate_to_mode("tts")
+        )
+        merger_btn = ModeButton(
+            "Audio Merger",
+            "Combine multiple audio files into one",
+            callback=lambda: self.navigate_to_mode("merger")
+        )
+        full_auto_btn = ModeButton(
+            "Full Automation",
+            "Complete pipeline: Scrape → TTS → Merge",
+            callback=lambda: self.navigate_to_mode("full_auto")
+        )
         
-        cards_layout.addWidget(scraper_card, 0, 0)
-        cards_layout.addWidget(tts_card, 0, 1)
-        cards_layout.addWidget(merger_card, 0, 2)
+        buttons_layout.addWidget(scraper_btn)
+        buttons_layout.addWidget(tts_btn)
+        buttons_layout.addWidget(merger_btn)
+        buttons_layout.addWidget(full_auto_btn)
+        buttons_layout.addStretch()
         
-        # Row 2: Full Automation (URL to Audio)
-        full_auto_card = ModeCard("⚡", "Full Automation", "Complete pipeline:\nScrape → TTS → Merge",
-                                 callback=lambda: self.navigate_to_mode("full_auto"))
-        cards_layout.addWidget(full_auto_card, 1, 0, 1, 3)  # Span 3 columns
-        
-        # Add cards layout to main layout
-        cards_container = QWidget()
-        cards_container.setLayout(cards_layout)
-        main_layout.addWidget(cards_container)
+        main_layout.addLayout(buttons_layout)
         
         # Add stretch to center everything
         main_layout.addStretch()
