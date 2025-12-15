@@ -254,13 +254,29 @@ class NovelBinScraper(BaseScraper):
         if not content_elem:
             return None
 
-        # Extract paragraphs
-        paragraphs = content_elem.find_all(["p", "div"])  # type: ignore[attr-defined]
+        # Extract paragraphs - prefer p tags, avoid nested duplication
+        # Strategy: Extract all p tags first (they're usually the actual content)
+        # Then extract div tags only if they don't contain p tags (to avoid duplication)
+        paragraphs = content_elem.find_all("p", recursive=True)  # type: ignore[attr-defined]
+        
+        # Also get div elements that don't contain p tags (leaf divs with direct text)
+        divs_without_p = []
+        all_divs = content_elem.find_all("div", recursive=True)  # type: ignore[attr-defined]
+        for div in all_divs:
+            # Only include divs that don't contain p tags (to avoid extracting parent when child is already extracted)
+            if not div.find("p"):  # type: ignore[attr-defined]
+                divs_without_p.append(div)
+        
+        # Combine and process
+        all_elements = paragraphs + divs_without_p
+        
         text_parts: list[str] = []
-        for p in paragraphs:
+        seen_text: set[str] = set()  # Track seen text to avoid duplicates
+        
+        for elem in all_elements:
             if self.check_should_stop():
                 return None
-            text_raw = p.get_text(strip=True)  # type: ignore[attr-defined]
+            text_raw = elem.get_text(strip=True)  # type: ignore[attr-defined]
             text: str = str(text_raw) if text_raw is not None else ""
             if text and len(text) > 20:
                 # Filter out navigation/UI elements
@@ -269,18 +285,27 @@ class NovelBinScraper(BaseScraper):
                     text,
                     re.I,
                 ):
-                    text_parts.append(text)
+                    # Normalize text for comparison (remove extra whitespace)
+                    normalized = re.sub(r"\s+", " ", text.strip())
+                    # Only add if we haven't seen this exact text before
+                    if normalized not in seen_text:
+                        seen_text.add(normalized)
+                        text_parts.append(text)
 
         if not text_parts:
             # Fallback: get all text
             text_raw = content_elem.get_text(separator="\n", strip=True)  # type: ignore[attr-defined]
             text = str(text_raw) if text_raw is not None else ""
             if text and len(text) > 50:
-                lines: list[str] = [
-                    line.strip()
-                    for line in text.split("\n")
-                    if line.strip() and len(line.strip()) > 20
-                ]
+                lines: list[str] = []
+                seen_lines: set[str] = set()
+                for line in text.split("\n"):
+                    line = line.strip()
+                    if line and len(line) > 20:
+                        normalized = re.sub(r"\s+", " ", line)
+                        if normalized not in seen_lines:
+                            seen_lines.add(normalized)
+                            lines.append(line)
                 text_parts = lines
 
         return "\n\n".join(text_parts) if text_parts else None

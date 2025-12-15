@@ -245,13 +245,28 @@ class FileManager:
         """
         Check if audio file exists for a chapter.
         
+        This checks for any audio file matching the chapter number pattern,
+        including files with titles (e.g., chapter_0001_title.mp3).
+        
         Args:
             chapter_num: Chapter number (1-indexed)
             
         Returns:
             True if audio file exists
         """
-        return self.get_audio_file_path(chapter_num).exists()
+        # First check the standard path (without title)
+        standard_path = self.get_audio_file_path(chapter_num)
+        if standard_path.exists():
+            return True
+        
+        # Also check for files with title pattern (chapter_XXXX_*.mp3)
+        if self.audio_dir.exists():
+            pattern = f"chapter_{chapter_num:04d}_*.mp3"
+            matching_files = list(self.audio_dir.glob(pattern))
+            if matching_files:
+                return True
+        
+        return False
     
     def list_text_files(self) -> List[Path]:
         """

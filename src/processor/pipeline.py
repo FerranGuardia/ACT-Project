@@ -512,6 +512,26 @@ class ProcessingPipeline:
                 if ch.number in self.specific_chapters
             ]
         
+        # If skip_if_exists is True, find the first missing chapter and adjust start_from
+        if skip_if_exists and chapters_to_process:
+            first_missing = None
+            for chapter in chapters_to_process:
+                if not self.file_manager.audio_file_exists(chapter.number):
+                    first_missing = chapter.number
+                    break
+            
+            if first_missing is not None:
+                # Filter to only process from first missing chapter onwards
+                chapters_to_process = [
+                    ch for ch in chapters_to_process
+                    if ch.number >= first_missing
+                ]
+                logger.info(f"Resuming from chapter {first_missing} (first missing chapter)")
+            else:
+                # All chapters already exist
+                logger.info("All chapters already processed, nothing to do")
+                chapters_to_process = []
+        
         if max_chapters:
             chapters_to_process = chapters_to_process[:max_chapters]
         

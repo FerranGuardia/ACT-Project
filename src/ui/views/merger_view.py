@@ -284,7 +284,7 @@ class MergerView(QWidget):
         self.output_file_input = QLineEdit()
         self.output_file_input.setPlaceholderText("Select output file...")
         self.browse_file_button = QPushButton("Browse")
-        self.browse_file_button.clicked.connect(self.browse_output_file)
+        # Connection will be made in _connect_handlers() to avoid duplicate
         output_file_layout.addWidget(QLabel("Output File:"))
         output_file_layout.addWidget(self.output_file_input)
         output_file_layout.addWidget(self.browse_file_button)
