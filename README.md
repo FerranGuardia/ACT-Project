@@ -2,7 +2,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-v1.0.0-success)](https://github.com/FerranGuardia/ACT-Project)
+[![Status](https://img.shields.io/badge/Status-v1.1.0-success)](https://github.com/FerranGuardia/ACT-Project)
 
 A complete and modular Python tool for creating audiobooks from webnovels using AI voices. Transform your favorite web novels into high-quality audiobooks with automated scraping, multi-provider text-to-speech, and a modern GUI.
 

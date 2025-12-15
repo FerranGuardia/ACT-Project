@@ -50,7 +50,7 @@ class ConfigManager:
         """
         return {
             "app": {
-                "version": "1.0.0",
+                "version": "1.1.0",
                 "theme": "light",
                 "language": "es",
             },
