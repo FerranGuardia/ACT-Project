@@ -4,11 +4,13 @@ Landing page for ACT - Mode selection screen.
 This is the first page users see, with cards for each tool/mode.
 """
 
+from typing import Optional, Callable
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGridLayout
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QMouseEvent
 
 from core.logger import get_logger
+from ui.styles import get_card_style, COLORS, FONT_FAMILY
 
 logger = get_logger("ui.landing_page")
 
@@ -24,13 +26,13 @@ class ModeCard(QWidget):
     - Click action
     """
     
-    def __init__(self, icon: str, title: str, description: str, callback=None, parent=None):
+    def __init__(self, icon: str, title: str, description: str, callback: Optional[Callable[[], None]] = None, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.title = title
         self.callback = callback
         self.setup_ui(icon, title, description)
     
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: QMouseEvent) -> None:
         """Handle mouse click on card."""
         if self.callback:
             self.callback()
@@ -45,34 +47,29 @@ class ModeCard(QWidget):
         # Icon
         icon_label = QLabel(icon)
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_label.setFont(QFont("Arial", 32))
+        icon_label.setFont(QFont(FONT_FAMILY, 32))
         layout.addWidget(icon_label)
         
         # Title
         title_label = QLabel(title)
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title_label.setFont(QFont("Arial", 14, QFont.Weight.Bold))
+        title_label.setFont(QFont(FONT_FAMILY, 14, QFont.Weight.Bold))
+        title_label.setStyleSheet(f"color: {COLORS['text_primary']};")
         layout.addWidget(title_label)
         
         # Description
         desc_label = QLabel(description)
         desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        desc_label.setFont(QFont("Arial", 10))
+        desc_label.setFont(QFont(FONT_FAMILY, 10))
         desc_label.setWordWrap(True)
+        desc_label.setStyleSheet(f"color: {COLORS['text_secondary']};")
         layout.addWidget(desc_label)
         
         self.setLayout(layout)
         self.setMinimumSize(200, 180)
         
-        # Basic styling (will be enhanced later)
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #2d2d2d;
-                border: 2px solid #3a3a3a;
-                border-radius: 8px;
-                padding: 15px;
-            }
-        """)
+        # Apply card styling
+        self.setStyleSheet(get_card_style())
 
 
 class LandingPage(QWidget):
@@ -86,13 +83,13 @@ class LandingPage(QWidget):
     - Full Automation (URL to Audio)
     """
     
-    def __init__(self, parent=None):
+    def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        self.navigation_callback = None
+        self.navigation_callback: Optional[Callable[[str], None]] = None
         self.setup_ui()
         logger.info("Landing page initialized")
     
-    def set_navigation_callback(self, callback):
+    def set_navigation_callback(self, callback: Callable[[str], None]) -> None:
         """Set callback for navigation (called with mode name)."""
         self.navigation_callback = callback
     
@@ -102,10 +99,18 @@ class LandingPage(QWidget):
         main_layout.setSpacing(30)
         main_layout.setContentsMargins(40, 40, 40, 40)
         
+        # Set background color
+        self.setStyleSheet(f"""
+            QWidget {{
+                background-color: {COLORS['bg_dark']};
+            }}
+        """)
+        
         # Title
         title_label = QLabel("Choose Your Mode")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title_label.setFont(QFont("Arial", 24, QFont.Weight.Bold))
+        title_label.setFont(QFont(FONT_FAMILY, 24, QFont.Weight.Bold))
+        title_label.setStyleSheet(f"color: {COLORS['text_primary']};")
         main_layout.addWidget(title_label)
         
         # Mode cards grid

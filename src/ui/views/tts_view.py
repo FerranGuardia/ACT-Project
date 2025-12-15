@@ -4,7 +4,10 @@ TTS Mode View - Convert text files to audio.
 
 import os
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ui.main_window import MainWindow
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFileDialog,
@@ -16,6 +19,11 @@ from PySide6.QtGui import QFont
 
 from core.logger import get_logger
 from tts import TTSEngine, VoiceManager
+from ui.styles import (
+    get_button_primary_style, get_button_standard_style, get_line_edit_style,
+    get_combo_box_style, get_slider_style, get_group_box_style,
+    get_list_widget_style, get_progress_bar_style, COLORS, FONT_FAMILY
+)
 
 logger = get_logger("ui.tts_view")
 
@@ -158,29 +166,16 @@ class TTSView(QWidget):
         main_layout.setSpacing(20)
         main_layout.setContentsMargins(30, 30, 30, 30)
         
+        # Set background
+        self.setStyleSheet(f"QWidget {{ background-color: {COLORS['bg_dark']}; }}")
+        
         # Back button at the top
         back_button_layout = QHBoxLayout()
         self.back_button = QPushButton("← Back to Home")
         self.back_button.clicked.connect(self._go_back)
         self.back_button.setMinimumHeight(35)
         self.back_button.setMinimumWidth(140)
-        self.back_button.setStyleSheet("""
-            QPushButton {
-                background-color: #4a90e2;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                padding: 6px 12px;
-                font-size: 12px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #357abd;
-            }
-            QPushButton:pressed {
-                background-color: #2a5f8f;
-            }
-        """)
+        self.back_button.setStyleSheet(get_button_primary_style())
         back_button_layout.addWidget(self.back_button)
         back_button_layout.addStretch()
         main_layout.addLayout(back_button_layout)
@@ -191,8 +186,11 @@ class TTSView(QWidget):
         
         buttons_layout = QHBoxLayout()
         self.add_files_button = QPushButton("➕ Add Files")
+        self.add_files_button.setStyleSheet(get_button_standard_style())
         self.add_folder_button = QPushButton("➕ Add Folder")
+        self.add_folder_button.setStyleSheet(get_button_standard_style())
         self.remove_button = QPushButton("Remove Selected")
+        self.remove_button.setStyleSheet(get_button_standard_style())
         self.remove_button.setEnabled(False)
         buttons_layout.addWidget(self.add_files_button)
         buttons_layout.addWidget(self.add_folder_button)
@@ -201,12 +199,14 @@ class TTSView(QWidget):
         input_layout.addLayout(buttons_layout)
         
         self.files_list = QListWidget()
+        self.files_list.setStyleSheet(get_list_widget_style())
         self.files_list.itemSelectionChanged.connect(
             lambda: self.remove_button.setEnabled(len(self.files_list.selectedItems()) > 0)
         )
         input_layout.addWidget(self.files_list)
         
         input_group.setLayout(input_layout)
+        input_group.setStyleSheet(get_group_box_style())
         main_layout.addWidget(input_group)
         
         # Voice settings
@@ -215,18 +215,25 @@ class TTSView(QWidget):
         
         # Provider selector
         provider_layout = QHBoxLayout()
-        provider_layout.addWidget(QLabel("Provider:"))
+        provider_label = QLabel("Provider:")
+        provider_label.setStyleSheet(f"color: {COLORS['text_primary']};")
+        provider_layout.addWidget(provider_label)
         self.provider_combo = QComboBox()
+        self.provider_combo.setStyleSheet(get_combo_box_style())
         # Will be populated by _load_providers()
         provider_layout.addWidget(self.provider_combo)
         provider_layout.addStretch()
         voice_layout.addLayout(provider_layout)
         
         voice_select_layout = QHBoxLayout()
-        voice_select_layout.addWidget(QLabel("Voice:"))
+        voice_label = QLabel("Voice:")
+        voice_label.setStyleSheet(f"color: {COLORS['text_primary']};")
+        voice_select_layout.addWidget(voice_label)
         self.voice_combo = QComboBox()
+        self.voice_combo.setStyleSheet(get_combo_box_style())
         # Will be populated by _load_voices()
         self.preview_button = QPushButton("🔊 Preview")
+        self.preview_button.setStyleSheet(get_button_standard_style())
         voice_select_layout.addWidget(self.voice_combo)
         voice_select_layout.addWidget(self.preview_button)
         voice_select_layout.addStretch()
@@ -234,11 +241,15 @@ class TTSView(QWidget):
         
         # Rate slider
         rate_layout = QHBoxLayout()
-        rate_layout.addWidget(QLabel("Rate:"))
+        rate_label = QLabel("Rate:")
+        rate_label.setStyleSheet(f"color: {COLORS['text_primary']};")
+        rate_layout.addWidget(rate_label)
         self.rate_slider = QSlider(Qt.Orientation.Horizontal)
+        self.rate_slider.setStyleSheet(get_slider_style())
         self.rate_slider.setRange(50, 200)
         self.rate_slider.setValue(100)
         self.rate_label = QLabel("100%")
+        self.rate_label.setStyleSheet(f"color: {COLORS['text_primary']}; min-width: 50px;")
         self.rate_slider.valueChanged.connect(lambda v: self.rate_label.setText(f"{v}%"))
         rate_layout.addWidget(self.rate_slider)
         rate_layout.addWidget(self.rate_label)
@@ -246,11 +257,15 @@ class TTSView(QWidget):
         
         # Pitch slider
         pitch_layout = QHBoxLayout()
-        pitch_layout.addWidget(QLabel("Pitch:"))
+        pitch_label = QLabel("Pitch:")
+        pitch_label.setStyleSheet(f"color: {COLORS['text_primary']};")
+        pitch_layout.addWidget(pitch_label)
         self.pitch_slider = QSlider(Qt.Orientation.Horizontal)
+        self.pitch_slider.setStyleSheet(get_slider_style())
         self.pitch_slider.setRange(-50, 50)
         self.pitch_slider.setValue(0)
         self.pitch_label = QLabel("0")
+        self.pitch_label.setStyleSheet(f"color: {COLORS['text_primary']}; min-width: 50px;")
         self.pitch_slider.valueChanged.connect(lambda v: self.pitch_label.setText(str(v)))
         pitch_layout.addWidget(self.pitch_slider)
         pitch_layout.addWidget(self.pitch_label)
@@ -258,17 +273,22 @@ class TTSView(QWidget):
         
         # Volume slider
         volume_layout = QHBoxLayout()
-        volume_layout.addWidget(QLabel("Volume:"))
+        volume_label = QLabel("Volume:")
+        volume_label.setStyleSheet(f"color: {COLORS['text_primary']};")
+        volume_layout.addWidget(volume_label)
         self.volume_slider = QSlider(Qt.Orientation.Horizontal)
+        self.volume_slider.setStyleSheet(get_slider_style())
         self.volume_slider.setRange(0, 100)
         self.volume_slider.setValue(100)
         self.volume_label = QLabel("100%")
+        self.volume_label.setStyleSheet(f"color: {COLORS['text_primary']}; min-width: 50px;")
         self.volume_slider.valueChanged.connect(lambda v: self.volume_label.setText(f"{v}%"))
         volume_layout.addWidget(self.volume_slider)
         volume_layout.addWidget(self.volume_label)
         voice_layout.addLayout(volume_layout)
         
         voice_group.setLayout(voice_layout)
+        voice_group.setStyleSheet(get_group_box_style())
         main_layout.addWidget(voice_group)
         
         # Output settings
@@ -276,44 +296,58 @@ class TTSView(QWidget):
         output_layout = QVBoxLayout()
         
         output_dir_layout = QHBoxLayout()
+        output_dir_label = QLabel("Output Directory:")
+        output_dir_label.setStyleSheet(f"color: {COLORS['text_primary']};")
         self.output_dir_input = QLineEdit()
+        self.output_dir_input.setStyleSheet(get_line_edit_style())
         self.output_dir_input.setPlaceholderText("Select output directory...")
         self.browse_button = QPushButton("Browse")
+        self.browse_button.setStyleSheet(get_button_standard_style())
         self.browse_button.clicked.connect(self.browse_output_dir)
-        output_dir_layout.addWidget(QLabel("Output Directory:"))
+        output_dir_layout.addWidget(output_dir_label)
         output_dir_layout.addWidget(self.output_dir_input)
         output_dir_layout.addWidget(self.browse_button)
         output_layout.addLayout(output_dir_layout)
         
         format_layout = QHBoxLayout()
-        format_layout.addWidget(QLabel("File Format:"))
+        format_label = QLabel("File Format:")
+        format_label.setStyleSheet(f"color: {COLORS['text_primary']};")
+        format_layout.addWidget(format_label)
         self.format_combo = QComboBox()
+        self.format_combo.setStyleSheet(get_combo_box_style())
         self.format_combo.addItems([".mp3", ".wav", ".ogg"])
         format_layout.addWidget(self.format_combo)
         format_layout.addStretch()
         output_layout.addLayout(format_layout)
         
         output_group.setLayout(output_layout)
+        output_group.setStyleSheet(get_group_box_style())
         main_layout.addWidget(output_group)
         
         # Progress
         progress_group = QGroupBox("Progress")
         progress_layout = QVBoxLayout()
         self.progress_bar = QProgressBar()
+        self.progress_bar.setStyleSheet(get_progress_bar_style())
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self.status_label = QLabel("Ready")
+        self.status_label.setStyleSheet(f"color: {COLORS['text_primary']};")
         progress_layout.addWidget(self.progress_bar)
         progress_layout.addWidget(self.status_label)
         progress_group.setLayout(progress_layout)
+        progress_group.setStyleSheet(get_group_box_style())
         main_layout.addWidget(progress_group)
         
         # Control buttons
         control_layout = QHBoxLayout()
         self.start_button = QPushButton("▶️ Start Conversion")
+        self.start_button.setStyleSheet(get_button_primary_style())
         self.pause_button = QPushButton("⏸️ Pause")
+        self.pause_button.setStyleSheet(get_button_standard_style())
         self.pause_button.setEnabled(False)
         self.stop_button = QPushButton("⏹️ Stop")
+        self.stop_button.setStyleSheet(get_button_standard_style())
         self.stop_button.setEnabled(False)
         control_layout.addWidget(self.start_button)
         control_layout.addWidget(self.pause_button)
@@ -336,24 +370,24 @@ class TTSView(QWidget):
         self.stop_button.clicked.connect(self.stop_conversion)
         self.browse_button.clicked.connect(self.browse_output_dir)
     
-    def _go_back(self):
+    def _go_back(self) -> None:
         """Navigate back to landing page."""
         # Find the main window parent
+        from ui.main_window import MainWindow
         parent = self.parent()
         while parent:
-            if hasattr(parent, 'show_landing_page'):
+            if isinstance(parent, MainWindow):
                 parent.show_landing_page()
                 return
             parent = parent.parent()
         
         # Fallback: try to find MainWindow in the widget hierarchy
         from PySide6.QtWidgets import QMainWindow
-        widget = self
+        widget: Optional[QWidget] = self
         while widget:
-            if isinstance(widget, QMainWindow):
-                if hasattr(widget, 'show_landing_page'):
-                    widget.show_landing_page()
-                    return
+            if isinstance(widget, MainWindow):
+                widget.show_landing_page()
+                return
             widget = widget.parent()
     
     def _load_providers(self):

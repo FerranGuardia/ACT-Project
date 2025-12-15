@@ -4,12 +4,16 @@ Main application window for ACT.
 This is the main window that will contain the landing page with mode selection.
 """
 
-from PySide6.QtWidgets import QMainWindow, QStackedWidget, QToolBar, QPushButton
+from pathlib import Path
+from typing import Optional
+from PySide6.QtWidgets import QMainWindow, QStackedWidget, QToolBar, QPushButton, QWidget
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QFontDatabase, QCloseEvent
 
 from core.logger import get_logger
 from ui.landing_page import LandingPage
 from ui.views import ScraperView, TTSView, MergerView, FullAutoView
+from ui.styles import get_global_style, get_button_primary_style
 
 logger = get_logger("ui.main_window")
 
@@ -32,15 +36,28 @@ class MainWindow(QMainWindow):
     MERGER_VIEW = 3
     FULL_AUTO_VIEW = 4
     
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("ACT - Audiobook Creator Tools")
         self.setMinimumSize(1000, 700)
+        
+        # Load fonts
+        self._load_fonts()
+        
+        # Apply global styles
+        self.setStyleSheet(get_global_style())
         
         # Create toolbar with back button
         self.toolbar = QToolBar("Navigation")
         self.toolbar.setMovable(False)
         self.toolbar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.toolbar.setStyleSheet("""
+            QToolBar {
+                background-color: rgb(27, 29, 35);
+                border: none;
+                spacing: 5px;
+            }
+        """)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.toolbar)
         
         self.back_button = QPushButton("← Back to Home")
@@ -48,24 +65,7 @@ class MainWindow(QMainWindow):
         self.back_button.setVisible(False)  # Hidden on landing page
         self.back_button.setMinimumHeight(35)
         self.back_button.setMinimumWidth(140)
-        # Add some styling to make it more visible
-        self.back_button.setStyleSheet("""
-            QPushButton {
-                background-color: #4a90e2;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                padding: 6px 12px;
-                font-size: 12px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #357abd;
-            }
-            QPushButton:pressed {
-                background-color: #2a5f8f;
-            }
-        """)
+        self.back_button.setStyleSheet(get_button_primary_style())
         self.toolbar.addWidget(self.back_button)
         self.toolbar.setVisible(True)  # Always show toolbar
         
@@ -98,14 +98,32 @@ class MainWindow(QMainWindow):
         
         logger.info("Main window initialized")
     
-    def _on_view_changed(self, index: int):
+    def _load_fonts(self) -> None:
+        """Load custom fonts for the application."""
+        fonts_dir = Path(__file__).parent / "fonts"
+        segoeui_path = fonts_dir / "segoeui.ttf"
+        segoeuib_path = fonts_dir / "segoeuib.ttf"
+        
+        if segoeui_path.exists():
+            QFontDatabase.addApplicationFont(str(segoeui_path))
+            logger.info("Loaded Segoe UI font")
+        else:
+            logger.warning(f"Font file not found: {segoeui_path}")
+        
+        if segoeuib_path.exists():
+            QFontDatabase.addApplicationFont(str(segoeuib_path))
+            logger.info("Loaded Segoe UI Bold font")
+        else:
+            logger.warning(f"Font file not found: {segoeuib_path}")
+    
+    def _on_view_changed(self, index: int) -> None:
         """Handle view change to update back button visibility."""
         if index == self.LANDING_PAGE:
             self.back_button.setVisible(False)
         else:
             self.back_button.setVisible(True)
     
-    def navigate_to_mode(self, mode: str):
+    def navigate_to_mode(self, mode: str) -> None:
         """Navigate to the specified mode."""
         mode_map = {
             "scraper": self.SCRAPER_VIEW,
@@ -119,13 +137,13 @@ class MainWindow(QMainWindow):
             self.back_button.setVisible(True)
             logger.info(f"Navigated to {mode} view")
     
-    def show_landing_page(self):
+    def show_landing_page(self) -> None:
         """Show the landing page."""
         self.stacked_widget.setCurrentIndex(self.LANDING_PAGE)
         self.back_button.setVisible(False)
         logger.info("Returned to landing page")
     
-    def closeEvent(self, event):
+    def closeEvent(self, event: QCloseEvent) -> None:
         """Handle window close event."""
         logger.info("Main window closing")
         event.accept()

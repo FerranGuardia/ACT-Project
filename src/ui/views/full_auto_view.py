@@ -5,8 +5,11 @@ Full Automation View - Complete pipeline with queue system.
 import os
 import json
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any, cast, TYPE_CHECKING
 from urllib.parse import urlparse
+
+if TYPE_CHECKING:
+    from ui.main_window import MainWindow
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QListWidget,
@@ -21,6 +24,12 @@ from core.logger import get_logger
 from processor import ProcessingPipeline
 from tts import VoiceManager
 from ui.dialogs import ProviderSelectionDialog
+from ui.styles import (
+    get_button_primary_style, get_button_standard_style, get_line_edit_style,
+    get_combo_box_style, get_group_box_style, get_list_widget_style,
+    get_progress_bar_style, get_radio_button_style, get_spin_box_style,
+    COLORS, FONT_FAMILY
+)
 
 logger = get_logger("ui.full_auto_view")
 
@@ -270,7 +279,7 @@ class AddQueueDialog(QDialog):
             self.voice_combo.addItems(["Error loading voices"])
             self.voice_combo.setEnabled(False)
     
-    def get_data(self) -> tuple[str, str, str, str, dict]:
+    def get_data(self) -> tuple[str, str, str, Optional[str], Dict[str, Any]]:
         """Get the entered URL, title, voice, provider, and chapter selection."""
         url = self.url_input.text().strip()
         title = self.title_input.text().strip()
@@ -281,7 +290,7 @@ class AddQueueDialog(QDialog):
         
         # Get chapter selection
         if self.all_chapters_radio.isChecked():
-            chapter_selection = {'type': 'all'}
+            chapter_selection: Dict[str, Any] = {'type': 'all'}
         elif self.range_radio.isChecked():
             chapter_selection = {
                 'type': 'range',
@@ -379,7 +388,7 @@ class ProcessingThread(QThread):
     chapter_update = Signal(int, str, str)  # Chapter num, status, message
     finished = Signal(bool, str)  # Success, message
     
-    def __init__(self, url: str, project_name: str, voice: str = None, provider: str = None, chapter_selection: dict = None, output_folder: str = None, novel_title: str = None):
+    def __init__(self, url: str, project_name: str, voice: Optional[str] = None, provider: Optional[str] = None, chapter_selection: Optional[Dict[str, Any]] = None, output_folder: Optional[str] = None, novel_title: Optional[str] = None):
         super().__init__()
         self.url = url
         self.project_name = project_name
@@ -494,52 +503,50 @@ class FullAutoView(QWidget):
         
         # Back button at the top
         back_button_layout = QHBoxLayout()
+        # Set background
+        self.setStyleSheet(f"QWidget {{ background-color: {COLORS['bg_dark']}; }}")
+        
         self.back_button = QPushButton("← Back to Home")
         self.back_button.clicked.connect(self._go_back)
         self.back_button.setMinimumHeight(35)
         self.back_button.setMinimumWidth(140)
-        self.back_button.setStyleSheet("""
-            QPushButton {
-                background-color: #4a90e2;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                padding: 6px 12px;
-                font-size: 12px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #357abd;
-            }
-            QPushButton:pressed {
-                background-color: #2a5f8f;
-            }
-        """)
+        self.back_button.setStyleSheet(get_button_primary_style())
         back_button_layout.addWidget(self.back_button)
         back_button_layout.addStretch()
         main_layout.addLayout(back_button_layout)
         
         # Control buttons
         controls_group = QGroupBox("Controls")
+        controls_group.setStyleSheet(get_group_box_style())
         controls_layout = QHBoxLayout()
         self.add_queue_button = QPushButton("➕ Add to Queue")
+        self.add_queue_button.setStyleSheet(get_button_primary_style())
         self.clear_queue_button = QPushButton("🗑️ Clear Queue")
+        self.clear_queue_button.setStyleSheet(get_button_standard_style())
         self.start_button = QPushButton("▶️ Start Processing")
+        self.start_button.setStyleSheet(get_button_primary_style())
         self.pause_button = QPushButton("⏸️ Pause")
+        self.pause_button.setStyleSheet(get_button_standard_style())
         self.pause_button.setEnabled(False)
+        self.stop_button = QPushButton("⏹️ Stop")
+        self.stop_button.setStyleSheet(get_button_standard_style())
+        self.stop_button.setEnabled(False)
         controls_layout.addWidget(self.add_queue_button)
         controls_layout.addWidget(self.clear_queue_button)
         controls_layout.addWidget(self.start_button)
         controls_layout.addWidget(self.pause_button)
+        controls_layout.addWidget(self.stop_button)
         controls_layout.addStretch()
         controls_group.setLayout(controls_layout)
         main_layout.addWidget(controls_group)
         
         # Queue list
         queue_group = QGroupBox("Queue")
+        queue_group.setStyleSheet(get_group_box_style())
         queue_layout = QVBoxLayout()
         
         self.queue_list = QListWidget()
+        self.queue_list.setStyleSheet(get_list_widget_style())
         self.queue_list.setSpacing(5)
         
         queue_layout.addWidget(self.queue_list)
@@ -548,15 +555,19 @@ class FullAutoView(QWidget):
         
         # Current processing
         current_group = QGroupBox("Currently Processing")
+        current_group.setStyleSheet(get_group_box_style())
         current_layout = QVBoxLayout()
         
         self.current_widget = None  # Will be set when processing starts
         self.current_progress = QProgressBar()
+        self.current_progress.setStyleSheet(get_progress_bar_style())
         self.current_progress.setRange(0, 100)
         self.current_progress.setValue(0)
         self.current_progress.hide()
         self.current_status = QLabel("No active processing")
+        self.current_status.setStyleSheet(f"color: {COLORS['text_primary']};")
         self.current_eta = QLabel("")
+        self.current_eta.setStyleSheet(f"color: {COLORS['text_secondary']};")
         self.current_eta.hide()
         
         current_layout.addWidget(self.current_status)
@@ -569,7 +580,9 @@ class FullAutoView(QWidget):
         # Global controls
         global_controls_layout = QHBoxLayout()
         self.pause_all_button = QPushButton("⏸️ Pause All")
+        self.pause_all_button.setStyleSheet(get_button_standard_style())
         self.stop_all_button = QPushButton("⏹️ Stop All")
+        self.stop_all_button.setStyleSheet(get_button_standard_style())
         global_controls_layout.addWidget(self.pause_all_button)
         global_controls_layout.addWidget(self.stop_all_button)
         global_controls_layout.addStretch()
@@ -587,24 +600,24 @@ class FullAutoView(QWidget):
         self.pause_all_button.clicked.connect(self.pause_all)
         self.stop_all_button.clicked.connect(self.stop_all)
     
-    def _go_back(self):
+    def _go_back(self) -> None:
         """Navigate back to landing page."""
         # Find the main window parent
+        from ui.main_window import MainWindow
         parent = self.parent()
         while parent:
-            if hasattr(parent, 'show_landing_page'):
+            if isinstance(parent, MainWindow):
                 parent.show_landing_page()
                 return
             parent = parent.parent()
         
         # Fallback: try to find MainWindow in the widget hierarchy
         from PySide6.QtWidgets import QMainWindow
-        widget = self
+        widget: Optional[QWidget] = self
         while widget:
-            if isinstance(widget, QMainWindow):
-                if hasattr(widget, 'show_landing_page'):
-                    widget.show_landing_page()
-                    return
+            if isinstance(widget, MainWindow):
+                widget.show_landing_page()
+                return
             widget = widget.parent()
     
     def _clear_sample_data(self):
@@ -758,11 +771,11 @@ class FullAutoView(QWidget):
         
         # Create and start processing thread
         project_name = item['title'].replace(' ', '_').lower()
-        voice = item.get('voice', 'en-US-AndrewNeural')
-        provider = item.get('provider')
-        chapter_selection = item.get('chapter_selection', {'type': 'all'})
-        output_folder = item.get('output_folder', str(Path.home() / "Desktop"))
-        novel_title = item.get('title', project_name)
+        voice: Optional[str] = item.get('voice', 'en-US-AndrewNeural')
+        provider: Optional[str] = item.get('provider')
+        chapter_selection: Dict[str, Any] = item.get('chapter_selection', {'type': 'all'})
+        output_folder: Optional[str] = item.get('output_folder', str(Path.home() / "Desktop"))
+        novel_title: Optional[str] = item.get('title', project_name)
         self.current_processing = ProcessingThread(
             item['url'], 
             project_name,

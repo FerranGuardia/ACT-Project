@@ -5,8 +5,11 @@ Scraper Mode View - Extract text content from webnovels.
 import os
 import subprocess
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from urllib.parse import urlparse
+
+if TYPE_CHECKING:
+    from ui.main_window import MainWindow
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
@@ -18,6 +21,12 @@ from PySide6.QtGui import QFont
 
 from core.logger import get_logger
 from scraper import GenericScraper
+from ui.styles import (
+    get_button_primary_style, get_button_standard_style, get_line_edit_style,
+    get_combo_box_style, get_group_box_style, get_list_widget_style,
+    get_progress_bar_style, get_radio_button_style, get_spin_box_style,
+    COLORS, FONT_FAMILY
+)
 
 logger = get_logger("ui.scraper_view")
 
@@ -59,7 +68,7 @@ class ScrapingThread(QThread):
             
             # Get chapter URLs
             self.status.emit("Fetching chapter URLs...")
-            chapter_urls = scraper.get_chapter_urls()
+            chapter_urls = scraper.get_chapter_urls(self.url)
             
             if not chapter_urls:
                 self.finished.emit(False, "No chapters found")
@@ -94,7 +103,7 @@ class ScrapingThread(QThread):
                 
                 try:
                     self.status.emit(f"Scraping chapter {idx + 1}/{total}...")
-                    content = scraper.scrape_chapter(chapter_url)
+                    content, title, error_msg = scraper.scrape_chapter(chapter_url)
                     
                     if content:
                         # Save chapter
@@ -106,6 +115,8 @@ class ScrapingThread(QThread):
                             f.write(content)
                         
                         self.file_created.emit(filepath)
+                    elif error_msg:
+                        logger.warning(f"Failed to scrape chapter {idx + 1}: {error_msg}")
                     
                     progress = int((idx + 1) / total * 100)
                     self.progress.emit(progress)
@@ -157,29 +168,16 @@ class ScraperView(QWidget):
         main_layout.setSpacing(20)
         main_layout.setContentsMargins(30, 30, 30, 30)
         
+        # Set background
+        self.setStyleSheet(f"QWidget {{ background-color: {COLORS['bg_dark']}; }}")
+        
         # Back button at the top
         back_button_layout = QHBoxLayout()
         self.back_button = QPushButton("← Back to Home")
         self.back_button.clicked.connect(self._go_back)
         self.back_button.setMinimumHeight(35)
         self.back_button.setMinimumWidth(140)
-        self.back_button.setStyleSheet("""
-            QPushButton {
-                background-color: #4a90e2;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                padding: 6px 12px;
-                font-size: 12px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #357abd;
-            }
-            QPushButton:pressed {
-                background-color: #2a5f8f;
-            }
-        """)
+        self.back_button.setStyleSheet(get_button_primary_style())
         back_button_layout.addWidget(self.back_button)
         back_button_layout.addStretch()
         main_layout.addLayout(back_button_layout)
@@ -188,9 +186,11 @@ class ScraperView(QWidget):
         url_group = QGroupBox("Novel URL")
         url_layout = QVBoxLayout()
         self.url_input = QLineEdit()
+        self.url_input.setStyleSheet(get_line_edit_style())
         self.url_input.setPlaceholderText("https://novel-site.com/novel-name")
         url_layout.addWidget(self.url_input)
         url_group.setLayout(url_layout)
+        url_group.setStyleSheet(get_group_box_style())
         main_layout.addWidget(url_group)
         
         # Chapter selection
@@ -199,32 +199,42 @@ class ScraperView(QWidget):
         self.chapter_group = QButtonGroup()
         
         self.all_chapters_radio = QRadioButton("All chapters")
+        self.all_chapters_radio.setStyleSheet(get_radio_button_style())
         self.all_chapters_radio.setChecked(True)
         self.chapter_group.addButton(self.all_chapters_radio, 0)
         chapter_layout.addWidget(self.all_chapters_radio)
         
         range_layout = QHBoxLayout()
         self.range_radio = QRadioButton("Range:")
+        self.range_radio.setStyleSheet(get_radio_button_style())
         self.chapter_group.addButton(self.range_radio, 1)
         self.from_spin = QSpinBox()
+        self.from_spin.setStyleSheet(get_spin_box_style())
         self.from_spin.setMinimum(1)
         self.from_spin.setMaximum(10000)
         self.from_spin.setValue(1)
         self.to_spin = QSpinBox()
+        self.to_spin.setStyleSheet(get_spin_box_style())
         self.to_spin.setMinimum(1)
         self.to_spin.setMaximum(10000)
         self.to_spin.setValue(50)
         range_layout.addWidget(self.range_radio)
-        range_layout.addWidget(QLabel("from"))
+        from_label = QLabel("from")
+        from_label.setStyleSheet(f"color: {COLORS['text_primary']};")
+        range_layout.addWidget(from_label)
         range_layout.addWidget(self.from_spin)
-        range_layout.addWidget(QLabel("to"))
+        to_label = QLabel("to")
+        to_label.setStyleSheet(f"color: {COLORS['text_primary']};")
+        range_layout.addWidget(to_label)
         range_layout.addWidget(self.to_spin)
         range_layout.addStretch()
         chapter_layout.addLayout(range_layout)
         
         self.specific_radio = QRadioButton("Specific chapters:")
+        self.specific_radio.setStyleSheet(get_radio_button_style())
         self.chapter_group.addButton(self.specific_radio, 2)
         self.specific_input = QLineEdit()
+        self.specific_input.setStyleSheet(get_line_edit_style())
         self.specific_input.setPlaceholderText("1, 5, 10, 15")
         self.specific_input.setEnabled(False)
         self.specific_radio.toggled.connect(self.specific_input.setEnabled)
@@ -232,6 +242,7 @@ class ScraperView(QWidget):
         chapter_layout.addWidget(self.specific_input)
         
         chapter_group.setLayout(chapter_layout)
+        chapter_group.setStyleSheet(get_group_box_style())
         main_layout.addWidget(chapter_group)
         
         # Output settings
@@ -239,44 +250,58 @@ class ScraperView(QWidget):
         output_layout = QVBoxLayout()
         
         output_dir_layout = QHBoxLayout()
+        output_dir_label = QLabel("Output Directory:")
+        output_dir_label.setStyleSheet(f"color: {COLORS['text_primary']};")
         self.output_dir_input = QLineEdit()
+        self.output_dir_input.setStyleSheet(get_line_edit_style())
         self.output_dir_input.setPlaceholderText("Select output directory...")
         self.browse_button = QPushButton("Browse")
+        self.browse_button.setStyleSheet(get_button_standard_style())
         self.browse_button.clicked.connect(self.browse_output_dir)
-        output_dir_layout.addWidget(QLabel("Output Directory:"))
+        output_dir_layout.addWidget(output_dir_label)
         output_dir_layout.addWidget(self.output_dir_input)
         output_dir_layout.addWidget(self.browse_button)
         output_layout.addLayout(output_dir_layout)
         
         format_layout = QHBoxLayout()
-        format_layout.addWidget(QLabel("File Format:"))
+        format_label = QLabel("File Format:")
+        format_label.setStyleSheet(f"color: {COLORS['text_primary']};")
+        format_layout.addWidget(format_label)
         self.format_combo = QComboBox()
+        self.format_combo.setStyleSheet(get_combo_box_style())
         self.format_combo.addItems([".txt", ".md"])
         format_layout.addWidget(self.format_combo)
         format_layout.addStretch()
         output_layout.addLayout(format_layout)
         
         output_group.setLayout(output_layout)
+        output_group.setStyleSheet(get_group_box_style())
         main_layout.addWidget(output_group)
         
         # Progress
         progress_group = QGroupBox("Progress")
         progress_layout = QVBoxLayout()
         self.progress_bar = QProgressBar()
+        self.progress_bar.setStyleSheet(get_progress_bar_style())
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self.status_label = QLabel("Ready")
+        self.status_label.setStyleSheet(f"color: {COLORS['text_primary']};")
         progress_layout.addWidget(self.progress_bar)
         progress_layout.addWidget(self.status_label)
         progress_group.setLayout(progress_layout)
+        progress_group.setStyleSheet(get_group_box_style())
         main_layout.addWidget(progress_group)
         
         # Control buttons
         control_layout = QHBoxLayout()
         self.start_button = QPushButton("▶️ Start Scraping")
+        self.start_button.setStyleSheet(get_button_primary_style())
         self.pause_button = QPushButton("⏸️ Pause")
+        self.pause_button.setStyleSheet(get_button_standard_style())
         self.pause_button.setEnabled(False)
         self.stop_button = QPushButton("⏹️ Stop")
+        self.stop_button.setStyleSheet(get_button_standard_style())
         self.stop_button.setEnabled(False)
         control_layout.addWidget(self.start_button)
         control_layout.addWidget(self.pause_button)
@@ -288,10 +313,13 @@ class ScraperView(QWidget):
         files_group = QGroupBox("Output Files")
         files_layout = QVBoxLayout()
         self.files_list = QListWidget()
+        self.files_list.setStyleSheet(get_list_widget_style())
         self.open_folder_button = QPushButton("📂 Open Folder")
+        self.open_folder_button.setStyleSheet(get_button_standard_style())
         files_layout.addWidget(self.files_list)
         files_layout.addWidget(self.open_folder_button)
         files_group.setLayout(files_layout)
+        files_group.setStyleSheet(get_group_box_style())
         main_layout.addWidget(files_group)
         
         main_layout.addStretch()
@@ -304,25 +332,26 @@ class ScraperView(QWidget):
         self.stop_button.clicked.connect(self.stop_scraping)
         self.open_folder_button.clicked.connect(self.open_output_folder)
     
-    def _go_back(self):
+    def _go_back(self) -> None:
         """Navigate back to landing page."""
         # Find the main window parent
+        from ui.main_window import MainWindow
         parent = self.parent()
         while parent:
-            if hasattr(parent, 'show_landing_page'):
+            if isinstance(parent, MainWindow):
                 parent.show_landing_page()
                 return
             parent = parent.parent()
         
         # Fallback: try to find MainWindow in the widget hierarchy
-        from PySide6.QtWidgets import QMainWindow
-        widget = self
+        from PySide6.QtWidgets import QMainWindow, QWidget
+        widget: Optional[QWidget] = self
         while widget:
-            if isinstance(widget, QMainWindow):
-                if hasattr(widget, 'show_landing_page'):
-                    widget.show_landing_page()
-                    return
-            widget = widget.parent()
+            if isinstance(widget, MainWindow):
+                widget.show_landing_page()
+                return
+            parent = widget.parent()
+            widget = parent if isinstance(parent, QWidget) else None
     
     def _validate_inputs(self) -> tuple[bool, str]:
         """Validate user inputs."""

@@ -4,7 +4,10 @@ Audio Merger View - Combine multiple audio files into one.
 
 import os
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ui.main_window import MainWindow
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFileDialog,
@@ -15,6 +18,11 @@ from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QFont
 
 from core.logger import get_logger
+from ui.styles import (
+    get_button_primary_style, get_button_standard_style, get_line_edit_style,
+    get_group_box_style, get_list_widget_style, get_progress_bar_style,
+    get_spin_box_style, COLORS, FONT_FAMILY
+)
 
 logger = get_logger("ui.merger_view")
 
@@ -178,6 +186,7 @@ class AudioFileItem(QWidget):
         super().__init__(parent)
         self.file_path = file_path
         self.index = index
+        self.button_style = get_button_standard_style()
         self.setup_ui()
     
     def setup_ui(self):
@@ -188,21 +197,25 @@ class AudioFileItem(QWidget):
         # Index label
         index_label = QLabel(f"{self.index}.")
         index_label.setMinimumWidth(30)
+        index_label.setStyleSheet(f"color: {COLORS['text_primary']};")
         layout.addWidget(index_label)
         
         # File name
-        from pathlib import Path
         file_name = Path(self.file_path).name
         name_label = QLabel(file_name)
         name_label.setWordWrap(True)
+        name_label.setStyleSheet(f"color: {COLORS['text_primary']};")
         layout.addWidget(name_label, 1)
         
         # Move buttons
         up_button = QPushButton("↑")
+        up_button.setStyleSheet(self.button_style)
         up_button.setMaximumWidth(30)
         down_button = QPushButton("↓")
+        down_button.setStyleSheet(self.button_style)
         down_button.setMaximumWidth(30)
         remove_button = QPushButton("✖️")
+        remove_button.setStyleSheet(self.button_style)
         remove_button.setMaximumWidth(30)
         
         layout.addWidget(up_button)
@@ -231,27 +244,14 @@ class MergerView(QWidget):
         
         # Back button at the top
         back_button_layout = QHBoxLayout()
+        # Set background
+        self.setStyleSheet(f"QWidget {{ background-color: {COLORS['bg_dark']}; }}")
+        
         self.back_button = QPushButton("← Back to Home")
         self.back_button.clicked.connect(self._go_back)
         self.back_button.setMinimumHeight(35)
         self.back_button.setMinimumWidth(140)
-        self.back_button.setStyleSheet("""
-            QPushButton {
-                background-color: #4a90e2;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                padding: 6px 12px;
-                font-size: 12px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #357abd;
-            }
-            QPushButton:pressed {
-                background-color: #2a5f8f;
-            }
-        """)
+        self.back_button.setStyleSheet(get_button_primary_style())
         back_button_layout.addWidget(self.back_button)
         back_button_layout.addStretch()
         main_layout.addLayout(back_button_layout)
@@ -262,8 +262,11 @@ class MergerView(QWidget):
         
         buttons_layout = QHBoxLayout()
         self.add_files_button = QPushButton("➕ Add Files")
+        self.add_files_button.setStyleSheet(get_button_standard_style())
         self.add_folder_button = QPushButton("➕ Add Folder")
+        self.add_folder_button.setStyleSheet(get_button_standard_style())
         self.auto_sort_button = QPushButton("Auto-sort by filename")
+        self.auto_sort_button.setStyleSheet(get_button_standard_style())
         buttons_layout.addWidget(self.add_files_button)
         buttons_layout.addWidget(self.add_folder_button)
         buttons_layout.addWidget(self.auto_sort_button)
@@ -271,9 +274,11 @@ class MergerView(QWidget):
         files_layout.addLayout(buttons_layout)
         
         self.files_list = QListWidget()
+        self.files_list.setStyleSheet(get_list_widget_style())
         files_layout.addWidget(self.files_list)
         
         files_group.setLayout(files_layout)
+        files_group.setStyleSheet(get_group_box_style())
         main_layout.addWidget(files_group)
         
         # Output settings
@@ -281,18 +286,25 @@ class MergerView(QWidget):
         output_layout = QVBoxLayout()
         
         output_file_layout = QHBoxLayout()
+        output_file_label = QLabel("Output File:")
+        output_file_label.setStyleSheet(f"color: {COLORS['text_primary']};")
         self.output_file_input = QLineEdit()
+        self.output_file_input.setStyleSheet(get_line_edit_style())
         self.output_file_input.setPlaceholderText("Select output file...")
         self.browse_file_button = QPushButton("Browse")
+        self.browse_file_button.setStyleSheet(get_button_standard_style())
         # Connection will be made in _connect_handlers() to avoid duplicate
-        output_file_layout.addWidget(QLabel("Output File:"))
+        output_file_layout.addWidget(output_file_label)
         output_file_layout.addWidget(self.output_file_input)
         output_file_layout.addWidget(self.browse_file_button)
         output_layout.addLayout(output_file_layout)
         
         silence_layout = QHBoxLayout()
-        silence_layout.addWidget(QLabel("Add silence between files:"))
+        silence_label = QLabel("Add silence between files:")
+        silence_label.setStyleSheet(f"color: {COLORS['text_primary']};")
+        silence_layout.addWidget(silence_label)
         self.silence_spin = QSpinBox()
+        self.silence_spin.setStyleSheet(get_spin_box_style())
         self.silence_spin.setRange(0, 10)
         self.silence_spin.setValue(2)
         self.silence_spin.setSuffix(" seconds")
@@ -301,26 +313,33 @@ class MergerView(QWidget):
         output_layout.addLayout(silence_layout)
         
         output_group.setLayout(output_layout)
+        output_group.setStyleSheet(get_group_box_style())
         main_layout.addWidget(output_group)
         
         # Progress
         progress_group = QGroupBox("Progress")
         progress_layout = QVBoxLayout()
         self.progress_bar = QProgressBar()
+        self.progress_bar.setStyleSheet(get_progress_bar_style())
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self.status_label = QLabel("Ready")
+        self.status_label.setStyleSheet(f"color: {COLORS['text_primary']};")
         progress_layout.addWidget(self.progress_bar)
         progress_layout.addWidget(self.status_label)
         progress_group.setLayout(progress_layout)
+        progress_group.setStyleSheet(get_group_box_style())
         main_layout.addWidget(progress_group)
         
         # Control buttons
         control_layout = QHBoxLayout()
         self.start_button = QPushButton("▶️ Start Merging")
+        self.start_button.setStyleSheet(get_button_primary_style())
         self.pause_button = QPushButton("⏸️ Pause")
+        self.pause_button.setStyleSheet(get_button_standard_style())
         self.pause_button.setEnabled(False)
         self.stop_button = QPushButton("⏹️ Stop")
+        self.stop_button.setStyleSheet(get_button_standard_style())
         self.stop_button.setEnabled(False)
         control_layout.addWidget(self.start_button)
         control_layout.addWidget(self.pause_button)
@@ -341,24 +360,24 @@ class MergerView(QWidget):
         self.stop_button.clicked.connect(self.stop_merging)
         self.browse_file_button.clicked.connect(self.browse_output_file)
     
-    def _go_back(self):
+    def _go_back(self) -> None:
         """Navigate back to landing page."""
         # Find the main window parent
+        from ui.main_window import MainWindow
         parent = self.parent()
         while parent:
-            if hasattr(parent, 'show_landing_page'):
+            if isinstance(parent, MainWindow):
                 parent.show_landing_page()
                 return
             parent = parent.parent()
         
         # Fallback: try to find MainWindow in the widget hierarchy
         from PySide6.QtWidgets import QMainWindow
-        widget = self
+        widget: Optional[QWidget] = self
         while widget:
-            if isinstance(widget, QMainWindow):
-                if hasattr(widget, 'show_landing_page'):
-                    widget.show_landing_page()
-                    return
+            if isinstance(widget, MainWindow):
+                widget.show_landing_page()
+                return
             widget = widget.parent()
     
     def add_files(self):
