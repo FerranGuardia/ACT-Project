@@ -478,6 +478,41 @@ def get_spin_box_style() -> str:
     """
 
 
+def get_tab_widget_style() -> str:
+    """Get tab widget style."""
+    return f"""
+    QTabWidget::pane {{
+        border: 1px solid {COLORS['border']};
+        border-radius: 5px;
+        background-color: {COLORS['bg_dark']};
+        top: -1px;
+    }}
+    QTabWidget::tab-bar {{
+        alignment: left;
+    }}
+    QTabBar::tab {{
+        background-color: {COLORS['bg_medium']};
+        color: {COLORS['text_primary']};
+        border: 1px solid {COLORS['border']};
+        border-bottom: none;
+        border-top-left-radius: 5px;
+        border-top-right-radius: 5px;
+        padding: 8px 20px;
+        margin-right: 2px;
+        font-family: '{FONT_FAMILY}';
+        font-size: 10pt;
+    }}
+    QTabBar::tab:selected {{
+        background-color: {COLORS['bg_dark']};
+        color: {COLORS['accent']};
+        border-bottom: 1px solid {COLORS['bg_dark']};
+    }}
+    QTabBar::tab:hover:!selected {{
+        background-color: {COLORS['bg_light']};
+    }}
+    """
+
+
 def get_global_style() -> str:
     """Get global application stylesheet."""
     return f"""
@@ -493,6 +528,7 @@ def get_global_style() -> str:
     {get_label_style()}
     {get_plain_text_edit_style()}
     {get_spin_box_style()}
+    {get_tab_widget_style()}
     """
 
 

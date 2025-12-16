@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFileDialog,
     QListWidget, QProgressBar, QGroupBox, QComboBox, QSlider, QSpinBox, QLineEdit,
-    QMessageBox, QListWidgetItem
+    QMessageBox, QListWidgetItem, QTabWidget, QPlainTextEdit
 )
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QFont
@@ -22,7 +22,8 @@ from tts import TTSEngine, VoiceManager
 from ui.styles import (
     get_button_primary_style, get_button_standard_style, get_line_edit_style,
     get_combo_box_style, get_slider_style, get_group_box_style,
-    get_list_widget_style, get_progress_bar_style, COLORS, FONT_FAMILY
+    get_list_widget_style, get_progress_bar_style, get_plain_text_edit_style,
+    get_tab_widget_style, COLORS, FONT_FAMILY
 )
 
 logger = get_logger("ui.tts_view")
@@ -180,9 +181,18 @@ class TTSView(QWidget):
         back_button_layout.addStretch()
         main_layout.addLayout(back_button_layout)
         
-        # Input files
-        input_group = QGroupBox("Input Files")
+        # Input section with tabs (Files and Text Editor)
+        input_group = QGroupBox("Input")
         input_layout = QVBoxLayout()
+        
+        # Create tab widget
+        self.input_tabs = QTabWidget()
+        self.input_tabs.setStyleSheet(get_tab_widget_style())
+        
+        # Files tab
+        files_tab = QWidget()
+        files_layout = QVBoxLayout()
+        files_layout.setContentsMargins(0, 0, 0, 0)
         
         buttons_layout = QHBoxLayout()
         self.add_files_button = QPushButton("➕ Add Files")
@@ -196,14 +206,36 @@ class TTSView(QWidget):
         buttons_layout.addWidget(self.add_folder_button)
         buttons_layout.addWidget(self.remove_button)
         buttons_layout.addStretch()
-        input_layout.addLayout(buttons_layout)
+        files_layout.addLayout(buttons_layout)
         
         self.files_list = QListWidget()
         self.files_list.setStyleSheet(get_list_widget_style())
         self.files_list.itemSelectionChanged.connect(
             lambda: self.remove_button.setEnabled(len(self.files_list.selectedItems()) > 0)
         )
-        input_layout.addWidget(self.files_list)
+        files_layout.addWidget(self.files_list)
+        
+        files_tab.setLayout(files_layout)
+        self.input_tabs.addTab(files_tab, "Files")
+        
+        # Text Editor tab
+        editor_tab = QWidget()
+        editor_layout = QVBoxLayout()
+        editor_layout.setContentsMargins(0, 0, 0, 0)
+        
+        editor_label = QLabel("Enter or paste text to convert:")
+        editor_label.setStyleSheet(f"color: {COLORS['text_primary']};")
+        editor_layout.addWidget(editor_label)
+        
+        self.text_editor = QPlainTextEdit()
+        self.text_editor.setStyleSheet(get_plain_text_edit_style())
+        self.text_editor.setPlaceholderText("Type or paste your text here...")
+        editor_layout.addWidget(self.text_editor)
+        
+        editor_tab.setLayout(editor_layout)
+        self.input_tabs.addTab(editor_tab, "Text Editor")
+        
+        input_layout.addWidget(self.input_tabs)
         
         input_group.setLayout(input_layout)
         input_group.setStyleSheet(get_group_box_style())
@@ -374,12 +406,12 @@ class TTSView(QWidget):
         """Navigate back to landing page."""
         # Find the main window parent
         from ui.main_window import MainWindow
-        parent = self.parent()
-        while parent:
-            if isinstance(parent, MainWindow):
-                parent.show_landing_page()
+        parent_obj = self.parent()
+        while parent_obj:
+            if isinstance(parent_obj, MainWindow):
+                parent_obj.show_landing_page()
                 return
-            parent = parent.parent()
+            parent_obj = parent_obj.parent()
         
         # Fallback: try to find MainWindow in the widget hierarchy
         from PySide6.QtWidgets import QMainWindow
@@ -388,7 +420,12 @@ class TTSView(QWidget):
             if isinstance(widget, MainWindow):
                 widget.show_landing_page()
                 return
-            widget = widget.parent()
+            # parent() returns QObject | None, need to check if it's a QWidget
+            parent_obj = widget.parent()
+            if isinstance(parent_obj, QWidget):
+                widget = parent_obj
+            else:
+                break
     
     def _load_providers(self):
         """Load available providers into the combo box."""
@@ -527,8 +564,17 @@ class TTSView(QWidget):
         # Get selected provider
         provider = self._get_selected_provider()
         
-        # Sample text for preview
-        sample_text = "Hello, this is a preview of the selected voice."
+        # Use text from editor if editor tab is active and has text, otherwise use sample text
+        current_tab = self.input_tabs.currentIndex()
+        if current_tab == 1:  # Text Editor tab
+            editor_text = self.text_editor.toPlainText().strip()
+            if editor_text:
+                # Use first 200 characters of editor text for preview
+                sample_text = editor_text[:200] + ("..." if len(editor_text) > 200 else "")
+            else:
+                sample_text = "Hello, this is a preview of the selected voice."
+        else:
+            sample_text = "Hello, this is a preview of the selected voice."
         
         try:
             self.status_label.setText("Generating preview...")
@@ -576,8 +622,16 @@ class TTSView(QWidget):
     
     def _validate_inputs(self) -> tuple[bool, str]:
         """Validate user inputs."""
-        if not self.file_paths:
-            return False, "Please add at least one text file to convert"
+        # Check which tab is active
+        current_tab = self.input_tabs.currentIndex()
+        
+        if current_tab == 0:  # Files tab
+            if not self.file_paths:
+                return False, "Please add at least one text file to convert"
+        elif current_tab == 1:  # Text Editor tab
+            editor_text = self.text_editor.toPlainText().strip()
+            if not editor_text:
+                return False, "Please enter text in the editor to convert"
         
         output_dir = self.output_dir_input.text().strip()
         if not output_dir:
@@ -609,9 +663,29 @@ class TTSView(QWidget):
         file_format = self.format_combo.currentText()
         provider = self._get_selected_provider()
         
+        # Determine input source (files or editor)
+        current_tab = self.input_tabs.currentIndex()
+        if current_tab == 1:  # Text Editor tab
+            # Create a temporary file from editor text
+            import tempfile
+            editor_text = self.text_editor.toPlainText()
+            if not editor_text.strip():
+                QMessageBox.warning(self, "Validation Error", "Please enter text in the editor to convert")
+                return
+            
+            # Create temporary file
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt', encoding='utf-8') as tmp:
+                tmp.write(editor_text)
+                temp_file_path = tmp.name
+            
+            # Use temporary file for conversion
+            file_paths_to_convert = [temp_file_path]
+        else:  # Files tab
+            file_paths_to_convert = self.file_paths.copy()
+        
         # Create and start thread
         self.conversion_thread = TTSConversionThread(
-            self.file_paths.copy(),
+            file_paths_to_convert,
             output_dir,
             voice,
             rate,
@@ -631,11 +705,13 @@ class TTSView(QWidget):
         self.stop_button.setEnabled(True)
         self.add_files_button.setEnabled(False)
         self.add_folder_button.setEnabled(False)
+        self.input_tabs.setEnabled(False)
+        self.text_editor.setEnabled(False)
         self.progress_bar.setValue(0)
         
         # Start thread
         self.conversion_thread.start()
-        logger.info(f"Started TTS conversion: {len(self.file_paths)} files")
+        logger.info(f"Started TTS conversion: {len(file_paths_to_convert)} file(s)")
     
     def pause_conversion(self):
         """Pause the conversion operation."""
@@ -673,6 +749,24 @@ class TTSView(QWidget):
         self.stop_button.setEnabled(False)
         self.add_files_button.setEnabled(True)
         self.add_folder_button.setEnabled(True)
+        self.input_tabs.setEnabled(True)
+        self.text_editor.setEnabled(True)
+        
+        # Clean up temporary file if it was created from editor
+        current_tab = self.input_tabs.currentIndex()
+        if current_tab == 1 and self.conversion_thread and self.conversion_thread.file_paths:
+            # Check if first file is a temp file (starts with temp directory)
+            import tempfile
+            temp_dir = tempfile.gettempdir()
+            for file_path in self.conversion_thread.file_paths:
+                if file_path.startswith(temp_dir):
+                    try:
+                        import os
+                        if os.path.exists(file_path):
+                            os.unlink(file_path)
+                            logger.debug(f"Cleaned up temporary file: {file_path}")
+                    except Exception as e:
+                        logger.warning(f"Failed to cleanup temp file {file_path}: {e}")
         
         if success:
             QMessageBox.information(self, "Success", message)
