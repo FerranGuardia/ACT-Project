@@ -4,7 +4,7 @@ TTS Mode View - Convert text files to audio.
 
 import os
 from pathlib import Path
-from typing import Optional, List, TYPE_CHECKING
+from typing import Optional, List, TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from ui.main_window import MainWindow
@@ -14,10 +14,21 @@ from PySide6.QtWidgets import (
     QListWidget, QProgressBar, QGroupBox, QComboBox, QSlider, QSpinBox, QLineEdit,
     QMessageBox, QListWidgetItem, QTabWidget, QPlainTextEdit
 )
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import Qt, QThread, Signal, QUrl
 from PySide6.QtGui import QFont
 
 from core.logger import get_logger
+
+# Try to import QtMultimedia for audio playback, fallback to subprocess if not available
+logger = get_logger("ui.tts_view")
+try:
+    from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
+    QT_MULTIMEDIA_AVAILABLE = True
+except ImportError:
+    QT_MULTIMEDIA_AVAILABLE = False
+    QMediaPlayer = None  # type: ignore[assignment, misc]
+    QAudioOutput = None  # type: ignore[assignment, misc]
+    logger.warning("QtMultimedia not available, preview will use external player")
 from tts import TTSEngine, VoiceManager
 from ui.styles import (
     get_button_primary_style, get_button_standard_style, get_line_edit_style,
@@ -25,8 +36,6 @@ from ui.styles import (
     get_list_widget_style, get_progress_bar_style, get_plain_text_edit_style,
     get_tab_widget_style, COLORS, FONT_FAMILY
 )
-
-logger = get_logger("ui.tts_view")
 
 
 class TTSConversionThread(QThread):
@@ -155,6 +164,18 @@ class TTSView(QWidget):
         self.conversion_thread: Optional[TTSConversionThread] = None
         self.tts_engine = TTSEngine()
         self.voice_manager = VoiceManager()
+        
+        # Audio playback for preview
+        self.preview_player: Optional[Any] = None
+        self.preview_audio_output: Optional[Any] = None
+        self.preview_temp_file: Optional[str] = None
+        if QT_MULTIMEDIA_AVAILABLE and QMediaPlayer is not None and QAudioOutput is not None:
+            self.preview_player = QMediaPlayer()
+            self.preview_audio_output = QAudioOutput()
+            self.preview_player.setAudioOutput(self.preview_audio_output)  # type: ignore[attr-defined]
+            # Connect signals for cleanup
+            self.preview_player.playbackStateChanged.connect(self._on_preview_state_changed)  # type: ignore[attr-defined]
+        
         self.setup_ui()
         self._connect_handlers()
         self._load_providers()
@@ -266,8 +287,12 @@ class TTSView(QWidget):
         # Will be populated by _load_voices()
         self.preview_button = QPushButton("🔊 Preview")
         self.preview_button.setStyleSheet(get_button_standard_style())
+        self.stop_preview_button = QPushButton("⏹️ Stop Preview")
+        self.stop_preview_button.setStyleSheet(get_button_standard_style())
+        self.stop_preview_button.setEnabled(False)
         voice_select_layout.addWidget(self.voice_combo)
         voice_select_layout.addWidget(self.preview_button)
+        voice_select_layout.addWidget(self.stop_preview_button)
         voice_select_layout.addStretch()
         voice_layout.addLayout(voice_select_layout)
         
@@ -397,6 +422,7 @@ class TTSView(QWidget):
         self.remove_button.clicked.connect(self.remove_selected_files)
         self.provider_combo.currentTextChanged.connect(self._on_provider_changed)
         self.preview_button.clicked.connect(self.preview_voice)
+        self.stop_preview_button.clicked.connect(self.stop_preview)
         self.start_button.clicked.connect(self.start_conversion)
         self.pause_button.clicked.connect(self.pause_conversion)
         self.stop_button.clicked.connect(self.stop_conversion)
@@ -561,27 +587,34 @@ class TTSView(QWidget):
             QMessageBox.warning(self, "No Voice", "Please select a voice")
             return
         
+        # Stop any currently playing preview
+        if QT_MULTIMEDIA_AVAILABLE and self.preview_player and QMediaPlayer is not None:
+            if self.preview_player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:  # type: ignore[attr-defined, comparison-overlap]
+                self.preview_player.stop()  # type: ignore[attr-defined]
+        
         # Get selected provider
         provider = self._get_selected_provider()
         
         # Use text from editor if editor tab is active and has text, otherwise use sample text
+        sample_text = "Hello, this is a preview of the selected voice."
         current_tab = self.input_tabs.currentIndex()
         if current_tab == 1:  # Text Editor tab
             editor_text = self.text_editor.toPlainText().strip()
             if editor_text:
                 # Use first 200 characters of editor text for preview
                 sample_text = editor_text[:200] + ("..." if len(editor_text) > 200 else "")
-            else:
-                sample_text = "Hello, this is a preview of the selected voice."
-        else:
-            sample_text = "Hello, this is a preview of the selected voice."
         
         try:
             self.status_label.setText("Generating preview...")
+            self.preview_button.setEnabled(False)
+            
             # Create temporary output file
             import tempfile
             with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tmp:
                 temp_path = tmp.name
+            
+            # Store temp file path for cleanup
+            self.preview_temp_file = temp_path
             
             # Get voice settings
             rate = ((self.rate_slider.value() - 100) / 100) * 50
@@ -600,25 +633,73 @@ class TTSView(QWidget):
             )
             
             if success:
-                # Play the preview (platform-specific)
-                import subprocess
-                import platform
-                if platform.system() == 'Windows':
-                    os.startfile(temp_path)
-                elif platform.system() == 'Darwin':  # macOS
-                    subprocess.run(['afplay', temp_path])
-                else:  # Linux
-                    subprocess.run(['xdg-open', temp_path])
-                
-                self.status_label.setText("Preview playing...")
-                logger.info(f"Preview generated for voice: {voice}")
+                # Play the preview using QMediaPlayer if available
+                if QT_MULTIMEDIA_AVAILABLE and self.preview_player:
+                    self.preview_player.setSource(QUrl.fromLocalFile(temp_path))  # type: ignore[attr-defined]
+                    self.preview_player.play()  # type: ignore[attr-defined]
+                    self.status_label.setText("Preview playing...")
+                    self.stop_preview_button.setEnabled(True)
+                    logger.info(f"Preview playing for voice: {voice}")
+                else:
+                    # Fallback to external player
+                    import subprocess
+                    import platform
+                    if platform.system() == 'Windows':
+                        os.startfile(temp_path)
+                    elif platform.system() == 'Darwin':  # macOS
+                        subprocess.run(['afplay', temp_path])
+                    else:  # Linux
+                        subprocess.run(['xdg-open', temp_path])
+                    self.status_label.setText("Preview playing in external player...")
+                    logger.info(f"Preview opened in external player for voice: {voice}")
             else:
                 QMessageBox.warning(self, "Preview Error", "Failed to generate preview")
                 self.status_label.setText("Ready")
+                self.preview_button.setEnabled(True)
         except Exception as e:
             QMessageBox.warning(self, "Preview Error", f"Error generating preview:\n{str(e)}")
             self.status_label.setText("Ready")
+            self.preview_button.setEnabled(True)
             logger.error(f"Preview error: {e}")
+    
+    def stop_preview(self):
+        """Stop the currently playing preview."""
+        if QT_MULTIMEDIA_AVAILABLE and self.preview_player:
+            self.preview_player.stop()  # type: ignore[attr-defined]
+            self.status_label.setText("Preview stopped")
+            self.stop_preview_button.setEnabled(False)
+            self.preview_button.setEnabled(True)
+            logger.info("Preview stopped by user")
+    
+    def _on_preview_state_changed(self, state):
+        """Handle preview playback state changes for cleanup."""
+        if QT_MULTIMEDIA_AVAILABLE and QMediaPlayer is not None:
+            # When playback stops (finished or stopped), clean up and reset UI
+            if state == QMediaPlayer.PlaybackState.StoppedState:  # type: ignore[comparison-overlap]
+                self.status_label.setText("Ready")
+                self.stop_preview_button.setEnabled(False)
+                self.preview_button.setEnabled(True)
+                
+                # Clean up temporary file after a short delay (in case it's still being used)
+                temp_file = self.preview_temp_file
+                if temp_file:
+                    import os
+                    try:
+                        # Use QTimer to delay cleanup (give OS time to release file handle)
+                        from PySide6.QtCore import QTimer
+                        def cleanup_temp_file():
+                            try:
+                                if temp_file and os.path.exists(temp_file):
+                                    os.unlink(temp_file)
+                                    logger.debug(f"Cleaned up preview temp file: {temp_file}")
+                            except Exception as e:
+                                logger.warning(f"Failed to cleanup preview temp file: {e}")
+                            finally:
+                                self.preview_temp_file = None
+                        
+                        QTimer.singleShot(500, cleanup_temp_file)  # 500ms delay
+                    except Exception as e:
+                        logger.warning(f"Error scheduling temp file cleanup: {e}")
     
     def _validate_inputs(self) -> tuple[bool, str]:
         """Validate user inputs."""
