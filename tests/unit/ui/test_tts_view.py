@@ -193,19 +193,45 @@ class TestTTSView:
         qt_application: QApplication, 
         mock_tts_engine: MagicMock
     ) -> None:
-        """Test that voice preview button generates preview"""
+        """Test that voice preview button generates preview with in-program playback"""
         try:
             from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
             
             view: TTSView = TTSView()  # type: ignore[assignment]
             if hasattr(view, 'tts_engine'):
                 view.tts_engine = mock_tts_engine
+            mock_tts_engine.convert_text_to_speech.return_value = True  # type: ignore[attr-defined]
             
-            if hasattr(view, 'preview_voice'):
-                view.preview_voice()
-                # Should call TTS engine to generate preview
-                if hasattr(mock_tts_engine, 'preview'):
-                    mock_tts_engine.preview.assert_called_once()  # type: ignore[attr-defined]
+            # Set voice
+            if hasattr(view, 'voice_combo'):
+                view.voice_combo.addItem("en-US-AndrewNeural")
+                view.voice_combo.setCurrentIndex(0)
+            
+            # Mock QMediaPlayer if available, otherwise fallback to external player
+            with patch('tempfile.NamedTemporaryFile') as mock_temp:
+                mock_file = MagicMock()
+                mock_file.name = "/tmp/preview.mp3"
+                mock_temp.return_value.__enter__.return_value = mock_file  # type: ignore[attr-defined]
+                
+                # Mock QMediaPlayer if QtMultimedia is available
+                try:
+                    from PySide6.QtMultimedia import QMediaPlayer
+                    with patch.object(view, 'preview_player') as mock_player:
+                        if view.preview_player is not None:
+                            mock_player.setSource = MagicMock()  # type: ignore[assignment]
+                            mock_player.play = MagicMock()  # type: ignore[assignment]
+                            mock_player.playbackState.return_value = QMediaPlayer.PlaybackState.StoppedState  # type: ignore[attr-defined]
+                        
+                        if hasattr(view, 'preview_voice'):
+                            view.preview_voice()
+                            # Should call TTS engine to generate preview
+                            mock_tts_engine.convert_text_to_speech.assert_called()  # type: ignore[attr-defined]
+                except (ImportError, AttributeError):
+                    # Fallback: mock external player
+                    with patch('os.startfile'):
+                        if hasattr(view, 'preview_voice'):
+                            view.preview_voice()
+                            mock_tts_engine.convert_text_to_speech.assert_called()  # type: ignore[attr-defined]
             
         except ImportError:
             pytest.skip("UI module not available")
@@ -648,12 +674,20 @@ class TestTTSView:
             view.voice_combo.addItem("en-US-AndrewNeural")
             view.voice_combo.setCurrentIndex(0)
             
-            # Mock file operations for preview
+            # Mock file operations and audio playback for preview
             with patch('tempfile.NamedTemporaryFile') as mock_temp:
-                with patch('os.startfile'):
-                    mock_file = MagicMock()
-                    mock_file.name = "/tmp/preview.mp3"
-                    mock_temp.return_value.__enter__.return_value = mock_file  # type: ignore[attr-defined]
+                mock_file = MagicMock()
+                mock_file.name = "/tmp/preview.mp3"
+                mock_temp.return_value.__enter__.return_value = mock_file  # type: ignore[attr-defined]
+                
+                # Mock QMediaPlayer if available
+                try:
+                    from PySide6.QtMultimedia import QMediaPlayer
+                    if view.preview_player is not None:
+                        view.preview_player.setSource = MagicMock()  # type: ignore[assignment]
+                        view.preview_player.play = MagicMock()  # type: ignore[assignment]
+                        view.preview_player.playbackState.return_value = QMediaPlayer.PlaybackState.StoppedState  # type: ignore[attr-defined]
+                    
                     view.preview_voice()
                     
                     # Should call convert_text_to_speech with editor text (or first 200 chars)
@@ -662,6 +696,19 @@ class TestTTSView:
                     text_arg = call_kwargs.get('text', '')
                     # Check that the text argument contains editor text
                     assert editor_text[:200] in text_arg or editor_text in text_arg
+                    
+                    # If QMediaPlayer is available, should use it
+                    if view.preview_player is not None:
+                        view.preview_player.setSource.assert_called()  # type: ignore[attr-defined]
+                        view.preview_player.play.assert_called()  # type: ignore[attr-defined]
+                except (ImportError, AttributeError):
+                    # Fallback: mock external player
+                    with patch('os.startfile'):
+                        view.preview_voice()
+                        mock_tts_engine.convert_text_to_speech.assert_called()  # type: ignore[attr-defined]
+                        call_kwargs = mock_tts_engine.convert_text_to_speech.call_args[1]  # type: ignore[attr-defined]
+                        text_arg = call_kwargs.get('text', '')
+                        assert editor_text[:200] in text_arg or editor_text in text_arg
             
         except ImportError:
             pytest.skip("UI module not available")
@@ -689,12 +736,20 @@ class TestTTSView:
             view.voice_combo.addItem("en-US-AndrewNeural")
             view.voice_combo.setCurrentIndex(0)
             
-            # Mock file operations for preview
+            # Mock file operations and audio playback for preview
             with patch('tempfile.NamedTemporaryFile') as mock_temp:
-                with patch('os.startfile'):
-                    mock_file = MagicMock()
-                    mock_file.name = "/tmp/preview.mp3"
-                    mock_temp.return_value.__enter__.return_value = mock_file  # type: ignore[attr-defined]
+                mock_file = MagicMock()
+                mock_file.name = "/tmp/preview.mp3"
+                mock_temp.return_value.__enter__.return_value = mock_file  # type: ignore[attr-defined]
+                
+                # Mock QMediaPlayer if available
+                try:
+                    from PySide6.QtMultimedia import QMediaPlayer
+                    if view.preview_player is not None:
+                        view.preview_player.setSource = MagicMock()  # type: ignore[assignment]
+                        view.preview_player.play = MagicMock()  # type: ignore[assignment]
+                        view.preview_player.playbackState.return_value = QMediaPlayer.PlaybackState.StoppedState  # type: ignore[attr-defined]
+                    
                     view.preview_voice()
                     
                     # Should call convert_text_to_speech with sample text
@@ -703,6 +758,54 @@ class TestTTSView:
                     text_arg = call_kwargs.get('text', '')
                     # Should contain preview sample text
                     assert "preview" in text_arg.lower() or "Hello" in text_arg
+                except (ImportError, AttributeError):
+                    # Fallback: mock external player
+                    with patch('os.startfile'):
+                        view.preview_voice()
+                        mock_tts_engine.convert_text_to_speech.assert_called()  # type: ignore[attr-defined]
+                        call_kwargs = mock_tts_engine.convert_text_to_speech.call_args[1]  # type: ignore[attr-defined]
+                        text_arg = call_kwargs.get('text', '')
+                        assert "preview" in text_arg.lower() or "Hello" in text_arg
+            
+        except ImportError:
+            pytest.skip("UI module not available")
+    
+    def test_stop_preview_button(
+        self, 
+        qt_application: QApplication, 
+        mock_tts_engine: MagicMock
+    ) -> None:
+        """Test that stop preview button stops the currently playing preview"""
+        try:
+            from ui.views.tts_view import TTSView  # type: ignore[import-untyped]
+            
+            view: TTSView = TTSView()  # type: ignore[assignment]
+            view.tts_engine = mock_tts_engine
+            mock_tts_engine.convert_text_to_speech.return_value = True  # type: ignore[attr-defined]
+            
+            # Set voice
+            view.voice_combo.addItem("en-US-AndrewNeural")
+            view.voice_combo.setCurrentIndex(0)
+            
+            # Mock QMediaPlayer if available
+            try:
+                from PySide6.QtMultimedia import QMediaPlayer
+                if view.preview_player is not None:
+                    view.preview_player.stop = MagicMock()  # type: ignore[assignment]
+                    view.preview_player.playbackState.return_value = QMediaPlayer.PlaybackState.PlayingState  # type: ignore[attr-defined]
+                    
+                    # Test stop_preview
+                    if hasattr(view, 'stop_preview'):
+                        view.stop_preview()
+                        # Should call stop on player
+                        view.preview_player.stop.assert_called_once()  # type: ignore[attr-defined]
+                        # Stop button should be disabled
+                        assert view.stop_preview_button.isEnabled() is False
+                        # Preview button should be enabled
+                        assert view.preview_button.isEnabled() is True
+            except (ImportError, AttributeError):
+                # If QMediaPlayer not available, skip this test
+                pytest.skip("QMediaPlayer not available")
             
         except ImportError:
             pytest.skip("UI module not available")

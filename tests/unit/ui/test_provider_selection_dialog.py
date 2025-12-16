@@ -18,9 +18,13 @@ from PySide6.QtCore import Qt
 from typing import List, Tuple, Optional, Dict
 from pathlib import Path as PathType
 
-# Add src to path
-# Path setup is handled by conftest.py
-act_src = Path(__file__).parent.parent.parent.parent / "src"
+# Add project root and src to path (matching conftest.py approach)
+project_root = Path(__file__).parent.parent.parent.parent
+src_path = project_root / "src"
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
 
 # Mock external dependencies BEFORE any imports
 sys.modules["edge_tts"] = MagicMock()
@@ -44,42 +48,60 @@ if "core.config_manager" not in sys.modules:
     config_module.get_config = mock_get_config  # type: ignore[attr-defined]
     sys.modules["core.config_manager"] = config_module
 
-# Mock tts modules
+# Ensure ui is recognized as a package before creating submodules
+# Import ui.__init__ to establish it as a package
+try:
+    import ui  # type: ignore[import-untyped]
+except ImportError:
+    # If ui can't be imported, create it as a package
+    ui_module = types.ModuleType("ui")
+    sys.modules["ui"] = ui_module
+
+# Mock ui.main_window before importing ui.dialogs (which imports ui.__init__)
+if "ui.main_window" not in sys.modules:
+    main_window_module = types.ModuleType("ui.main_window")
+    # Create a mock MainWindow class
+    class MockMainWindow:
+        pass
+    main_window_module.MainWindow = MockMainWindow  # type: ignore[attr-defined]
+    sys.modules["ui.main_window"] = main_window_module
+
+# Don't mock ui.dialogs - we need to import it for real
+# Only mock other ui modules if needed
+if "ui.views" not in sys.modules:
+    sys.modules["ui.views"] = types.ModuleType("ui.views")
+
+# Mock tts module and all its submodules (needed by provider_selection_dialog)
+# IMPORTANT: Do this in one place to avoid conflicts
 if "tts" not in sys.modules:
-    sys.modules["tts"] = types.ModuleType("tts")
+    tts_module = types.ModuleType("tts")
+    # Create a mock TTSEngine class (needed for "from tts import TTSEngine")
+    class MockTTSEngine:
+        pass
+    tts_module.TTSEngine = MockTTSEngine  # type: ignore[attr-defined]
+    sys.modules["tts"] = tts_module
+
+# Mock tts submodules
 if "tts.providers" not in sys.modules:
     sys.modules["tts.providers"] = types.ModuleType("tts.providers")
+# Mock tts.providers.provider_manager with TTSProviderManager class
 if "tts.providers.provider_manager" not in sys.modules:
     provider_manager_module = types.ModuleType("tts.providers.provider_manager")
+    # Create a mock class that can be imported
+    class MockTTSProviderManager:
+        pass
+    provider_manager_module.TTSProviderManager = MockTTSProviderManager  # type: ignore[attr-defined]
     sys.modules["tts.providers.provider_manager"] = provider_manager_module
 if "tts.voice_manager" not in sys.modules:
     sys.modules["tts.voice_manager"] = types.ModuleType("tts.voice_manager")
 if "tts.tts_engine" not in sys.modules:
-    sys.modules["tts.tts_engine"] = types.ModuleType("tts.tts_engine")
-
-# Mock tts.providers.provider_manager before importing dialog
-mock_provider_manager_class = MagicMock()
-if "tts.providers.provider_manager" not in sys.modules:
-    provider_manager_module = types.ModuleType("tts.providers.provider_manager")
-    provider_manager_module.TTSProviderManager = mock_provider_manager_class  # type: ignore[attr-defined]
-    sys.modules["tts.providers.provider_manager"] = provider_manager_module
-
-# Mock ui modules to avoid full import chain
-if "ui" not in sys.modules:
-    sys.modules["ui"] = types.ModuleType("ui")
-if "ui.views" not in sys.modules:
-    sys.modules["ui.views"] = types.ModuleType("ui.views")
-if "ui.main_window" not in sys.modules:
-    sys.modules["ui.main_window"] = types.ModuleType("ui.main_window")
-
-# Mock tts module
-if "tts" not in sys.modules:
-    sys.modules["tts"] = types.ModuleType("tts")
-mock_tts_engine = MagicMock()
-if "tts.tts_engine" not in sys.modules:
     tts_engine_module = types.ModuleType("tts.tts_engine")
-    tts_engine_module.TTSEngine = MagicMock  # type: ignore[attr-defined]
+    class MockTTSEngineClass:
+        pass
+    tts_engine_module.TTSEngine = MockTTSEngineClass  # type: ignore[attr-defined]
     sys.modules["tts.tts_engine"] = tts_engine_module
+
+mock_tts_engine = MagicMock()
 
 # Create QApplication if it doesn't exist
 app_instance = QApplication.instance()
