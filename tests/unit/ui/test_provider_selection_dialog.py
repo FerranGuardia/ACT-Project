@@ -103,11 +103,6 @@ if "tts.tts_engine" not in sys.modules:
 
 mock_tts_engine = MagicMock()
 
-# Create QApplication if it doesn't exist
-app_instance = QApplication.instance()
-if app_instance is None:
-    app = QApplication([])
-
 import pytest
 
 # Import after mocking
@@ -170,7 +165,7 @@ def mock_provider_manager() -> MockProviderManager:
 
 
 @pytest.fixture
-def dialog(mock_provider_manager: MockProviderManager):  # type: ignore[type-arg]
+def dialog(mock_provider_manager: MockProviderManager, qt_application):  # type: ignore[type-arg]
     """Create a provider selection dialog with mocked dependencies"""
     with patch('ui.dialogs.provider_selection_dialog.TTSProviderManager', return_value=mock_provider_manager):
         dialog = ProviderSelectionDialog()  # type: ignore[assignment]
@@ -280,7 +275,7 @@ class TestProviderSelectionDialog:
         provider_name = dialog.get_selected_provider()
         assert provider_name in ["edge_tts", "edge_tts_working", "pyttsx3"]
     
-    def test_current_provider_selected_on_open(self, mock_provider_manager):  # type: ignore[no-untyped-def]
+    def test_current_provider_selected_on_open(self, mock_provider_manager, qt_application):  # type: ignore[no-untyped-def]
         """Test that current provider is selected when dialog opens"""
         with patch('ui.dialogs.provider_selection_dialog.TTSProviderManager', return_value=mock_provider_manager):
             dialog = ProviderSelectionDialog(current_provider="edge_tts")
