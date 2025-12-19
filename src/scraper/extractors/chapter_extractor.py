@@ -1,7 +1,7 @@
 """
-Content scraper module.
+Chapter content extractor module.
 
-Handles scraping chapter content and titles from individual chapter pages.
+Handles extracting chapter content and titles from individual chapter pages.
 """
 
 import re
@@ -29,22 +29,22 @@ except ImportError:
     HAS_CLOUDSCRAPER = False  # type: ignore[constant-redefinition]
     cloudscraper = None  # type: ignore[assignment, misc]
 
-from .chapter_parser import extract_chapter_number
-from .text_cleaner import clean_text
+from ..chapter_parser import extract_chapter_number
+from ..text_cleaner import clean_text
 from core.logger import get_logger
-from .config import (
+from ..config import (
     REQUEST_TIMEOUT,
     REQUEST_DELAY,
     TITLE_SELECTORS,
     CONTENT_SELECTORS,
 )
 
-logger = get_logger("scraper.content_scraper")
+logger = get_logger("scraper.extractors.chapter_extractor")
 
 
-class ContentScraper:
+class ChapterExtractor:
     """
-    Scrapes chapter content and titles from webnovel pages.
+    Extracts chapter content and titles from webnovel pages.
     
     Uses failsafe methods to extract content and titles using
     multiple selector patterns.
@@ -52,7 +52,7 @@ class ContentScraper:
 
     def __init__(self, base_url: str, timeout: int = REQUEST_TIMEOUT, delay: float = REQUEST_DELAY):
         """
-        Initialize the content scraper.
+        Initialize the chapter extractor.
         
         Args:
             base_url: Base URL of the webnovel site

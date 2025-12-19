@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 from core.logger import get_logger
 from core.config_manager import get_config
 
-from scraper.generic_scraper import GenericScraper
+from scraper import GenericScraper
 from tts import TTSEngine
 
 from .project_manager import ProjectManager

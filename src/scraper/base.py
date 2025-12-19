@@ -14,7 +14,7 @@ from .text_cleaner import clean_text
 from .chapter_parser import extract_chapter_number, sort_chapters_by_number
 from .config import REQUEST_TIMEOUT, REQUEST_DELAY, MAX_RETRIES
 
-logger = get_logger("scraper.base_scraper")
+logger = get_logger("scraper.base")
 
 
 class BaseScraper(ABC):

@@ -1,33 +1,33 @@
 """
-Generic scraper with failsafe methods for webnovel content extraction.
+Novel scraper with failsafe methods for webnovel content extraction.
 
-Combines URL fetching and content scraping modules to provide
+Combines URL extraction and content extraction modules to provide
 a unified interface for webnovel scraping.
 Works for most webnovel sites without site-specific code.
 """
 
 from typing import Optional, Tuple, List, Any
 
-from .base_scraper import BaseScraper
-from .url_fetcher import ChapterUrlFetcher
-from .content_scraper import ContentScraper
+from .base import BaseScraper
+from .extractors.url_extractor import UrlExtractor
+from .extractors.chapter_extractor import ChapterExtractor
 from core.logger import get_logger
 
-logger = get_logger("scraper.generic_scraper")
+logger = get_logger("scraper.novel_scraper")
 
 
-class GenericScraper(BaseScraper):
+class NovelScraper(BaseScraper):
     """
-    Generic scraper with failsafe methods for webnovel sites.
+    Novel scraper with failsafe methods for webnovel sites.
     
-    Combines URL fetching and content scraping modules to provide
+    Combines URL extraction and content extraction modules to provide
     a unified interface. Uses failsafe methods that try multiple
     approaches in order of speed.
     """
 
     def __init__(self, base_url: str, **kwargs: Any):
         """
-        Initialize generic scraper.
+        Initialize novel scraper.
         
         Args:
             base_url: Base URL of the webnovel site
@@ -35,13 +35,13 @@ class GenericScraper(BaseScraper):
         """
         super().__init__(base_url, **kwargs)
         
-        # Initialize URL fetcher and content scraper
-        self.url_fetcher = ChapterUrlFetcher(
+        # Initialize URL extractor and chapter extractor
+        self.url_extractor = UrlExtractor(
             base_url=base_url,
             timeout=self.timeout,
             delay=self.delay
         )
-        self.content_scraper = ContentScraper(
+        self.chapter_extractor = ChapterExtractor(
             base_url=base_url,
             timeout=self.timeout,
             delay=self.delay
@@ -51,7 +51,7 @@ class GenericScraper(BaseScraper):
         """
         Get list of chapter URLs using failsafe methods.
         
-        Delegates to ChapterUrlFetcher which tries methods in order of speed:
+        Delegates to UrlExtractor which tries methods in order of speed:
         1. JavaScript variable extraction
         2. AJAX endpoint discovery
         3. HTML parsing
@@ -66,7 +66,7 @@ class GenericScraper(BaseScraper):
         Returns:
             List of chapter URLs, sorted by chapter number
         """
-        result = self.url_fetcher.fetch(
+        result = self.url_extractor.fetch(
             toc_url, 
             should_stop=self.check_should_stop,  # type: ignore[arg-type]
             min_chapter_number=min_chapter_number,
@@ -81,7 +81,7 @@ class GenericScraper(BaseScraper):
         """
         Scrape a single chapter using failsafe methods.
         
-        Delegates to ContentScraper which uses multiple selector patterns
+        Delegates to ChapterExtractor which uses multiple selector patterns
         to extract content and titles.
         
         Args:
@@ -93,5 +93,5 @@ class GenericScraper(BaseScraper):
             - title: Chapter title
             - error_message: Error message if scraping failed, None otherwise
         """
-        return self.content_scraper.scrape(chapter_url, should_stop=self.check_should_stop)  # type: ignore[arg-type]
+        return self.chapter_extractor.scrape(chapter_url, should_stop=self.check_should_stop)  # type: ignore[arg-type]
 

@@ -62,7 +62,7 @@ def real_provider_manager():
 def real_scraper():
     """Create a real GenericScraper instance for integration testing"""
     try:
-        from scraper.generic_scraper import GenericScraper
+        from scraper import GenericScraper
         scraper = GenericScraper()
         yield scraper
     except ImportError:

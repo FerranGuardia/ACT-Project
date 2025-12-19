@@ -288,7 +288,9 @@ class ProviderSelectionDialog(QDialog):
         
         # Select current provider if provided (after a short delay to allow status checks to start)
         if self.current_provider:
-            QTimer.singleShot(500, lambda: self._select_provider_by_name(self.current_provider))
+            def select_provider():
+                self._select_provider_by_name(self.current_provider)
+            QTimer.singleShot(500, select_provider)
     
     def _populate_provider_list(self):
         """Populate the provider list with all providers."""

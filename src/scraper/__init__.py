@@ -2,16 +2,19 @@
 Scraper module - Content extraction from web sources.
 """
 
-from .generic_scraper import GenericScraper
-from .base_scraper import BaseScraper
-from .url_fetcher import ChapterUrlFetcher
-from .content_scraper import ContentScraper
+from .novel_scraper import NovelScraper
+from .base import BaseScraper
+
+# Backwards compatibility aliases
+GenericScraper = NovelScraper  # Deprecated: use NovelScraper
+ChapterUrlFetcher = None  # Moved to extractors.url_extractor.UrlExtractor
+ContentScraper = None  # Moved to extractors.chapter_extractor.ChapterExtractor
 
 __all__ = [
-    "GenericScraper",
+    "NovelScraper",
     "BaseScraper",
-    "ChapterUrlFetcher",
-    "ContentScraper",
+    # Backwards compatibility
+    "GenericScraper",
 ]
 
 
