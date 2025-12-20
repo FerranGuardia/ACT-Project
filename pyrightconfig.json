@@ -1,0 +1,28 @@
+{
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    "**/node_modules",
+    "**/.pytest_cache"
+  ],
+  "reportMissingImports": "warning",
+  "reportMissingTypeStubs": false,
+  "reportUnusedImport": true,
+  "reportUnusedClass": true,
+  "reportUnusedFunction": true,
+  "reportUnusedVariable": true,
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "basic",
+  "stubPath": "",
+  "venvPath": ".",
+  "venv": "",
+  "ignore": [
+    "**/node_modules",
+    "**/__pycache__",
+    ".pytest_cache"
+  ],
+  "reportMissingModuleSource": false
+}
+

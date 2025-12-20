@@ -9,7 +9,7 @@ Handles extracting chapter URLs from table of contents pages using multiple meth
 5. Follow "next" links (slow but reliable)
 """
 
-from typing import Optional, List, Callable, Dict, Tuple, Set
+from typing import Optional, List, Callable, Dict, Tuple, Set, Any
 
 from ..chapter_parser import (
     extract_chapter_number,

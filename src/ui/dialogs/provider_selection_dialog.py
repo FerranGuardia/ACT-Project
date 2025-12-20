@@ -7,7 +7,7 @@ Shows real-time status and allows testing each provider.
 
 import tempfile
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
@@ -220,7 +220,7 @@ class ProviderSelectionDialog(QDialog):
         self.test_threads: Dict[str, ProviderTestThread] = {}
         
         # Provider status storage
-        self.provider_status: Dict[str, Dict] = {}  # {provider_name: {"available": bool, "message": str, "tested": bool}}
+        self.provider_status: Dict[str, Dict[str, Any]] = {}  # {provider_name: {"available": bool, "message": str, "tested": bool}}
         
         self.setup_ui()
         self._check_all_providers()

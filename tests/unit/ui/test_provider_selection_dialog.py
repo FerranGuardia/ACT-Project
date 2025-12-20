@@ -48,16 +48,8 @@ if "core.config_manager" not in sys.modules:
     config_module.get_config = mock_get_config  # type: ignore[attr-defined]
     sys.modules["core.config_manager"] = config_module
 
-# Ensure ui is recognized as a package before creating submodules
-# Import ui.__init__ to establish it as a package
-try:
-    import ui  # type: ignore[import-untyped]
-except ImportError:
-    # If ui can't be imported, create it as a package
-    ui_module = types.ModuleType("ui")
-    sys.modules["ui"] = ui_module
-
-# Mock ui.main_window before importing ui.dialogs (which imports ui.__init__)
+# Mock ui.main_window BEFORE trying to import ui (since ui.__init__ imports it)
+# This allows the real ui package to be imported without errors
 if "ui.main_window" not in sys.modules:
     main_window_module = types.ModuleType("ui.main_window")
     # Create a mock MainWindow class
@@ -66,10 +58,34 @@ if "ui.main_window" not in sys.modules:
     main_window_module.MainWindow = MockMainWindow  # type: ignore[attr-defined]
     sys.modules["ui.main_window"] = main_window_module
 
-# Don't mock ui.dialogs - we need to import it for real
-# Only mock other ui modules if needed
-if "ui.views" not in sys.modules:
-    sys.modules["ui.views"] = types.ModuleType("ui.views")
+# Ensure no mock ui module exists - we need the real package
+# Remove any existing mock ui from sys.modules if it's not a real package
+if "ui" in sys.modules:
+    ui_module = sys.modules["ui"]
+    # Check if it's a real package (has __file__ or __path__)
+    if not (hasattr(ui_module, "__file__") or hasattr(ui_module, "__path__")):
+        # It's a mock, remove it so we can import the real one
+        del sys.modules["ui"]
+    # Also check for ui.dialogs
+    if "ui.dialogs" in sys.modules:
+        dialogs_module = sys.modules["ui.dialogs"]
+        if not (hasattr(dialogs_module, "__file__") or hasattr(dialogs_module, "__path__")):
+            del sys.modules["ui.dialogs"]
+
+# Import ui package to ensure it's recognized as a package before importing submodules
+# This is necessary because Python needs to know ui is a package, not a module
+try:
+    import ui  # type: ignore[import-untyped]
+    # Also import ui.dialogs to ensure it's recognized as a package
+    import ui.dialogs  # type: ignore[import-untyped]
+except ImportError as e:
+    # If ui can't be imported, we can't run these tests
+    # But don't fail here - let the actual import below fail with a clearer error
+    pass
+
+# Don't mock ui or ui.dialogs - we need to import the real modules
+# Python will import them from the file system since src is in sys.path
+# Only mock the dependencies that provider_selection_dialog needs
 
 # Mock tts module and all its submodules (needed by provider_selection_dialog)
 # IMPORTANT: Do this in one place to avoid conflicts
