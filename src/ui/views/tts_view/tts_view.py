@@ -28,6 +28,9 @@ from ui.views.tts_view.voice_settings import VoiceSettings
 from ui.views.tts_view.output_settings import OutputSettings
 from ui.views.tts_view.progress_section import ProgressSection
 from ui.views.tts_view.handlers import TTSViewHandlers
+from ui.views.tts_view.queue_section import QueueSection
+from ui.views.tts_view.controls_section import TTSControlsSection
+from ui.views.tts_view.queue_item_widget import TTSQueueItemWidget
 
 logger = get_logger("ui.tts_view")
 
@@ -39,6 +42,7 @@ class TTSView(QWidget):
         super().__init__(parent)
         self.file_paths: List[str] = []
         self.conversion_thread: Optional[TTSConversionThread] = None
+        self.queue_items: list = []  # List of queue items
         
         # Initialize handlers
         self.handlers = TTSViewHandlers(self)
@@ -78,43 +82,38 @@ class TTSView(QWidget):
         back_button_layout.addStretch()
         main_layout.addLayout(back_button_layout)
         
-        # Input section
-        self.input_section = InputSection()
+        # Controls section (with queue management buttons)
+        self.controls_section = TTSControlsSection()
+        main_layout.addWidget(self.controls_section)
+        
+        # Queue section
+        self.queue_section = QueueSection()
+        main_layout.addWidget(self.queue_section)
+        
+        # Input sections (for adding to queue)
         from PySide6.QtWidgets import QGroupBox
-        input_group_wrapper = QGroupBox("Input")
+        input_group_wrapper = QGroupBox("Add to Queue")
         input_group_wrapper.setStyleSheet(get_group_box_style())
         input_group_wrapper_layout = QVBoxLayout()
+        
+        # Input section
+        self.input_section = InputSection()
         input_group_wrapper_layout.addWidget(self.input_section)
-        input_group_wrapper.setLayout(input_group_wrapper_layout)
-        main_layout.addWidget(input_group_wrapper)
         
         # Voice settings
         self.voice_settings = VoiceSettings()
-        main_layout.addWidget(self.voice_settings)
+        input_group_wrapper_layout.addWidget(self.voice_settings)
         
         # Output settings
         self.output_settings = OutputSettings()
-        main_layout.addWidget(self.output_settings)
+        input_group_wrapper_layout.addWidget(self.output_settings)
         
-        # Progress
+        input_group_wrapper.setLayout(input_group_wrapper_layout)
+        main_layout.addWidget(input_group_wrapper)
+        
+        # Progress section (for current processing)
         self.progress_section = ProgressSection()
         main_layout.addWidget(self.progress_section)
-        
-        # Control buttons
-        control_layout = QHBoxLayout()
-        self.start_button = QPushButton("▶️ Start Conversion")
-        self.start_button.setStyleSheet(get_button_primary_style())
-        self.pause_button = QPushButton("⏸️ Pause")
-        self.pause_button.setStyleSheet(get_button_standard_style())
-        self.pause_button.setEnabled(False)
-        self.stop_button = QPushButton("⏹️ Stop")
-        self.stop_button.setStyleSheet(get_button_standard_style())
-        self.stop_button.setEnabled(False)
-        control_layout.addWidget(self.start_button)
-        control_layout.addWidget(self.pause_button)
-        control_layout.addWidget(self.stop_button)
-        control_layout.addStretch()
-        main_layout.addLayout(control_layout)
         
         main_layout.addStretch()
         self.setLayout(main_layout)
@@ -135,9 +134,11 @@ class TTSView(QWidget):
         self.output_settings.browse_button.clicked.connect(self.browse_output_dir)
         
         # Control buttons
-        self.start_button.clicked.connect(self.start_conversion)
-        self.pause_button.clicked.connect(self.pause_conversion)
-        self.stop_button.clicked.connect(self.stop_conversion)
+        self.controls_section.add_queue_button.clicked.connect(self.add_to_queue)
+        self.controls_section.clear_queue_button.clicked.connect(self.clear_queue)
+        self.controls_section.start_button.clicked.connect(self.start_conversion)
+        self.controls_section.pause_button.clicked.connect(self.pause_conversion)
+        self.controls_section.stop_button.clicked.connect(self.stop_conversion)
     
     def _go_back(self) -> None:
         """Navigate back to landing page."""
@@ -276,9 +277,9 @@ class TTSView(QWidget):
         self.conversion_thread.file_created.connect(self._on_file_created)
         
         # Update UI
-        self.start_button.setEnabled(False)
-        self.pause_button.setEnabled(True)
-        self.stop_button.setEnabled(True)
+        self.controls_section.start_button.setEnabled(False)
+        self.controls_section.pause_button.setEnabled(True)
+        self.controls_section.stop_button.setEnabled(True)
         self.input_section.add_files_button.setEnabled(False)
         self.input_section.add_folder_button.setEnabled(False)
         self.input_section.input_tabs.setEnabled(False)
@@ -294,11 +295,11 @@ class TTSView(QWidget):
         if self.conversion_thread and self.conversion_thread.isRunning():
             if self.conversion_thread.is_paused:
                 self.conversion_thread.resume()
-                self.pause_button.setText("⏸️ Pause")
+                self.controls_section.pause_button.setText("⏸️ Pause")
                 logger.info("Resumed conversion")
             else:
                 self.conversion_thread.pause()
-                self.pause_button.setText("▶️ Resume")
+                self.controls_section.pause_button.setText("▶️ Resume")
                 logger.info("Paused conversion")
     
     def stop_conversion(self):
@@ -319,10 +320,10 @@ class TTSView(QWidget):
     def _on_finished(self, success: bool, message: str):
         """Handle conversion completion."""
         # Reset UI
-        self.start_button.setEnabled(True)
-        self.pause_button.setEnabled(False)
-        self.pause_button.setText("⏸️ Pause")
-        self.stop_button.setEnabled(False)
+        self.controls_section.start_button.setEnabled(True)
+        self.controls_section.pause_button.setEnabled(False)
+        self.controls_section.pause_button.setText("⏸️ Pause")
+        self.controls_section.stop_button.setEnabled(False)
         self.input_section.add_files_button.setEnabled(True)
         self.input_section.add_folder_button.setEnabled(True)
         self.input_section.input_tabs.setEnabled(True)
@@ -355,4 +356,128 @@ class TTSView(QWidget):
         """Handle new file creation."""
         filename = os.path.basename(filepath)
         logger.debug(f"File created: {filepath}")
+    
+    def add_to_queue(self):
+        """Add current settings to the queue."""
+        # Validate inputs
+        valid, error_msg = self.handlers.validate_inputs(
+            self.file_paths,
+            self.input_section.input_tabs,
+            self.input_section.text_editor,
+            self.output_settings.output_dir_input
+        )
+        if not valid:
+            QMessageBox.warning(self, "Validation Error", error_msg)
+            return
+        
+        # Get parameters
+        output_dir = self.output_settings.get_output_dir()
+        voice = self.voice_settings.get_selected_voice()
+        provider = self.voice_settings.get_selected_provider()
+        rate = self.voice_settings.get_rate()
+        pitch = self.voice_settings.get_pitch()
+        volume = self.voice_settings.get_volume()
+        file_format = self.output_settings.get_file_format()
+        
+        # Determine input source
+        current_tab = self.input_section.get_current_tab_index()
+        if current_tab == 1:  # Text Editor tab
+            title = "Text Editor Content"
+            file_count = 1
+            input_type = "text"
+            input_data = self.input_section.get_editor_text()
+        else:  # Files tab
+            title = f"{len(self.file_paths)} File(s)"
+            file_count = len(self.file_paths)
+            input_type = "files"
+            input_data = self.file_paths.copy()
+        
+        # Create queue item
+        queue_item = {
+            'title': title,
+            'voice': voice,
+            'provider': provider,
+            'rate': rate,
+            'pitch': pitch,
+            'volume': volume,
+            'output_dir': output_dir,
+            'file_format': file_format,
+            'input_type': input_type,
+            'input_data': input_data,
+            'file_count': file_count,
+            'status': 'Pending',
+            'progress': 0
+        }
+        self.queue_items.append(queue_item)
+        self._update_queue_display()
+        
+        # Clear input fields
+        self.file_paths.clear()
+        self.input_section.files_list.clear()
+        self.input_section.text_editor.clear()
+        logger.info(f"Added to queue: {title} - Voice: {voice}")
+    
+    def clear_queue(self):
+        """Clear all items from the queue."""
+        if not self.queue_items:
+            return
+        
+        reply = QMessageBox.question(
+            self,
+            "Clear Queue",
+            "Are you sure you want to clear the entire queue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            self.queue_items.clear()
+            self.queue_section.clear()
+            logger.info("Queue cleared")
+    
+    def _update_queue_display(self):
+        """Update the queue list display."""
+        self.queue_section.clear()
+        
+        from PySide6.QtWidgets import QListWidgetItem
+        
+        for idx, item in enumerate(self.queue_items):
+            queue_widget = TTSQueueItemWidget(
+                item['title'],
+                item['voice'],
+                item['file_count'],
+                item['status'],
+                item['progress']
+            )
+            
+            # Connect action buttons
+            for button in queue_widget.findChildren(QPushButton):
+                if button.text() == "↑":
+                    button.clicked.connect(lambda checked, row=idx: self._move_queue_item_up(row))
+                elif button.text() == "↓":
+                    button.clicked.connect(lambda checked, row=idx: self._move_queue_item_down(row))
+                elif "Remove" in button.text():
+                    button.clicked.connect(lambda checked, row=idx: self._remove_queue_item(row))
+            
+            list_item = QListWidgetItem()
+            list_item.setSizeHint(queue_widget.sizeHint())
+            self.queue_section.queue_list.addItem(list_item)
+            self.queue_section.queue_list.setItemWidget(list_item, queue_widget)
+    
+    def _move_queue_item_up(self, row: int):
+        """Move a queue item up."""
+        if row > 0:
+            self.queue_items[row], self.queue_items[row - 1] = self.queue_items[row - 1], self.queue_items[row]
+            self._update_queue_display()
+    
+    def _move_queue_item_down(self, row: int):
+        """Move a queue item down."""
+        if row < len(self.queue_items) - 1:
+            self.queue_items[row], self.queue_items[row + 1] = self.queue_items[row + 1], self.queue_items[row]
+            self._update_queue_display()
+    
+    def _remove_queue_item(self, row: int):
+        """Remove a queue item."""
+        if 0 <= row < len(self.queue_items):
+            self.queue_items.pop(row)
+            self._update_queue_display()
 
