@@ -296,6 +296,44 @@ class TTSEngine:
                     pitch=pitch,
                     volume=volume
                 )
+    async def _convert_chunks_parallel(
+        self,
+        chunks: List[str],
+        voice: str,
+        temp_dir: Path,
+        output_stem: str
+    ) -> List[Path]:
+        """Convert chunks in parallel using asyncio"""
+        import edge_tts
+        
+        async def convert_chunk(chunk: str, index: int) -> Path:
+            chunk_path = temp_dir / f"{output_stem}_chunk_{index}.mp3"
+            max_retries = 5
+            retry_delay = 5.0
+            
+            for retry in range(max_retries):
+                try:
+                    communicate = edge_tts.Communicate(text=chunk, voice=voice)
+                    await communicate.save(str(chunk_path))
+                    
+                    if chunk_path.exists() and chunk_path.stat().st_size > 0:
+                        return chunk_path
+                    else:
+                        logger.warning(f"Chunk {index+1} attempt {retry+1} produced empty file, retrying...")
+                except Exception as retry_error:
+                    if retry < max_retries - 1:
+                        await asyncio.sleep(retry_delay)
+                        retry_delay *= 1.5
+                    else:
+                        raise retry_error
+            
+            raise Exception(f"Failed to convert chunk {index+1} after retries")
+        
+        # Convert all chunks concurrently
+        tasks = [convert_chunk(chunk, i) for i, chunk in enumerate(chunks)]
+        chunk_files = await asyncio.gather(*tasks)
+        return chunk_files
+
     def _convert_with_chunking(
         self,
         text: str,
@@ -340,66 +378,30 @@ class TTSEngine:
         chunks = self._chunk_text(text, MAX_BYTES)
         logger.info(f"Split text into {len(chunks)} chunks")
         
-        # Convert each chunk
+        # Convert chunks in parallel
         import tempfile
-        import time
         temp_dir = Path(tempfile.gettempdir())
         chunk_files: List[Path] = []
         
         try:
+            # Log chunk details
             for i, chunk in enumerate(chunks):
-                chunk_path = temp_dir / f"{output_path.stem}_chunk_{i}.mp3"
                 chunk_bytes = len(chunk.encode('utf-8'))
-                logger.info(f"Converting chunk {i+1}/{len(chunks)} ({chunk_bytes} bytes, {len(chunk)} chars)...")
-                
-                # Add retry logic
-                max_retries = 5
-                retry_delay = 5.0
-                success = False
-                
-                for retry in range(max_retries):
-                    try:
-                        chunk_loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(chunk_loop)
-                        communicate = edge_tts.Communicate(text=chunk, voice=voice)
-                        chunk_loop.run_until_complete(communicate.save(str(chunk_path)))
-                        chunk_loop.close()
-                        
-                        if chunk_path.exists() and chunk_path.stat().st_size > 0:
-                            success = True
-                            break
-                        else:
-                            logger.warning(f"Chunk {i+1} attempt {retry+1} produced empty file, retrying...")
-                    except Exception as retry_error:
-                        error_msg = str(retry_error)
-                        is_rate_limit = ("No audio was received" in error_msg or 
-                                       "NoAudioReceived" in type(retry_error).__name__ or
-                                       "rate limit" in error_msg.lower())
-                        
-                        if retry < max_retries - 1:
-                            if is_rate_limit:
-                                delay = retry_delay * (retry + 1)
-                                logger.warning(f"Chunk {i+1} attempt {retry+1} failed (rate limit?): {retry_error}, waiting {delay}s...")
-                            else:
-                                delay = retry_delay
-                                logger.warning(f"Chunk {i+1} attempt {retry+1} failed: {retry_error}, retrying in {delay}s...")
-                            
-                            time.sleep(delay)
-                            retry_delay *= 1.5
-                        else:
-                            raise retry_error
-                
-                if not success:
-                    raise Exception(f"Failed to convert chunk {i+1} after retries")
-                
-                file_size = chunk_path.stat().st_size
-                logger.info(f"✓ Chunk {i+1} converted successfully ({file_size} bytes)")
-                # chunk_path is Path, chunk_files is List[Path]
-                chunk_files.append(chunk_path)  # type: ignore[arg-type]
-                
-                # Delay between chunks to avoid rate limiting
-                if i < len(chunks) - 1:
-                    time.sleep(5.0)
+                logger.info(f"Chunk {i+1}/{len(chunks)}: {chunk_bytes} bytes, {len(chunk)} chars")
+            
+            # Convert all chunks in parallel
+            logger.info(f"Converting {len(chunks)} chunks in parallel...")
+            chunk_files = asyncio.run(
+                self._convert_chunks_parallel(chunks, voice, temp_dir, output_path.stem)
+            )
+            
+            # Log successful conversions
+            for i, chunk_file in enumerate(chunk_files):
+                if chunk_file.exists():
+                    file_size = chunk_file.stat().st_size
+                    logger.info(f"✓ Chunk {i+1} converted successfully ({file_size} bytes)")
+                else:
+                    logger.warning(f"Chunk {i+1} file not found: {chunk_file}")
             
             # Merge audio chunks
             logger.info(f"Merging {len(chunk_files)} audio chunks...")
