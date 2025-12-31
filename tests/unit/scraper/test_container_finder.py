@@ -45,10 +45,12 @@ class TestContainerFinder:
             page.set_content(html)
             
             result = page.evaluate(f"""
-                {container_finder_code}
-                
-                var container = findChapterContainer();
-                return container.id;
+                (function() {{
+                    {container_finder_code}
+                    
+                    var container = findChapterContainer();
+                    return container.id;
+                }})()
             """)
             
             assert result == "chapters", "Should find #chapters container"
@@ -74,10 +76,12 @@ class TestContainerFinder:
             page.set_content(html)
             
             result = page.evaluate(f"""
-                {container_finder_code}
-                
-                var container = findChapterContainer();
-                return container.className;
+                (function() {{
+                    {container_finder_code}
+                    
+                    var container = findChapterContainer();
+                    return container.className;
+                }})()
             """)
             
             assert "chapter-list" in result, "Should find .chapter-list container"
@@ -103,10 +107,12 @@ class TestContainerFinder:
             page.set_content(html)
             
             result = page.evaluate(f"""
-                {container_finder_code}
-                
-                var container = findChapterContainer();
-                return container.tagName.toLowerCase();
+                (function() {{
+                    {container_finder_code}
+                    
+                    var container = findChapterContainer();
+                    return container.tagName.toLowerCase();
+                }})()
             """)
             
             assert result == "main", "Should fall back to <main> container"
@@ -130,10 +136,12 @@ class TestContainerFinder:
             page.set_content(html)
             
             result = page.evaluate(f"""
-                {container_finder_code}
-                
-                var container = findChapterContainer();
-                return container === document.body;
+                (function() {{
+                    {container_finder_code}
+                    
+                    var container = findChapterContainer();
+                    return container === document.body;
+                }})()
             """)
             
             assert result == True, "Should fall back to document.body"
@@ -161,10 +169,12 @@ class TestContainerFinder:
             page.set_content(html)
             
             result = page.evaluate(f"""
-                {container_finder_code}
-                
-                var container = findChapterContainer();
-                return container.id;
+                (function() {{
+                    {container_finder_code}
+                    
+                    var container = findChapterContainer();
+                    return container.id;
+                }})()
             """)
             
             assert result == "chapters", "Should prioritize #chapters over <main>"
@@ -193,11 +203,13 @@ class TestContainerFinder:
             page.set_content(html)
             
             result = page.evaluate(f"""
-                {container_finder_code}
-                
-                var container = findChapterContainer();
-                // querySelector returns first match, so it should be .chapter-list
-                return container.className || container.id;
+                (function() {{
+                    {container_finder_code}
+                    
+                    var container = findChapterContainer();
+                    // querySelector returns first match, so it should be .chapter-list
+                    return container.className || container.id;
+                }})()
             """)
             
             # Should find one of them (querySelector returns first match)

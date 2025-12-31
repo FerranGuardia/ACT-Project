@@ -54,10 +54,12 @@ class TestLinkCounter:
             page.set_content(html)
             
             result = page.evaluate(f"""
-                {chapter_detector_code}
-                {link_counter_code}
-                
-                return countChapterLinks(isChapterLink);
+                (function() {{
+                    {chapter_detector_code}
+                    {link_counter_code}
+                    
+                    return countChapterLinks(isChapterLink);
+                }})()
             """)
             
             assert result == 3, "Should count 3 chapter links"
@@ -83,10 +85,12 @@ class TestLinkCounter:
             page.set_content(html)
             
             result = page.evaluate(f"""
-                {chapter_detector_code}
-                {link_counter_code}
-                
-                return countChapterLinks(isChapterLink);
+                (function() {{
+                    {chapter_detector_code}
+                    {link_counter_code}
+                    
+                    return countChapterLinks(isChapterLink);
+                }})()
             """)
             
             assert result == 0, "Should count 0 chapter links"
@@ -112,17 +116,18 @@ class TestLinkCounter:
             page.set_content(html)
             
             result = page.evaluate(f"""
-                {chapter_detector_code}
-                {link_counter_code}
-                
-                var links = getChapterLinks(isChapterLink);
-                return {{
-                            count: links.length,
-                    hasCh1: links.some(link => link.id === 'ch1'),
-                    hasCh2: links.some(link => link.id === 'ch2'),
-                    hasAbout: links.some(link => link.id === 'about')
-                }};
-            }})()
+                (function() {{
+                    {chapter_detector_code}
+                    {link_counter_code}
+                    
+                    var links = getChapterLinks(isChapterLink);
+                    return {{
+                        count: links.length,
+                        hasCh1: links.some(link => link.id === 'ch1'),
+                        hasCh2: links.some(link => link.id === 'ch2'),
+                        hasAbout: links.some(link => link.id === 'about')
+                    }};
+                }})()
             """)
             
             assert result['count'] == 2, "Should return 2 chapter links"
@@ -152,25 +157,31 @@ class TestLinkCounter:
             
             # Count initial links
             initial_count = page.evaluate(f"""
-                {chapter_detector_code}
-                {link_counter_code}
-                
-                return countChapterLinks(isChapterLink);
+                (function() {{
+                    {chapter_detector_code}
+                    {link_counter_code}
+                    
+                    return countChapterLinks(isChapterLink);
+                }})()
             """)
             
             # Add more links dynamically
             page.evaluate("""
-                var container = document.getElementById('container');
-                container.innerHTML += '<a href="/chapter-2">Chapter 2</a>';
-                container.innerHTML += '<a href="/chapter-3">Chapter 3</a>';
+                (function() {
+                    var container = document.getElementById('container');
+                    container.innerHTML += '<a href="/chapter-2">Chapter 2</a>';
+                    container.innerHTML += '<a href="/chapter-3">Chapter 3</a>';
+                })()
             """)
             
             # Count again
             final_count = page.evaluate(f"""
-                {chapter_detector_code}
-                {link_counter_code}
-                
-                return countChapterLinks(isChapterLink);
+                (function() {{
+                    {chapter_detector_code}
+                    {link_counter_code}
+                    
+                    return countChapterLinks(isChapterLink);
+                }})()
             """)
             
             assert initial_count == 1, "Initial count should be 1"
@@ -187,14 +198,15 @@ class TestLinkCounter:
             page.set_content("<html><body></body></html>")
             
             result = page.evaluate(f"""
-                {chapter_detector_code}
-                {link_counter_code}
-                
-                return {{
-                            count: countChapterLinks(isChapterLink),
-                    links: getChapterLinks(isChapterLink).length
-                }};
-            }})()
+                (function() {{
+                    {chapter_detector_code}
+                    {link_counter_code}
+                    
+                    return {{
+                        count: countChapterLinks(isChapterLink),
+                        links: getChapterLinks(isChapterLink).length
+                    }};
+                }})()
             """)
             
             assert result['count'] == 0, "Should return 0 for empty DOM"

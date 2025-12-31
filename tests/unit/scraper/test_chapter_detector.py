@@ -97,15 +97,15 @@ class TestChapterDetector:
             
             result = page.evaluate(f"""
                 (function() {{
-                    chapter_detector_code
+                    {chapter_detector_code}
                     
                     return {{
-                                    link1: isChapterLink(document.getElementById('link1')),
-                    link2: isChapterLink(document.getElementById('link2')),
-                    link3: isChapterLink(document.getElementById('link3')),
-                    link4: isChapterLink(document.getElementById('link4'))
-                }};
-            }})()
+                        link1: isChapterLink(document.getElementById('link1')),
+                        link2: isChapterLink(document.getElementById('link2')),
+                        link3: isChapterLink(document.getElementById('link3')),
+                        link4: isChapterLink(document.getElementById('link4'))
+                    }};
+                }})()
             """)
             
             assert result['link1'] == True, "Should detect by text 'Chapter 123'"
@@ -137,14 +137,14 @@ class TestChapterDetector:
             
             result = page.evaluate(f"""
                 (function() {{
-                    chapter_detector_code
+                    {chapter_detector_code}
                     
                     return {{
-                                    link1: isChapterLink(document.getElementById('link1')),
-                    link2: isChapterLink(document.getElementById('link2')),
-                    link3: isChapterLink(document.getElementById('link3'))
-                }};
-            }})()
+                        link1: isChapterLink(document.getElementById('link1')),
+                        link2: isChapterLink(document.getElementById('link2')),
+                        link3: isChapterLink(document.getElementById('link3'))
+                    }};
+                }})()
             """)
             
             assert result['link1'] == True, "Should detect .html in chapter-list"
@@ -173,14 +173,14 @@ class TestChapterDetector:
             
             result = page.evaluate(f"""
                 (function() {{
-                    chapter_detector_code
+                    {chapter_detector_code}
                     
                     return {{
-                                    link1: isChapterLink(document.getElementById('link1')),
-                    link2: isChapterLink(document.getElementById('link2')),
-                    link3: isChapterLink(document.getElementById('link3'))
-                }};
-            }})()
+                        link1: isChapterLink(document.getElementById('link1')),
+                        link2: isChapterLink(document.getElementById('link2')),
+                        link3: isChapterLink(document.getElementById('link3'))
+                    }};
+                }})()
             """)
             
             assert result['link1'] == True, "Should detect /book/novel-name/chapter-123"
@@ -215,14 +215,14 @@ class TestChapterDetector:
             
             result = page.evaluate(f"""
                 (function() {{
-                    chapter_detector_code
+                    {chapter_detector_code}
                     
                     return {{
-                                    link1: isChapterLink(document.getElementById('link1')),
-                    link2: isChapterLink(document.getElementById('link2')),
-                    link3: isChapterLink(document.getElementById('link3'))
-                }};
-            }})()
+                        link1: isChapterLink(document.getElementById('link1')),
+                        link2: isChapterLink(document.getElementById('link2')),
+                        link3: isChapterLink(document.getElementById('link3'))
+                    }};
+                }})()
             """)
             
             # Links in chapter containers should be detected if they have chapter indicators
@@ -250,15 +250,15 @@ class TestChapterDetector:
             
             result = page.evaluate(f"""
                 (function() {{
-                    chapter_detector_code
+                    {chapter_detector_code}
                     
                     return {{
-                                    link1: isChapterLink(document.getElementById('link1')),
-                    link2: isChapterLink(document.getElementById('link2')),
-                    link3: isChapterLink(document.getElementById('link3')),
-                    link4: isChapterLink(document.getElementById('link4'))
-                }};
-            }})()
+                        link1: isChapterLink(document.getElementById('link1')),
+                        link2: isChapterLink(document.getElementById('link2')),
+                        link3: isChapterLink(document.getElementById('link3')),
+                        link4: isChapterLink(document.getElementById('link4'))
+                    }};
+                }})()
             """)
             
             assert result['link1'] == False, "Should reject /about"
@@ -278,15 +278,15 @@ class TestChapterDetector:
             
             result = page.evaluate(f"""
                 (function() {{
-                    chapter_detector_code
+                    {chapter_detector_code}
                     
                     return {{
-                                    nullLink: isChapterLink(null),
-                    undefinedLink: isChapterLink(undefined),
-                    emptyObject: isChapterLink({{}}),
-                    linkWithoutHref: isChapterLink({{textContent: 'Chapter 1'}})
-                }};
-            }})()
+                        nullLink: isChapterLink(null),
+                        undefinedLink: isChapterLink(undefined),
+                        emptyObject: isChapterLink({{}}),
+                        linkWithoutHref: isChapterLink({{textContent: 'Chapter 1'}})
+                    }};
+                }})()
             """)
             
             assert result['nullLink'] == False, "Should handle null"

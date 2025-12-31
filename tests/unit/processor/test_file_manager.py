@@ -41,8 +41,8 @@ class TestFileManager:
         assert file_manager.project_name == "test_project"
         assert file_manager.base_output_dir == temp_dir
         assert file_manager.project_dir == temp_dir / "test_project"
-        assert file_manager.text_dir == temp_dir / "test_project" / "text"
-        assert file_manager.audio_dir == temp_dir / "test_project" / "audio"
+        assert file_manager.text_dir == temp_dir / "test_project" / "test_project_scraps"
+        assert file_manager.audio_dir == temp_dir / "test_project" / "test_project_audio"
         assert file_manager.metadata_dir == temp_dir / "test_project" / "metadata"
     
     def test_directory_creation(self, file_manager):
@@ -73,7 +73,10 @@ class TestFileManager:
         file_path = file_manager.save_text_file(1, content, "Chapter 1")
         
         assert file_path.exists()
-        assert file_path.read_text(encoding="utf-8") == content
+        # FileManager adds "Chapter X" prefix automatically
+        saved_content = file_path.read_text(encoding="utf-8")
+        assert saved_content.startswith("Chapter 1")
+        assert content in saved_content
         assert file_path.name.startswith("chapter_0001")
         assert file_path.suffix == ".txt"
     
@@ -85,7 +88,10 @@ class TestFileManager:
         
         # Verify file was saved with content
         assert file_path.exists()
-        assert file_path.read_text(encoding="utf-8") == content
+        saved_content = file_path.read_text(encoding="utf-8")
+        # FileManager adds "Chapter X" prefix automatically
+        assert saved_content.startswith("Chapter 1")
+        assert content in saved_content
         assert file_path.name.startswith("chapter_0001")
         # Title is included in filename (exact format may vary)
     

@@ -234,7 +234,7 @@ class TestProjectManager:
         chapter_manager = project_manager.get_chapter_manager()
         chapter_manager.add_chapter(1, "https://example.com/1")
         chapter_manager.add_chapter(2, "https://example.com/2")
-        chapter_manager.update_chapter_status(1, ChapterStatus.COMPLETED)
+        chapter_manager.update_chapter_status(1, ChapterStatus.CONVERTED)
         project_manager.save_project()
         
         # Verify project exists and has data

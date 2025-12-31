@@ -50,9 +50,11 @@ class TestMain:
             page.set_content("<html><body></body></html>")
             
             result = page.evaluate(f"""
-                {all_modules_code}
-                
-                return typeof scrollAndCountChapters;
+                (function() {{
+                    {all_modules_code}
+                    
+                    return typeof scrollAndCountChapters;
+                }})()
             """)
             
             assert result == "function", "scrollAndCountChapters should be a function"
@@ -81,14 +83,16 @@ class TestMain:
             
             # Override config for faster testing
             result = page.evaluate(f"""
-                {all_modules_code}
-                
-                // Override SCROLL_CONFIG for faster testing
-                SCROLL_CONFIG.maxScrolls = 5;
-                SCROLL_CONFIG.maxNoChange = 2;
-                SCROLL_CONFIG.scrollDelay = 50;
-                
-                return scrollAndCountChapters();
+                (function() {{
+                    {all_modules_code}
+                    
+                    // Override SCROLL_CONFIG for faster testing
+                    SCROLL_CONFIG.maxScrolls = 5;
+                    SCROLL_CONFIG.maxNoChange = 2;
+                    SCROLL_CONFIG.scrollDelay = 50;
+                    
+                    return scrollAndCountChapters();
+                }})()
             """)
             
             assert isinstance(result, (int, float)), "Should return a number"
@@ -122,13 +126,15 @@ class TestMain:
             
             # Override config for faster testing
             result = page.evaluate(f"""
-                {all_modules_code}
-                
-                SCROLL_CONFIG.maxScrolls = 10;
-                SCROLL_CONFIG.maxNoChange = 3;
-                SCROLL_CONFIG.scrollDelay = 50;
-                
-                return scrollAndCountChapters();
+                (function() {{
+                    {all_modules_code}
+                    
+                    SCROLL_CONFIG.maxScrolls = 10;
+                    SCROLL_CONFIG.maxNoChange = 3;
+                    SCROLL_CONFIG.scrollDelay = 50;
+                    
+                    return scrollAndCountChapters();
+                }})()
             """)
             
             assert result == 5, "Should find all 5 chapters"
@@ -145,13 +151,15 @@ class TestMain:
             
             # Override config for faster testing
             result = page.evaluate(f"""
-                {all_modules_code}
-                
-                SCROLL_CONFIG.maxScrolls = 5;
-                SCROLL_CONFIG.maxNoChange = 2;
-                SCROLL_CONFIG.scrollDelay = 50;
-                
-                return scrollAndCountChapters();
+                (function() {{
+                    {all_modules_code}
+                    
+                    SCROLL_CONFIG.maxScrolls = 5;
+                    SCROLL_CONFIG.maxNoChange = 2;
+                    SCROLL_CONFIG.scrollDelay = 50;
+                    
+                    return scrollAndCountChapters();
+                }})()
             """)
             
             assert result == 0, "Should return 0 for empty page"
@@ -180,31 +188,32 @@ class TestMain:
             
             # Track which modules are called
             result = page.evaluate(f"""
-                {all_modules_code}
-                
-                // Override config for faster testing
-                SCROLL_CONFIG.maxScrolls = 5;
-                SCROLL_CONFIG.maxNoChange = 2;
-                SCROLL_CONFIG.scrollDelay = 50;
-                
-                // Verify all functions exist
-                var functionsExist = {{
-                    isChapterLink: typeof isChapterLink === 'function',
-                    countChapterLinks: typeof countChapterLinks === 'function',
-                    getChapterLinks: typeof getChapterLinks === 'function',
-                    tryClickLoadMore: typeof tryClickLoadMore === 'function',
-                    findChapterContainer: typeof findChapterContainer === 'function',
-                    scrollContainer: typeof scrollContainer === 'function',
-                    performScrollLoop: typeof performScrollLoop === 'function'
-                }};
-                
-                var count = scrollAndCountChapters();
-                
-                return {{
-                            count: count,
-                    functionsExist: functionsExist
-                }};
-            }})()
+                (function() {{
+                    {all_modules_code}
+                    
+                    // Override config for faster testing
+                    SCROLL_CONFIG.maxScrolls = 5;
+                    SCROLL_CONFIG.maxNoChange = 2;
+                    SCROLL_CONFIG.scrollDelay = 50;
+                    
+                    // Verify all functions exist
+                    var functionsExist = {{
+                        isChapterLink: typeof isChapterLink === 'function',
+                        countChapterLinks: typeof countChapterLinks === 'function',
+                        getChapterLinks: typeof getChapterLinks === 'function',
+                        tryClickLoadMore: typeof tryClickLoadMore === 'function',
+                        findChapterContainer: typeof findChapterContainer === 'function',
+                        scrollContainer: typeof scrollContainer === 'function',
+                        performScrollLoop: typeof performScrollLoop === 'function'
+                    }};
+                    
+                    var count = scrollAndCountChapters();
+                    
+                    return {{
+                        count: count,
+                        functionsExist: functionsExist
+                    }};
+                }})()
             """)
             
             assert result['count'] == 2, "Should count 2 chapters"
@@ -236,13 +245,15 @@ class TestMain:
             
             # Override config for faster testing
             result = page.evaluate(f"""
-                {all_modules_code}
-                
-                SCROLL_CONFIG.maxScrolls = 5;
-                SCROLL_CONFIG.maxNoChange = 2;
-                SCROLL_CONFIG.scrollDelay = 50;
-                
-                return scrollAndCountChapters();
+                (function() {{
+                    {all_modules_code}
+                    
+                    SCROLL_CONFIG.maxScrolls = 5;
+                    SCROLL_CONFIG.maxNoChange = 2;
+                    SCROLL_CONFIG.scrollDelay = 50;
+                    
+                    return scrollAndCountChapters();
+                }})()
             """)
             
             assert result == 5, "Should find all 5 chapters"

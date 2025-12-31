@@ -47,20 +47,21 @@ class TestLoadMoreHandler:
             
             # Test matchesLoadMoreText function
             result = page.evaluate(f"""
-                {load_more_handler_code}
-                
-                var btn1 = document.getElementById('btn1');
-                var btn2 = document.getElementById('btn2');
-                var btn3 = document.getElementById('btn3');
-                var btn4 = document.getElementById('btn4');
-                
-                return {{
-                            btn1: matchesLoadMoreText(btn1.textContent.toLowerCase().trim()),
-                    btn2: matchesLoadMoreText(btn2.textContent.toLowerCase().trim()),
-                    btn3: matchesLoadMoreText(btn3.textContent.toLowerCase().trim()),
-                    btn4: matchesLoadMoreText(btn4.textContent.toLowerCase().trim())
-                }};
-            }})()
+                (function() {{
+                    {load_more_handler_code}
+                    
+                    var btn1 = document.getElementById('btn1');
+                    var btn2 = document.getElementById('btn2');
+                    var btn3 = document.getElementById('btn3');
+                    var btn4 = document.getElementById('btn4');
+                    
+                    return {{
+                        btn1: matchesLoadMoreText(btn1.textContent.toLowerCase().trim()),
+                        btn2: matchesLoadMoreText(btn2.textContent.toLowerCase().trim()),
+                        btn3: matchesLoadMoreText(btn3.textContent.toLowerCase().trim()),
+                        btn4: matchesLoadMoreText(btn4.textContent.toLowerCase().trim())
+                    }};
+                }})()
             """)
             
             assert result['btn1'] == True, "Should detect 'Load More'"
@@ -92,23 +93,24 @@ class TestLoadMoreHandler:
             # Test that tryClickLoadMore can find these buttons
             # We'll check if the function attempts to click them
             result = page.evaluate(f"""
-                {load_more_handler_code}
-                
-                // Mock click to track if button was found
-                var clicked = false;
-                var btn1 = document.getElementById('btn1');
-                var originalClick = btn1.click;
-                btn1.click = function() {{
-                    clicked = true;
-                    originalClick.call(this);
-                }};
-                
-                return {{
-                            found: tryClickLoadMore().then(function(result) {{
-                        return result;
-                    }})
-                }};
-            }})()
+                (function() {{
+                    {load_more_handler_code}
+                    
+                    // Mock click to track if button was found
+                    var clicked = false;
+                    var btn1 = document.getElementById('btn1');
+                    var originalClick = btn1.click;
+                    btn1.click = function() {{
+                        clicked = true;
+                        originalClick.call(this);
+                    }};
+                    
+                    return {{
+                        found: tryClickLoadMore().then(function(result) {{
+                            return result;
+                        }})
+                    }};
+                }})()
             """)
             
             # Note: This is a simplified test - actual clicking requires async handling
@@ -133,18 +135,19 @@ class TestLoadMoreHandler:
             page.set_content(html)
             
             result = page.evaluate(f"""
-                {load_more_handler_code}
-                
-                var btn1 = document.getElementById('btn1');
-                var btn2 = document.getElementById('btn2');
-                var btn3 = document.getElementById('btn3');
-                
-                return {{
-                            btn1: matchesLoadMoreText(btn1.textContent.toLowerCase().trim()),
-                    btn2: matchesLoadMoreText(btn2.textContent.toLowerCase().trim()),
-                    btn3: matchesLoadMoreText(btn3.textContent.toLowerCase().trim())
-                }};
-            }})()
+                (function() {{
+                    {load_more_handler_code}
+                    
+                    var btn1 = document.getElementById('btn1');
+                    var btn2 = document.getElementById('btn2');
+                    var btn3 = document.getElementById('btn3');
+                    
+                    return {{
+                        btn1: matchesLoadMoreText(btn1.textContent.toLowerCase().trim()),
+                        btn2: matchesLoadMoreText(btn2.textContent.toLowerCase().trim()),
+                        btn3: matchesLoadMoreText(btn3.textContent.toLowerCase().trim())
+                    }};
+                }})()
             """)
             
             assert result['btn1'] == False, "Should reject 'Submit'"
@@ -179,10 +182,12 @@ class TestLoadMoreHandler:
                 page.set_content(html)
                 
                 result = page.evaluate(f"""
-                    {load_more_handler_code}
-                    
-                    var btn = document.getElementById('btn{i}');
-                    return matchesLoadMoreText(btn.textContent.toLowerCase().trim());
+                    (function() {{
+                        {load_more_handler_code}
+                        
+                        var btn = document.getElementById('btn{i}');
+                        return matchesLoadMoreText(btn.textContent.toLowerCase().trim());
+                    }})()
                 """)
                 
                 results.append((text, result))
