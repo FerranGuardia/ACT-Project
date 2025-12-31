@@ -43,21 +43,23 @@ class TestProjectFileManagerIntegration:
     def project_manager(self, temp_dir):
         """Create ProjectManager with temp directory."""
         with patch('processor.project_manager.get_config') as mock_config:
-            mock_config.return_value.get.side_effect = lambda key: {
+            config_dict = {
                 "paths.projects_dir": str(temp_dir / "projects"),
                 "paths.output_dir": str(temp_dir / "output")
-            }.get(key, None)
-            return ProjectManager("test_project")
+            }
+            mock_config.return_value.get.side_effect = lambda key, default=None: config_dict.get(key, default)
+            yield ProjectManager("test_project")
     
     @pytest.fixture
     def file_manager(self, temp_dir):
         """Create FileManager with temp directory."""
         with patch('processor.file_manager.get_config') as mock_config:
-            mock_config.return_value.get.side_effect = lambda key: {
+            config_dict = {
                 "paths.output_dir": str(temp_dir / "output"),
                 "paths.projects_dir": str(temp_dir / "projects")
-            }.get(key, None)
-            return FileManager("test_project")
+            }
+            mock_config.return_value.get.side_effect = lambda key, default=None: config_dict.get(key, default)
+            yield FileManager("test_project")
     
     def test_project_save_and_file_operations(self, project_manager, file_manager, temp_dir):
         """Test that project save works with file manager operations."""
@@ -74,39 +76,40 @@ class TestProjectFileManagerIntegration:
         chapter_manager.add_chapter(2, "https://example.com/2", title="Chapter 2")
         
         # Save text files using file manager
-        file_manager.save_text_file(1, "Chapter 1 content", "Chapter 1")
-        file_manager.save_text_file(2, "Chapter 2 content", "Chapter 2")
+        text_file1 = file_manager.save_text_file(1, "Chapter 1 content", "Chapter 1")
+        text_file2 = file_manager.save_text_file(2, "Chapter 2 content", "Chapter 2")
         
         # Update chapter file paths
-        chapter1 = chapter_manager.get_chapter_by_number(1)
-        chapter2 = chapter_manager.get_chapter_by_number(2)
-        chapter1.file_path = file_manager.get_text_file_path(1)
-        chapter2.file_path = file_manager.get_text_file_path(2)
+        chapter1 = chapter_manager.get_chapter(1)
+        chapter2 = chapter_manager.get_chapter(2)
+        chapter1.text_file_path = str(text_file1)
+        chapter2.text_file_path = str(text_file2)
         
         # Save project
         project_manager.save_project()
         
         # Verify project file exists
-        project_file = project_manager.get_project_file_path()
+        project_file = project_manager.metadata_file
         assert project_file.exists()
         
         # Verify text files exist
-        assert file_manager.get_text_file_path(1).exists()
-        assert file_manager.get_text_file_path(2).exists()
+        assert text_file1.exists()
+        assert text_file2.exists()
         
         # Load project and verify
         new_project = ProjectManager("test_project")
         with patch('processor.project_manager.get_config') as mock_config:
-            mock_config.return_value.get.side_effect = lambda key: {
+            config_dict = {
                 "paths.projects_dir": str(temp_dir / "projects"),
                 "paths.output_dir": str(temp_dir / "output")
-            }.get(key, None)
+            }
+            mock_config.return_value.get.side_effect = lambda key, default=None: config_dict.get(key, default)
             new_project.load_project()
             
             assert new_project.metadata["novel_title"] == "Test Novel"
             loaded_chapters = new_project.get_chapter_manager()
             assert loaded_chapters.get_total_count() == 2
-            assert loaded_chapters.get_chapter_by_number(1).title == "Chapter 1"
+            assert loaded_chapters.get_chapter(1).title == "Chapter 1"
 
 
 class TestPipelineComponentIntegration:
@@ -129,9 +132,9 @@ class TestPipelineComponentIntegration:
                 "paths.projects_dir": str(temp_dir / "projects"),
                 "tts.voice": "en-US-AndrewNeural"
             }
-            mock_config.return_value.get.side_effect = lambda key: config_dict.get(key, None)
-            mock_pm_config.return_value.get.side_effect = lambda key: config_dict.get(key, None)
-            mock_fm_config.return_value.get.side_effect = lambda key: config_dict.get(key, None)
+            mock_config.return_value.get.side_effect = lambda key, default=None: config_dict.get(key, default)
+            mock_pm_config.return_value.get.side_effect = lambda key, default=None: config_dict.get(key, default)
+            mock_fm_config.return_value.get.side_effect = lambda key, default=None: config_dict.get(key, default)
             yield ProcessingPipeline("test_project")
     
     def test_pipeline_project_initialization(self, pipeline, temp_dir):
@@ -173,7 +176,7 @@ class TestPipelineComponentIntegration:
         pipeline.project_manager.save_project()
         
         # Verify project file exists
-        project_file = pipeline.project_manager.get_project_file_path()
+        project_file = pipeline.project_manager.metadata_file
         assert project_file.exists()
 
 
@@ -190,10 +193,11 @@ class TestSaveLoadResumeIntegration:
         """Test complete workflow: create → save → load → resume."""
         # Create and save project
         with patch('processor.project_manager.get_config') as mock_config:
-            mock_config.return_value.get.side_effect = lambda key: {
+            config_dict = {
                 "paths.projects_dir": str(temp_dir / "projects"),
                 "paths.output_dir": str(temp_dir / "output")
-            }.get(key, None)
+            }
+            mock_config.return_value.get.side_effect = lambda key, default=None: config_dict.get(key, default)
             
             project1 = ProjectManager("test_project")
             project1.create_project(
@@ -210,10 +214,11 @@ class TestSaveLoadResumeIntegration:
         
         # Load project
         with patch('processor.project_manager.get_config') as mock_config:
-            mock_config.return_value.get.side_effect = lambda key: {
+            config_dict = {
                 "paths.projects_dir": str(temp_dir / "projects"),
                 "paths.output_dir": str(temp_dir / "output")
-            }.get(key, None)
+            }
+            mock_config.return_value.get.side_effect = lambda key, default=None: config_dict.get(key, default)
             
             project2 = ProjectManager("test_project")
             project2.load_project()
@@ -222,8 +227,8 @@ class TestSaveLoadResumeIntegration:
             assert project2.metadata["novel_title"] == "Test Novel"
             loaded_chapters = project2.get_chapter_manager()
             assert loaded_chapters.get_total_count() == 2
-            assert loaded_chapters.get_chapter_by_number(1).status == ChapterStatus.COMPLETED
-            assert loaded_chapters.get_chapter_by_number(2).status == ChapterStatus.PENDING
+            assert loaded_chapters.get_chapter(1).status == ChapterStatus.COMPLETED
+            assert loaded_chapters.get_chapter(2).status == ChapterStatus.PENDING
             
             # Verify resume capability
             assert project2.can_resume() is True
@@ -261,9 +266,9 @@ class TestProgressTrackerIntegration:
         assert progress_tracker.get_failed_count() == 1
         
         # Verify chapter manager status matches
-        assert chapter_manager.get_chapter_by_number(1).status == ChapterStatus.COMPLETED
-        assert chapter_manager.get_chapter_by_number(2).status == ChapterStatus.FAILED
-        assert chapter_manager.get_chapter_by_number(3).status == ChapterStatus.PENDING
+        assert chapter_manager.get_chapter(1).status == ChapterStatus.COMPLETED
+        assert chapter_manager.get_chapter(2).status == ChapterStatus.FAILED
+        assert chapter_manager.get_chapter(3).status == ChapterStatus.PENDING
 
 
 class TestErrorHandlingIntegration:
@@ -286,9 +291,9 @@ class TestErrorHandlingIntegration:
                 "paths.projects_dir": str(temp_dir / "projects"),
                 "tts.voice": "en-US-AndrewNeural"
             }
-            mock_config.return_value.get.side_effect = lambda key: config_dict.get(key, None)
-            mock_pm_config.return_value.get.side_effect = lambda key: config_dict.get(key, None)
-            mock_fm_config.return_value.get.side_effect = lambda key: config_dict.get(key, None)
+            mock_config.return_value.get.side_effect = lambda key, default=None: config_dict.get(key, default)
+            mock_pm_config.return_value.get.side_effect = lambda key, default=None: config_dict.get(key, default)
+            mock_fm_config.return_value.get.side_effect = lambda key, default=None: config_dict.get(key, default)
             yield ProcessingPipeline("test_project")
     
     @patch('processor.pipeline.GenericScraper')
