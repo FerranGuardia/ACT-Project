@@ -161,3 +161,6 @@ scraped_chapters/
 *.bak
 *.swp
 
+# Qt Designer - isolated for learning, will integrate later
+qt_designer/
+
