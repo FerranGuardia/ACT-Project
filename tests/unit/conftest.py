@@ -8,9 +8,39 @@ import pytest
 from pathlib import Path
 import tempfile
 import shutil
+import types
 from unittest.mock import Mock, MagicMock, patch
 
-# Add ACT project src to path
+# IMPORTANT: Mock tts module BEFORE adding src to path
+# This ensures the mock takes precedence when test files import tts
+# Some UI tests need tts mocked before ui.dialogs imports provider_selection_dialog
+if "tts" not in sys.modules:
+    tts_module = types.ModuleType("tts")
+    class MockTTSEngine:
+        pass
+    tts_module.TTSEngine = MockTTSEngine  # type: ignore[attr-defined]
+    tts_module.__all__ = ["TTSEngine"]  # type: ignore[attr-defined]
+    sys.modules["tts"] = tts_module
+
+# Mock tts submodules
+if "tts.providers" not in sys.modules:
+    sys.modules["tts.providers"] = types.ModuleType("tts.providers")
+if "tts.providers.provider_manager" not in sys.modules:
+    provider_manager_module = types.ModuleType("tts.providers.provider_manager")
+    class MockTTSProviderManager:
+        pass
+    provider_manager_module.TTSProviderManager = MockTTSProviderManager  # type: ignore[attr-defined]
+    sys.modules["tts.providers.provider_manager"] = provider_manager_module
+if "tts.voice_manager" not in sys.modules:
+    sys.modules["tts.voice_manager"] = types.ModuleType("tts.voice_manager")
+if "tts.tts_engine" not in sys.modules:
+    tts_engine_module = types.ModuleType("tts.tts_engine")
+    class MockTTSEngineClass:
+        pass
+    tts_engine_module.TTSEngine = MockTTSEngineClass  # type: ignore[attr-defined]
+    sys.modules["tts.tts_engine"] = tts_engine_module
+
+# Add ACT project src to path (after mocking tts)
 project_root = Path(__file__).parent.parent.parent
 src_path = project_root / "src"
 if src_path.exists():
@@ -147,9 +177,19 @@ def mock_voice_manager():
     return mock_manager
 
 
-# Register custom markers
+# Register custom markers and ensure mocks are set up early
 def pytest_configure(config):
-    """Register custom markers"""
+    """Register custom markers and ensure tts mock is set up before test collection"""
+    # Ensure tts mock is set up (in case pytest_configure runs before module-level code)
+    import types
+    if "tts" not in sys.modules:
+        tts_module = types.ModuleType("tts")
+        class MockTTSEngine:
+            pass
+        tts_module.TTSEngine = MockTTSEngine  # type: ignore[attr-defined]
+        tts_module.__all__ = ["TTSEngine"]  # type: ignore[attr-defined]
+        sys.modules["tts"] = tts_module
+    
     config.addinivalue_line("markers", "unit: marks tests as unit tests")
     config.addinivalue_line("markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')")
     config.addinivalue_line("markers", "network: marks tests that require network connection")

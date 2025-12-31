@@ -19,6 +19,7 @@ from typing import List, Tuple, Optional, Dict
 from pathlib import Path as PathType
 
 # Add project root and src to path (matching conftest.py approach)
+# Note: conftest.py already sets up tts mocks before adding src to path
 project_root = Path(__file__).parent.parent.parent.parent
 src_path = project_root / "src"
 if str(project_root) not in sys.path:
@@ -58,6 +59,8 @@ if "ui.main_window" not in sys.modules:
     main_window_module.MainWindow = MockMainWindow  # type: ignore[attr-defined]
     sys.modules["ui.main_window"] = main_window_module
 
+# Note: tts module is already mocked in conftest.py before src was added to path
+
 # Ensure no mock ui module exists - we need the real package
 # Remove any existing mock ui from sys.modules if it's not a real package
 if "ui" in sys.modules:
@@ -74,6 +77,7 @@ if "ui" in sys.modules:
 
 # Import ui package to ensure it's recognized as a package before importing submodules
 # This is necessary because Python needs to know ui is a package, not a module
+# Now that tts is mocked, ui.dialogs can safely import provider_selection_dialog
 try:
     import ui  # type: ignore[import-untyped]
     # Also import ui.dialogs to ensure it's recognized as a package
@@ -86,36 +90,6 @@ except ImportError as e:
 # Don't mock ui or ui.dialogs - we need to import the real modules
 # Python will import them from the file system since src is in sys.path
 # Only mock the dependencies that provider_selection_dialog needs
-
-# Mock tts module and all its submodules (needed by provider_selection_dialog)
-# IMPORTANT: Do this in one place to avoid conflicts
-if "tts" not in sys.modules:
-    tts_module = types.ModuleType("tts")
-    # Create a mock TTSEngine class (needed for "from tts import TTSEngine")
-    class MockTTSEngine:
-        pass
-    tts_module.TTSEngine = MockTTSEngine  # type: ignore[attr-defined]
-    sys.modules["tts"] = tts_module
-
-# Mock tts submodules
-if "tts.providers" not in sys.modules:
-    sys.modules["tts.providers"] = types.ModuleType("tts.providers")
-# Mock tts.providers.provider_manager with TTSProviderManager class
-if "tts.providers.provider_manager" not in sys.modules:
-    provider_manager_module = types.ModuleType("tts.providers.provider_manager")
-    # Create a mock class that can be imported
-    class MockTTSProviderManager:
-        pass
-    provider_manager_module.TTSProviderManager = MockTTSProviderManager  # type: ignore[attr-defined]
-    sys.modules["tts.providers.provider_manager"] = provider_manager_module
-if "tts.voice_manager" not in sys.modules:
-    sys.modules["tts.voice_manager"] = types.ModuleType("tts.voice_manager")
-if "tts.tts_engine" not in sys.modules:
-    tts_engine_module = types.ModuleType("tts.tts_engine")
-    class MockTTSEngineClass:
-        pass
-    tts_engine_module.TTSEngine = MockTTSEngineClass  # type: ignore[attr-defined]
-    sys.modules["tts.tts_engine"] = tts_engine_module
 
 mock_tts_engine = MagicMock()
 
