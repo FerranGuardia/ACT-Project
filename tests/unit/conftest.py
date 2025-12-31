@@ -18,8 +18,11 @@ if "tts" not in sys.modules:
     tts_module = types.ModuleType("tts")
     class MockTTSEngine:
         pass
+    class MockVoiceManager:
+        pass
     tts_module.TTSEngine = MockTTSEngine  # type: ignore[attr-defined]
-    tts_module.__all__ = ["TTSEngine"]  # type: ignore[attr-defined]
+    tts_module.VoiceManager = MockVoiceManager  # type: ignore[attr-defined]
+    tts_module.__all__ = ["TTSEngine", "VoiceManager"]  # type: ignore[attr-defined]
     sys.modules["tts"] = tts_module
 
 # Mock tts submodules
@@ -32,12 +35,20 @@ if "tts.providers.provider_manager" not in sys.modules:
     provider_manager_module.TTSProviderManager = MockTTSProviderManager  # type: ignore[attr-defined]
     sys.modules["tts.providers.provider_manager"] = provider_manager_module
 if "tts.voice_manager" not in sys.modules:
-    sys.modules["tts.voice_manager"] = types.ModuleType("tts.voice_manager")
+    voice_manager_module = types.ModuleType("tts.voice_manager")
+    class MockVoiceManagerClass:
+        pass
+    voice_manager_module.VoiceManager = MockVoiceManagerClass  # type: ignore[attr-defined]
+    sys.modules["tts.voice_manager"] = voice_manager_module
 if "tts.tts_engine" not in sys.modules:
     tts_engine_module = types.ModuleType("tts.tts_engine")
     class MockTTSEngineClass:
         pass
+    def mock_format_chapter_intro(chapter_title: str, content: str, provider=None):
+        """Mock format_chapter_intro function"""
+        return f"... {chapter_title}. ... {content}"
     tts_engine_module.TTSEngine = MockTTSEngineClass  # type: ignore[attr-defined]
+    tts_engine_module.format_chapter_intro = mock_format_chapter_intro  # type: ignore[attr-defined]
     sys.modules["tts.tts_engine"] = tts_engine_module
 
 # Add ACT project src to path (after mocking tts)
@@ -46,6 +57,16 @@ src_path = project_root / "src"
 if src_path.exists():
     sys.path.insert(0, str(project_root))
     sys.path.insert(0, str(src_path))
+
+# Mock ui.main_window BEFORE trying to import ui (since ui.__init__ imports it)
+# This allows UI tests to import ui.views without MainWindow dependencies failing
+if "ui.main_window" not in sys.modules:
+    main_window_module = types.ModuleType("ui.main_window")
+    # Create a mock MainWindow class
+    class MockMainWindow:
+        pass
+    main_window_module.MainWindow = MockMainWindow  # type: ignore[attr-defined]
+    sys.modules["ui.main_window"] = main_window_module
 
 
 @pytest.fixture(scope="session")
@@ -186,8 +207,11 @@ def pytest_configure(config):
         tts_module = types.ModuleType("tts")
         class MockTTSEngine:
             pass
+        class MockVoiceManager:
+            pass
         tts_module.TTSEngine = MockTTSEngine  # type: ignore[attr-defined]
-        tts_module.__all__ = ["TTSEngine"]  # type: ignore[attr-defined]
+        tts_module.VoiceManager = MockVoiceManager  # type: ignore[attr-defined]
+        tts_module.__all__ = ["TTSEngine", "VoiceManager"]  # type: ignore[attr-defined]
         sys.modules["tts"] = tts_module
     
     config.addinivalue_line("markers", "unit: marks tests as unit tests")

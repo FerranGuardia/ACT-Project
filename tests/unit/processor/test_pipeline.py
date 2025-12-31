@@ -29,18 +29,27 @@ class TestProcessingPipeline:
     @pytest.fixture
     def pipeline(self, temp_dir):
         """Create a ProcessingPipeline instance."""
-        with patch('processor.pipeline.get_config') as mock_config:
+        # Reset ConfigManager singleton to ensure clean state
+        from core.config_manager import ConfigManager
+        ConfigManager._instance = None
+        ConfigManager._initialized = False
+        
+        with patch('core.config_manager.get_config') as mock_get_config:
             config_dict = {
                 "paths.output_dir": str(temp_dir / "output"),
                 "paths.projects_dir": str(temp_dir / "projects"),
                 "tts.voice": "en-US-AndrewNeural"
             }
-            def mock_get(key, default=None):
-                return config_dict.get(key, default)
-            mock_config.return_value.get = mock_get
+            mock_config_obj = MagicMock()
+            mock_config_obj.get.side_effect = lambda key, default=None: config_dict.get(key, default)
+            mock_get_config.return_value = mock_config_obj
             
             pipeline = ProcessingPipeline("test_project")
-            return pipeline
+            yield pipeline
+            
+            # Clean up: reset singleton after test
+            ConfigManager._instance = None
+            ConfigManager._initialized = False
     
     def test_initialization(self, pipeline):
         """Test pipeline initialization."""
@@ -56,15 +65,15 @@ class TestProcessingPipeline:
         on_status_change = Mock()
         on_chapter_update = Mock()
         
-        with patch('processor.pipeline.get_config') as mock_config:
+        with patch('core.config_manager.get_config') as mock_config:
             config_dict = {
                 "paths.output_dir": str(temp_dir / "output"),
                 "paths.projects_dir": str(temp_dir / "projects"),
                 "tts.voice": "en-US-AndrewNeural"
             }
-            def mock_get(key, default=None):
-                return config_dict.get(key, default)
-            mock_config.return_value.get = mock_get
+            mock_config_obj = MagicMock()
+            mock_config_obj.get.side_effect = lambda key, default=None: config_dict.get(key, default)
+            mock_config.return_value = mock_config_obj
             
             pipeline = ProcessingPipeline(
                 "test_project",
@@ -105,30 +114,54 @@ class TestProcessingPipeline:
         # Progress tracker is created when project is initialized, even without chapters
         # (it will be None if no chapters exist, but the project is created)
     
-    def test_initialize_project_existing(self, pipeline, temp_dir):
+    def test_initialize_project_existing(self, temp_dir):
         """Test initializing an existing project."""
-        # Create and save a project first
-        pipeline.initialize_project(
-            toc_url="https://example.com/toc",
-            novel_title="Test Novel"
-        )
-        chapter_manager = pipeline.project_manager.get_chapter_manager()
-        chapter_manager.add_chapter(1, "https://example.com/1")
-        chapter_manager.add_chapter(2, "https://example.com/2")
-        pipeline.project_manager.save_project()
+        # Use a unique project name to avoid conflicts with previous test runs
+        import uuid
+        project_name = f"test_project_{uuid.uuid4().hex[:8]}"
         
-        # Create new pipeline and load
-        with patch('processor.pipeline.get_config') as mock_config:
+        # Reset ConfigManager singleton to ensure clean state
+        from core.config_manager import ConfigManager
+        ConfigManager._instance = None
+        ConfigManager._initialized = False
+        
+        # Create and save a project first
+        with patch('core.config_manager.get_config') as mock_get_config:
             config_dict = {
                 "paths.output_dir": str(temp_dir / "output"),
                 "paths.projects_dir": str(temp_dir / "projects"),
                 "tts.voice": "en-US-AndrewNeural"
             }
-            def mock_get(key, default=None):
-                return config_dict.get(key, default)
-            mock_config.return_value.get = mock_get
+            mock_config_obj = MagicMock()
+            mock_config_obj.get.side_effect = lambda key, default=None: config_dict.get(key, default)
+            mock_get_config.return_value = mock_config_obj
             
-            new_pipeline = ProcessingPipeline("test_project")
+            pipeline = ProcessingPipeline(project_name)
+            pipeline.initialize_project(
+                toc_url="https://example.com/toc",
+                novel_title="Test Novel"
+            )
+            chapter_manager = pipeline.project_manager.get_chapter_manager()
+            chapter_manager.add_chapter(1, "https://example.com/1")
+            chapter_manager.add_chapter(2, "https://example.com/2")
+            pipeline.project_manager.save_project()
+        
+        # Reset singleton again before creating new pipeline
+        ConfigManager._instance = None
+        ConfigManager._initialized = False
+        
+        # Create new pipeline and load
+        with patch('core.config_manager.get_config') as mock_get_config:
+            config_dict = {
+                "paths.output_dir": str(temp_dir / "output"),
+                "paths.projects_dir": str(temp_dir / "projects"),
+                "tts.voice": "en-US-AndrewNeural"
+            }
+            mock_config_obj = MagicMock()
+            mock_config_obj.get.side_effect = lambda key, default=None: config_dict.get(key, default)
+            mock_get_config.return_value = mock_config_obj
+            
+            new_pipeline = ProcessingPipeline(project_name)
             success = new_pipeline.initialize_project(toc_url="https://example.com/toc")
             
             assert success is True
@@ -247,33 +280,32 @@ class TestProcessingPipeline:
         pipeline.tts_engine = Mock()
         pipeline.tts_engine.convert_text_to_speech.return_value = True
         
-        # Mock file manager
-        pipeline.file_manager.save_text_file = Mock(return_value=Path(temp_dir / "text.txt"))
-        pipeline.file_manager.save_audio_file = Mock(return_value=Path(temp_dir / "audio.mp3"))
+        # Mock file manager - create actual files so pipeline validation passes
+        def mock_save_text_file(chapter_num, content, title=None):
+            text_file = Path(temp_dir / f"chapter_{chapter_num}.txt")
+            text_file.write_text(content)
+            return text_file
+        
+        def mock_save_audio_file(chapter_num, temp_audio_path, title=None):
+            audio_file = Path(temp_dir / f"chapter_{chapter_num}.mp3")
+            # Create a non-empty file so pipeline validation passes
+            audio_file.write_bytes(b"fake audio content")
+            return audio_file
+        
+        pipeline.file_manager.save_text_file = Mock(side_effect=mock_save_text_file)
+        pipeline.file_manager.save_audio_file = Mock(side_effect=mock_save_audio_file)
         pipeline.file_manager.audio_file_exists = Mock(return_value=False)
         
-        # Mock format_chapter_intro by patching it at the source module
-        # Since it's imported inside process_chapter, we patch it at tts.tts_engine
-        import tts.tts_engine as tts_module
-        original_func = getattr(tts_module, 'format_chapter_intro', None)
-        if original_func:
-            with patch.object(tts_module, 'format_chapter_intro', return_value="Formatted text"):
-                # Process with error isolation enabled
-                result = pipeline.process_all_chapters(ignore_errors=True)
-                
-                # Should complete processing (not stop on chapter 2 failure)
-                assert result["success"] is True
-                assert result["failed"] >= 1  # Chapter 2 should fail
-                assert result["completed"] >= 1  # Other chapters should succeed
-        else:
-            # If function doesn't exist, skip this part of the test
+        # Mock format_chapter_intro by patching it at tts.tts_engine where it's imported from
+        # Since it's imported inside process_chapter, we patch it at the source module
+        with patch('tts.tts_engine.format_chapter_intro', return_value="Formatted text"):
             # Process with error isolation enabled
             result = pipeline.process_all_chapters(ignore_errors=True)
             
             # Should complete processing (not stop on chapter 2 failure)
             assert result["success"] is True
             assert result["failed"] >= 1  # Chapter 2 should fail
-            # Note: completed might be 0 if format_chapter_intro import fails
+            assert result["completed"] >= 1  # Other chapters should succeed
     
     @patch('processor.pipeline.GenericScraper')
     def test_process_all_chapters_error_isolation_disabled(self, mock_scraper_class, pipeline, temp_dir):
