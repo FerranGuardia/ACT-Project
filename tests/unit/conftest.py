@@ -193,6 +193,16 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "unit: marks tests as unit tests")
     config.addinivalue_line("markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')")
     config.addinivalue_line("markers", "network: marks tests that require network connection")
+    config.addinivalue_line("markers", "asyncio: marks tests as async tests")
+    
+    # Configure pytest-asyncio if available
+    try:
+        import pytest_asyncio
+        # Set asyncio mode to auto (automatically detect async test functions)
+        config.option.asyncio_mode = "auto"
+    except ImportError:
+        # pytest-asyncio not installed - async tests will be skipped
+        pass
 
 # Mark all tests in this directory as unit tests
 pytestmark = pytest.mark.unit
