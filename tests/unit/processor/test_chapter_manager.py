@@ -8,8 +8,6 @@ Tests chapter management functionality including:
 - Serialization
 """
 
-import pytest
-
 # Path setup is handled by conftest.py
 from processor.chapter_manager import ChapterManager, Chapter, ChapterStatus
 
@@ -137,7 +135,7 @@ class TestChapterManager:
         manager = ChapterManager()
         
         urls = ["https://example.com/1", "https://example.com/2"]
-        chapters = manager.add_chapters_from_urls(urls, start_number=10)
+        manager.add_chapters_from_urls(urls, start_number=10)
         
         assert manager.get_chapter(10) is not None
         assert manager.get_chapter(11) is not None

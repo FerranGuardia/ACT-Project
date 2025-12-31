@@ -42,3 +42,4 @@ class TTSControlsSection(QGroupBox):
         self.setStyleSheet(get_group_box_style())
 
 
+

@@ -4,8 +4,7 @@ Tests queue management, controls, processing, and backend integration
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock, patch
-from PySide6.QtWidgets import QApplication
+from unittest.mock import MagicMock, patch
 
 
 class TestFullAutoView:

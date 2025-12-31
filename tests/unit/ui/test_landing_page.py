@@ -4,8 +4,8 @@ Tests navigation, button clicks, and UI initialization
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock, patch
-from PySide6.QtWidgets import QApplication
+from unittest.mock import Mock
+from PySide6.QtCore import Qt
 
 
 class TestLandingPage:

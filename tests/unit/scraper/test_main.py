@@ -91,7 +91,9 @@ class TestMain:
                     SCROLL_CONFIG.maxNoChange = 2;
                     SCROLL_CONFIG.scrollDelay = 50;
                     
-                    return scrollAndCountChapters();
+                    return scrollAndCountChapters().then(function(count) {{
+                        return count;
+                    }});
                 }})()
             """)
             
@@ -133,7 +135,9 @@ class TestMain:
                     SCROLL_CONFIG.maxNoChange = 3;
                     SCROLL_CONFIG.scrollDelay = 50;
                     
-                    return scrollAndCountChapters();
+                    return scrollAndCountChapters().then(function(count) {{
+                        return count;
+                    }});
                 }})()
             """)
             
@@ -158,7 +162,9 @@ class TestMain:
                     SCROLL_CONFIG.maxNoChange = 2;
                     SCROLL_CONFIG.scrollDelay = 50;
                     
-                    return scrollAndCountChapters();
+                    return scrollAndCountChapters().then(function(count) {{
+                        return count;
+                    }});
                 }})()
             """)
             
@@ -207,12 +213,12 @@ class TestMain:
                         performScrollLoop: typeof performScrollLoop === 'function'
                     }};
                     
-                    var count = scrollAndCountChapters();
-                    
-                    return {{
-                        count: count,
-                        functionsExist: functionsExist
-                    }};
+                    return scrollAndCountChapters().then(function(count) {{
+                        return {{
+                            count: count,
+                            functionsExist: functionsExist
+                        }};
+                    }});
                 }})()
             """)
             
@@ -252,7 +258,9 @@ class TestMain:
                     SCROLL_CONFIG.maxNoChange = 2;
                     SCROLL_CONFIG.scrollDelay = 50;
                     
-                    return scrollAndCountChapters();
+                    return scrollAndCountChapters().then(function(count) {{
+                        return count;
+                    }});
                 }})()
             """)
             

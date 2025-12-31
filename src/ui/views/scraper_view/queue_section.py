@@ -31,3 +31,4 @@ class QueueSection(QGroupBox):
         self.queue_list.clear()
 
 
+

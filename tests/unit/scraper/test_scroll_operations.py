@@ -48,18 +48,19 @@ class TestScrollOperations:
             page.set_content(html)
             
             result = page.evaluate(f"""
-                {scroll_operations_code}
-                
-                var container = document.getElementById('container');
-                var initialScroll = container.scrollTop;
-                scrollContainer(container, 200);
-                var finalScroll = container.scrollTop;
-                
-                return {{
-                            scrolled: finalScroll > initialScroll,
-                    scrollAmount: finalScroll - initialScroll
-                }};
-            }})()
+                (function() {{
+                    {scroll_operations_code}
+                    
+                    var container = document.getElementById('container');
+                    var initialScroll = container.scrollTop;
+                    scrollContainer(container, 200);
+                    var finalScroll = container.scrollTop;
+                    
+                    return {{
+                        scrolled: finalScroll > initialScroll,
+                        scrollAmount: finalScroll - initialScroll
+                    }};
+                }})()
             """)
             
             assert result['scrolled'] == True, "Container should be scrolled"
@@ -88,18 +89,19 @@ class TestScrollOperations:
             page.set_content(html)
             
             result = page.evaluate(f"""
-                {scroll_operations_code}
-                
-                var container = document.getElementById('container');
-                scrollContainerToBottom(container);
-                
-                return {{
-                            scrollTop: container.scrollTop,
-                    scrollHeight: container.scrollHeight,
-                    clientHeight: container.clientHeight,
-                    isAtBottom: container.scrollTop >= (container.scrollHeight - container.clientHeight - 10)
-                }};
-            }})()
+                (function() {{
+                    {scroll_operations_code}
+                    
+                    var container = document.getElementById('container');
+                    scrollContainerToBottom(container);
+                    
+                    return {{
+                        scrollTop: container.scrollTop,
+                        scrollHeight: container.scrollHeight,
+                        clientHeight: container.clientHeight,
+                        isAtBottom: container.scrollTop >= (container.scrollHeight - container.clientHeight - 10)
+                    }};
+                }})()
             """)
             
             assert result['isAtBottom'] == True, "Container should be scrolled to bottom"
@@ -127,22 +129,21 @@ class TestScrollOperations:
             page.set_content(html)
             
             result = page.evaluate(f"""
-                {scroll_operations_code}
-                
-                var ch1 = document.getElementById('ch1');
-                var ch2 = document.getElementById('ch2');
-                var ch3 = document.getElementById('ch3');
-                var chapterLinks = [ch1, ch2, ch3];
-                
-                return new Promise(function(resolve) {{
-                    scrollToLastChapter(chapterLinks, 100).then(function() {{
-                        var lastLinkRect = ch3.getBoundingClientRect();
-                        resolve({{
-                            isVisible: lastLinkRect.top >= 0 && lastLinkRect.bottom <= window.innerHeight,
-                            scrollY: window.scrollY
-                        }});
-                    }});
-                }});
+                (async function() {{
+                    {scroll_operations_code}
+                    
+                    var ch1 = document.getElementById('ch1');
+                    var ch2 = document.getElementById('ch2');
+                    var ch3 = document.getElementById('ch3');
+                    var chapterLinks = [ch1, ch2, ch3];
+                    
+                    await scrollToLastChapter(chapterLinks, 100);
+                    var lastLinkRect = ch3.getBoundingClientRect();
+                    return {{
+                        isVisible: lastLinkRect.top >= 0 && lastLinkRect.bottom <= window.innerHeight,
+                        scrollY: window.scrollY
+                    }};
+                }})()
             """)
             
             # The last chapter should be scrolled into view
@@ -169,20 +170,19 @@ class TestScrollOperations:
             page.set_content(html)
             
             result = page.evaluate(f"""
-                {scroll_operations_code}
-                
-                var ch1 = document.getElementById('ch1');
-                var chapterLinks = [ch1];
-                var initialScrollY = window.scrollY;
-                
-                return new Promise(function(resolve) {{
-                    scrollPastLastChapter(chapterLinks, 2, 100).then(function() {{
-                        resolve({{
-                            scrolled: window.scrollY > initialScrollY,
-                            scrollAmount: window.scrollY - initialScrollY
-                        }});
-                    }});
-                }});
+                (async function() {{
+                    {scroll_operations_code}
+                    
+                    var ch1 = document.getElementById('ch1');
+                    var chapterLinks = [ch1];
+                    var initialScrollY = window.scrollY;
+                    
+                    await scrollPastLastChapter(chapterLinks, 2, 100);
+                    return {{
+                        scrolled: window.scrollY > initialScrollY,
+                        scrollAmount: window.scrollY - initialScrollY
+                    }};
+                }})()
             """)
             
             assert result['scrolled'] == True, "Should scroll past last chapter"
@@ -200,13 +200,12 @@ class TestScrollOperations:
             
             # Should not throw error
             result = page.evaluate(f"""
-                {scroll_operations_code}
-                
-                return new Promise(function(resolve) {{
-                    scrollToLastChapter([], 100).then(function() {{
-                        resolve({{success: true}});
-                    }});
-                }});
+                (async function() {{
+                    {scroll_operations_code}
+                    
+                    await scrollToLastChapter([], 100);
+                    return {{success: true}};
+                }})()
             """)
             
             assert result['success'] == True, "Should handle empty array gracefully"
@@ -232,20 +231,22 @@ class TestScrollOperations:
             page.set_content(html)
             
             result = page.evaluate(f"""
-                {scroll_operations_code}
-                
-                var initialScrollY = window.scrollY;
-                scrollContainer(document.body, 200);
-                var finalScrollY = window.scrollY;
-                
-                return {{
-                            scrolled: finalScrollY > initialScrollY,
-                    scrollAmount: finalScrollY - initialScrollY
-                }};
-            }})()
+                (function() {{
+                    {scroll_operations_code}
+                    
+                    var initialScrollY = window.scrollY;
+                    scrollContainer(document.body, 200);
+                    var finalScrollY = window.scrollY;
+                    
+                    return {{
+                        scrolled: finalScrollY > initialScrollY,
+                        scrollAmount: finalScrollY - initialScrollY
+                    }};
+                }})()
             """)
             
             assert result['scrolled'] == True, "Window should be scrolled"
             
             browser.close()
+
 

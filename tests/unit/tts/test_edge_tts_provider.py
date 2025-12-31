@@ -7,10 +7,9 @@ Tests the EdgeTTSProvider wrapper implementation.
 import sys
 import importlib.util
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock, patch, AsyncMock
 import pytest
 import tempfile
-import shutil
 
 # Path setup is handled by conftest.py
 act_src = Path(__file__).parent.parent.parent.parent / "src"

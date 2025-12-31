@@ -4,9 +4,7 @@ Tests URL validation, chapter selection, controls, UI state, and backend integra
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock, patch, call
-from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QThread
+from unittest.mock import patch
 
 
 class TestScraperView:

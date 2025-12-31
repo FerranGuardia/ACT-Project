@@ -56,7 +56,7 @@ class TestScrollLoop:
             
             result = page.evaluate(f"""
                 (function() {{
-                    scroll_loop_code
+                    {scroll_loop_code}
                     
                     return {{
                             exists: typeof SCROLL_CONFIG !== 'undefined',
@@ -100,40 +100,42 @@ class TestScrollLoop:
             
             # Create a simplified version that stops early for testing
             result = page.evaluate(f"""
-                {all_dependencies_code}
-                {scroll_loop_code}
-                
-                // Override SCROLL_CONFIG for faster testing
-                SCROLL_CONFIG.maxScrolls = 5;
-                SCROLL_CONFIG.maxNoChange = 2;
-                SCROLL_CONFIG.scrollDelay = 50;
-                
-                var dependencies = {{
-                    countChapterLinks: function() {{
-                        return countChapterLinks(isChapterLink);
-                    }},
-                    getChapterLinks: function() {{
-                        return getChapterLinks(isChapterLink);
-                    }},
-                    tryClickLoadMore: async function() {{ return false; }},
-                    findChapterContainer: findChapterContainer,
-                    scrollContainer: function(container) {{
-                        // Simplified scroll for testing
-                        container.scrollTop += 100;
-                        window.scrollTo(0, document.body.scrollHeight);
-                    }},
-                    scrollContainerToBottom: scrollContainerToBottom,
-                    scrollToLastChapter: async function(links) {{
-                        if (links.length > 0) {{
-                            links[links.length - 1].scrollIntoView();
+                (async function() {{
+                    {all_dependencies_code}
+                    {scroll_loop_code}
+                    
+                    // Override SCROLL_CONFIG for faster testing
+                    SCROLL_CONFIG.maxScrolls = 5;
+                    SCROLL_CONFIG.maxNoChange = 2;
+                    SCROLL_CONFIG.scrollDelay = 50;
+                    
+                    var dependencies = {{
+                        countChapterLinks: function() {{
+                            return countChapterLinks(isChapterLink);
+                        }},
+                        getChapterLinks: function() {{
+                            return getChapterLinks(isChapterLink);
+                        }},
+                        tryClickLoadMore: async function() {{ return false; }},
+                        findChapterContainer: findChapterContainer,
+                        scrollContainer: function(container) {{
+                            // Simplified scroll for testing
+                            container.scrollTop += 100;
+                            window.scrollTo(0, document.body.scrollHeight);
+                        }},
+                        scrollContainerToBottom: scrollContainerToBottom,
+                        scrollToLastChapter: async function(links) {{
+                            if (links.length > 0) {{
+                                links[links.length - 1].scrollIntoView();
+                            }}
+                        }},
+                        scrollPastLastChapter: async function(links) {{
+                            // Simplified for testing
                         }}
-                    }},
-                    scrollPastLastChapter: async function(links) {{
-                        // Simplified for testing
-                    }}
-                }};
-                
-                return performScrollLoop(dependencies);
+                    }};
+                    
+                    return await performScrollLoop(dependencies);
+                }})()
             """)
             
             assert result == 3, "Should count 3 chapters"
@@ -159,28 +161,29 @@ class TestScrollLoop:
             page.set_content(html)
             
             result = page.evaluate(f"""
-                {all_dependencies_code}
-                {scroll_loop_code}
-                
-                var tryClickLoadMoreCalled = 0;
-                var mockTryClickLoadMore = async function() {{
-                    tryClickLoadMoreCalled++;
-                    return false; // Simulate no button found
-                }};
-                
-                var countCalled = 0;
-                var mockCountChapterLinks = function() {{
-                    countCalled++;
-                    return countChapterLinks(isChapterLink);
-                }};
-                
-                return performFinalLoadMoreAttempts(mockTryClickLoadMore, mockCountChapterLinks).then(function(result) {{
+                (async function() {{
+                    {all_dependencies_code}
+                    {scroll_loop_code}
+                    
+                    var tryClickLoadMoreCalled = 0;
+                    var mockTryClickLoadMore = async function() {{
+                        tryClickLoadMoreCalled++;
+                        return false; // Simulate no button found
+                    }};
+                    
+                    var countCalled = 0;
+                    var mockCountChapterLinks = function() {{
+                        countCalled++;
+                        return countChapterLinks(isChapterLink);
+                    }};
+                    
+                    var result = await performFinalLoadMoreAttempts(mockTryClickLoadMore, mockCountChapterLinks);
                     return {{
-                                result: result,
+                        result: result,
                         tryClickLoadMoreCalled: tryClickLoadMoreCalled,
                         countCalled: countCalled
                     }};
-                }});
+                }})()
             """)
             
             assert result['tryClickLoadMoreCalled'] == 5, "Should attempt 5 times"
@@ -210,44 +213,45 @@ class TestScrollLoop:
             
             # Override config for faster testing
             result = page.evaluate(f"""
-                {all_dependencies_code}
-                {scroll_loop_code}
-                
-                SCROLL_CONFIG.finalAggressiveScrolls = 2;
-                SCROLL_CONFIG.finalAggressiveLoadMoreAttempts = 1;
-                SCROLL_CONFIG.finalAggressiveWait = 50;
-                
-                var container = document.getElementById('chapters');
-                var scrollToBottomCalled = 0;
-                var tryClickLoadMoreCalled = 0;
-                
-                var dependencies = {{
-                    scrollContainerToBottom: function(cont) {{
-                        scrollToBottomCalled++;
-                        scrollContainerToBottom(cont);
-                    }},
-                    tryClickLoadMore: async function() {{
-                        tryClickLoadMoreCalled++;
-                        return false;
-                    }},
-                    countChapterLinks: function() {{
-                        return countChapterLinks(isChapterLink);
-                    }},
-                    getChapterLinks: function() {{
-                        return getChapterLinks(isChapterLink);
-                    }},
-                    scrollPastLastChapter: async function(links) {{
-                        // Simplified
-                    }}
-                }};
-                
-                return performFinalAggressiveScroll(container, dependencies, 1).then(function(finalCount) {{
+                (async function() {{
+                    {all_dependencies_code}
+                    {scroll_loop_code}
+                    
+                    SCROLL_CONFIG.finalAggressiveScrolls = 2;
+                    SCROLL_CONFIG.finalAggressiveLoadMoreAttempts = 1;
+                    SCROLL_CONFIG.finalAggressiveWait = 50;
+                    
+                    var container = document.getElementById('chapters');
+                    var scrollToBottomCalled = 0;
+                    var tryClickLoadMoreCalled = 0;
+                    
+                    var dependencies = {{
+                        scrollContainerToBottom: function(cont) {{
+                            scrollToBottomCalled++;
+                            scrollContainerToBottom(cont);
+                        }},
+                        tryClickLoadMore: async function() {{
+                            tryClickLoadMoreCalled++;
+                            return false;
+                        }},
+                        countChapterLinks: function() {{
+                            return countChapterLinks(isChapterLink);
+                        }},
+                        getChapterLinks: function() {{
+                            return getChapterLinks(isChapterLink);
+                        }},
+                        scrollPastLastChapter: async function(links) {{
+                            // Simplified
+                        }}
+                    }};
+                    
+                    var finalCount = await performFinalAggressiveScroll(container, dependencies, 1);
                     return {{
-                                finalCount: finalCount,
+                        finalCount: finalCount,
                         scrollToBottomCalled: scrollToBottomCalled,
                         tryClickLoadMoreCalled: tryClickLoadMoreCalled
                     }};
-                }});
+                }})()
             """)
             
             assert result['scrollToBottomCalled'] == 2, "Should scroll to bottom 2 times"
@@ -274,44 +278,48 @@ class TestScrollLoop:
             
             page.set_content(html)
             
+            max_no_change = 3
             result = page.evaluate(f"""
-                {all_dependencies_code}
-                {scroll_loop_code}
-                
-                // Override config for faster testing
-                SCROLL_CONFIG.maxScrolls = 100;
-                SCROLL_CONFIG.maxNoChange = 3;
-                SCROLL_CONFIG.scrollDelay = 10;
-                
-                var scrollCount = 0;
-                var dependencies = {{
-                    countChapterLinks: function() {{
-                        return 1; // Always return same count
-                    }},
-                    getChapterLinks: function() {{
-                        return [];
-                    }},
-                    tryClickLoadMore: async function() {{ return false; }},
-                    findChapterContainer: findChapterContainer,
-                    scrollContainer: function(container) {{
-                        scrollCount++;
-                    }},
-                    scrollContainerToBottom: function() {{}},
-                    scrollToLastChapter: async function() {{}},
-                    scrollPastLastChapter: async function() {{}}
-                }};
-                
-                return performScrollLoop(dependencies).then(function(count) {{
-                    return {{
-                                count: count,
-                        scrollCount: scrollCount
+                (async function() {{
+                    {all_dependencies_code}
+                    {scroll_loop_code}
+                    
+                    // Override config for faster testing
+                    SCROLL_CONFIG.maxScrolls = 100;
+                    SCROLL_CONFIG.maxNoChange = {max_no_change};
+                    SCROLL_CONFIG.scrollDelay = 10;
+                    
+                    var scrollCount = 0;
+                    var dependencies = {{
+                        countChapterLinks: function() {{
+                            return 1; // Always return same count
+                        }},
+                        getChapterLinks: function() {{
+                            return [];
+                        }},
+                        tryClickLoadMore: async function() {{ return false; }},
+                        findChapterContainer: findChapterContainer,
+                        scrollContainer: function(container) {{
+                            scrollCount++;
+                        }},
+                        scrollContainerToBottom: function() {{}},
+                        scrollToLastChapter: async function() {{}},
+                        scrollPastLastChapter: async function() {{}}
                     }};
-                }});
+                    
+                    var count = await performScrollLoop(dependencies);
+                    return {{
+                        count: count,
+                        scrollCount: scrollCount,
+                        maxNoChange: SCROLL_CONFIG.maxNoChange
+                    }};
+                }})()
             """)
             
             # Should stop after maxNoChange iterations
-            assert result['scrollCount'] <= SCROLL_CONFIG.maxNoChange + 5, "Should stop after maxNoChange"
+            assert result['scrollCount'] <= result['maxNoChange'] + 5, "Should stop after maxNoChange"
             assert result['count'] == 1, "Should return final count"
             
             browser.close()
+
 

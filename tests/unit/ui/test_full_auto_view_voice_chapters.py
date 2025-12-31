@@ -4,8 +4,7 @@ Tests the new functionality for selecting voice and chapters when adding to queu
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock, patch
-from PySide6.QtWidgets import QApplication
+from unittest.mock import MagicMock, patch
 
 
 class TestAddQueueDialogVoiceChapterSelection:
@@ -81,7 +80,7 @@ class TestAddQueueDialogVoiceChapterSelection:
             dialog.url_input.setText("https://example.com/novel")
             dialog.voice_combo.setCurrentIndex(0)
             
-            url, title, voice, chapter_selection = dialog.get_data()
+            _, _, voice, _ = dialog.get_data()
             
             assert voice is not None
             assert isinstance(voice, str)
@@ -99,7 +98,7 @@ class TestAddQueueDialogVoiceChapterSelection:
             dialog.url_input.setText("https://example.com/novel")
             dialog.all_chapters_radio.setChecked(True)
             
-            url, title, voice, chapter_selection = dialog.get_data()
+            _, _, _, chapter_selection = dialog.get_data()
             
             assert chapter_selection['type'] == 'all'
             
@@ -117,7 +116,7 @@ class TestAddQueueDialogVoiceChapterSelection:
             dialog.from_spin.setValue(5)
             dialog.to_spin.setValue(10)
             
-            url, title, voice, chapter_selection = dialog.get_data()
+            _, _, _, chapter_selection = dialog.get_data()
             
             assert chapter_selection['type'] == 'range'
             assert chapter_selection['from'] == 5
@@ -136,7 +135,7 @@ class TestAddQueueDialogVoiceChapterSelection:
             dialog.specific_radio.setChecked(True)
             dialog.specific_input.setText("1, 3, 5, 7")
             
-            url, title, voice, chapter_selection = dialog.get_data()
+            _, _, _, chapter_selection = dialog.get_data()
             
             assert chapter_selection['type'] == 'specific'
             assert chapter_selection['chapters'] == [1, 3, 5, 7]
@@ -154,7 +153,7 @@ class TestAddQueueDialogVoiceChapterSelection:
             dialog.specific_radio.setChecked(True)
             dialog.specific_input.setText("invalid, text")
             
-            url, title, voice, chapter_selection = dialog.get_data()
+            _, _, _, chapter_selection = dialog.get_data()
             
             # Should default to 'all' if invalid
             assert chapter_selection['type'] == 'all'
@@ -195,24 +194,20 @@ class TestFullAutoViewVoiceChapterIntegration:
             view = FullAutoView()
             
             # Mock dialog to return voice and chapter selection
-            with patch.object(view, 'add_to_queue') as mock_add:
-                dialog = AddQueueDialog()
-                dialog.url_input.setText(sample_novel_url)
-                dialog.title_input.setText("Test Novel")
-                dialog.voice_combo.setCurrentIndex(0)
-                dialog.all_chapters_radio.setChecked(True)
+            with patch('ui.views.full_auto_view.AddQueueDialog') as mock_dialog_class:
+                mock_dialog = MagicMock()
+                mock_dialog.exec.return_value = 1
+                mock_dialog.get_data.return_value = (
+                    sample_novel_url, "Test Novel", "en-US-AndrewNeural", {'type': 'all'}
+                )
+                mock_dialog_class.return_value = mock_dialog
                 
-                # Simulate dialog acceptance
-                with patch.object(AddQueueDialog, 'exec', return_value=1):
-                    with patch.object(AddQueueDialog, 'get_data', return_value=(
-                        sample_novel_url, "Test Novel", "en-US-AndrewNeural", {'type': 'all'}
-                    )):
-                        view.add_to_queue()
-                        
-                        # Check that queue item has voice
-                        if len(view.queue_items) > 0:
-                            assert 'voice' in view.queue_items[0]
-                            assert view.queue_items[0]['voice'] == "en-US-AndrewNeural"
+                view.add_to_queue()
+                
+                # Check that queue item has voice
+                if len(view.queue_items) > 0:
+                    assert 'voice' in view.queue_items[0]
+                    assert view.queue_items[0]['voice'] == "en-US-AndrewNeural"
             
         except ImportError:
             pytest.skip("UI module not available")

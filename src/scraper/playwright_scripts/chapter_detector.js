@@ -24,7 +24,8 @@ function isChapterLink(link) {
     }
     
     // Standard patterns: /chapter/, chapter-123, ch_123, etc. in href
-    if (/chapter|ch[_-\s]?\d+/.test(href) || /chapter|ch[_-\s]?\d+/.test(text)) {
+    // Match chapter/ch followed by separator and number, or /chapter/ in path
+    if (/\/chapter\/|\/chapter-|chapter[_-\s]\d+|ch[_-\s]\d+/.test(href) || /chapter[_-\s]\d+|ch[_-\s]\d+/.test(text)) {
         return true;
     }
     
@@ -33,8 +34,8 @@ function isChapterLink(link) {
         // Check if it's in a chapter list context
         var parent = link.closest('.chapter-list, #chapters, [class*="chapter"], [id*="chapter"]');
         if (parent) return true;
-        // Or if link text suggests it's a chapter
-        if (/chapter|第.*章|ch\s*\d+/i.test(text)) return true;
+        // Or if link text suggests it's a chapter (must have chapter followed by number)
+        if (/chapter\s*\d+|第.*章|ch\s*\d+/i.test(text)) return true;
     }
     
     // LightNovelPub/NovelLive pattern: /book/novel-name/chapter-123 or /book/novel-name/123
@@ -46,8 +47,8 @@ function isChapterLink(link) {
     // Generic pattern: URL contains numbers and link text suggests it's a chapter
     // This is more flexible - checks if text has "chapter" indicator
     if (/\d+/.test(href)) {
-        // Check if text contains chapter indicators
-        if (/chapter|第.*章|ch\s*\d+/i.test(text)) {
+        // Check if text contains chapter indicators (must have chapter followed by number)
+        if (/chapter\s*\d+|第.*章|ch\s*\d+/i.test(text)) {
             // Also check if it's in a chapter list container
             var parent = link.closest('.chapter-list, #chapters, .list-chapter, [class*="chapter"], [id*="chapter"], ul, ol, [role="list"]');
             if (parent) {
@@ -66,4 +67,5 @@ function isChapterLink(link) {
     
     return false;
 }
+
 

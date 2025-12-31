@@ -44,3 +44,4 @@ async function scrollAndCountChapters() {
     return finalCount;
 }
 
+

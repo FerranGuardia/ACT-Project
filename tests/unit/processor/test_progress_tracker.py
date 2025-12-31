@@ -8,8 +8,7 @@ Tests progress tracking functionality including:
 - Callback functionality
 """
 
-import pytest
-from unittest.mock import Mock, call
+from unittest.mock import Mock
 
 # Path setup is handled by conftest.py
 from processor.progress_tracker import ProgressTracker, ProcessingStatus
