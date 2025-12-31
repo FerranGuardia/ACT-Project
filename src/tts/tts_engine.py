@@ -414,12 +414,26 @@ class TTSEngine:
                 return False
             
             # Clean up chunk files
+            # Add a small delay to ensure file handles are released
+            import time
+            time.sleep(0.1)
+            
             for cf in chunk_files:
                 if not isinstance(cf, Path):
                     continue
                 try:
                     if cf.exists():
-                        cf.unlink()
+                        # Try multiple times with delays if file is locked
+                        max_retries = 3
+                        for retry in range(max_retries):
+                            try:
+                                cf.unlink()
+                                break
+                            except (PermissionError, OSError) as e:
+                                if retry < max_retries - 1:
+                                    time.sleep(0.2)
+                                else:
+                                    logger.warning(f"Failed to cleanup chunk file {cf} after {max_retries} attempts: {e}")
                 except Exception as e:
                     logger.warning(f"Failed to cleanup chunk file {cf}: {e}")
             
@@ -561,11 +575,20 @@ class TTSEngine:
                 from pydub import AudioSegment  # type: ignore[import-untyped]
                 
                 combined = AudioSegment.empty()  # type: ignore[attr-defined]
+                audio_segments = []
                 for chunk_file in chunk_files:
                     audio = AudioSegment.from_mp3(str(chunk_file))  # type: ignore[attr-defined]
+                    audio_segments.append(audio)
                     combined += audio  # type: ignore[assignment]
                 
                 combined.export(str(output_path), format="mp3")  # type: ignore[attr-defined]
+                
+                # Explicitly delete references to ensure file handles are released
+                del combined
+                del audio_segments
+                import gc
+                gc.collect()
+                
                 logger.info(f"✓ Merged {len(chunk_files)} audio chunks using pydub")
                 return True
             except ImportError:
