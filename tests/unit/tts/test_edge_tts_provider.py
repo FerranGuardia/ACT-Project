@@ -159,7 +159,12 @@ class TestEdgeTTSProvider:
         
         mock_communicate_instance = AsyncMock()
         mock_communicate = MagicMock(return_value=mock_communicate_instance)
-        mock_communicate_instance.save = AsyncMock()
+        
+        # Mock save to actually write to the file
+        async def mock_save(path):
+            Path(path).write_bytes(b'fake audio data')
+        
+        mock_communicate_instance.save = AsyncMock(side_effect=mock_save)
         
         with patch('edge_tts.list_voices', new_callable=AsyncMock, return_value=mock_voices), \
              patch('edge_tts.Communicate', mock_communicate):
@@ -191,7 +196,12 @@ class TestEdgeTTSProvider:
         
         mock_communicate_instance = AsyncMock()
         mock_communicate = MagicMock(return_value=mock_communicate_instance)
-        mock_communicate_instance.save = AsyncMock()
+        
+        # Mock save to actually write to the file
+        async def mock_save(path):
+            Path(path).write_bytes(b'fake audio data')
+        
+        mock_communicate_instance.save = AsyncMock(side_effect=mock_save)
         
         with patch('edge_tts.list_voices', new_callable=AsyncMock, return_value=mock_voices), \
              patch('edge_tts.Communicate', mock_communicate):
