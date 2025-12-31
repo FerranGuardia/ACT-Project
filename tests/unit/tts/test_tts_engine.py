@@ -254,6 +254,263 @@ class TestTTSEngine:
             
         except ImportError:
             pytest.skip("TTS module not available")
+    
+    @pytest.mark.asyncio
+    async def test_convert_chunks_parallel_success(self, temp_dir, mock_config):
+        """Test successful parallel chunk conversion"""
+        try:
+            from src.tts.tts_engine import TTSEngine  # type: ignore
+            # Import edge_tts to ensure it's available for patching
+            try:
+                import edge_tts  # type: ignore
+            except ImportError:
+                pytest.skip("edge-tts not available")
+            
+            engine = TTSEngine()
+            chunks = ["Chunk 1 text.", "Chunk 2 text.", "Chunk 3 text."]
+            voice = "en-US-AndrewNeural"
+            output_stem = "test_output"
+            
+            # Mock edge_tts.Communicate
+            with patch('edge_tts.Communicate') as mock_communicate_class:
+                # Create mock communicate instances for each chunk
+                mock_communicates = []
+                for i, chunk in enumerate(chunks):
+                    mock_comm = AsyncMock()
+                    chunk_path = temp_dir / f"{output_stem}_chunk_{i}.mp3"
+                    
+                    async def save_side_effect(path, idx=i):
+                        # Ensure file exists and has content
+                        Path(path).write_bytes(b'fake audio data')
+                    
+                    mock_comm.save = AsyncMock(side_effect=save_side_effect)
+                    mock_communicates.append(mock_comm)
+                
+                mock_communicate_class.side_effect = mock_communicates
+                
+                # Run the parallel conversion
+                result = await engine._convert_chunks_parallel(
+                    chunks=chunks,
+                    voice=voice,
+                    temp_dir=temp_dir,
+                    output_stem=output_stem
+                )
+                
+                # Verify results
+                assert isinstance(result, list)
+                assert len(result) == len(chunks)
+                for i, chunk_file in enumerate(result):
+                    assert isinstance(chunk_file, Path)
+                    assert chunk_file.exists()
+                    assert chunk_file.stat().st_size > 0
+                    assert chunk_file.name == f"{output_stem}_chunk_{i}.mp3"
+                
+                # Verify all chunks were processed
+                assert mock_communicate_class.call_count == len(chunks)
+                
+        except ImportError:
+            pytest.skip("TTS module not available")
+    
+    @pytest.mark.asyncio
+    async def test_convert_chunks_parallel_retry_on_empty_file(self, temp_dir, mock_config):
+        """Test that parallel conversion retries when empty file is produced"""
+        try:
+            from src.tts.tts_engine import TTSEngine  # type: ignore
+            
+            engine = TTSEngine()
+            chunks = ["Test chunk."]
+            voice = "en-US-AndrewNeural"
+            output_stem = "test_output"
+            chunk_path = temp_dir / f"{output_stem}_chunk_0.mp3"
+            
+            call_count = 0
+            
+            async def save_side_effect(path):
+                nonlocal call_count
+                call_count += 1
+                # First call creates empty file, second call creates valid file
+                if call_count == 1:
+                    Path(path).write_bytes(b'')  # Empty file
+                else:
+                    Path(path).write_bytes(b'valid audio data')
+            
+            # Import edge_tts to ensure it's available for patching
+            try:
+                import edge_tts  # type: ignore
+            except ImportError:
+                pytest.skip("edge-tts not available")
+            
+            with patch('edge_tts.Communicate') as mock_communicate_class:
+                mock_comm = AsyncMock()
+                mock_comm.save = AsyncMock(side_effect=save_side_effect)
+                mock_communicate_class.return_value = mock_comm
+                
+                # Run the parallel conversion
+                result = await engine._convert_chunks_parallel(
+                    chunks=chunks,
+                    voice=voice,
+                    temp_dir=temp_dir,
+                    output_stem=output_stem
+                )
+                
+                # Should have retried and succeeded
+                assert len(result) == 1
+                assert result[0].exists()
+                assert result[0].stat().st_size > 0
+                assert call_count == 2  # Initial attempt + retry
+                
+        except ImportError:
+            pytest.skip("TTS module not available")
+    
+    @pytest.mark.asyncio
+    async def test_convert_chunks_parallel_retry_on_exception(self, temp_dir, mock_config):
+        """Test that parallel conversion retries on exception"""
+        try:
+            from src.tts.tts_engine import TTSEngine  # type: ignore
+            
+            engine = TTSEngine()
+            chunks = ["Test chunk."]
+            voice = "en-US-AndrewNeural"
+            output_stem = "test_output"
+            chunk_path = temp_dir / f"{output_stem}_chunk_0.mp3"
+            
+            call_count = 0
+            
+            async def save_side_effect(path):
+                nonlocal call_count
+                call_count += 1
+                # First call raises exception, second call succeeds
+                if call_count == 1:
+                    raise Exception("Network error")
+                else:
+                    Path(path).write_bytes(b'valid audio data')
+            
+            # Import edge_tts to ensure it's available for patching
+            try:
+                import edge_tts  # type: ignore
+            except ImportError:
+                pytest.skip("edge-tts not available")
+            
+            with patch('edge_tts.Communicate') as mock_communicate_class:
+                mock_comm = AsyncMock()
+                mock_comm.save = AsyncMock(side_effect=save_side_effect)
+                mock_communicate_class.return_value = mock_comm
+                
+                # Run the parallel conversion
+                result = await engine._convert_chunks_parallel(
+                    chunks=chunks,
+                    voice=voice,
+                    temp_dir=temp_dir,
+                    output_stem=output_stem
+                )
+                
+                # Should have retried and succeeded
+                assert len(result) == 1
+                assert result[0].exists()
+                assert result[0].stat().st_size > 0
+                assert call_count == 2  # Initial attempt + retry
+                
+        except ImportError:
+            pytest.skip("TTS module not available")
+    
+    @pytest.mark.asyncio
+    async def test_convert_chunks_parallel_all_retries_fail(self, temp_dir, mock_config):
+        """Test that parallel conversion raises exception after all retries fail"""
+        try:
+            from src.tts.tts_engine import TTSEngine  # type: ignore
+            
+            engine = TTSEngine()
+            chunks = ["Test chunk."]
+            voice = "en-US-AndrewNeural"
+            output_stem = "test_output"
+            
+            async def save_side_effect(path):
+                # Always raise exception
+                raise Exception("Persistent error")
+            
+            # Import edge_tts to ensure it's available for patching
+            try:
+                import edge_tts  # type: ignore
+            except ImportError:
+                pytest.skip("edge-tts not available")
+            
+            with patch('edge_tts.Communicate') as mock_communicate_class:
+                mock_comm = AsyncMock()
+                mock_comm.save = AsyncMock(side_effect=save_side_effect)
+                mock_communicate_class.return_value = mock_comm
+                
+                # Should raise exception after all retries
+                with pytest.raises(Exception, match="Failed to convert chunk 1 after retries"):
+                    await engine._convert_chunks_parallel(
+                        chunks=chunks,
+                        voice=voice,
+                        temp_dir=temp_dir,
+                        output_stem=output_stem
+                    )
+                
+                # Should have attempted max_retries times (5)
+                assert mock_comm.save.call_count == 5
+                
+        except ImportError:
+            pytest.skip("TTS module not available")
+    
+    @pytest.mark.asyncio
+    async def test_convert_chunks_parallel_multiple_chunks(self, temp_dir, mock_config):
+        """Test parallel conversion with multiple chunks runs concurrently"""
+        try:
+            from src.tts.tts_engine import TTSEngine  # type: ignore
+            
+            engine = TTSEngine()
+            chunks = [f"Chunk {i} text." for i in range(5)]
+            voice = "en-US-AndrewNeural"
+            output_stem = "test_output"
+            
+            # Track when each chunk starts processing
+            start_times = []
+            
+            async def save_side_effect(path):
+                import time
+                start_times.append(time.time())
+                # Small delay to simulate processing
+                await asyncio.sleep(0.1)
+                Path(path).write_bytes(b'audio data')
+            
+            # Import edge_tts to ensure it's available for patching
+            try:
+                import edge_tts  # type: ignore
+            except ImportError:
+                pytest.skip("edge-tts not available")
+            
+            with patch('edge_tts.Communicate') as mock_communicate_class:
+                mock_comm = AsyncMock()
+                mock_comm.save = AsyncMock(side_effect=save_side_effect)
+                mock_communicate_class.return_value = mock_comm
+                
+                import time
+                start = time.time()
+                result = await engine._convert_chunks_parallel(
+                    chunks=chunks,
+                    voice=voice,
+                    temp_dir=temp_dir,
+                    output_stem=output_stem
+                )
+                elapsed = time.time() - start
+                
+                # Verify all chunks were processed
+                assert len(result) == len(chunks)
+                
+                # Verify chunks were processed in parallel (should be faster than sequential)
+                # Sequential would take at least 0.1 * 5 = 0.5 seconds
+                # Parallel should take closer to 0.1 seconds (all chunks processed concurrently)
+                assert elapsed < 0.3  # Should be much faster than sequential
+                
+                # Verify all chunks started processing around the same time (within 0.05s)
+                if len(start_times) > 1:
+                    time_spread = max(start_times) - min(start_times)
+                    assert time_spread < 0.05  # All should start almost simultaneously
+                
+        except ImportError:
+            pytest.skip("TTS module not available")
 
 
 
