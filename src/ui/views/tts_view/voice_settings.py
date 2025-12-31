@@ -34,6 +34,7 @@ class VoiceSettings(QGroupBox):
         provider_layout.addWidget(provider_label)
         self.provider_combo = QComboBox()
         self.provider_combo.setStyleSheet(get_combo_box_style())
+        self.provider_combo.setMinimumWidth(250)  # Ensure readable width for provider names
         provider_layout.addWidget(self.provider_combo)
         provider_layout.addStretch()
         layout.addLayout(provider_layout)
@@ -45,6 +46,7 @@ class VoiceSettings(QGroupBox):
         voice_select_layout.addWidget(voice_label)
         self.voice_combo = QComboBox()
         self.voice_combo.setStyleSheet(get_combo_box_style())
+        self.voice_combo.setMinimumWidth(300)  # Ensure readable width for voice names (e.g., "en-US-AndrewNeural - Male")
         self.preview_button = QPushButton("🔊 Preview")
         self.preview_button.setStyleSheet(get_button_standard_style())
         self.stop_preview_button = QPushButton("⏹️ Stop Preview")

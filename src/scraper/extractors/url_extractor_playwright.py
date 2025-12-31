@@ -75,23 +75,52 @@ def retry_with_backoff(func: Callable[..., Any], max_retries: int = 3, base_dela
 
 def _load_playwright_scroll_script() -> str:
     """
-    Load the Playwright scroll script from external file.
+    Load and bundle all Playwright scroll script modules.
+    
+    Modules are loaded in dependency order:
+    1. chapter_detector.js - Chapter link detection
+    2. link_counter.js - Link counting utilities
+    3. load_more_handler.js - Load More button handling
+    4. container_finder.js - Container finding utilities
+    5. scroll_operations.js - Scroll operation helpers
+    6. scroll_loop.js - Main scroll loop logic
+    7. main.js - Entry point
     
     Returns:
         JavaScript code as string, wrapped in async function call
     """
-    script_path = Path(__file__).parent.parent / "playwright_scroll_script.js"
-    try:
-        with open(script_path, "r", encoding="utf-8") as f:
-            script_content = f.read()
-        # Wrap in async function call for page.evaluate()
-        return f"async () => {{ {script_content} return await scrollAndCountChapters(); }}"
-    except FileNotFoundError:
-        logger.error(f"Playwright scroll script not found at {script_path}")
-        raise
-    except Exception as e:
-        logger.error(f"Error loading Playwright scroll script: {e}")
-        raise
+    script_dir = Path(__file__).parent.parent / "playwright_scripts"
+    
+    # Define modules in dependency order
+    modules = [
+        ("chapter_detector", "chapter_detector.js"),
+        ("link_counter", "link_counter.js"),
+        ("load_more_handler", "load_more_handler.js"),
+        ("container_finder", "container_finder.js"),
+        ("scroll_operations", "scroll_operations.js"),
+        ("scroll_loop", "scroll_loop.js"),
+        ("main", "main.js"),
+    ]
+    
+    bundled_parts = []
+    for module_name, filename in modules:
+        module_path = script_dir / filename
+        try:
+            with open(module_path, "r", encoding="utf-8") as f:
+                module_content = f.read()
+            bundled_parts.append(f"// === {module_name} ===\n{module_content}")
+        except FileNotFoundError:
+            logger.error(f"Playwright module '{module_name}' not found at {module_path}")
+            raise
+        except Exception as e:
+            logger.error(f"Error loading Playwright module '{module_name}': {e}")
+            raise
+    
+    # Combine all modules
+    bundled_script = "\n\n".join(bundled_parts)
+    
+    # Wrap in async function call for page.evaluate()
+    return f"async () => {{ {bundled_script} return await scrollAndCountChapters(); }}"
 
 
 class PlaywrightExtractor:

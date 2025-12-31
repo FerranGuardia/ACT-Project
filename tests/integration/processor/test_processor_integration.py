@@ -15,12 +15,13 @@ from unittest.mock import Mock, patch, MagicMock
 
 # Add ACT project to path
 import sys
-# Path: ACT REFERENCES/PROCESSOR REFERENCES/TESTS/integration/test_processor_integration.py
-# Go up 4 levels to get to ACT REFERENCES, then go to sibling ACT folder
-act_references = Path(__file__).parent.parent.parent.parent  # ACT REFERENCES
-act_project = act_references.parent / "ACT"  # Desktop/ACT
-if str(act_project / "src") not in sys.path:
-    sys.path.insert(0, str(act_project / "src"))
+# Path setup: go up from tests/integration/processor/ to project root
+project_root = Path(__file__).parent.parent.parent.parent
+src_path = project_root / "src"
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
 
 from processor.project_manager import ProjectManager
 from processor.file_manager import FileManager
@@ -120,13 +121,18 @@ class TestPipelineComponentIntegration:
     @pytest.fixture
     def pipeline(self, temp_dir):
         """Create ProcessingPipeline with temp directory."""
-        with patch('processor.pipeline.get_config') as mock_config:
-            mock_config.return_value.get.side_effect = lambda key: {
+        with patch('processor.pipeline.get_config') as mock_config, \
+             patch('processor.project_manager.get_config') as mock_pm_config, \
+             patch('processor.file_manager.get_config') as mock_fm_config:
+            config_dict = {
                 "paths.output_dir": str(temp_dir / "output"),
                 "paths.projects_dir": str(temp_dir / "projects"),
                 "tts.voice": "en-US-AndrewNeural"
-            }.get(key, None)
-            return ProcessingPipeline("test_project")
+            }
+            mock_config.return_value.get.side_effect = lambda key: config_dict.get(key, None)
+            mock_pm_config.return_value.get.side_effect = lambda key: config_dict.get(key, None)
+            mock_fm_config.return_value.get.side_effect = lambda key: config_dict.get(key, None)
+            yield ProcessingPipeline("test_project")
     
     def test_pipeline_project_initialization(self, pipeline, temp_dir):
         """Test pipeline initializes project correctly."""
@@ -272,13 +278,18 @@ class TestErrorHandlingIntegration:
     @pytest.fixture
     def pipeline(self, temp_dir):
         """Create ProcessingPipeline with temp directory."""
-        with patch('processor.pipeline.get_config') as mock_config:
-            mock_config.return_value.get.side_effect = lambda key: {
+        with patch('processor.pipeline.get_config') as mock_config, \
+             patch('processor.project_manager.get_config') as mock_pm_config, \
+             patch('processor.file_manager.get_config') as mock_fm_config:
+            config_dict = {
                 "paths.output_dir": str(temp_dir / "output"),
                 "paths.projects_dir": str(temp_dir / "projects"),
                 "tts.voice": "en-US-AndrewNeural"
-            }.get(key, None)
-            return ProcessingPipeline("test_project")
+            }
+            mock_config.return_value.get.side_effect = lambda key: config_dict.get(key, None)
+            mock_pm_config.return_value.get.side_effect = lambda key: config_dict.get(key, None)
+            mock_fm_config.return_value.get.side_effect = lambda key: config_dict.get(key, None)
+            yield ProcessingPipeline("test_project")
     
     @patch('processor.pipeline.GenericScraper')
     def test_error_isolation_continues_processing(self, mock_scraper_class, pipeline, temp_dir):

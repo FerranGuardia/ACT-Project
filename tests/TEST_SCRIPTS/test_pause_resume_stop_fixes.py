@@ -31,8 +31,12 @@ from core.logger import get_logger
 logger = get_logger("test.pause_resume_stop")
 
 
-class TestPauseResumeStop:
-    """Test pause/resume/stop functionality and audio file verification."""
+class PauseResumeStopTester:
+    """Test pause/resume/stop functionality and audio file verification.
+    
+    Note: This is a standalone test script, not a pytest test class.
+    It can be run directly: python tests/TEST_SCRIPTS/test_pause_resume_stop_fixes.py
+    """
     
     def __init__(self, temp_dir: Path):
         """Initialize test with temporary directory."""
@@ -275,7 +279,7 @@ def main():
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
         
-        tester = TestPauseResumeStop(temp_path)
+        tester = PauseResumeStopTester(temp_path)
         success = tester.run_all_tests()
         
         return 0 if success else 1

@@ -30,3 +30,4 @@ class QueueSection(QGroupBox):
         """Clear the queue list."""
         self.queue_list.clear()
 
+

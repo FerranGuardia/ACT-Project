@@ -25,7 +25,7 @@ class AddQueueDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Add to Queue")
-        self.setMinimumWidth(500)
+        self.setMinimumWidth(600)  # Increased from 500 to accommodate wider combo boxes
         self.voice_manager = VoiceManager()
         self.selected_provider: Optional[str] = None
         self.setup_ui()
@@ -68,6 +68,7 @@ class AddQueueDialog(QDialog):
         provider_layout.addWidget(QLabel("Provider:"))
         self.provider_button = QPushButton("Select Provider...")
         self.provider_button.clicked.connect(self._select_provider)
+        self.provider_button.setMinimumWidth(300)  # Ensure readable width for provider names
         self.provider_status_label = QLabel("")
         self.provider_status_label.setMinimumWidth(20)
         provider_layout.addWidget(self.provider_button, 1)
@@ -77,6 +78,7 @@ class AddQueueDialog(QDialog):
         voice_select_layout = QHBoxLayout()
         voice_select_layout.addWidget(QLabel("Voice:"))
         self.voice_combo = QComboBox()
+        self.voice_combo.setMinimumWidth(350)  # Ensure readable width for voice names (e.g., "en-US-AndrewNeural - Male")
         voice_select_layout.addWidget(self.voice_combo, 1)
         voice_layout.addLayout(voice_select_layout)
         

@@ -39,7 +39,7 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("ACT - Audiobook Creator Tools")
-        self.setMinimumSize(1000, 700)
+        self.setMinimumSize(1200, 700)  # Increased width from 1000 to 1200 to accommodate wider combo boxes
         
         # Load fonts
         self._load_fonts()

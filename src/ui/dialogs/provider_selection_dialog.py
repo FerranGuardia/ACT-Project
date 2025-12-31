@@ -19,7 +19,6 @@ from PySide6.QtGui import QFont
 
 from core.logger import get_logger
 from tts.providers.provider_manager import TTSProviderManager
-from tts import TTSEngine
 
 logger = get_logger("ui.dialogs.provider_selection")
 

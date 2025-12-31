@@ -147,16 +147,33 @@ class ChapterManager:
         """
         Add multiple chapters from a list of URLs.
         
+        Tries to extract chapter numbers from URLs first, falls back to sequential numbering.
+        
         Args:
             urls: List of chapter URLs
-            start_number: Starting chapter number (default: 1)
+            start_number: Starting chapter number (default: 1) - used as fallback if URL doesn't contain chapter number
             
         Returns:
             List of created Chapter objects
         """
+        from scraper.chapter_parser import extract_chapter_number
+        
         chapters = []
-        for i, url in enumerate(urls, start=start_number):
-            chapter = self.add_chapter(number=i, url=url)
+        for i, url in enumerate(urls):
+            # Try to extract chapter number from URL
+            url_chapter_num = extract_chapter_number(url)
+            
+            if url_chapter_num:
+                # Use chapter number from URL
+                chapter = self.add_chapter(number=url_chapter_num, url=url)
+                # Warn if there's a mismatch with sequential numbering
+                expected_num = i + start_number
+                if url_chapter_num != expected_num:
+                    logger.debug(f"Chapter number mismatch: URL suggests {url_chapter_num}, sequential would be {expected_num} (using {url_chapter_num} from URL)")
+            else:
+                # Fallback to sequential numbering if URL doesn't contain chapter number
+                chapter = self.add_chapter(number=i + start_number, url=url)
+            
             chapters.append(chapter)
         
         logger.info(f"Added {len(chapters)} chapters from URLs")

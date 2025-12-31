@@ -282,7 +282,15 @@ class ProcessingPipeline:
                 return False
             
             # Step 1: Scrape chapter
+            # Log chapter number and URL to detect mismatches
             logger.info(f"Scraping chapter {chapter_num} from {chapter.url}")
+            
+            # Check for URL/chapter number mismatch
+            from scraper.chapter_parser import extract_chapter_number
+            url_chapter_num = extract_chapter_number(chapter.url)
+            if url_chapter_num and url_chapter_num != chapter_num:
+                logger.warning(f"⚠ URL mismatch detected: Chapter {chapter_num} but URL suggests chapter {url_chapter_num} ({chapter.url})")
+            
             if self.progress_tracker:
                 self.progress_tracker.update_chapter(
                     chapter_num,
@@ -303,6 +311,13 @@ class ProcessingPipeline:
             
             if error or not content:
                 error_msg = error or "Failed to scrape chapter"
+                
+                # Check if error suggests novel was removed
+                if "removed" in error_msg.lower() or "not found" in error_msg.lower() or "404" in error_msg:
+                    logger.error(f"⚠ Chapter {chapter_num} may have been removed from the site: {error_msg}")
+                    logger.error(f"   URL: {chapter.url}")
+                    logger.error(f"   This could indicate the novel was deleted or chapters were renumbered")
+                
                 logger.error(f"Error scraping chapter {chapter_num}: {error_msg}")
                 if self.progress_tracker:
                     self.progress_tracker.update_chapter(

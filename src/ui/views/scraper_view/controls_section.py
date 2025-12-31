@@ -41,3 +41,4 @@ class ScraperControlsSection(QGroupBox):
         self.setLayout(layout)
         self.setStyleSheet(get_group_box_style())
 
+

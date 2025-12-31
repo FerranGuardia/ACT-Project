@@ -3,9 +3,11 @@ TTS View Handlers - Event handlers and business logic for TTS view.
 """
 
 import os
+import sys
 import tempfile
 from pathlib import Path
 from typing import Optional, Any, TYPE_CHECKING
+from contextlib import contextmanager
 
 if TYPE_CHECKING:
     from PySide6.QtWidgets import QWidget
@@ -28,6 +30,18 @@ except ImportError:
     logger.warning("QtMultimedia not available, preview will use external player")
 
 
+@contextmanager
+def suppress_stderr():
+    """Temporarily suppress stderr output."""
+    with open(os.devnull, 'w') as devnull:
+        old_stderr = sys.stderr
+        sys.stderr = devnull
+        try:
+            yield
+        finally:
+            sys.stderr = old_stderr
+
+
 class TTSViewHandlers:
     """Handles business logic and event handlers for TTS view."""
     
@@ -41,13 +55,25 @@ class TTSViewHandlers:
         self.preview_status_label = None
         self.preview_button = None
         self.stop_preview_button = None
+        self.multimedia_available = False  # Track if multimedia actually works
         
         # Initialize audio playback if available
         if QT_MULTIMEDIA_AVAILABLE and QMediaPlayer is not None and QAudioOutput is not None:
-            self.preview_player = QMediaPlayer()
-            self.preview_audio_output = QAudioOutput()
-            self.preview_player.setAudioOutput(self.preview_audio_output)  # type: ignore[attr-defined]
-            self.preview_player.playbackStateChanged.connect(self._on_preview_state_changed)  # type: ignore[attr-defined]
+            try:
+                # Suppress Qt's stderr warnings during initialization
+                with suppress_stderr():
+                    self.preview_player = QMediaPlayer()
+                    self.preview_audio_output = QAudioOutput()
+                    self.preview_player.setAudioOutput(self.preview_audio_output)  # type: ignore[attr-defined]
+                    self.preview_player.playbackStateChanged.connect(self._on_preview_state_changed)  # type: ignore[attr-defined]
+                self.multimedia_available = True
+                logger.info("QMediaPlayer initialized successfully")
+            except Exception as e:
+                # QMediaPlayer initialization failed (likely missing backend plugins)
+                logger.warning(f"Failed to initialize QMediaPlayer: {e}. Preview will use external player.")
+                self.preview_player = None
+                self.preview_audio_output = None
+                self.multimedia_available = False
     
     def set_preview_ui_elements(self, status_label, preview_button, stop_preview_button):
         """Set UI elements for preview state updates."""
@@ -183,7 +209,7 @@ class TTSViewHandlers:
             return
         
         # Stop any currently playing preview
-        if QT_MULTIMEDIA_AVAILABLE and self.preview_player and QMediaPlayer is not None:
+        if self.multimedia_available and self.preview_player and QMediaPlayer is not None:
             if self.preview_player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:  # type: ignore[attr-defined, comparison-overlap]
                 self.preview_player.stop()  # type: ignore[attr-defined]
         
@@ -229,7 +255,7 @@ class TTSViewHandlers:
             
             if success:
                 # Play the preview using QMediaPlayer if available
-                if QT_MULTIMEDIA_AVAILABLE and self.preview_player:
+                if self.multimedia_available and self.preview_player:
                     self.preview_player.setSource(QUrl.fromLocalFile(temp_path))  # type: ignore[attr-defined]
                     self.preview_player.play()  # type: ignore[attr-defined]
                     status_label.setText("Preview playing...")
@@ -259,7 +285,7 @@ class TTSViewHandlers:
     
     def stop_preview(self, status_label, preview_button, stop_preview_button):
         """Stop the currently playing preview."""
-        if QT_MULTIMEDIA_AVAILABLE and self.preview_player:
+        if self.multimedia_available and self.preview_player:
             self.preview_player.stop()  # type: ignore[attr-defined]
             status_label.setText("Preview stopped")
             stop_preview_button.setEnabled(False)
@@ -268,7 +294,7 @@ class TTSViewHandlers:
     
     def _on_preview_state_changed(self, state):
         """Handle preview playback state changes for cleanup."""
-        if QT_MULTIMEDIA_AVAILABLE and QMediaPlayer is not None:
+        if self.multimedia_available and QMediaPlayer is not None:
             # When playback stops (finished or stopped), clean up and reset UI
             if state == QMediaPlayer.PlaybackState.StoppedState:  # type: ignore[comparison-overlap]
                 # Update UI if elements are available
