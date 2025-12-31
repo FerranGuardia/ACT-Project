@@ -208,7 +208,7 @@ class TestSaveLoadResumeIntegration:
             chapter_manager = project1.get_chapter_manager()
             chapter_manager.add_chapter(1, "https://example.com/1")
             chapter_manager.add_chapter(2, "https://example.com/2")
-            chapter_manager.update_chapter_status(1, ChapterStatus.COMPLETED)
+            chapter_manager.update_chapter_status(1, ChapterStatus.CONVERTED)
             
             project1.save_project()
         
@@ -227,7 +227,7 @@ class TestSaveLoadResumeIntegration:
             assert project2.metadata["novel_title"] == "Test Novel"
             loaded_chapters = project2.get_chapter_manager()
             assert loaded_chapters.get_total_count() == 2
-            assert loaded_chapters.get_chapter(1).status == ChapterStatus.COMPLETED
+            assert loaded_chapters.get_chapter(1).status == ChapterStatus.CONVERTED
             assert loaded_chapters.get_chapter(2).status == ChapterStatus.PENDING
             
             # Verify resume capability
@@ -254,7 +254,7 @@ class TestProgressTrackerIntegration:
         progress_tracker = ProgressTracker(total_chapters=3)
         
         # Update chapter statuses
-        chapter_manager.update_chapter_status(1, ChapterStatus.COMPLETED)
+        chapter_manager.update_chapter_status(1, ChapterStatus.CONVERTED)
         progress_tracker.update_chapter(1, ProcessingStatus.COMPLETED)
         
         chapter_manager.update_chapter_status(2, ChapterStatus.FAILED)
@@ -262,11 +262,11 @@ class TestProgressTrackerIntegration:
         
         # Verify progress
         assert progress_tracker.get_overall_progress() == pytest.approx(0.333, abs=0.001)
-        assert progress_tracker.get_completed_count() == 1
-        assert progress_tracker.get_failed_count() == 1
+        assert progress_tracker.completed_chapters == 1
+        assert progress_tracker.failed_chapters == 1
         
         # Verify chapter manager status matches
-        assert chapter_manager.get_chapter(1).status == ChapterStatus.COMPLETED
+        assert chapter_manager.get_chapter(1).status == ChapterStatus.CONVERTED
         assert chapter_manager.get_chapter(2).status == ChapterStatus.FAILED
         assert chapter_manager.get_chapter(3).status == ChapterStatus.PENDING
 
@@ -323,9 +323,22 @@ class TestErrorHandlingIntegration:
         pipeline.tts_engine = Mock()
         pipeline.tts_engine.convert_text_to_speech.return_value = True
         
-        # Mock file manager
-        pipeline.file_manager.save_text_file = Mock(return_value=Path(temp_dir / "text.txt"))
-        pipeline.file_manager.save_audio_file = Mock(return_value=Path(temp_dir / "audio.mp3"))
+        # Mock file manager - create actual files for successful chapters
+        def mock_save_text_file(chapter_num, content, title=None):
+            path = Path(temp_dir / f"text_{chapter_num}.txt")
+            path.write_text(content)
+            return path
+        
+        def mock_save_audio_file(chapter_num, temp_path, title=None):
+            # Only create file for chapters that should succeed (not chapter 2)
+            if chapter_num != 2:
+                path = Path(temp_dir / f"audio_{chapter_num}.mp3")
+                path.write_bytes(b"fake audio content")
+                return path
+            return Path(temp_dir / f"audio_{chapter_num}.mp3")  # Return path but don't create file
+        
+        pipeline.file_manager.save_text_file = Mock(side_effect=mock_save_text_file)
+        pipeline.file_manager.save_audio_file = Mock(side_effect=mock_save_audio_file)
         pipeline.file_manager.audio_file_exists = Mock(return_value=False)
         
         # Process with error isolation
@@ -359,9 +372,9 @@ class TestErrorHandlingIntegration:
         temp_file = temp_dir_path / "chapter_1_temp.mp3"
         temp_file.write_bytes(b"temp")
         
-        # Mock TTS to fail
+        # Mock TTS to fail by raising an exception (callback only called on exceptions)
         pipeline.tts_engine = Mock()
-        pipeline.tts_engine.convert_text_to_speech.return_value = False
+        pipeline.tts_engine.convert_text_to_speech.side_effect = Exception("TTS conversion failed")
         
         # Mock file manager
         pipeline.file_manager.audio_file_exists = Mock(return_value=False)
