@@ -229,4 +229,16 @@ class Pyttsx3Provider(TTSProvider):
     def supports_volume(self) -> bool:
         """pyttsx3 supports volume adjustment"""
         return True
+    
+    def supports_ssml(self) -> bool:
+        """pyttsx3 does not support SSML"""
+        return False
+    
+    def supports_chunking(self) -> bool:
+        """pyttsx3 does not support async chunking"""
+        return False
+    
+    def get_max_text_bytes(self) -> Optional[int]:
+        """pyttsx3 typically has no hard limit, but very long texts may cause issues"""
+        return None  # No hard limit, but practical limit depends on system
 

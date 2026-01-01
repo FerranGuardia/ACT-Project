@@ -15,6 +15,7 @@ from .voice_manager import VoiceManager
 from .text_cleaner import clean_text_for_tts
 from .ssml_builder import build_ssml, parse_rate, parse_pitch, parse_volume
 from .providers.provider_manager import TTSProviderManager
+from .providers.base_provider import TTSProvider
 
 logger = get_logger("tts.tts_engine")
 
@@ -37,18 +38,29 @@ def format_chapter_intro(chapter_title: str, content: str, provider: Optional[st
     Returns:
         Formatted text with chapter introduction and pauses
     """
-    # For pyttsx3, use ellipsis (...) to create natural pauses
-    # Ellipsis creates approximately 1 second pause in pyttsx3
+    # Use ellipsis (...) to create natural pauses (approximately 1 second)
+    # This works for providers that don't support SSML (like pyttsx3)
+    # Providers that support SSML (like Edge TTS) will handle breaks via SSML elsewhere
     # Format: "... " (ellipsis space) creates pause, then title with period, then another pause
-    if provider == "pyttsx3" or provider is None:
-        # Use "..." (ellipsis) for approximately 1 second pause
-        # pyttsx3 interprets ellipsis as a pause, not as spoken "dot dot dot"
-        # Note: The text cleaner normalizes ". . ." to "...", so we use "..." directly
-        return f"... {chapter_title}. ... {content}"
-    else:
-        # For other providers (like Edge TTS), use similar format
-        # Edge TTS will handle SSML breaks if SSML is used elsewhere
-        return f"... {chapter_title}. ... {content}"
+    # Note: The text cleaner normalizes ". . ." to "...", so we use "..." directly
+    
+    # Check provider capabilities if provider name is provided
+    use_ellipsis = True  # Default to ellipsis for backward compatibility
+    if provider:
+        try:
+            from .providers.provider_manager import TTSProviderManager
+            temp_manager = TTSProviderManager()
+            provider_instance = temp_manager.get_provider(provider)
+            if provider_instance and provider_instance.supports_ssml():
+                # Provider supports SSML, but we still use ellipsis here for consistency
+                # SSML breaks are handled in build_ssml() function
+                use_ellipsis = True
+        except Exception:
+            # If provider check fails, default to ellipsis
+            pass
+    
+    # Use ellipsis format (works for all providers)
+    return f"... {chapter_title}. ... {content}"
 
 
 class TTSEngine:
@@ -219,9 +231,20 @@ class TTSEngine:
             preview = cleaned_text[:100].replace('\n', ' ').strip()
             logger.info(f"Text preview (first 100 chars): {preview}...")
 
-        # Build SSML (only for Edge TTS, other providers may not support it)
-        # For now, we'll use SSML if provider is Edge TTS or not specified (backward compatibility)
-        use_ssml_for_provider: bool = bool(provider is None or provider == "edge_tts")
+        # Build SSML (only for providers that support it)
+        # Check provider capabilities instead of hardcoded provider name
+        use_ssml_for_provider: bool = False
+        if provider:
+            provider_instance = self.provider_manager.get_provider(provider)
+            if provider_instance and provider_instance.is_available():
+                use_ssml_for_provider = provider_instance.supports_ssml()
+        else:
+            # If no provider specified, check if default provider supports SSML
+            # Default to Edge TTS which supports SSML
+            default_provider = self.provider_manager.get_available_provider()
+            if default_provider:
+                use_ssml_for_provider = default_provider.supports_ssml()
+        
         if use_ssml_for_provider:
             ssml_text = build_ssml(cleaned_text, rate=rate, pitch=pitch, volume=volume)
             use_ssml = ssml_text != cleaned_text
@@ -235,23 +258,35 @@ class TTSEngine:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         
         text_bytes_size = len(text_to_convert.encode('utf-8'))
-        MAX_BYTES = 3000  # Edge TTS limit (4096 bytes, using 3000 for safety)
         
         logger.info(f"Converting text to speech: {output_path.name}")
         logger.info(f"Voice: {voice}, Provider: {provider or 'auto'}, Rate: {rate}%, Pitch: {pitch}%, Volume: {volume}%")
         logger.info(f"Using SSML: {use_ssml}")
         logger.info(f"Text size: {text_bytes_size} bytes")
 
-        # Check if we need chunking (only for Edge TTS)
-        needs_chunking: bool = bool((provider is None or provider == "edge_tts") and text_bytes_size > MAX_BYTES)
+        # Determine which provider will be used and check if chunking is needed
+        provider_for_chunking = None
+        if provider:
+            provider_for_chunking = self.provider_manager.get_provider(provider)
+        else:
+            provider_for_chunking = self.provider_manager.get_available_provider()
         
-        if needs_chunking:
-            # Use chunking for Edge TTS (legacy behavior)
+        # Check if chunking is needed based on provider capabilities
+        needs_chunking = False
+        max_bytes = None
+        if provider_for_chunking and provider_for_chunking.is_available():
+            if provider_for_chunking.supports_chunking():
+                max_bytes = provider_for_chunking.get_max_text_bytes()
+                if max_bytes and text_bytes_size > max_bytes:
+                    needs_chunking = True
+        
+        if needs_chunking and max_bytes:
+            # Use chunking for providers that support it
             # Ensure voice is a string
             if not isinstance(voice, str):
                 logger.error(f"Voice must be a string, got {type(voice)}")
                 return False
-            logger.info(f"Text exceeds {MAX_BYTES} bytes ({text_bytes_size} bytes), chunking for Edge TTS...")
+            logger.info(f"Text exceeds {max_bytes} bytes ({text_bytes_size} bytes), using chunking...")
             return self._convert_with_chunking(text_to_convert, voice, output_path, rate, pitch, volume, provider)
         else:
             # Use provider manager for conversion
@@ -301,22 +336,53 @@ class TTSEngine:
         chunks: List[str],
         voice: str,
         temp_dir: Path,
-        output_stem: str
+        output_stem: str,
+        provider: Optional[TTSProvider],
+        rate: Optional[float] = None,
+        pitch: Optional[float] = None,
+        volume: Optional[float] = None
     ) -> List[Path]:
-        """Convert chunks in parallel using asyncio"""
-        import edge_tts
+        """Convert chunks in parallel using provider abstraction.
+        
+        Args:
+            chunks: List of text chunks to convert
+            voice: Voice identifier
+            temp_dir: Temporary directory for chunk files
+            output_stem: Stem name for chunk files
+            provider: TTS provider instance (must support async chunk conversion)
+            rate: Speech rate adjustment
+            pitch: Pitch adjustment
+            volume: Volume adjustment
+        
+        Returns:
+            List of Path objects for converted chunk files
+        """
+        if not provider:
+            raise ValueError("Provider is required for parallel chunk conversion")
+        
+        # Check if provider supports async chunk conversion
+        if not hasattr(provider, 'convert_chunk_async'):
+            raise ValueError(f"Provider {provider.get_provider_name()} does not support async chunk conversion")
         
         async def convert_chunk(chunk: str, index: int) -> Path:
+            """Convert a single chunk using the provider's async method"""
             chunk_path = temp_dir / f"{output_stem}_chunk_{index}.mp3"
             max_retries = 5
             retry_delay = 5.0
             
             for retry in range(max_retries):
                 try:
-                    communicate = edge_tts.Communicate(text=chunk, voice=voice)
-                    await communicate.save(str(chunk_path))
+                    # Use provider's async chunk conversion method
+                    success = await provider.convert_chunk_async(  # type: ignore[attr-defined]
+                        text=chunk,
+                        voice=voice,
+                        output_path=chunk_path,
+                        rate=rate,
+                        pitch=pitch,
+                        volume=volume
+                    )
                     
-                    if chunk_path.exists() and chunk_path.stat().st_size > 0:
+                    if success and chunk_path.exists() and chunk_path.stat().st_size > 0:
                         return chunk_path
                     else:
                         logger.warning(f"Chunk {index+1} attempt {retry+1} produced empty file, retrying...")
@@ -324,10 +390,12 @@ class TTSEngine:
                     if retry < max_retries - 1:
                         await asyncio.sleep(retry_delay)
                         retry_delay *= 1.5
+                        logger.debug(f"Retrying chunk {index+1} after error: {retry_error}")
                     else:
+                        logger.error(f"Failed to convert chunk {index+1} after {max_retries} retries: {retry_error}")
                         raise retry_error
             
-            raise Exception(f"Failed to convert chunk {index+1} after retries")
+            raise Exception(f"Failed to convert chunk {index+1} after {max_retries} retries")
         
         # Convert all chunks concurrently
         tasks = [convert_chunk(chunk, i) for i, chunk in enumerate(chunks)]
@@ -345,7 +413,10 @@ class TTSEngine:
         provider: Optional[str]
     ) -> bool:
         """
-        Convert text to speech with chunking (Edge TTS specific).
+        Convert text to speech with chunking using provider abstraction.
+        
+        Chunking is used when text exceeds provider limits.
+        Text is split into chunks, converted in parallel, then merged.
         
         Args:
             text: Text to convert (may be SSML)
@@ -354,24 +425,37 @@ class TTSEngine:
             rate: Speech rate
             pitch: Pitch adjustment
             volume: Volume adjustment
-            provider: Provider name (should be "edge_tts" or None)
+            provider: Provider name (None for auto-detect)
         
         Returns:
             True if successful, False otherwise
         """
-        # Chunking is primarily for Edge TTS
-        # Try to use Edge TTS provider if available
-        edge_provider = self.provider_manager.get_provider("edge_tts")
-        if edge_provider and edge_provider.is_available():
-            # Use provider for chunking if possible
-            # For now, fall back to direct Edge TTS for chunking (complex logic)
-            pass
+        # Determine which provider to use for chunking
+        # Use specified provider or get first available provider that supports chunking
+        if provider:
+            provider_name = provider
+            tts_provider = self.provider_manager.get_provider(provider_name)
+        else:
+            # Find first available provider that supports chunking
+            tts_provider = None
+            # Try edge_tts first (supports chunking)
+            candidate = self.provider_manager.get_provider("edge_tts")
+            if candidate and candidate.is_available() and candidate.supports_chunking():
+                tts_provider = candidate
+                provider_name = "edge_tts"
+            
+            # If no chunking-capable provider found, try to get any available provider
+            if not tts_provider:
+                tts_provider = self.provider_manager.get_available_provider()
+                provider_name = tts_provider.get_provider_name() if tts_provider else "unknown"
         
-        # Use direct Edge TTS for chunking (legacy behavior)
-        try:
-            import edge_tts
-        except ImportError:
-            logger.error("edge-tts not installed. Install with: pip install edge-tts")
+        if not tts_provider or not tts_provider.is_available():
+            logger.error(f"Provider '{provider_name}' is not available for chunking")
+            return False
+        
+        # Check if provider supports async chunk conversion
+        if not hasattr(tts_provider, 'convert_chunk_async'):
+            logger.error(f"Provider '{provider_name}' does not support async chunk conversion (required for parallel chunking)")
             return False
         
         MAX_BYTES = 3000
@@ -389,10 +473,19 @@ class TTSEngine:
                 chunk_bytes = len(chunk.encode('utf-8'))
                 logger.info(f"Chunk {i+1}/{len(chunks)}: {chunk_bytes} bytes, {len(chunk)} chars")
             
-            # Convert all chunks in parallel
-            logger.info(f"Converting {len(chunks)} chunks in parallel...")
+            # Convert all chunks in parallel using provider abstraction
+            logger.info(f"Converting {len(chunks)} chunks in parallel using {provider_name} provider...")
             chunk_files = asyncio.run(
-                self._convert_chunks_parallel(chunks, voice, temp_dir, output_path.stem)
+                self._convert_chunks_parallel(
+                    chunks=chunks,
+                    voice=voice,
+                    temp_dir=temp_dir,
+                    output_stem=output_path.stem,
+                    provider=tts_provider,
+                    rate=rate,
+                    pitch=pitch,
+                    volume=volume
+                )
             )
             
             # Log successful conversions

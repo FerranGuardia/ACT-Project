@@ -137,7 +137,6 @@ class MockProviderManager:
     def __init__(self):
         self._providers = {
             "edge_tts": MockProvider("edge_tts", available=True),
-            "edge_tts_working": MockProvider("edge_tts_working", available=True),
             "pyttsx3": MockProvider("pyttsx3", available=True)
         }
     
@@ -190,7 +189,6 @@ class TestProviderSelectionDialog:
     def test_provider_info_structure(self):
         """Test that PROVIDER_INFO has correct structure"""
         assert "edge_tts" in PROVIDER_INFO
-        assert "edge_tts_working" in PROVIDER_INFO
         assert "pyttsx3" in PROVIDER_INFO
         
         for _provider_name, info in PROVIDER_INFO.items():
@@ -263,7 +261,7 @@ class TestProviderSelectionDialog:
         
         # Should return provider name
         provider_name = dialog.get_selected_provider()
-        assert provider_name in ["edge_tts", "edge_tts_working", "pyttsx3"]
+                assert provider_name in ["edge_tts", "pyttsx3"]
     
     def test_current_provider_selected_on_open(self, mock_provider_manager, qt_application):  # type: ignore[no-untyped-def]
         """Test that current provider is selected when dialog opens"""
@@ -279,7 +277,7 @@ class TestProviderSelectionDialog:
             if selected_items:
                 selected_provider = selected_items[0].data(Qt.ItemDataRole.UserRole)
                 # May or may not be selected depending on timing
-                assert selected_provider in ["edge_tts", "edge_tts_working", "pyttsx3"]
+                assert selected_provider in ["edge_tts", "pyttsx3"]
 
 
 class TestProviderStatusThread:

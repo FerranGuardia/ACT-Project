@@ -129,5 +129,32 @@ class TTSProvider(ABC):
             True if volume adjustment is supported
         """
         return False
+    
+    def supports_ssml(self) -> bool:
+        """Check if provider supports SSML (Speech Synthesis Markup Language).
+        
+        Returns:
+            True if SSML is supported
+        """
+        return False
+    
+    def supports_chunking(self) -> bool:
+        """Check if provider supports chunking for long texts.
+        
+        Providers that support chunking should implement convert_chunk_async()
+        for parallel chunk processing.
+        
+        Returns:
+            True if chunking is supported
+        """
+        return False
+    
+    def get_max_text_bytes(self) -> Optional[int]:
+        """Get maximum text size in bytes supported by this provider.
+        
+        Returns:
+            Maximum bytes, or None if no limit
+        """
+        return None
 
 

@@ -63,14 +63,7 @@ pyttsx3_module = importlib.util.module_from_spec(spec_pyttsx3)
 sys.modules["tts.providers.pyttsx3_provider"] = pyttsx3_module
 spec_pyttsx3.loader.exec_module(pyttsx3_module)
 
-# Load edge_tts_working_provider (required by provider_manager)
-edge_tts_working_path = act_src / "tts" / "providers" / "edge_tts_working_provider.py"
-spec_edge_working = importlib.util.spec_from_file_location("tts.providers.edge_tts_working_provider", edge_tts_working_path)
-if spec_edge_working is None or spec_edge_working.loader is None:
-    raise ImportError(f"Could not load spec for edge_tts_working_provider from {edge_tts_working_path}")
-edge_tts_working_module = importlib.util.module_from_spec(spec_edge_working)
-sys.modules["tts.providers.edge_tts_working_provider"] = edge_tts_working_module
-spec_edge_working.loader.exec_module(edge_tts_working_module)
+# Note: edge_tts_working_provider removed - no longer needed
 
 # Now load provider_manager (it uses relative imports to the above)
 provider_manager_path = act_src / "tts" / "providers" / "provider_manager.py"
@@ -96,6 +89,10 @@ class MockProvider:
             {"id": f"{name}_voice1", "name": f"{name} Voice 1", "language": "en-US", "gender": "male", "provider": name},
             {"id": f"{name}_voice2", "name": f"{name} Voice 2", "language": "en-US", "gender": "female", "provider": name}
         ]
+        # Set capabilities based on provider name (matching real providers)
+        self._supports_ssml = name == "edge_tts"
+        self._supports_chunking = name == "edge_tts"
+        self._max_bytes = 3000 if name == "edge_tts" else None
     
     def get_provider_name(self) -> str:
         return self.name
@@ -117,31 +114,54 @@ class MockProvider:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text("mock audio")
         return True
+    
+    def supports_rate(self) -> bool:
+        return True  # Most providers support rate
+    
+    def supports_pitch(self) -> bool:
+        return self.name == "edge_tts"  # Only Edge TTS supports pitch
+    
+    def supports_volume(self) -> bool:
+        return self.name in ["edge_tts", "pyttsx3"]  # Edge TTS and pyttsx3 support volume
+    
+    def supports_ssml(self) -> bool:
+        """Check if provider supports SSML"""
+        return self._supports_ssml
+    
+    def supports_chunking(self) -> bool:
+        """Check if provider supports chunking"""
+        return self._supports_chunking
+    
+    def get_max_text_bytes(self):
+        """Get maximum text size in bytes"""
+        return self._max_bytes
+    
+    async def convert_chunk_async(self, text, voice, output_path, rate=None, pitch=None, volume=None):
+        """Async chunk conversion (only for providers that support chunking)"""
+        if not self._supports_chunking:
+            raise ValueError(f"Provider {self.name} does not support chunking")
+        return self.convert_text_to_speech(text, voice, output_path, rate, pitch, volume)
 
 
 class TestTTSProviderManager:
     """Test TTSProviderManager class"""
     
     @patch('tts.providers.provider_manager.EdgeTTSProvider')
-    @patch('tts.providers.provider_manager.EdgeTTSWorkingProvider')
     @patch('tts.providers.provider_manager.Pyttsx3Provider')
-    def test_initialization_with_both_providers(self, mock_pyttsx3, mock_edge_working, mock_edge):
-        """Test manager initialization with all providers available"""
+    def test_initialization_with_both_providers(self, mock_pyttsx3, mock_edge):
+        """Test manager initialization with both providers available"""
         # Setup mocks
         edge_provider = MockProvider("edge_tts", ProviderType.CLOUD, available=True)
-        edge_working_provider = MockProvider("edge_tts_working", ProviderType.CLOUD, available=True)
         pyttsx3_provider = MockProvider("pyttsx3", ProviderType.OFFLINE, available=True)
         
         mock_edge.return_value = edge_provider
-        mock_edge_working.return_value = edge_working_provider
         mock_pyttsx3.return_value = pyttsx3_provider
         
         manager = TTSProviderManager()
         
         assert "edge_tts" in manager._providers
-        assert "edge_tts_working" in manager._providers
         assert "pyttsx3" in manager._providers
-        assert len(manager._providers) >= 2  # At least 2, could be 3 if all available
+        assert len(manager._providers) == 2  # Both providers available
     
     @patch('tts.providers.provider_manager.EdgeTTSProvider')
     @patch('tts.providers.provider_manager.Pyttsx3Provider')
@@ -284,9 +304,9 @@ class TestTTSProviderManager:
         
         assert result is True  # Should succeed with pyttsx3 fallback
     
-    @patch('tts.providers.provider_manager.EdgeTTSProvider')
     @patch('tts.providers.provider_manager.Pyttsx3Provider')
-    def test_convert_with_fallback_all_fail(self, mock_pyttsx3, mock_edge):
+    @patch('tts.providers.provider_manager.EdgeTTSProvider')
+    def test_convert_with_fallback_all_fail(self, mock_edge, mock_pyttsx3):
         """Test convert_with_fallback when all providers fail"""
         edge_provider = MockProvider("edge_tts", ProviderType.CLOUD, available=True)
         pyttsx3_provider = MockProvider("pyttsx3", ProviderType.OFFLINE, available=True)
@@ -309,9 +329,9 @@ class TestTTSProviderManager:
         
         assert result is False
     
-    @patch('tts.providers.provider_manager.EdgeTTSProvider')
     @patch('tts.providers.provider_manager.Pyttsx3Provider')
-    def test_get_all_voices(self, mock_pyttsx3, mock_edge):
+    @patch('tts.providers.provider_manager.EdgeTTSProvider')
+    def test_get_all_voices(self, mock_edge, mock_pyttsx3):
         """Test get_all_voices returns voices from all providers"""
         edge_provider = MockProvider("edge_tts", ProviderType.CLOUD, available=True)
         pyttsx3_provider = MockProvider("pyttsx3", ProviderType.OFFLINE, available=True)
@@ -325,9 +345,9 @@ class TestTTSProviderManager:
         assert len(voices) == 4  # 2 from each provider
         assert all("provider" in v for v in voices)
     
-    @patch('tts.providers.provider_manager.EdgeTTSProvider')
     @patch('tts.providers.provider_manager.Pyttsx3Provider')
-    def test_get_all_voices_with_locale(self, mock_pyttsx3, mock_edge):
+    @patch('tts.providers.provider_manager.EdgeTTSProvider')
+    def test_get_all_voices_with_locale(self, mock_edge, mock_pyttsx3):
         """Test get_all_voices with locale filter"""
         edge_provider = MockProvider("edge_tts", ProviderType.CLOUD, available=True)
         pyttsx3_provider = MockProvider("pyttsx3", ProviderType.OFFLINE, available=True)
@@ -341,9 +361,9 @@ class TestTTSProviderManager:
         assert len(voices) == 4
         assert all(v.get("language") == "en-US" for v in voices)
     
-    @patch('tts.providers.provider_manager.EdgeTTSProvider')
     @patch('tts.providers.provider_manager.Pyttsx3Provider')
-    def test_get_voices_by_provider(self, mock_pyttsx3, mock_edge):
+    @patch('tts.providers.provider_manager.EdgeTTSProvider')
+    def test_get_voices_by_provider(self, mock_edge, mock_pyttsx3):
         """Test get_voices_by_provider returns voices from specific provider"""
         edge_provider = MockProvider("edge_tts", ProviderType.CLOUD, available=True)
         pyttsx3_provider = MockProvider("pyttsx3", ProviderType.OFFLINE, available=True)
@@ -372,9 +392,9 @@ class TestTTSProviderManager:
         
         assert len(voices) == 0
     
-    @patch('tts.providers.provider_manager.EdgeTTSProvider')
     @patch('tts.providers.provider_manager.Pyttsx3Provider')
-    def test_get_voices_by_type_cloud(self, mock_pyttsx3, mock_edge):
+    @patch('tts.providers.provider_manager.EdgeTTSProvider')
+    def test_get_voices_by_type_cloud(self, mock_edge, mock_pyttsx3):
         """Test get_voices_by_type for cloud providers"""
         edge_provider = MockProvider("edge_tts", ProviderType.CLOUD, available=True)
         pyttsx3_provider = MockProvider("pyttsx3", ProviderType.OFFLINE, available=True)
@@ -388,9 +408,9 @@ class TestTTSProviderManager:
         assert len(voices) == 2
         assert all(v.get("provider") == "edge_tts" for v in voices)
     
-    @patch('tts.providers.provider_manager.EdgeTTSProvider')
     @patch('tts.providers.provider_manager.Pyttsx3Provider')
-    def test_get_voices_by_type_offline(self, mock_pyttsx3, mock_edge):
+    @patch('tts.providers.provider_manager.EdgeTTSProvider')
+    def test_get_voices_by_type_offline(self, mock_edge, mock_pyttsx3):
         """Test get_voices_by_type for offline providers"""
         edge_provider = MockProvider("edge_tts", ProviderType.CLOUD, available=True)
         pyttsx3_provider = MockProvider("pyttsx3", ProviderType.OFFLINE, available=True)
@@ -405,29 +425,25 @@ class TestTTSProviderManager:
         assert all(v.get("provider") == "pyttsx3" for v in voices)
     
     @patch('tts.providers.provider_manager.EdgeTTSProvider')
-    @patch('tts.providers.provider_manager.EdgeTTSWorkingProvider')
     @patch('tts.providers.provider_manager.Pyttsx3Provider')
-    def test_get_providers(self, mock_pyttsx3, mock_edge_working, mock_edge):
+    def test_get_providers(self, mock_pyttsx3, mock_edge):
         """Test get_providers returns list of available provider names"""
         edge_provider = MockProvider("edge_tts", ProviderType.CLOUD, available=True)
-        edge_working_provider = MockProvider("edge_tts_working", ProviderType.CLOUD, available=True)
         pyttsx3_provider = MockProvider("pyttsx3", ProviderType.OFFLINE, available=True)
         
         mock_edge.return_value = edge_provider
-        mock_edge_working.return_value = edge_working_provider
         mock_pyttsx3.return_value = pyttsx3_provider
         
         manager = TTSProviderManager()
         providers = manager.get_providers()
         
         assert "edge_tts" in providers
-        assert "edge_tts_working" in providers
         assert "pyttsx3" in providers
-        assert len(providers) >= 2  # At least 2, could be 3 if all available
+        assert len(providers) == 2  # Both providers available
     
-    @patch('tts.providers.provider_manager.EdgeTTSProvider')
     @patch('tts.providers.provider_manager.Pyttsx3Provider')
-    def test_get_provider(self, mock_pyttsx3, mock_edge):
+    @patch('tts.providers.provider_manager.EdgeTTSProvider')
+    def test_get_provider(self, mock_edge, mock_pyttsx3):
         """Test get_provider returns specific provider instance"""
         edge_provider = MockProvider("edge_tts", ProviderType.CLOUD, available=True)
         pyttsx3_provider = MockProvider("pyttsx3", ProviderType.OFFLINE, available=True)

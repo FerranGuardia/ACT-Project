@@ -72,14 +72,7 @@ pyttsx3_module = importlib.util.module_from_spec(spec_pyttsx3)
 sys.modules["tts.providers.pyttsx3_provider"] = pyttsx3_module
 spec_pyttsx3.loader.exec_module(pyttsx3_module)
 
-# Load edge_tts_working_provider (required by provider_manager)
-edge_tts_working_path = act_src / "tts" / "providers" / "edge_tts_working_provider.py"
-spec_edge_working = importlib.util.spec_from_file_location("tts.providers.edge_tts_working_provider", edge_tts_working_path)
-if spec_edge_working is None or spec_edge_working.loader is None:
-    raise ImportError(f"Could not load spec for edge_tts_working_provider from {edge_tts_working_path}")
-edge_tts_working_module = importlib.util.module_from_spec(spec_edge_working)
-sys.modules["tts.providers.edge_tts_working_provider"] = edge_tts_working_module
-spec_edge_working.loader.exec_module(edge_tts_working_module)
+# Note: edge_tts_working_provider removed - no longer needed
 
 # Load provider_manager
 provider_manager_path = act_src / "tts" / "providers" / "provider_manager.py"

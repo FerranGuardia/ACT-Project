@@ -184,8 +184,7 @@ class AddQueueDialog(QDialog):
         
         # Get provider info
         provider_labels = {
-            "edge_tts": "Edge TTS (Standard Method)",
-            "edge_tts_working": "Edge TTS (Alternative Method)",
+            "edge_tts": "Edge TTS",
             "pyttsx3": "pyttsx3 (Offline)"
         }
         

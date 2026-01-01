@@ -167,4 +167,24 @@ class TestTTSProvider:
         """Test supports_volume default implementation"""
         provider = ConcreteProvider()
         assert provider.supports_volume() is False
+    
+    def test_supports_ssml_default(self):
+        """Test supports_ssml default implementation"""
+        provider = ConcreteProvider()
+        # Default implementation returns False
+        # Subclasses should override if they support SSML
+        assert provider.supports_ssml() is False
+    
+    def test_supports_chunking_default(self):
+        """Test supports_chunking default implementation"""
+        provider = ConcreteProvider()
+        # Default implementation returns False
+        # Subclasses should override if they support chunking
+        assert provider.supports_chunking() is False
+    
+    def test_get_max_text_bytes_default(self):
+        """Test get_max_text_bytes default implementation"""
+        provider = ConcreteProvider()
+        # Default implementation returns None (no limit)
+        assert provider.get_max_text_bytes() is None
 

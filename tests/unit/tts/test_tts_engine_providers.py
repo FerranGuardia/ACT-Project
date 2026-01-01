@@ -71,14 +71,7 @@ pyttsx3_module = importlib.util.module_from_spec(spec_pyttsx3)
 sys.modules["tts.providers.pyttsx3_provider"] = pyttsx3_module
 spec_pyttsx3.loader.exec_module(pyttsx3_module)
 
-# Load edge_tts_working_provider (required by provider_manager)
-edge_tts_working_path = act_src / "tts" / "providers" / "edge_tts_working_provider.py"
-spec_edge_working = importlib.util.spec_from_file_location("tts.providers.edge_tts_working_provider", edge_tts_working_path)
-if spec_edge_working is None or spec_edge_working.loader is None:
-    raise ImportError(f"Could not load spec for edge_tts_working_provider from {edge_tts_working_path}")
-edge_tts_working_module = importlib.util.module_from_spec(spec_edge_working)
-sys.modules["tts.providers.edge_tts_working_provider"] = edge_tts_working_module
-spec_edge_working.loader.exec_module(edge_tts_working_module)
+# Note: edge_tts_working_provider removed - no longer needed
 
 # Load provider_manager
 provider_manager_path = act_src / "tts" / "providers" / "provider_manager.py"
@@ -325,4 +318,120 @@ class TestTTSEngineProviders:
         assert result is True
         mock_pm.get_provider.assert_called_with("edge_tts")
         mock_provider.convert_text_to_speech.assert_called_once()
+    
+    @patch('tts.tts_engine.TTSProviderManager')
+    @patch('tts.tts_engine.VoiceManager')
+    def test_chunking_uses_provider_capabilities(self, mock_vm_class, mock_pm_class):
+        """Test that chunking checks provider capabilities instead of hardcoded provider name"""
+        mock_provider = MagicMock()
+        mock_provider.is_available.return_value = True
+        mock_provider.supports_chunking.return_value = True
+        mock_provider.get_max_text_bytes.return_value = 3000
+        mock_provider.supports_ssml.return_value = True
+        mock_provider.convert_chunk_async = MagicMock()
+        mock_provider.convert_chunk_async.return_value = True
+        
+        mock_pm = MagicMock()
+        mock_pm.get_provider.return_value = mock_provider
+        mock_pm.get_available_provider.return_value = mock_provider
+        mock_pm_class.return_value = mock_pm
+        
+        mock_vm = MagicMock()
+        mock_voice = {"id": "voice1", "name": "Voice 1", "provider": "edge_tts"}
+        mock_vm.get_voice_by_name.return_value = mock_voice
+        mock_vm_class.return_value = mock_vm
+        
+        engine = TTSEngine(provider_manager=mock_pm)
+        
+        # Create long text that exceeds limit
+        long_text = "A" * 4000  # Exceeds 3000 byte limit
+        
+        # Mock chunking methods
+        with patch.object(engine, '_chunk_text', return_value=["chunk1", "chunk2"]), \
+             patch.object(engine, '_merge_audio_chunks', return_value=True), \
+             patch('asyncio.run') as mock_asyncio_run:
+            
+            mock_asyncio_run.return_value = [Path("/tmp/chunk1.mp3"), Path("/tmp/chunk2.mp3")]
+            
+            output_path = Path("/tmp/test_output.mp3")
+            result = engine.convert_text_to_speech(
+                text=long_text,
+                output_path=output_path,
+                voice="voice1",
+                provider="edge_tts"
+            )
+            
+            # Should check capabilities, not hardcoded provider name
+            mock_provider.supports_chunking.assert_called()
+            mock_provider.get_max_text_bytes.assert_called()
+    
+    @patch('tts.tts_engine.TTSProviderManager')
+    @patch('tts.tts_engine.VoiceManager')
+    def test_ssml_uses_provider_capabilities(self, mock_vm_class, mock_pm_class):
+        """Test that SSML usage checks provider capabilities instead of hardcoded provider name"""
+        mock_provider = MagicMock()
+        mock_provider.is_available.return_value = True
+        mock_provider.supports_ssml.return_value = True
+        mock_provider.convert_text_to_speech.return_value = True
+        
+        mock_pm = MagicMock()
+        mock_pm.get_provider.return_value = mock_provider
+        mock_pm.get_available_provider.return_value = mock_provider
+        mock_pm_class.return_value = mock_pm
+        
+        mock_vm = MagicMock()
+        mock_voice = {"id": "voice1", "name": "Voice 1", "provider": "edge_tts"}
+        mock_vm.get_voice_by_name.return_value = mock_voice
+        mock_vm_class.return_value = mock_vm
+        
+        engine = TTSEngine(provider_manager=mock_pm)
+        output_path = Path("/tmp/test_output.mp3")
+        
+        result = engine.convert_text_to_speech(
+            text="Hello world",
+            output_path=output_path,
+            voice="voice1",
+            provider="edge_tts"
+        )
+        
+        # Should check SSML capability, not hardcoded provider name
+        mock_provider.supports_ssml.assert_called()
+    
+    @patch('tts.tts_engine.TTSProviderManager')
+    @patch('tts.tts_engine.VoiceManager')
+    def test_chunking_fails_when_provider_doesnt_support_it(self, mock_vm_class, mock_pm_class):
+        """Test that chunking fails gracefully when provider doesn't support it"""
+        mock_provider = MagicMock()
+        mock_provider.is_available.return_value = True
+        mock_provider.supports_chunking.return_value = False  # Doesn't support chunking
+        mock_provider.get_max_text_bytes.return_value = None
+        
+        mock_pm = MagicMock()
+        mock_pm.get_provider.return_value = mock_provider
+        mock_pm.get_available_provider.return_value = mock_provider
+        mock_pm_class.return_value = mock_pm
+        
+        mock_vm = MagicMock()
+        mock_voice = {"id": "voice1", "name": "Voice 1", "provider": "pyttsx3"}
+        mock_vm.get_voice_by_name.return_value = mock_voice
+        mock_vm_class.return_value = mock_vm
+        
+        engine = TTSEngine(provider_manager=mock_pm)
+        
+        # Create long text
+        long_text = "A" * 4000
+        
+        output_path = Path("/tmp/test_output.mp3")
+        # Should not use chunking, should try regular conversion
+        result = engine.convert_text_to_speech(
+            text=long_text,
+            output_path=output_path,
+            voice="voice1",
+            provider="pyttsx3"
+        )
+        
+        # Should check capabilities
+        mock_provider.supports_chunking.assert_called()
+        # Should attempt regular conversion (not chunking)
+        mock_provider.convert_text_to_speech.assert_called()
 
