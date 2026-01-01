@@ -246,4 +246,82 @@ class EdgeTTSWorkingProvider(TTSProvider):
     def supports_volume(self) -> bool:
         """Edge TTS supports volume adjustment (but Hugging Face demo doesn't use it)"""
         return False  # Hugging Face demo doesn't use volume
+    
+    def supports_ssml(self) -> bool:
+        """Edge TTS supports SSML (Speech Synthesis Markup Language)"""
+        return True
+    
+    def supports_chunking(self) -> bool:
+        """Edge TTS supports chunking for long texts"""
+        return True
+    
+    def get_max_text_bytes(self) -> Optional[int]:
+        """Edge TTS has a limit of approximately 3000 bytes per request"""
+        return 3000
+    
+    async def convert_chunk_async(
+        self,
+        text: str,
+        voice: str,
+        output_path: Path,
+        rate: Optional[float] = None,
+        pitch: Optional[float] = None,
+        volume: Optional[float] = None
+    ) -> bool:
+        """Convert a single chunk of text to speech asynchronously.
+        
+        This method is designed for parallel chunk processing and works within
+        an existing event loop. Use this for chunking scenarios where multiple
+        chunks need to be converted concurrently.
+        
+        Args:
+            text: Text chunk to convert
+            voice: Voice identifier (e.g., "en-US-AndrewNeural")
+            output_path: Path where audio file will be saved
+            rate: Speech rate (-50 to 50, Edge TTS format)
+            pitch: Pitch adjustment (-50 to 50, Edge TTS format)
+            volume: Volume adjustment (not used in this provider)
+        
+        Returns:
+            True if conversion successful, False otherwise
+        """
+        if not self._available:
+            logger.error("Edge TTS Working provider is not available")
+            return False
+        
+        try:
+            import edge_tts
+        except ImportError:
+            logger.error("edge-tts not installed")
+            return False
+        
+        try:
+            # Use Hugging Face demo's EXACT format - always pass rate and pitch
+            rate_int = int(round(rate)) if rate is not None else 0
+            rate_str = f"{rate_int:+d}%"  # e.g., "+0%", "+25%", "-10%"
+            
+            pitch_int = int(round(pitch)) if pitch is not None else 0
+            pitch_str = f"{pitch_int:+d}Hz"  # e.g., "+0Hz", "+10Hz", "-5Hz"
+            
+            # Extract voice short name
+            voice_short_name = voice.split(" - ")[0].strip() if " - " in voice else voice.strip()
+            
+            # Use their EXACT method - positional args for text/voice, keyword for rate/pitch
+            communicate = edge_tts.Communicate(text, voice_short_name, rate=rate_str, pitch=pitch_str)
+            
+            # Save to file (async operation)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            await communicate.save(str(output_path))
+            
+            # Verify file was created
+            if output_path.exists() and output_path.stat().st_size > 0:
+                return True
+            else:
+                logger.error(f"Edge TTS Working chunk conversion failed: file not created or empty")
+                return False
+                
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Error in Edge TTS Working chunk conversion: {error_msg}")
+            return False
 

@@ -148,17 +148,19 @@ class TTSEngine:
         else:
             voice = "en-US-AndrewNeural"  # Fallback if config returns None
         
-        # Check provider availability if specified
-        if provider:
-            provider_instance = self.provider_manager.get_provider(provider)
-            if not provider_instance or not provider_instance.is_available():
-                logger.error(f"Provider '{provider}' is not available")
-                return False
-        
         # Ensure voice is a string at this point
         if not isinstance(voice, str):
             logger.error(f"Invalid voice type: {type(voice)}")
             return False
+        
+        # Get provider instance once and reuse it (avoid redundant lookups)
+        # get_provider() already returns None if provider is unavailable
+        provider_instance: Optional[TTSProvider] = None
+        if provider:
+            provider_instance = self.provider_manager.get_provider(provider)
+            if not provider_instance:
+                logger.error(f"Provider '{provider}' is not available")
+                return False
         
         # Determine which provider to use for voice lookup
         # If provider is specified, look up voice in that provider only
@@ -232,15 +234,13 @@ class TTSEngine:
             logger.info(f"Text preview (first 100 chars): {preview}...")
 
         # Build SSML (only for providers that support it)
-        # Check provider capabilities instead of hardcoded provider name
+        # Reuse provider_instance if already fetched, otherwise get default
         use_ssml_for_provider: bool = False
-        if provider:
-            provider_instance = self.provider_manager.get_provider(provider)
-            if provider_instance and provider_instance.is_available():
-                use_ssml_for_provider = provider_instance.supports_ssml()
+        if provider_instance:
+            # Provider was already fetched and validated above
+            use_ssml_for_provider = provider_instance.supports_ssml()
         else:
             # If no provider specified, check if default provider supports SSML
-            # Default to Edge TTS which supports SSML
             default_provider = self.provider_manager.get_available_provider()
             if default_provider:
                 use_ssml_for_provider = default_provider.supports_ssml()
@@ -265,16 +265,14 @@ class TTSEngine:
         logger.info(f"Text size: {text_bytes_size} bytes")
 
         # Determine which provider will be used and check if chunking is needed
-        provider_for_chunking = None
-        if provider:
-            provider_for_chunking = self.provider_manager.get_provider(provider)
-        else:
-            provider_for_chunking = self.provider_manager.get_available_provider()
+        # Reuse provider_instance if already fetched, otherwise get default
+        provider_for_chunking = provider_instance if provider_instance else self.provider_manager.get_available_provider()
         
         # Check if chunking is needed based on provider capabilities
+        # get_provider() and get_available_provider() already filter unavailable providers
         needs_chunking = False
         max_bytes = None
-        if provider_for_chunking and provider_for_chunking.is_available():
+        if provider_for_chunking:
             if provider_for_chunking.supports_chunking():
                 max_bytes = provider_for_chunking.get_max_text_bytes()
                 if max_bytes and text_bytes_size > max_bytes:
@@ -282,31 +280,17 @@ class TTSEngine:
         
         if needs_chunking and max_bytes:
             # Use chunking for providers that support it
-            # Ensure voice is a string
-            if not isinstance(voice, str):
-                logger.error(f"Voice must be a string, got {type(voice)}")
-                return False
+            # Voice is already validated as string at line 159
             logger.info(f"Text exceeds {max_bytes} bytes ({text_bytes_size} bytes), using chunking...")
             return self._convert_with_chunking(text_to_convert, voice, output_path, rate, pitch, volume, provider)
         else:
             # Use provider manager for conversion
             # If provider is specified, use it directly (no fallback)
             # If not specified, use fallback logic
-            if provider:
+            if provider_instance:
+                # Provider was already fetched and validated above
+                # Voice is already validated as string at line 159
                 logger.info(f"Attempting conversion with provider '{provider}' (no fallback)")
-                if not isinstance(provider, str):
-                    logger.error(f"Provider must be a string, got {type(provider)}")
-                    return False
-                provider_instance = self.provider_manager.get_provider(provider)
-                if not provider_instance or not provider_instance.is_available():
-                    logger.error(f"Provider '{provider}' is not available")
-                    return False
-                
-                # Ensure voice is a string
-                if not isinstance(voice, str):
-                    logger.error(f"Voice must be a string, got {type(voice)}")
-                    return False
-                
                 return provider_instance.convert_text_to_speech(
                     text=text_to_convert,
                     voice=voice,
@@ -317,10 +301,7 @@ class TTSEngine:
                 )
             else:
                 # No provider specified - use fallback logic
-                # Ensure voice is a string
-                if not isinstance(voice, str):
-                    logger.error(f"Voice must be a string, got {type(voice)}")
-                    return False
+                # Voice is already validated as string at line 159
                 logger.info(f"Attempting conversion with provider manager (auto fallback)")
                 return self.provider_manager.convert_with_fallback(
                     text=text_to_convert,
@@ -344,25 +325,31 @@ class TTSEngine:
     ) -> List[Path]:
         """Convert chunks in parallel using provider abstraction.
         
+        Note: The provider must already be validated to support async chunk conversion
+        (i.e., have convert_chunk_async method) before calling this method. This is
+        typically done by the caller (_convert_with_chunking).
+        
         Args:
             chunks: List of text chunks to convert
             voice: Voice identifier
             temp_dir: Temporary directory for chunk files
             output_stem: Stem name for chunk files
-            provider: TTS provider instance (must support async chunk conversion)
+            provider: TTS provider instance (must support async chunk conversion via convert_chunk_async)
             rate: Speech rate adjustment
             pitch: Pitch adjustment
             volume: Volume adjustment
         
         Returns:
             List of Path objects for converted chunk files
+            
+        Raises:
+            ValueError: If provider is None
         """
         if not provider:
             raise ValueError("Provider is required for parallel chunk conversion")
         
-        # Check if provider supports async chunk conversion
-        if not hasattr(provider, 'convert_chunk_async'):
-            raise ValueError(f"Provider {provider.get_provider_name()} does not support async chunk conversion")
+        # Provider validation (availability and convert_chunk_async support) is done
+        # by the caller (_convert_with_chunking) to avoid redundancy
         
         async def convert_chunk(chunk: str, index: int) -> Path:
             """Convert a single chunk using the provider's async method"""
@@ -435,12 +422,14 @@ class TTSEngine:
         if provider:
             provider_name = provider
             tts_provider = self.provider_manager.get_provider(provider_name)
+            # get_provider() already returns None if provider is unavailable
         else:
             # Find first available provider that supports chunking
             tts_provider = None
             # Try edge_tts first (supports chunking)
+            # get_provider() already filters unavailable providers
             candidate = self.provider_manager.get_provider("edge_tts")
-            if candidate and candidate.is_available() and candidate.supports_chunking():
+            if candidate and candidate.supports_chunking():
                 tts_provider = candidate
                 provider_name = "edge_tts"
             
@@ -449,7 +438,8 @@ class TTSEngine:
                 tts_provider = self.provider_manager.get_available_provider()
                 provider_name = tts_provider.get_provider_name() if tts_provider else "unknown"
         
-        if not tts_provider or not tts_provider.is_available():
+        # get_provider() and get_available_provider() already filter unavailable providers
+        if not tts_provider:
             logger.error(f"Provider '{provider_name}' is not available for chunking")
             return False
         

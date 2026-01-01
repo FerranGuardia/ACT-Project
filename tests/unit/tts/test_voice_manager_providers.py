@@ -18,8 +18,28 @@ import types
 act_src = Path(__file__).parent.parent.parent.parent / "src"
 
 # Mock external dependencies before importing
-sys.modules["pyttsx3"] = MagicMock()
-sys.modules["edge_tts"] = MagicMock()
+# Create proper async mock for edge_tts.list_voices()
+import asyncio
+
+async def mock_list_voices():
+    """Mock async function that returns a list of voices"""
+    return [
+        {"ShortName": "en-US-AndrewNeural", "FriendlyName": "Andrew", "Locale": "en-US", "Gender": "Male"},
+        {"ShortName": "en-US-JennyNeural", "FriendlyName": "Jenny", "Locale": "en-US", "Gender": "Female"}
+    ]
+
+# Create proper mock for edge_tts module
+mock_edge_tts_module = MagicMock()
+mock_edge_tts_module.list_voices = mock_list_voices
+sys.modules["edge_tts"] = mock_edge_tts_module
+
+# Create proper mock for pyttsx3 module
+mock_pyttsx3_module = MagicMock()
+# Mock pyttsx3.init() to return a mock engine
+mock_engine = MagicMock()
+mock_engine.getProperty.return_value = []  # Empty voices list by default
+mock_pyttsx3_module.init.return_value = mock_engine
+sys.modules["pyttsx3"] = mock_pyttsx3_module
 
 # Mock core.logger
 if "core" not in sys.modules:

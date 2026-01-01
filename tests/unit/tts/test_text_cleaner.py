@@ -30,7 +30,8 @@ class TestTextCleaner:
             from src.tts.text_cleaner import clean_text_for_tts  # type: ignore[import-untyped]
             from src.scraper.text_cleaner import clean_text  # type: ignore[import-untyped]
             
-            text = "<p>Hello <b>world</b></p>"
+            # Use text that survives scraper filtering (>15 chars or has punctuation)
+            text = "<p>Hello <b>world</b>, this is a test sentence.</p>"
             cleaned = clean_text_for_tts(text, base_cleaner=clean_text)
             
             assert "<p>" not in cleaned

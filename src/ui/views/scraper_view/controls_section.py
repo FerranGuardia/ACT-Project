@@ -43,3 +43,4 @@ class ScraperControlsSection(QGroupBox):
 
 
 
+

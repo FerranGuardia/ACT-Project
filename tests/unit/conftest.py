@@ -198,6 +198,25 @@ def mock_voice_manager():
     return mock_manager
 
 
+@pytest.fixture
+def sample_novel_url():
+    """Sample novel URL for testing"""
+    return "https://example.com/novel/test-novel"
+
+
+@pytest.fixture
+def mock_processing_pipeline():
+    """Mock ProcessingPipeline for testing"""
+    mock_pipeline = MagicMock()
+    mock_pipeline.process = MagicMock()
+    mock_pipeline.pause = MagicMock()
+    mock_pipeline.stop = MagicMock()
+    mock_pipeline.resume = MagicMock()
+    mock_pipeline.is_running = MagicMock(return_value=False)
+    mock_pipeline.is_paused = MagicMock(return_value=False)
+    return mock_pipeline
+
+
 # Register custom markers and ensure mocks are set up early
 def pytest_configure(config):
     """Register custom markers and ensure tts mock is set up before test collection"""

@@ -261,7 +261,7 @@ class TestProviderSelectionDialog:
         
         # Should return provider name
         provider_name = dialog.get_selected_provider()
-                assert provider_name in ["edge_tts", "pyttsx3"]
+        assert provider_name in ["edge_tts", "pyttsx3"]
     
     def test_current_provider_selected_on_open(self, mock_provider_manager, qt_application):  # type: ignore[no-untyped-def]
         """Test that current provider is selected when dialog opens"""

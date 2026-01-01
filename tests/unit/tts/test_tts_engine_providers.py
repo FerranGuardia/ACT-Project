@@ -16,8 +16,28 @@ import types
 act_src = Path(__file__).parent.parent.parent.parent / "src"
 
 # Mock external dependencies before importing
-sys.modules["pyttsx3"] = MagicMock()
-sys.modules["edge_tts"] = MagicMock()
+# Create proper async mock for edge_tts.list_voices()
+import asyncio
+
+async def mock_list_voices():
+    """Mock async function that returns a list of voices"""
+    return [
+        {"ShortName": "en-US-AndrewNeural", "FriendlyName": "Andrew", "Locale": "en-US", "Gender": "Male"},
+        {"ShortName": "en-US-JennyNeural", "FriendlyName": "Jenny", "Locale": "en-US", "Gender": "Female"}
+    ]
+
+# Create proper mock for edge_tts module
+mock_edge_tts_module = MagicMock()
+mock_edge_tts_module.list_voices = mock_list_voices
+sys.modules["edge_tts"] = mock_edge_tts_module
+
+# Create proper mock for pyttsx3 module
+mock_pyttsx3_module = MagicMock()
+# Mock pyttsx3.init() to return a mock engine
+mock_engine = MagicMock()
+mock_engine.getProperty.return_value = []  # Empty voices list by default
+mock_pyttsx3_module.init.return_value = mock_engine
+sys.modules["pyttsx3"] = mock_pyttsx3_module
 
 # Mock core.logger
 if "core" not in sys.modules:
@@ -257,11 +277,9 @@ class TestTTSEngineProviders:
     @patch('tts.tts_engine.VoiceManager')
     def test_convert_text_to_speech_fails_when_provider_unavailable(self, mock_vm_class, mock_pm_class):
         """Test convert_text_to_speech fails when specified provider is unavailable (no fallback)"""
-        mock_provider = MagicMock()
-        mock_provider.is_available.return_value = False
-        
+        # get_provider() returns None when provider is unavailable (already filtered)
         mock_pm = MagicMock()
-        mock_pm.get_provider.return_value = mock_provider
+        mock_pm.get_provider.return_value = None  # Provider unavailable
         mock_pm_class.return_value = mock_pm
         
         mock_vm = MagicMock()
