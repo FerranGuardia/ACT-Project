@@ -211,6 +211,9 @@ class TestTTSEngineProviders:
         mock_provider = MagicMock()
         mock_provider.is_available.return_value = True
         mock_provider.convert_text_to_speech.return_value = True
+        # Mock provider capabilities for chunking check
+        mock_provider.supports_chunking.return_value = False
+        mock_provider.get_max_text_bytes.return_value = None
         
         mock_pm = MagicMock()
         mock_pm.get_provider.return_value = mock_provider
@@ -245,6 +248,9 @@ class TestTTSEngineProviders:
         mock_provider = MagicMock()
         mock_provider.is_available.return_value = True
         mock_provider.convert_text_to_speech.return_value = True
+        # Mock provider capabilities for chunking check
+        mock_provider.supports_chunking.return_value = False
+        mock_provider.get_max_text_bytes.return_value = None
         
         mock_pm = MagicMock()
         # Mock get_available_provider for SSML/chunking checks (called but shouldn't affect fallback)
