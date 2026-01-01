@@ -17,11 +17,20 @@ class TestTTSEngine:
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
             
-            engine = TTSEngine()
-            
-            assert engine is not None
-            assert hasattr(engine, 'voice_manager')
-            assert hasattr(engine, 'config')
+            # Mock provider manager and voice manager to avoid real provider initialization
+            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
+                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
+                mock_pm = MagicMock()
+                mock_pm_class.return_value = mock_pm
+                mock_vm = MagicMock()
+                mock_vm_class.return_value = mock_vm
+                
+                engine = TTSEngine()
+                
+                assert engine is not None
+                assert hasattr(engine, 'voice_manager')
+                assert hasattr(engine, 'config')
+                assert engine.provider_manager == mock_pm  # Verify it uses mocked manager
             
         except ImportError:
             pytest.skip("TTS module not available")
@@ -31,18 +40,22 @@ class TestTTSEngine:
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
             
-            engine = TTSEngine()
-            voices = engine.get_available_voices()
-            
-            assert isinstance(voices, list)
-            # In test environments, voices might not be available (e.g., no TTS voices installed)
-            # So we just verify it returns a list, but don't require voices to be present
-            # If voices are available, verify they have the expected structure
-            if len(voices) > 0:
-                # Verify voice structure if voices are available
-                for voice in voices:
-                    assert isinstance(voice, dict)
-                    assert "id" in voice or "name" in voice
+            # Mock provider manager and voice manager to avoid real provider initialization
+            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
+                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
+                mock_pm = MagicMock()
+                mock_pm_class.return_value = mock_pm
+                mock_vm = MagicMock()
+                mock_voices = [{"id": "voice1", "name": "Voice 1"}]
+                mock_vm.get_voices.return_value = mock_voices
+                mock_vm_class.return_value = mock_vm
+                
+                engine = TTSEngine()
+                voices = engine.get_available_voices()
+                
+                assert isinstance(voices, list)
+                assert voices == mock_voices  # Should return mocked voices
+                mock_vm.get_voices.assert_called_once_with(locale=None, provider=None)
             
         except ImportError:
             pytest.skip("TTS module not available")
@@ -52,13 +65,25 @@ class TestTTSEngine:
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
             
-            engine = TTSEngine()
-            english_voices = engine.get_available_voices(locale="en-US")
-            
-            assert isinstance(english_voices, list)
-            # All voices should be English
-            for voice in english_voices:
-                assert "en" in voice.get("Locale", "").lower() or "en" in str(voice).lower()
+            # Mock provider manager and voice manager to avoid real provider initialization
+            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
+                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
+                mock_pm = MagicMock()
+                mock_pm_class.return_value = mock_pm
+                mock_vm = MagicMock()
+                mock_english_voices = [
+                    {"id": "en-US-Voice1", "Locale": "en-US"},
+                    {"id": "en-US-Voice2", "Locale": "en-US"}
+                ]
+                mock_vm.get_voices.return_value = mock_english_voices
+                mock_vm_class.return_value = mock_vm
+                
+                engine = TTSEngine()
+                english_voices = engine.get_available_voices(locale="en-US")
+                
+                assert isinstance(english_voices, list)
+                assert english_voices == mock_english_voices
+                mock_vm.get_voices.assert_called_once_with(locale="en-US", provider=None)
             
         except ImportError:
             pytest.skip("TTS module not available")
@@ -92,17 +117,25 @@ class TestTTSEngine:
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
             
-            engine = TTSEngine()
-            output_path = temp_dir / "test_output.mp3"
-            
-            result = engine.convert_text_to_speech(
-                text="",
-                output_path=output_path,
-                voice="en-US-AndrewNeural"
-            )
-            
-            assert result is False
-            assert not output_path.exists()
+            # Mock provider manager and voice manager to avoid real provider initialization
+            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
+                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
+                mock_pm = MagicMock()
+                mock_pm_class.return_value = mock_pm
+                mock_vm = MagicMock()
+                mock_vm_class.return_value = mock_vm
+                
+                engine = TTSEngine()
+                output_path = temp_dir / "test_output.mp3"
+                
+                result = engine.convert_text_to_speech(
+                    text="",
+                    output_path=output_path,
+                    voice="en-US-AndrewNeural"
+                )
+                
+                assert result is False
+                assert not output_path.exists()
             
         except ImportError:
             pytest.skip("TTS module not available")
@@ -112,18 +145,28 @@ class TestTTSEngine:
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
             
-            engine = TTSEngine()
-            output_path = temp_dir / "test_output.mp3"
-            
-            # Should not raise exception, should use default voice
-            result = engine.convert_text_to_speech(
-                text=sample_text,
-                output_path=output_path,
-                voice="invalid-voice-name"
-            )
-            
-            # May fail if Edge-TTS unavailable, but shouldn't crash
-            assert isinstance(result, bool)
+            # Mock provider manager and voice manager to avoid real provider initialization
+            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
+                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
+                mock_pm = MagicMock()
+                mock_pm_class.return_value = mock_pm
+                mock_vm = MagicMock()
+                # Mock voice not found scenario
+                mock_vm.get_voice_by_name.return_value = None
+                mock_vm_class.return_value = mock_vm
+                
+                engine = TTSEngine()
+                output_path = temp_dir / "test_output.mp3"
+                
+                # Should not raise exception, should return False when voice not found
+                result = engine.convert_text_to_speech(
+                    text=sample_text,
+                    output_path=output_path,
+                    voice="invalid-voice-name"
+                )
+                
+                # Should return False when voice is not found
+                assert result is False
             
         except ImportError:
             pytest.skip("TTS module not available")
@@ -133,20 +176,32 @@ class TestTTSEngine:
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
             
-            engine = TTSEngine()
-            input_file = temp_dir / "input.txt"
-            input_file.write_text(sample_text)
-            
-            output_path = temp_dir / "output.mp3"
-            
-            result = engine.convert_file_to_speech(
-                input_file=input_file,
-                output_path=output_path,
-                voice="en-US-AndrewNeural"
-            )
-            
-            # May fail if Edge-TTS unavailable, but shouldn't crash
-            assert isinstance(result, bool)
+            # Mock provider manager and voice manager to avoid real provider initialization
+            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
+                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
+                mock_pm = MagicMock()
+                mock_pm_class.return_value = mock_pm
+                mock_vm = MagicMock()
+                mock_voice = {"id": "en-US-AndrewNeural", "name": "Andrew"}
+                mock_vm.get_voice_by_name.return_value = mock_voice
+                mock_vm_class.return_value = mock_vm
+                
+                # Mock the convert_text_to_speech to return True
+                engine = TTSEngine()
+                with patch.object(engine, 'convert_text_to_speech', return_value=True) as mock_convert:
+                    input_file = temp_dir / "input.txt"
+                    input_file.write_text(sample_text)
+                    
+                    output_path = temp_dir / "output.mp3"
+                    
+                    result = engine.convert_file_to_speech(
+                        input_file=input_file,
+                        output_path=output_path,
+                        voice="en-US-AndrewNeural"
+                    )
+                    
+                    assert result is True
+                    mock_convert.assert_called_once()
             
         except ImportError:
             pytest.skip("TTS module not available")
@@ -156,16 +211,24 @@ class TestTTSEngine:
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
             
-            engine = TTSEngine()
-            input_file = temp_dir / "nonexistent.txt"
-            output_path = temp_dir / "output.mp3"
-            
-            result = engine.convert_file_to_speech(
-                input_file=input_file,
-                output_path=output_path
-            )
-            
-            assert result is False
+            # Mock provider manager and voice manager to avoid real provider initialization
+            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
+                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
+                mock_pm = MagicMock()
+                mock_pm_class.return_value = mock_pm
+                mock_vm = MagicMock()
+                mock_vm_class.return_value = mock_vm
+                
+                engine = TTSEngine()
+                input_file = temp_dir / "nonexistent.txt"
+                output_path = temp_dir / "output.mp3"
+                
+                result = engine.convert_file_to_speech(
+                    input_file=input_file,
+                    output_path=output_path
+                )
+                
+                assert result is False
             
         except ImportError:
             pytest.skip("TTS module not available")
@@ -175,18 +238,26 @@ class TestTTSEngine:
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
             
-            engine = TTSEngine()
-            long_text = " ".join(["Sentence {}.".format(i) for i in range(200)])
-            
-            chunks = engine._chunk_text(long_text, max_bytes=1000)
-            
-            assert isinstance(chunks, list)
-            assert len(chunks) > 1  # Should be split into multiple chunks
-            
-            # Each chunk should be within byte limit
-            for chunk in chunks:
-                chunk_bytes = len(chunk.encode('utf-8'))
-                assert chunk_bytes <= 1000
+            # Mock provider manager and voice manager to avoid real provider initialization
+            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
+                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
+                mock_pm = MagicMock()
+                mock_pm_class.return_value = mock_pm
+                mock_vm = MagicMock()
+                mock_vm_class.return_value = mock_vm
+                
+                engine = TTSEngine()
+                long_text = " ".join(["Sentence {}.".format(i) for i in range(200)])
+                
+                chunks = engine._chunk_text(long_text, max_bytes=1000)
+                
+                assert isinstance(chunks, list)
+                assert len(chunks) > 1  # Should be split into multiple chunks
+                
+                # Each chunk should be within byte limit
+                for chunk in chunks:
+                    chunk_bytes = len(chunk.encode('utf-8'))
+                    assert chunk_bytes <= 1000
             
         except ImportError:
             pytest.skip("TTS module not available")
@@ -196,20 +267,28 @@ class TestTTSEngine:
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
             
-            engine = TTSEngine()
-            
-            # Create fake chunk files
-            chunk1 = temp_dir / "chunk1.mp3"
-            chunk2 = temp_dir / "chunk2.mp3"
-            chunk1.write_bytes(b'fake audio 1')
-            chunk2.write_bytes(b'fake audio 2')
-            
-            output_path = temp_dir / "merged.mp3"
-            
-            # This may fail if pydub/ffmpeg not available, but shouldn't crash
-            result = engine._merge_audio_chunks([chunk1, chunk2], output_path)
-            
-            assert isinstance(result, bool)
+            # Mock provider manager and voice manager to avoid real provider initialization
+            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
+                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
+                mock_pm = MagicMock()
+                mock_pm_class.return_value = mock_pm
+                mock_vm = MagicMock()
+                mock_vm_class.return_value = mock_vm
+                
+                engine = TTSEngine()
+                
+                # Create fake chunk files
+                chunk1 = temp_dir / "chunk1.mp3"
+                chunk2 = temp_dir / "chunk2.mp3"
+                chunk1.write_bytes(b'fake audio 1')
+                chunk2.write_bytes(b'fake audio 2')
+                
+                output_path = temp_dir / "merged.mp3"
+                
+                # This may fail if pydub/ffmpeg not available, but shouldn't crash
+                result = engine._merge_audio_chunks([chunk1, chunk2], output_path)
+                
+                assert isinstance(result, bool)
             
         except ImportError:
             pytest.skip("TTS module not available")
@@ -266,40 +345,40 @@ class TestTTSEngine:
         """Test successful parallel chunk conversion"""
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
-            # Import edge_tts to ensure it's available for patching
-            try:
-                import edge_tts  # type: ignore
-            except ImportError:
-                pytest.skip("edge-tts not available")
+            from src.tts.providers.base_provider import TTSProvider  # type: ignore
             
-            engine = TTSEngine()
-            chunks = ["Chunk 1 text.", "Chunk 2 text.", "Chunk 3 text."]
-            voice = "en-US-AndrewNeural"
-            output_stem = "test_output"
-            
-            # Mock edge_tts.Communicate
-            with patch('edge_tts.Communicate') as mock_communicate_class:
-                # Create mock communicate instances for each chunk
-                mock_communicates = []
-                for i, chunk in enumerate(chunks):
-                    mock_comm = AsyncMock()
-                    chunk_path = temp_dir / f"{output_stem}_chunk_{i}.mp3"
-                    
-                    async def save_side_effect(path, idx=i):
-                        # Ensure file exists and has content
-                        Path(path).write_bytes(b'fake audio data')
-                    
-                    mock_comm.save = AsyncMock(side_effect=save_side_effect)
-                    mock_communicates.append(mock_comm)
+            # Mock provider manager and voice manager to avoid real provider initialization
+            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
+                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
+                mock_pm = MagicMock()
+                mock_pm_class.return_value = mock_pm
+                mock_vm = MagicMock()
+                mock_vm_class.return_value = mock_vm
                 
-                mock_communicate_class.side_effect = mock_communicates
+                engine = TTSEngine()
+                chunks = ["Chunk 1 text.", "Chunk 2 text.", "Chunk 3 text."]
+                voice = "en-US-AndrewNeural"
+                output_stem = "test_output"
+                
+                # Create mock provider
+                mock_provider = MagicMock(spec=TTSProvider)
+                
+                # Mock convert_chunk_async to create files
+                async def mock_convert_chunk(text, voice, output_path, rate=None, pitch=None, volume=None):
+                    # Ensure file exists and has content
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+                    output_path.write_bytes(b'fake audio data')
+                    return True
+                
+                mock_provider.convert_chunk_async = AsyncMock(side_effect=mock_convert_chunk)
                 
                 # Run the parallel conversion
                 result = await engine._convert_chunks_parallel(
                     chunks=chunks,
                     voice=voice,
                     temp_dir=temp_dir,
-                    output_stem=output_stem
+                    output_stem=output_stem,
+                    provider=mock_provider
                 )
                 
                 # Verify results
@@ -312,7 +391,7 @@ class TestTTSEngine:
                     assert chunk_file.name == f"{output_stem}_chunk_{i}.mp3"
                 
                 # Verify all chunks were processed
-                assert mock_communicate_class.call_count == len(chunks)
+                assert mock_provider.convert_chunk_async.call_count == len(chunks)
                 
         except ImportError:
             pytest.skip("TTS module not available")
@@ -322,41 +401,48 @@ class TestTTSEngine:
         """Test that parallel conversion retries when empty file is produced"""
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
+            from src.tts.providers.base_provider import TTSProvider  # type: ignore
             
-            engine = TTSEngine()
-            chunks = ["Test chunk."]
-            voice = "en-US-AndrewNeural"
-            output_stem = "test_output"
-            chunk_path = temp_dir / f"{output_stem}_chunk_0.mp3"
-            
-            call_count = 0
-            
-            async def save_side_effect(path):
-                nonlocal call_count
-                call_count += 1
-                # First call creates empty file, second call creates valid file
-                if call_count == 1:
-                    Path(path).write_bytes(b'')  # Empty file
-                else:
-                    Path(path).write_bytes(b'valid audio data')
-            
-            # Import edge_tts to ensure it's available for patching
-            try:
-                import edge_tts  # type: ignore
-            except ImportError:
-                pytest.skip("edge-tts not available")
-            
-            with patch('edge_tts.Communicate') as mock_communicate_class:
-                mock_comm = AsyncMock()
-                mock_comm.save = AsyncMock(side_effect=save_side_effect)
-                mock_communicate_class.return_value = mock_comm
+            # Mock provider manager and voice manager to avoid real provider initialization
+            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
+                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class, \
+                 patch('asyncio.sleep') as mock_sleep:  # Mock asyncio.sleep to avoid real delays
+                mock_pm = MagicMock()
+                mock_pm_class.return_value = mock_pm
+                mock_vm = MagicMock()
+                mock_vm_class.return_value = mock_vm
+                mock_sleep.return_value = None  # Make sleep return immediately
+                
+                engine = TTSEngine()
+                chunks = ["Test chunk."]
+                voice = "en-US-AndrewNeural"
+                output_stem = "test_output"
+                chunk_path = temp_dir / f"{output_stem}_chunk_0.mp3"
+                
+                call_count = 0
+                
+                async def mock_convert_chunk(text, voice, output_path, rate=None, pitch=None, volume=None):
+                    nonlocal call_count
+                    call_count += 1
+                    # First call creates empty file, second call creates valid file
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+                    if call_count == 1:
+                        output_path.write_bytes(b'')  # Empty file
+                    else:
+                        output_path.write_bytes(b'valid audio data')
+                    return True
+                
+                # Create mock provider
+                mock_provider = MagicMock(spec=TTSProvider)
+                mock_provider.convert_chunk_async = AsyncMock(side_effect=mock_convert_chunk)
                 
                 # Run the parallel conversion
                 result = await engine._convert_chunks_parallel(
                     chunks=chunks,
                     voice=voice,
                     temp_dir=temp_dir,
-                    output_stem=output_stem
+                    output_stem=output_stem,
+                    provider=mock_provider
                 )
                 
                 # Should have retried and succeeded
@@ -373,41 +459,48 @@ class TestTTSEngine:
         """Test that parallel conversion retries on exception"""
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
+            from src.tts.providers.base_provider import TTSProvider  # type: ignore
             
-            engine = TTSEngine()
-            chunks = ["Test chunk."]
-            voice = "en-US-AndrewNeural"
-            output_stem = "test_output"
-            chunk_path = temp_dir / f"{output_stem}_chunk_0.mp3"
-            
-            call_count = 0
-            
-            async def save_side_effect(path):
-                nonlocal call_count
-                call_count += 1
-                # First call raises exception, second call succeeds
-                if call_count == 1:
-                    raise Exception("Network error")
-                else:
-                    Path(path).write_bytes(b'valid audio data')
-            
-            # Import edge_tts to ensure it's available for patching
-            try:
-                import edge_tts  # type: ignore
-            except ImportError:
-                pytest.skip("edge-tts not available")
-            
-            with patch('edge_tts.Communicate') as mock_communicate_class:
-                mock_comm = AsyncMock()
-                mock_comm.save = AsyncMock(side_effect=save_side_effect)
-                mock_communicate_class.return_value = mock_comm
+            # Mock provider manager and voice manager to avoid real provider initialization
+            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
+                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class, \
+                 patch('asyncio.sleep') as mock_sleep:  # Mock asyncio.sleep to avoid real delays
+                mock_pm = MagicMock()
+                mock_pm_class.return_value = mock_pm
+                mock_vm = MagicMock()
+                mock_vm_class.return_value = mock_vm
+                mock_sleep.return_value = None  # Make sleep return immediately
+                
+                engine = TTSEngine()
+                chunks = ["Test chunk."]
+                voice = "en-US-AndrewNeural"
+                output_stem = "test_output"
+                chunk_path = temp_dir / f"{output_stem}_chunk_0.mp3"
+                
+                call_count = 0
+                
+                async def mock_convert_chunk(text, voice, output_path, rate=None, pitch=None, volume=None):
+                    nonlocal call_count
+                    call_count += 1
+                    # First call raises exception, second call succeeds
+                    if call_count == 1:
+                        raise Exception("Network error")
+                    else:
+                        output_path.parent.mkdir(parents=True, exist_ok=True)
+                        output_path.write_bytes(b'valid audio data')
+                    return True
+                
+                # Create mock provider
+                mock_provider = MagicMock(spec=TTSProvider)
+                mock_provider.convert_chunk_async = AsyncMock(side_effect=mock_convert_chunk)
                 
                 # Run the parallel conversion
                 result = await engine._convert_chunks_parallel(
                     chunks=chunks,
                     voice=voice,
                     temp_dir=temp_dir,
-                    output_stem=output_stem
+                    output_stem=output_stem,
+                    provider=mock_provider
                 )
                 
                 # Should have retried and succeeded
@@ -424,26 +517,30 @@ class TestTTSEngine:
         """Test that parallel conversion raises exception after all retries fail"""
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
+            from src.tts.providers.base_provider import TTSProvider  # type: ignore
             
-            engine = TTSEngine()
-            chunks = ["Test chunk."]
-            voice = "en-US-AndrewNeural"
-            output_stem = "test_output"
-            
-            async def save_side_effect(path):
-                # Always raise exception
-                raise Exception("Persistent error")
-            
-            # Import edge_tts to ensure it's available for patching
-            try:
-                import edge_tts  # type: ignore
-            except ImportError:
-                pytest.skip("edge-tts not available")
-            
-            with patch('edge_tts.Communicate') as mock_communicate_class:
-                mock_comm = AsyncMock()
-                mock_comm.save = AsyncMock(side_effect=save_side_effect)
-                mock_communicate_class.return_value = mock_comm
+            # Mock provider manager and voice manager to avoid real provider initialization
+            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
+                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class, \
+                 patch('asyncio.sleep') as mock_sleep:  # Mock asyncio.sleep to avoid real delays
+                mock_pm = MagicMock()
+                mock_pm_class.return_value = mock_pm
+                mock_vm = MagicMock()
+                mock_vm_class.return_value = mock_vm
+                mock_sleep.return_value = None  # Make sleep return immediately
+                
+                engine = TTSEngine()
+                chunks = ["Test chunk."]
+                voice = "en-US-AndrewNeural"
+                output_stem = "test_output"
+                
+                async def mock_convert_chunk(text, voice, output_path, rate=None, pitch=None, volume=None):
+                    # Always raise exception
+                    raise Exception("Persistent error")
+                
+                # Create mock provider
+                mock_provider = MagicMock(spec=TTSProvider)
+                mock_provider.convert_chunk_async = AsyncMock(side_effect=mock_convert_chunk)
                 
                 # Should raise exception after all retries
                 with pytest.raises(Exception, match="Failed to convert chunk 1 after retries"):
@@ -451,11 +548,12 @@ class TestTTSEngine:
                         chunks=chunks,
                         voice=voice,
                         temp_dir=temp_dir,
-                        output_stem=output_stem
+                        output_stem=output_stem,
+                        provider=mock_provider
                     )
                 
                 # Should have attempted max_retries times (5)
-                assert mock_comm.save.call_count == 5
+                assert mock_provider.convert_chunk_async.call_count == 5
                 
         except ImportError:
             pytest.skip("TTS module not available")
@@ -465,32 +563,36 @@ class TestTTSEngine:
         """Test parallel conversion with multiple chunks runs concurrently"""
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
+            from src.tts.providers.base_provider import TTSProvider  # type: ignore
             
-            engine = TTSEngine()
-            chunks = [f"Chunk {i} text." for i in range(5)]
-            voice = "en-US-AndrewNeural"
-            output_stem = "test_output"
-            
-            # Track when each chunk starts processing
-            start_times = []
-            
-            async def save_side_effect(path):
-                import time
-                start_times.append(time.time())
-                # Small delay to simulate processing
-                await asyncio.sleep(0.1)
-                Path(path).write_bytes(b'audio data')
-            
-            # Import edge_tts to ensure it's available for patching
-            try:
-                import edge_tts  # type: ignore
-            except ImportError:
-                pytest.skip("edge-tts not available")
-            
-            with patch('edge_tts.Communicate') as mock_communicate_class:
-                mock_comm = AsyncMock()
-                mock_comm.save = AsyncMock(side_effect=save_side_effect)
-                mock_communicate_class.return_value = mock_comm
+            # Mock provider manager and voice manager to avoid real provider initialization
+            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
+                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
+                mock_pm = MagicMock()
+                mock_pm_class.return_value = mock_pm
+                mock_vm = MagicMock()
+                mock_vm_class.return_value = mock_vm
+                
+                engine = TTSEngine()
+                chunks = [f"Chunk {i} text." for i in range(5)]
+                voice = "en-US-AndrewNeural"
+                output_stem = "test_output"
+                
+                # Track when each chunk starts processing
+                start_times = []
+                
+                async def mock_convert_chunk(text, voice, output_path, rate=None, pitch=None, volume=None):
+                    import time
+                    start_times.append(time.time())
+                    # Small delay to simulate processing
+                    await asyncio.sleep(0.1)
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+                    output_path.write_bytes(b'audio data')
+                    return True
+                
+                # Create mock provider
+                mock_provider = MagicMock(spec=TTSProvider)
+                mock_provider.convert_chunk_async = AsyncMock(side_effect=mock_convert_chunk)
                 
                 import time
                 start = time.time()
@@ -498,7 +600,8 @@ class TestTTSEngine:
                     chunks=chunks,
                     voice=voice,
                     temp_dir=temp_dir,
-                    output_stem=output_stem
+                    output_stem=output_stem,
+                    provider=mock_provider
                 )
                 elapsed = time.time() - start
                 
