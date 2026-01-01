@@ -51,13 +51,17 @@ class TestTTSMultiProvider:
         assert "ShortName" in voice or "Name" in voice or "name" in voice
     
     @pytest.mark.network
-    @pytest.mark.skip(reason="edge_tts_working provider not initialized by default in ProviderManager")
     def test_edge_tts_working_provider_loads_voices(self, real_provider_manager):
         """Test that Edge TTS Working provider can load voices
         
         Note: This provider is not initialized by default in TTSProviderManager.
         It's an alternative implementation that can be used manually.
         """
+        # Check if provider is available first
+        provider_instance = real_provider_manager.get_provider('edge_tts_working')
+        if not provider_instance:
+            pytest.skip("edge_tts_working provider not initialized by default in ProviderManager")
+        
         voices = real_provider_manager.get_voices_by_provider(provider='edge_tts_working')
         
         assert isinstance(voices, list)
@@ -115,6 +119,11 @@ class TestTTSMultiProvider:
     @pytest.mark.real
     def test_tts_engine_with_edge_tts_working_provider(self, real_tts_engine, temp_dir, sample_text):
         """Test TTS conversion with Edge TTS Working provider (real network call)"""
+        # Check if provider is available first
+        provider_instance = real_tts_engine.provider_manager.get_provider('edge_tts_working')
+        if not provider_instance:
+            pytest.skip("edge_tts_working provider not initialized by default in ProviderManager")
+        
         output_path = temp_dir / "test_edge_tts_working_output.mp3"
         
         result = real_tts_engine.convert_text_to_speech(
