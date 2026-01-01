@@ -164,3 +164,6 @@ scraped_chapters/
 # Qt Designer - isolated for learning, will integrate later
 qt_designer/
 
+# Legacy UI tests - will be removed after UI refactoring
+tests/unit/old ui test/
+
