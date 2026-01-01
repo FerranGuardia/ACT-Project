@@ -194,7 +194,12 @@ class TTSEngine:
             provider_value = voice_dict.get("provider")  # type: ignore[arg-type]
             if isinstance(provider_value, str):
                 provider = provider_value
-                logger.info(f"Using provider '{provider}' from voice metadata")
+                # Update provider_instance when provider is determined from voice metadata
+                provider_instance = self.provider_manager.get_provider(provider)
+                if not provider_instance:
+                    logger.warning(f"Provider '{provider}' from voice metadata is not available, will use fallback")
+                else:
+                    logger.info(f"Using provider '{provider}' from voice metadata")
         
         # Get locale and gender for logging
         # Type ignore because voice_dict is Dict[str, Any] but Pylance sees Dict[Unknown, Unknown]
