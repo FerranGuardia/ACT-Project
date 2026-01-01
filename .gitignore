@@ -172,4 +172,5 @@ tests/unit/ui/
 tests/unit/ui_tests_refactoring/
 tests/integration/ui/
 tests/integration/ui_tests_refactoring/
+tests/legacy/
 

@@ -117,7 +117,8 @@ def real_scraper():
     """Create a real GenericScraper instance for integration testing"""
     try:
         from scraper import GenericScraper
-        scraper = GenericScraper()
+        # GenericScraper requires base_url parameter
+        scraper = GenericScraper(base_url="https://novelfull.net")
         yield scraper
     except ImportError:
         pytest.skip("GenericScraper not available")

@@ -203,7 +203,8 @@ class TestFullPipelineE2E:
             toc_url=test_novel_url,
             novel_url=test_novel_url,
             start_from=1,
-            max_chapters=1
+            max_chapters=1,
+            voice="en-US-AndrewNeural"  # Use a valid English voice for testing
         )
         
         assert result1.get('success') == True, f"First run failed: {result1.get('error')}"
