@@ -18,17 +18,28 @@ class TestVoiceManager:
             manager = VoiceManager()
             
             assert manager is not None
-            assert hasattr(manager, 'voices')
+            # VoiceManager uses _voices (private) for internal storage
+            assert hasattr(manager, '_voices')
+            assert hasattr(manager, 'provider_manager')
             
         except ImportError:
             pytest.skip("TTS module not available")
     
-    def test_get_voices(self):
+    @patch('src.tts.voice_manager.TTSProviderManager')
+    def test_get_voices(self, mock_pm_class):
         """Test getting all voices"""
         try:
             from src.tts.voice_manager import VoiceManager  # type: ignore
             
-            manager = VoiceManager()
+            # Mock provider manager
+            mock_pm = MagicMock()
+            mock_voices = [
+                {"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "ShortName": "en-US-AndrewNeural", "Locale": "en-US", "Gender": "Male"}
+            ]
+            mock_pm.get_all_voices.return_value = mock_voices
+            mock_pm_class.return_value = mock_pm
+            
+            manager = VoiceManager(provider_manager=mock_pm)
             voices = manager.get_voices()
             
             assert isinstance(voices, list)
@@ -94,12 +105,21 @@ class TestVoiceManager:
         except ImportError:
             pytest.skip("TTS module not available")
     
-    def test_get_voice_list(self):
+    @patch('src.tts.voice_manager.TTSProviderManager')
+    def test_get_voice_list(self, mock_pm_class):
         """Test getting formatted voice list"""
         try:
             from src.tts.voice_manager import VoiceManager  # type: ignore
             
-            manager = VoiceManager()
+            # Mock provider manager
+            mock_pm = MagicMock()
+            mock_voices = [
+                {"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "ShortName": "en-US-AndrewNeural", "Locale": "en-US", "Gender": "Male"}
+            ]
+            mock_pm.get_all_voices.return_value = mock_voices
+            mock_pm_class.return_value = mock_pm
+            
+            manager = VoiceManager(provider_manager=mock_pm)
             voice_list = manager.get_voice_list()
             
             assert isinstance(voice_list, list)
