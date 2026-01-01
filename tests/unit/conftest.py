@@ -74,13 +74,28 @@ def qt_application():
     """Create QApplication instance for UI tests (session-scoped)"""
     try:
         from PySide6.QtWidgets import QApplication
+        from PySide6.QtCore import QThread
         import sys
         
         # Check if QApplication already exists
         app = QApplication.instance()
         if app is None:
             app = QApplication(sys.argv)
+        
         yield app
+        
+        # Cleanup: Wait for all threads to finish before destroying QApplication
+        # This prevents "QThread: Destroyed while thread is still running" warnings
+        import time
+        threads = QThread.allThreads()
+        for thread in threads:
+            if thread != QThread.currentThread() and thread.isRunning():
+                thread.quit()
+                thread.wait(1000)  # Wait up to 1 second for thread to finish
+        
+        # Process any pending events
+        app.processEvents()
+        
     except ImportError:
         pytest.skip("PySide6 not available")
 

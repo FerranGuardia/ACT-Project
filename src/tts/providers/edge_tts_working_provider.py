@@ -49,7 +49,21 @@ class EdgeTTSWorkingProvider(TTSProvider):
                 logger.warning(f"Edge TTS Working provider check failed: {error_msg}")
                 self._available = False
             finally:
+                # Cancel all pending tasks before closing
+                pending = asyncio.all_tasks(loop)
+                for task in pending:
+                    task.cancel()
+                
+                # Wait for tasks to complete cancellation
+                if pending:
+                    try:
+                        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                    except Exception:
+                        pass  # Ignore errors during cleanup
+                
+                # Close the loop
                 loop.close()
+                asyncio.set_event_loop(None)
         except ImportError:
             logger.warning("edge-tts not installed. Install with: pip install edge-tts")
             self._available = False
@@ -117,7 +131,21 @@ class EdgeTTSWorkingProvider(TTSProvider):
                 self._voices_cache = voices
                 
             finally:
+                # Cancel all pending tasks before closing
+                pending = asyncio.all_tasks(loop)
+                for task in pending:
+                    task.cancel()
+                
+                # Wait for tasks to complete cancellation
+                if pending:
+                    try:
+                        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                    except Exception:
+                        pass  # Ignore errors during cleanup
+                
+                # Close the loop
                 loop.close()
+                asyncio.set_event_loop(None)
                 
         except ImportError:
             logger.error("edge-tts not installed")
@@ -210,7 +238,21 @@ class EdgeTTSWorkingProvider(TTSProvider):
                     return False
                     
             finally:
+                # Cancel all pending tasks before closing
+                pending = asyncio.all_tasks(loop)
+                for task in pending:
+                    task.cancel()
+                
+                # Wait for tasks to complete cancellation
+                if pending:
+                    try:
+                        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                    except Exception:
+                        pass  # Ignore errors during cleanup
+                
+                # Close the loop
                 loop.close()
+                asyncio.set_event_loop(None)
                 
         except Exception as e:
             error_msg = str(e)

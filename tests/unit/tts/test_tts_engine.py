@@ -88,26 +88,48 @@ class TestTTSEngine:
         except ImportError:
             pytest.skip("TTS module not available")
     
-    @pytest.mark.skip(reason="Requires network connection and may fail if Edge-TTS is unavailable")
     def test_convert_text_to_speech_success(self, temp_dir, mock_config, sample_text):
-        """Test successful text-to-speech conversion"""
+        """Test successful text-to-speech conversion with mocked providers (unit test)"""
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
             
-            engine = TTSEngine()
-            output_path = temp_dir / "test_output.mp3"
-            
-            result = engine.convert_text_to_speech(
-                text=sample_text,
-                output_path=output_path,
-                voice="en-US-AndrewNeural"
-            )
-            
-            # Note: This test may fail if Edge-TTS is unavailable
-            # It's marked as skip to avoid false failures
-            if result:
-                assert output_path.exists()
-                assert output_path.stat().st_size > 0
+            # Mock provider manager and voice manager to avoid real provider initialization
+            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
+                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
+                mock_provider = MagicMock()
+                mock_provider.is_available.return_value = True
+                mock_provider.convert_text_to_speech.return_value = True
+                mock_provider.supports_chunking.return_value = False
+                mock_provider.get_max_text_bytes.return_value = None
+                mock_provider.supports_ssml.return_value = True
+                
+                mock_pm = MagicMock()
+                mock_pm.get_provider.return_value = mock_provider
+                mock_pm.get_available_provider.return_value = mock_provider
+                mock_pm_class.return_value = mock_pm
+                
+                mock_vm = MagicMock()
+                mock_voice = {"id": "en-US-AndrewNeural", "name": "Andrew", "provider": "edge_tts"}
+                mock_vm.get_voice_by_name.return_value = mock_voice
+                mock_vm_class.return_value = mock_vm
+                
+                engine = TTSEngine(provider_manager=mock_pm)
+                output_path = temp_dir / "test_output.mp3"
+                
+                result = engine.convert_text_to_speech(
+                    text=sample_text,
+                    output_path=output_path,
+                    voice="en-US-AndrewNeural"
+                )
+                
+                # Should return True when provider conversion succeeds
+                assert result is True
+                # Verify provider was called correctly
+                mock_provider.convert_text_to_speech.assert_called_once()
+                call_args = mock_provider.convert_text_to_speech.call_args
+                assert call_args.kwargs['text'] == sample_text
+                assert call_args.kwargs['output_path'] == output_path
+                assert call_args.kwargs['voice'] == "en-US-AndrewNeural"
             
         except ImportError:
             pytest.skip("TTS module not available")

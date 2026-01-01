@@ -206,8 +206,8 @@ class TestFullPipelineE2E:
             max_chapters=1
         )
         
-        assert result1.get('success') == True
-        assert result1.get('completed', 0) >= 1
+        assert result1.get('success') == True, f"First run failed: {result1.get('error')}"
+        assert result1.get('completed', 0) >= 1, "No chapters completed in first run"
         logger.info(f"✓ First run completed: {result1.get('completed')} chapters")
         
         # Count files from first run
@@ -215,8 +215,10 @@ class TestFullPipelineE2E:
         audio_files1 = list(audio_dir1.glob("chapter_*.mp3"))
         initial_count = len(audio_files1)
         logger.info(f"  Initial audio files: {initial_count}")
+        assert initial_count >= 1, f"Expected at least 1 audio file after first run, found {initial_count}"
         
         # Second run: Resume and process 1 more chapter
+        # Note: skip_if_exists=True by default, so chapter 1 should be skipped
         logger.info("Second run: Resuming and processing 1 more chapter...")
         pipeline2 = ProcessingPipeline(
             project_name=project_name,
@@ -227,10 +229,10 @@ class TestFullPipelineE2E:
             toc_url=test_novel_url,
             novel_url=test_novel_url,
             start_from=1,
-            max_chapters=2  # Should skip chapter 1, process chapter 2
+            max_chapters=1  # Process 1 more chapter (should be chapter 2, skipping chapter 1)
         )
         
-        assert result2.get('success') == True
+        assert result2.get('success') == True, f"Second run failed: {result2.get('error')}"
         logger.info(f"✓ Second run completed: {result2.get('completed')} chapters")
         
         # Verify files
@@ -240,7 +242,16 @@ class TestFullPipelineE2E:
         logger.info(f"  Final audio files: {final_count}")
         
         # Should have 2 files total (chapter 1 from first run, chapter 2 from second run)
+        # Note: The resume logic should skip existing chapters, so we expect exactly 2 files
         assert final_count >= 2, f"Expected at least 2 audio files after resume, found {final_count}"
+        
+        # Verify that chapter 1 file still exists (wasn't reprocessed)
+        chapter1_file = audio_dir2 / "chapter_1.mp3"
+        assert chapter1_file.exists(), "Chapter 1 file should still exist after resume"
+        
+        # Verify that chapter 2 file exists (was processed in second run)
+        chapter2_file = audio_dir2 / "chapter_2.mp3"
+        assert chapter2_file.exists(), "Chapter 2 file should exist after resume"
         
         logger.info("✅ E2E Resume Test PASSED")
 

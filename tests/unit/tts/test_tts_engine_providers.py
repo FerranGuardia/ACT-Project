@@ -359,8 +359,9 @@ class TestTTSEngineProviders:
         mock_provider.supports_chunking.return_value = True
         mock_provider.get_max_text_bytes.return_value = 3000
         mock_provider.supports_ssml.return_value = True
+        mock_provider.get_provider_name.return_value = "edge_tts"
+        # Ensure provider has convert_chunk_async method (required for chunking)
         mock_provider.convert_chunk_async = MagicMock()
-        mock_provider.convert_chunk_async.return_value = True
         
         mock_pm = MagicMock()
         mock_pm.get_provider.return_value = mock_provider
@@ -377,13 +378,9 @@ class TestTTSEngineProviders:
         # Create long text that exceeds limit
         long_text = "A" * 4000  # Exceeds 3000 byte limit
         
-        # Mock chunking methods
-        with patch.object(engine, '_chunk_text', return_value=["chunk1", "chunk2"]), \
-             patch.object(engine, '_merge_audio_chunks', return_value=True), \
-             patch('asyncio.run') as mock_asyncio_run:
-            
-            mock_asyncio_run.return_value = [Path("/tmp/chunk1.mp3"), Path("/tmp/chunk2.mp3")]
-            
+        # Mock the entire _convert_with_chunking to avoid real async execution
+        # This prevents slow async operations while still testing capability checks
+        with patch.object(engine, '_convert_with_chunking', return_value=True) as mock_chunking:
             output_path = Path("/tmp/test_output.mp3")
             result = engine.convert_text_to_speech(
                 text=long_text,
@@ -392,7 +389,9 @@ class TestTTSEngineProviders:
                 provider="edge_tts"
             )
             
-            # Should check capabilities, not hardcoded provider name
+            # Verify chunking was called (which means capabilities were checked)
+            mock_chunking.assert_called_once()
+            # Verify provider capabilities were checked before chunking
             mock_provider.supports_chunking.assert_called()
             mock_provider.get_max_text_bytes.assert_called()
     

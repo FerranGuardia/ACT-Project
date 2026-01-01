@@ -470,7 +470,67 @@ class TTSEngine:
             
             # Convert all chunks in parallel using provider abstraction
             logger.info(f"Converting {len(chunks)} chunks in parallel using {provider_name} provider...")
-            chunk_files = asyncio.run(
+            
+            # Use a helper function to properly clean up event loop
+            def run_async_with_cleanup(coro):
+                """Run async coroutine with proper cleanup"""
+                # Check if there's a running event loop
+                try:
+                    # Python 3.7+ has get_running_loop()
+                    existing_loop = asyncio.get_running_loop()
+                    # If we're in an async context, we can't use asyncio.run()
+                    # This shouldn't happen in normal usage, but log a warning
+                    logger.warning("Event loop already running, this may cause issues")
+                    # Try to use the existing loop (may fail)
+                    return existing_loop.run_until_complete(coro)
+                except RuntimeError:
+                    # No running loop, proceed with creating a new one
+                    pass
+                
+                # Create new event loop and run with proper cleanup
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    return loop.run_until_complete(coro)
+                finally:
+                    # Cancel all pending tasks before closing
+                    try:
+                        if not loop.is_closed():
+                            pending = asyncio.all_tasks(loop)
+                            if pending:
+                                for task in pending:
+                                    task.cancel()
+                                
+                                # Wait for tasks to complete cancellation
+                                try:
+                                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                                except Exception:
+                                    pass  # Ignore errors during task cancellation
+                    except Exception:
+                        pass  # Ignore errors getting tasks
+                    
+                    # Close the loop
+                    try:
+                        if not loop.is_closed():
+                            loop.close()
+                    except Exception:
+                        pass  # Ignore errors closing loop
+                    
+                    # Reset event loop
+                    try:
+                        # Only reset if this loop is still the current one
+                        current_loop = None
+                        try:
+                            current_loop = asyncio.get_event_loop()
+                        except RuntimeError:
+                            pass
+                        
+                        if current_loop is loop:
+                            asyncio.set_event_loop(None)
+                    except Exception:
+                        pass  # Ignore errors resetting event loop
+            
+            chunk_files = run_async_with_cleanup(
                 self._convert_chunks_parallel(
                     chunks=chunks,
                     voice=voice,
