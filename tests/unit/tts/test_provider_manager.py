@@ -17,8 +17,28 @@ import types
 import importlib.util
 
 # Mock external dependencies before importing
-sys.modules["pyttsx3"] = MagicMock()
-sys.modules["edge_tts"] = MagicMock()
+# Create proper async mock for edge_tts.list_voices()
+import asyncio
+
+async def mock_list_voices():
+    """Mock async function that returns a list of voices"""
+    return [
+        {"ShortName": "en-US-AndrewNeural", "FriendlyName": "Andrew", "Locale": "en-US", "Gender": "Male"},
+        {"ShortName": "en-US-JennyNeural", "FriendlyName": "Jenny", "Locale": "en-US", "Gender": "Female"}
+    ]
+
+# Create proper mock for edge_tts module
+mock_edge_tts_module = MagicMock()
+mock_edge_tts_module.list_voices = mock_list_voices
+sys.modules["edge_tts"] = mock_edge_tts_module
+
+# Create proper mock for pyttsx3 module
+mock_pyttsx3_module = MagicMock()
+# Mock pyttsx3.init() to return a mock engine
+mock_engine = MagicMock()
+mock_engine.getProperty.return_value = []  # Empty voices list by default
+mock_pyttsx3_module.init.return_value = mock_engine
+sys.modules["pyttsx3"] = mock_pyttsx3_module
 
 # Mock core.logger
 if "core" not in sys.modules:
@@ -45,25 +65,109 @@ base_provider_module = importlib.util.module_from_spec(spec_base)
 sys.modules["tts.providers.base_provider"] = base_provider_module
 spec_base.loader.exec_module(base_provider_module)
 ProviderType = base_provider_module.ProviderType
+TTSProvider = base_provider_module.TTSProvider
 
-# Load edge_tts_provider and pyttsx3_provider (they have relative imports)
-edge_tts_path = act_src / "tts" / "providers" / "edge_tts_provider.py"
-spec_edge = importlib.util.spec_from_file_location("tts.providers.edge_tts_provider", edge_tts_path)
-if spec_edge is None or spec_edge.loader is None:
-    raise ImportError(f"Could not load spec for edge_tts_provider from {edge_tts_path}")
-edge_tts_module = importlib.util.module_from_spec(spec_edge)
-sys.modules["tts.providers.edge_tts_provider"] = edge_tts_module
-spec_edge.loader.exec_module(edge_tts_module)
+# ============================================================================
+# CRITICAL FIX: Create mock provider classes instead of loading real ones
+# ============================================================================
+# DO NOT load the real provider modules - they execute real initialization code
+# (EdgeTTSProvider.__init__ calls _check_availability() which imports edge_tts,
+#  Pyttsx3Provider.__init__ calls _initialize() which calls pyttsx3.init())
+# Instead, create mock provider classes that match the interface
 
-pyttsx3_path = act_src / "tts" / "providers" / "pyttsx3_provider.py"
-spec_pyttsx3 = importlib.util.spec_from_file_location("tts.providers.pyttsx3_provider", pyttsx3_path)
-if spec_pyttsx3 is None or spec_pyttsx3.loader is None:
-    raise ImportError(f"Could not load spec for pyttsx3_provider from {pyttsx3_path}")
-pyttsx3_module = importlib.util.module_from_spec(spec_pyttsx3)
-sys.modules["tts.providers.pyttsx3_provider"] = pyttsx3_module
-spec_pyttsx3.loader.exec_module(pyttsx3_module)
+class MockEdgeTTSProvider(TTSProvider):
+    """Mock Edge TTS Provider - prevents real initialization"""
+    
+    def __init__(self):
+        """Initialize mock - no real work done"""
+        self._available = False  # Will be set by test via is_available override
+        self._voices_cache = None
+    
+    def get_provider_name(self) -> str:
+        return "edge_tts"
+    
+    def get_provider_type(self):
+        return ProviderType.CLOUD
+    
+    def is_available(self) -> bool:
+        return self._available
+    
+    def get_voices(self, locale=None):
+        return []
+    
+    def convert_text_to_speech(self, text: str, voice: str, output_path: Path, 
+                                rate=None, pitch=None, volume=None) -> bool:
+        return False
+    
+    def supports_rate(self) -> bool:
+        return True
+    
+    def supports_pitch(self) -> bool:
+        return True
+    
+    def supports_volume(self) -> bool:
+        return True
+    
+    def supports_ssml(self) -> bool:
+        return True
+    
+    def supports_chunking(self) -> bool:
+        return True
+    
+    def get_max_text_bytes(self):
+        return 3000
 
-# Note: edge_tts_working_provider removed - no longer needed
+class MockPyttsx3Provider(TTSProvider):
+    """Mock Pyttsx3 Provider - prevents real initialization"""
+    
+    def __init__(self):
+        """Initialize mock - no real work done"""
+        self._available = False  # Will be set by test via is_available override
+        self._voices_cache = None
+    
+    def get_provider_name(self) -> str:
+        return "pyttsx3"
+    
+    def get_provider_type(self):
+        return ProviderType.OFFLINE
+    
+    def is_available(self) -> bool:
+        return self._available
+    
+    def get_voices(self, locale=None):
+        return []
+    
+    def convert_text_to_speech(self, text: str, voice: str, output_path: Path,
+                                rate=None, pitch=None, volume=None) -> bool:
+        return False
+    
+    def supports_rate(self) -> bool:
+        return True
+    
+    def supports_pitch(self) -> bool:
+        return False
+    
+    def supports_volume(self) -> bool:
+        return True
+    
+    def supports_ssml(self) -> bool:
+        return False
+    
+    def supports_chunking(self) -> bool:
+        return False
+    
+    def get_max_text_bytes(self):
+        return None
+
+# Register mock providers in sys.modules BEFORE loading provider_manager
+# This ensures provider_manager imports our mocks instead of real providers
+edge_tts_provider_module = types.ModuleType("tts.providers.edge_tts_provider")
+edge_tts_provider_module.EdgeTTSProvider = MockEdgeTTSProvider
+sys.modules["tts.providers.edge_tts_provider"] = edge_tts_provider_module
+
+pyttsx3_provider_module = types.ModuleType("tts.providers.pyttsx3_provider")
+pyttsx3_provider_module.Pyttsx3Provider = MockPyttsx3Provider
+sys.modules["tts.providers.pyttsx3_provider"] = pyttsx3_provider_module
 
 # Now load provider_manager (it uses relative imports to the above)
 provider_manager_path = act_src / "tts" / "providers" / "provider_manager.py"
