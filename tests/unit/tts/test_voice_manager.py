@@ -67,8 +67,9 @@ class TestVoiceManager:
             
             # All voices should match locale
             for voice in english_voices:
-                locale = voice.get("Locale", "")
-                assert "en" in locale.lower() or "en-US" in locale
+                # Voice dict uses "language" key, not "Locale"
+                language = voice.get("language", "")
+                assert "en" in language.lower() or "en-US" in language
             
         except ImportError:
             pytest.skip("TTS module not available")
@@ -83,11 +84,11 @@ class TestVoiceManager:
             
             if voice:
                 assert isinstance(voice, dict)
-                assert "ShortName" in voice or "Name" in voice
+                # Voice dict uses "id" and "name" keys, not "ShortName" or "Name"
+                voice_id = voice.get("id", "")
+                name = voice.get("name", "")
                 # Should match the requested voice
-                short_name = voice.get("ShortName", "")
-                name = voice.get("Name", "")
-                assert "AndrewNeural" in short_name or "AndrewNeural" in name
+                assert "AndrewNeural" in voice_id or "AndrewNeural" in name or "andrewneural" in voice_id.lower()
             
         except ImportError:
             pytest.skip("TTS module not available")
@@ -142,10 +143,15 @@ class TestVoiceManager:
             
             assert isinstance(voice_list, list)
             
-            # All voices should be English
+            # All voices should be English (verified by locale filter)
+            # Voice list format is "name - gender" (e.g., "Andrew - Male")
+            # We verify English voices by checking that we got results from en-US locale
+            assert len(voice_list) > 0, "Should have at least one English voice"
             for item in voice_list[:5]:  # Check first 5
                 assert isinstance(item, str)
-                assert "en" in item.lower()
+                # Voice list items are formatted as "name - gender", not locale
+                # The locale filter ensures they're English, so we just verify format
+                assert " - " in item, f"Voice list item should be formatted as 'name - gender', got: {item}"
             
         except ImportError:
             pytest.skip("TTS module not available")
