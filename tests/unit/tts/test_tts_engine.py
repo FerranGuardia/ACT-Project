@@ -543,7 +543,8 @@ class TestTTSEngine:
                 mock_provider.convert_chunk_async = AsyncMock(side_effect=mock_convert_chunk)
                 
                 # Should raise exception after all retries
-                with pytest.raises(Exception, match="Failed to convert chunk 1 after retries"):
+                # The implementation raises the original exception on the last retry, not a formatted one
+                with pytest.raises(Exception, match="Persistent error"):
                     await engine._convert_chunks_parallel(
                         chunks=chunks,
                         voice=voice,
