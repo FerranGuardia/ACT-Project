@@ -247,8 +247,10 @@ class TestTTSEngineProviders:
         mock_provider.convert_text_to_speech.return_value = True
         
         mock_pm = MagicMock()
-        # When provider is extracted from voice metadata, get_provider is called
-        mock_pm.get_provider.return_value = mock_provider
+        # Mock get_available_provider for SSML/chunking checks (called but shouldn't affect fallback)
+        mock_pm.get_available_provider.return_value = mock_provider
+        # get_provider should NOT be called when voice has no provider in metadata
+        mock_pm.get_provider.return_value = None  # Should not be called, but if it is, return None
         mock_pm.convert_with_fallback.return_value = True
         mock_pm_class.return_value = mock_pm
         
@@ -272,6 +274,8 @@ class TestTTSEngineProviders:
         call_args = mock_pm.convert_with_fallback.call_args
         # When no provider specified, preferred_provider should be None (allows fallback)
         assert call_args.kwargs.get("preferred_provider") is None
+        # get_provider should NOT be called when voice has no provider in metadata
+        # (it's only called when provider parameter is provided or provider is in voice metadata)
     
     @patch('tts.tts_engine.TTSProviderManager')
     @patch('tts.tts_engine.VoiceManager')
