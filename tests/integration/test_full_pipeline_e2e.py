@@ -230,7 +230,8 @@ class TestFullPipelineE2E:
             toc_url=test_novel_url,
             novel_url=test_novel_url,
             start_from=1,
-            max_chapters=1  # Process 1 more chapter (should be chapter 2, skipping chapter 1)
+            max_chapters=1,  # Process 1 more chapter (should be chapter 2, skipping chapter 1)
+            voice="en-US-AndrewNeural"  # Use same voice as first run
         )
         
         assert result2.get('success') == True, f"Second run failed: {result2.get('error')}"
