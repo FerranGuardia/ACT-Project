@@ -1,42 +1,226 @@
 """
 Centralized UI styles for ACT application.
 
-Based on the Simple_PySide_Base style reference.
+Uses modular theme system - themes are defined in ui/themes/ directory.
 """
 
-from typing import Dict
+from typing import Dict, Optional
 
-# Color palette from reference
-COLORS: Dict[str, str] = {
-    'bg_dark': 'rgb(27, 29, 35)',
-    'bg_medium': 'rgb(39, 44, 54)',
-    'bg_light': 'rgb(44, 49, 60)',
-    'bg_lighter': 'rgb(52, 59, 72)',
-    'bg_hover': 'rgb(33, 37, 43)',
-    'bg_content': 'rgb(40, 44, 52)',
-    'text_primary': 'rgb(210, 210, 210)',
-    'text_secondary': 'rgb(98, 103, 111)',
-    'accent': 'rgb(85, 170, 255)',
-    'accent_hover': 'rgb(105, 180, 255)',
-    'accent_pressed': 'rgb(65, 130, 195)',
-    'border': 'rgb(64, 71, 88)',
-    'border_focus': 'rgb(91, 101, 124)',
-}
+from ui.themes import get_current_theme_id, get_theme
 
-# Font family
-FONT_FAMILY: str = 'Segoe UI'
+# Global font family mapping: maps expected names to actual Qt font family names
+_font_family_map: dict[str, str] = {}
+
+
+def register_font_family_mapping(mapping: dict[str, str]) -> None:
+    """Register font family mapping from MainWindow."""
+    global _font_family_map
+    _font_family_map.update(mapping)
+
+
+def _resolve_font_family(font_family_str: str) -> str:
+    """
+    Resolve font family string to actual Qt font names.
+    
+    Qt stylesheets work best with a single primary font name.
+    Takes the first font from fallback lists like "Inter, Segoe UI"
+    and maps it to the actual Qt-registered name.
+    
+    Args:
+        font_family_str: Font family string from theme (e.g., "Inter, Segoe UI")
+        
+    Returns:
+        Resolved font family string with actual Qt font name (primary font only)
+    """
+    from core.logger import get_logger
+    logger = get_logger("ui.styles")
+    
+    if not font_family_str:
+        return "Segoe UI"
+    
+    # Take the first font name (primary font) - Qt handles fallback automatically
+    font_names = [name.strip() for name in font_family_str.split(",")]
+    primary_font = font_names[0] if font_names else "Segoe UI"
+    
+    # Check if we have a mapping for this font
+    font_key = primary_font.lower()
+    if font_key in _font_family_map:
+        # Use the actual Qt font name
+        resolved = _font_family_map[font_key]
+    else:
+        # Use as-is (might be a system font like "Segoe UI")
+        resolved = primary_font
+    
+    logger.debug(f"Resolved font '{font_family_str}' -> primary: '{resolved}'")
+    return resolved
+
+def _get_theme_data() -> Dict:
+    """
+    Get current theme data (colors + fonts + other settings).
+    
+    Returns:
+        Complete theme dictionary
+    """
+    theme_id = get_current_theme_id()
+    theme = get_theme(theme_id)
+    
+    if not theme:
+        # Fallback to default theme
+        from ui.themes import dark_default
+        theme = dark_default.THEME.copy()
+    
+    return theme
+
+
+def _get_colors() -> Dict[str, str]:
+    """
+    Get current theme colors.
+    
+    Returns:
+        Dictionary of color values from current theme
+    """
+    theme_id = get_current_theme_id()
+    theme = get_theme(theme_id)
+    
+    if not theme:
+        # Fallback to default theme
+        from ui.themes import dark_default
+        theme = dark_default.THEME
+    
+    # Return only color keys (exclude metadata)
+    colors = {}
+    color_keys = [
+        'bg_dark', 'bg_medium', 'bg_light', 'bg_lighter', 'bg_hover', 'bg_content',
+        'text_primary', 'text_secondary',
+        'accent', 'accent_hover', 'accent_pressed',
+        'border', 'border_focus'
+    ]
+    
+    for key in color_keys:
+        if key in theme:
+            colors[key] = theme[key]
+    
+    return colors
+
+
+# COLORS is a property-like accessor that always returns current theme colors
+# This ensures all style functions get the latest theme colors
+def _COLORS() -> Dict[str, str]:
+    """Get current theme colors (called as function to always get latest)."""
+    return _get_colors()
+
+
+# For backward compatibility and easier access, we'll use a class property pattern
+# But simpler: just access via function or use COLORS dict that gets updated
+class _ColorsDict(dict):
+    """Dict-like object that always returns current theme colors."""
+    
+    def __getitem__(self, key: str) -> str:
+        colors = _get_colors()
+        if key not in colors:
+            raise KeyError(f"Color '{key}' not found in current theme")
+        return colors[key]
+    
+    def get(self, key: str, default=None):
+        colors = _get_colors()
+        return colors.get(key, default)
+    
+    def copy(self):
+        return _get_colors().copy()
+    
+    def keys(self):
+        return _get_colors().keys()
+    
+    def values(self):
+        return _get_colors().values()
+    
+    def items(self):
+        return _get_colors().items()
+
+
+# Global COLORS object - always returns current theme colors
+COLORS = _ColorsDict()
+
+
+# Font settings from current theme
+def get_font_family() -> str:
+    """Get font family from current theme, resolved to actual Qt font names."""
+    from core.logger import get_logger
+    logger = get_logger("ui.styles")
+    
+    theme = _get_theme_data()
+    theme_id = get_current_theme_id()
+    font_family_str = theme.get('font_family', 'Segoe UI')
+    resolved = _resolve_font_family(font_family_str)
+    logger.debug(f"Theme '{theme_id}' font: '{font_family_str}' -> resolved: '{resolved}'")
+    return resolved
+
+
+def get_font_size_base() -> str:
+    """Get base font size from current theme."""
+    theme = _get_theme_data()
+    return theme.get('font_size_base', '10pt')
+
+
+def get_font_size_large() -> str:
+    """Get large font size from current theme."""
+    theme = _get_theme_data()
+    return theme.get('font_size_large', '12pt')
+
+
+def get_font_size_small() -> str:
+    """Get small font size from current theme."""
+    theme = _get_theme_data()
+    return theme.get('font_size_small', '9pt')
+
+
+# Helper to get font values for style functions
+def _get_font_values():
+    """Get font family and sizes for use in style functions."""
+    return {
+        'family': get_font_family(),
+        'size_base': get_font_size_base(),
+        'size_large': get_font_size_large(),
+        'size_small': get_font_size_small(),
+    }
+
+# Backward compatibility - create a module-level property-like accessor
+class _FontFamily:
+    """Property-like accessor for font family."""
+    def __str__(self):
+        return get_font_family()
+    
+    def __call__(self):
+        return get_font_family()
+
+FONT_FAMILY = _FontFamily()
 
 
 def get_main_window_style() -> str:
     """Get the main window stylesheet."""
+    # Get current colors for tooltip
+    bg_dark = COLORS['bg_dark']
+    text_primary = COLORS['text_primary']
+    border = COLORS['border']
+    
+    # Convert rgb() to rgba() for tooltip background
+    # Extract RGB values from 'rgb(r, g, b)' format
+    import re
+    rgb_match = re.search(r'rgb\((\d+),\s*(\d+),\s*(\d+)\)', bg_dark)
+    if rgb_match:
+        r, g, b = rgb_match.groups()
+        bg_dark_rgba = f'rgba({r}, {g}, {b}, 200)'
+    else:
+        bg_dark_rgba = 'rgba(27, 29, 35, 200)'
+    
     return f"""
     QMainWindow {{
         background: transparent;
     }}
     QToolTip {{
-        color: #ffffff;
-        background-color: rgba(27, 29, 35, 160);
-        border: 1px solid rgb(40, 40, 40);
+        color: {text_primary};
+        background-color: {bg_dark_rgba};
+        border: 1px solid {border};
         border-radius: 2px;
     }}
     """
@@ -54,23 +238,27 @@ def get_central_widget_style() -> str:
 
 def get_button_standard_style() -> str:
     """Get standard button style."""
+    font_family = get_font_family()
+    font_size = get_font_size_base()
+    theme_id = get_current_theme_id()
     return f"""
+    /* Theme: {theme_id} */
     QPushButton {{
         border: 2px solid {COLORS['bg_lighter']};
         border-radius: 5px;
         background-color: {COLORS['bg_lighter']};
         color: {COLORS['text_primary']};
         padding: 5px 10px;
-        font-family: '{FONT_FAMILY}';
-        font-size: 10pt;
+        font-family: '{font_family}';
+        font-size: {font_size};
     }}
     QPushButton:hover {{
-        background-color: rgb(57, 65, 80);
-        border: 2px solid rgb(61, 70, 86);
+        background-color: {COLORS['bg_light']};
+        border: 2px solid {COLORS['border']};
     }}
     QPushButton:pressed {{
-        background-color: rgb(35, 40, 49);
-        border: 2px solid rgb(43, 50, 61);
+        background-color: {COLORS['bg_dark']};
+        border: 2px solid {COLORS['border_focus']};
     }}
     QPushButton:disabled {{
         background-color: {COLORS['bg_dark']};
@@ -82,15 +270,19 @@ def get_button_standard_style() -> str:
 
 def get_button_primary_style() -> str:
     """Get primary/accent button style."""
+    font_family = get_font_family()
+    font_size = get_font_size_base()
+    theme_id = get_current_theme_id()
     return f"""
+    /* Theme: {theme_id} */
     QPushButton {{
         border: none;
         border-radius: 5px;
         background-color: {COLORS['accent']};
         color: white;
         padding: 6px 12px;
-        font-family: '{FONT_FAMILY}';
-        font-size: 10pt;
+        font-family: '{font_family}';
+        font-size: {font_size};
         font-weight: bold;
     }}
     QPushButton:hover {{
@@ -108,6 +300,7 @@ def get_button_primary_style() -> str:
 
 def get_line_edit_style() -> str:
     """Get line edit style."""
+    fonts = _get_font_values()
     return f"""
     QLineEdit {{
         background-color: {COLORS['bg_dark']};
@@ -118,8 +311,8 @@ def get_line_edit_style() -> str:
         padding-top: 5px;
         padding-bottom: 5px;
         color: {COLORS['text_primary']};
-        font-family: '{FONT_FAMILY}';
-        font-size: 10pt;
+        font-family: '{fonts['family']}';
+        font-size: {fonts['size_base']};
     }}
     QLineEdit:hover {{
         border: 2px solid {COLORS['border']};
@@ -132,6 +325,7 @@ def get_line_edit_style() -> str:
 
 def get_combo_box_style() -> str:
     """Get combo box style."""
+    fonts = _get_font_values()
     return f"""
     QComboBox {{
         background-color: {COLORS['bg_dark']};
@@ -140,8 +334,8 @@ def get_combo_box_style() -> str:
         padding: 5px;
         padding-left: 10px;
         color: {COLORS['text_primary']};
-        font-family: '{FONT_FAMILY}';
-        font-size: 10pt;
+        font-family: '{fonts['family']}';
+        font-size: {fonts['size_base']};
     }}
     QComboBox:hover {{
         border: 2px solid {COLORS['border']};
@@ -183,7 +377,7 @@ def get_scrollbar_style() -> str:
     }}
     QScrollBar::add-line:horizontal {{
         border: none;
-        background: rgb(55, 63, 77);
+        background: {COLORS['bg_medium']};
         width: 20px;
         border-top-right-radius: 7px;
         border-bottom-right-radius: 7px;
@@ -192,7 +386,7 @@ def get_scrollbar_style() -> str:
     }}
     QScrollBar::sub-line:horizontal {{
         border: none;
-        background: rgb(55, 63, 77);
+        background: {COLORS['bg_medium']};
         width: 20px;
         border-top-left-radius: 7px;
         border-bottom-left-radius: 7px;
@@ -219,7 +413,7 @@ def get_scrollbar_style() -> str:
     }}
     QScrollBar::add-line:vertical {{
         border: none;
-        background: rgb(55, 63, 77);
+        background: {COLORS['bg_medium']};
         height: 20px;
         border-bottom-left-radius: 7px;
         border-bottom-right-radius: 7px;
@@ -228,7 +422,7 @@ def get_scrollbar_style() -> str:
     }}
     QScrollBar::sub-line:vertical {{
         border: none;
-        background: rgb(55, 63, 77);
+        background: {COLORS['bg_medium']};
         height: 20px;
         border-top-left-radius: 7px;
         border-top-right-radius: 7px;
@@ -246,6 +440,7 @@ def get_scrollbar_style() -> str:
 
 def get_checkbox_style() -> str:
     """Get checkbox style."""
+    fonts = _get_font_values()
     return f"""
     QCheckBox::indicator {{
         border: 3px solid {COLORS['bg_lighter']};
@@ -255,7 +450,7 @@ def get_checkbox_style() -> str:
         background: {COLORS['bg_light']};
     }}
     QCheckBox::indicator:hover {{
-        border: 3px solid rgb(58, 66, 81);
+        border: 3px solid {COLORS['border']};
     }}
     QCheckBox::indicator:checked {{
         background: 3px solid {COLORS['bg_lighter']};
@@ -264,14 +459,15 @@ def get_checkbox_style() -> str:
     }}
     QCheckBox {{
         color: {COLORS['text_primary']};
-        font-family: '{FONT_FAMILY}';
-        font-size: 10pt;
+        font-family: '{fonts['family']}';
+        font-size: {fonts['size_base']};
     }}
     """
 
 
 def get_radio_button_style() -> str:
     """Get radio button style."""
+    fonts = _get_font_values()
     return f"""
     QRadioButton::indicator {{
         border: 3px solid {COLORS['bg_lighter']};
@@ -281,16 +477,16 @@ def get_radio_button_style() -> str:
         background: {COLORS['bg_light']};
     }}
     QRadioButton::indicator:hover {{
-        border: 3px solid rgb(58, 66, 81);
+        border: 3px solid {COLORS['border']};
     }}
     QRadioButton::indicator:checked {{
-        background: 3px solid rgb(94, 106, 130);
+        background: 3px solid {COLORS['accent']};
         border: 3px solid {COLORS['bg_lighter']};
     }}
     QRadioButton {{
         color: {COLORS['text_primary']};
-        font-family: '{FONT_FAMILY}';
-        font-size: 10pt;
+        font-family: '{fonts['family']}';
+        font-size: {fonts['size_base']};
     }}
     """
 
@@ -305,7 +501,7 @@ def get_slider_style() -> str:
         background-color: {COLORS['bg_lighter']};
     }}
     QSlider::groove:horizontal:hover {{
-        background-color: rgb(55, 62, 76);
+        background-color: {COLORS['bg_light']};
     }}
     QSlider::handle:horizontal {{
         background-color: {COLORS['accent']};
@@ -328,7 +524,7 @@ def get_slider_style() -> str:
         background-color: {COLORS['bg_lighter']};
     }}
     QSlider::groove:vertical:hover {{
-        background-color: rgb(55, 62, 76);
+        background-color: {COLORS['bg_light']};
     }}
     QSlider::handle:vertical {{
         background-color: {COLORS['accent']};
@@ -349,6 +545,7 @@ def get_slider_style() -> str:
 
 def get_group_box_style() -> str:
     """Get group box style."""
+    fonts = _get_font_values()
     return f"""
     QGroupBox {{
         border: 2px solid {COLORS['bg_medium']};
@@ -356,8 +553,8 @@ def get_group_box_style() -> str:
         margin-top: 10px;
         padding-top: 10px;
         color: {COLORS['text_primary']};
-        font-family: '{FONT_FAMILY}';
-        font-size: 11pt;
+        font-family: '{fonts['family']}';
+        font-size: {fonts['size_large']};
         font-weight: bold;
     }}
     QGroupBox::title {{
@@ -371,6 +568,7 @@ def get_group_box_style() -> str:
 
 def get_list_widget_style() -> str:
     """Get list widget style."""
+    fonts = _get_font_values()
     return f"""
     QListWidget {{
         background-color: {COLORS['bg_dark']};
@@ -378,8 +576,8 @@ def get_list_widget_style() -> str:
         border: 2px solid {COLORS['bg_dark']};
         padding: 5px;
         color: {COLORS['text_primary']};
-        font-family: '{FONT_FAMILY}';
-        font-size: 10pt;
+        font-family: '{fonts['family']}';
+        font-size: {fonts['size_base']};
     }}
     QListWidget::item {{
         padding: 5px;
@@ -398,6 +596,7 @@ def get_list_widget_style() -> str:
 
 def get_progress_bar_style() -> str:
     """Get progress bar style."""
+    fonts = _get_font_values()
     return f"""
     QProgressBar {{
         border: 2px solid {COLORS['bg_lighter']};
@@ -405,8 +604,8 @@ def get_progress_bar_style() -> str:
         text-align: center;
         background-color: {COLORS['bg_dark']};
         color: {COLORS['text_primary']};
-        font-family: '{FONT_FAMILY}';
-        font-size: 10pt;
+        font-family: '{fonts['family']}';
+        font-size: {fonts['size_base']};
     }}
     QProgressBar::chunk {{
         background-color: {COLORS['accent']};
@@ -417,17 +616,19 @@ def get_progress_bar_style() -> str:
 
 def get_label_style() -> str:
     """Get label style."""
+    fonts = _get_font_values()
     return f"""
     QLabel {{
         color: {COLORS['text_primary']};
-        font-family: '{FONT_FAMILY}';
-        font-size: 10pt;
+        font-family: '{fonts['family']}';
+        font-size: {fonts['size_base']};
     }}
     """
 
 
 def get_plain_text_edit_style() -> str:
     """Get plain text edit style."""
+    fonts = _get_font_values()
     return f"""
     QPlainTextEdit {{
         background-color: {COLORS['bg_dark']};
@@ -435,8 +636,8 @@ def get_plain_text_edit_style() -> str:
         padding: 10px;
         border: 2px solid {COLORS['bg_dark']};
         color: {COLORS['text_primary']};
-        font-family: '{FONT_FAMILY}';
-        font-size: 10pt;
+        font-family: '{fonts['family']}';
+        font-size: {fonts['size_base']};
     }}
     QPlainTextEdit:hover {{
         border: 2px solid {COLORS['border']};
@@ -450,6 +651,7 @@ def get_plain_text_edit_style() -> str:
 
 def get_spin_box_style() -> str:
     """Get spin box style."""
+    fonts = _get_font_values()
     return f"""
     QSpinBox {{
         background-color: {COLORS['bg_dark']};
@@ -458,8 +660,8 @@ def get_spin_box_style() -> str:
         padding: 5px;
         padding-left: 10px;
         color: {COLORS['text_primary']};
-        font-family: '{FONT_FAMILY}';
-        font-size: 10pt;
+        font-family: '{fonts['family']}';
+        font-size: {fonts['size_base']};
     }}
     QSpinBox:hover {{
         border: 2px solid {COLORS['border']};
@@ -480,6 +682,7 @@ def get_spin_box_style() -> str:
 
 def get_tab_widget_style() -> str:
     """Get tab widget style."""
+    fonts = _get_font_values()
     return f"""
     QTabWidget::pane {{
         border: 1px solid {COLORS['border']};
@@ -499,8 +702,8 @@ def get_tab_widget_style() -> str:
         border-top-right-radius: 5px;
         padding: 8px 20px;
         margin-right: 2px;
-        font-family: '{FONT_FAMILY}';
-        font-size: 10pt;
+        font-family: '{fonts['family']}';
+        font-size: {fonts['size_base']};
     }}
     QTabBar::tab:selected {{
         background-color: {COLORS['bg_dark']};
@@ -515,7 +718,10 @@ def get_tab_widget_style() -> str:
 
 def get_global_style() -> str:
     """Get global application stylesheet."""
+    # Add theme identifier comment to force Qt to see it as different
+    theme_id = get_current_theme_id()
     return f"""
+    /* Theme: {theme_id} */
     {get_main_window_style()}
     {get_central_widget_style()}
     {get_scrollbar_style()}
@@ -547,3 +753,58 @@ def get_card_style() -> str:
     }}
     """
 
+
+def get_toolbar_style() -> str:
+    """Get toolbar style."""
+    return f"""
+    QToolBar {{
+        background-color: {COLORS['bg_dark']};
+        border: none;
+        spacing: 5px;
+    }}
+    """
+
+
+def get_queue_item_style() -> str:
+    """Get queue item widget style."""
+    return f"""
+    QWidget {{
+        background-color: {COLORS['bg_medium']};
+        border: 1px solid {COLORS['bg_light']};
+        border-radius: 5px;
+    }}
+    """
+
+
+def get_icon_container_style() -> str:
+    """Get icon container style for queue items."""
+    return f"""
+    QLabel {{
+        background-color: {COLORS['bg_light']};
+        border-radius: 5px;
+    }}
+    """
+
+
+def get_status_label_style() -> str:
+    """Get status label style."""
+    fonts = _get_font_values()
+    return f"""
+    QLabel {{
+        color: {COLORS['text_primary']};
+        font-family: '{fonts['family']}';
+        font-size: {fonts['size_base']};
+    }}
+    """
+
+
+def get_secondary_text_style() -> str:
+    """Get secondary text label style (for less prominent text)."""
+    fonts = _get_font_values()
+    return f"""
+    QLabel {{
+        color: {COLORS['text_secondary']};
+        font-family: '{fonts['family']}';
+        font-size: {fonts['size_base']};
+    }}
+    """

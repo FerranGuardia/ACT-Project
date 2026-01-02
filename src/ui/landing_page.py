@@ -1,139 +1,282 @@
 """
-Landing page for ACT - Mode selection screen.
+Landing page for ACT - Mode selection screen with genre customization.
 
-This is the first page users see, with buttons for each tool/mode.
+Enhanced design with card-based buttons and genre presets support.
 """
 
 from pathlib import Path
 from typing import Optional, Callable
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont, QPixmap
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
+    QGraphicsDropShadowEffect, QFrame, QComboBox
+)
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QFont, QPixmap, QColor
 
 from core.logger import get_logger
-from ui.styles import COLORS, FONT_FAMILY
+from ui.styles import COLORS, get_font_family
+from ui.themes.genre_presets import get_available_genres, get_genre_preset
 
 logger = get_logger("ui.landing_page")
 
 
-class ModeButton(QPushButton):
+class GenreCard(QFrame):
     """
-    Large button for mode selection with title and description.
-    
-    Each button has:
-    - Title
-    - Description
-    - Click action
+    Card-style button with enhanced visual design.
+    Features:
+    - Shadow effects
+    - Smooth hover animations
+    - Icon support
+    - Genre-specific styling
     """
     
-    def __init__(self, title: str, description: str, callback: Optional[Callable[[], None]] = None, parent: Optional[QWidget] = None):
+    def __init__(self, title: str, description: str, icon: Optional[str] = None, 
+                 callback: Optional[Callable[[], None]] = None, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.title = title
         self.callback = callback
-        self.setup_ui(title, description)
+        self.setup_ui(title, description, icon)
     
-    def setup_ui(self, title: str, description: str):
-        """Set up the button UI."""
-        # Create custom layout for button content
-        button_layout = QVBoxLayout()
-        button_layout.setSpacing(5)
-        button_layout.setContentsMargins(20, 15, 20, 15)
+    def setup_ui(self, title: str, description: str, icon: Optional[str]):
+        """Set up the card UI."""
+        # Card properties
+        self.setMinimumHeight(120)
+        self.setMaximumHeight(140)
+        self.setFrameShape(QFrame.Shape.NoFrame)
+        
+        # Add shadow effect
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(20)
+        shadow.setXOffset(0)
+        shadow.setYOffset(4)
+        shadow.setColor(QColor(0, 0, 0, 80))
+        self.setGraphicsEffect(shadow)
+        
+        # Main layout
+        card_layout = QHBoxLayout()
+        card_layout.setSpacing(20)
+        card_layout.setContentsMargins(25, 20, 25, 20)
+        
+        # Icon area
+        if icon:
+            icon_label = QLabel(icon)
+            icon_label.setFont(QFont(get_font_family(), 32))
+            icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            icon_label.setStyleSheet("background: transparent;")
+            icon_label.setFixedWidth(60)
+            card_layout.addWidget(icon_label)
+        
+        # Text content
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(8)
+        text_layout.setContentsMargins(0, 0, 0, 0)
         
         # Title
         title_label = QLabel(title)
-        title_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        title_label.setFont(QFont(FONT_FAMILY, 16, QFont.Weight.Bold))
-        title_label.setStyleSheet("color: white; background: transparent;")
+        title_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        title_font = QFont(get_font_family(), 18, QFont.Weight.Bold)
+        title_label.setFont(title_font)
+        title_label.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
         
         # Description
         desc_label = QLabel(description)
-        desc_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        desc_label.setFont(QFont(FONT_FAMILY, 11))
-        desc_label.setStyleSheet("color: rgb(200, 200, 200); background: transparent;")
+        desc_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        desc_label.setFont(QFont(get_font_family(), 11))
+        desc_label.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
         desc_label.setWordWrap(True)
         
-        button_layout.addWidget(title_label)
-        button_layout.addWidget(desc_label)
+        text_layout.addWidget(title_label)
+        text_layout.addStretch()
+        text_layout.addWidget(desc_label)
         
-        # Create container widget
-        container = QWidget()
-        container.setLayout(button_layout)
-        container.setStyleSheet("background: transparent;")
+        card_layout.addLayout(text_layout, 1)
         
-        # Set button properties
-        self.setMinimumHeight(100)
+        # Arrow indicator
+        arrow_label = QLabel("→")
+        arrow_label.setFont(QFont(get_font_family(), 24))
+        arrow_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        arrow_label.setStyleSheet(f"color: {COLORS['accent']}; background: transparent;")
+        arrow_label.setFixedWidth(40)
+        card_layout.addWidget(arrow_label)
+        
+        self.setLayout(card_layout)
+        
+        # Styling
+        self.update_style()
+        
+        # Make clickable
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+    
+    def update_style(self):
+        """Update card style based on current theme."""
+        # Use bg_content for a lighter, more vibrant background
+        bg_color = COLORS.get('bg_content', COLORS['bg_medium'])
+        
         self.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLORS['bg_medium']};
+            QFrame {{
+                background-color: {bg_color};
                 border: 2px solid {COLORS['bg_light']};
-                border-radius: 8px;
-                text-align: left;
-                padding: 0px;
+                border-radius: 12px;
             }}
-            QPushButton:hover {{
+            QFrame:hover {{
                 background-color: {COLORS['bg_light']};
                 border: 2px solid {COLORS['accent']};
-            }}
-            QPushButton:pressed {{
-                background-color: {COLORS['accent']};
-                border: 2px solid {COLORS['accent_hover']};
+                border-width: 2px;
             }}
         """)
-        
-        # Set the container as button content
-        layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(container)
-        self.setLayout(layout)
-        
-        self.clicked.connect(self._on_clicked)
     
-    def _on_clicked(self):
-        """Handle button click."""
+    def mousePressEvent(self, event):
+        """Handle mouse press."""
         if self.callback:
             self.callback()
+        super().mousePressEvent(event)
+    
+    def enterEvent(self, event):
+        """Handle mouse enter - animate shadow."""
+        shadow = self.graphicsEffect()
+        if shadow:
+            shadow.setBlurRadius(30)
+            shadow.setColor(QColor(0, 0, 0, 100))
+        super().enterEvent(event)
+    
+    def leaveEvent(self, event):
+        """Handle mouse leave - restore shadow."""
+        shadow = self.graphicsEffect()
+        if shadow:
+            shadow.setBlurRadius(20)
+            shadow.setColor(QColor(0, 0, 0, 80))
+        super().leaveEvent(event)
 
 
 class LandingPage(QWidget):
     """
-    Landing page with mode selection buttons.
-    
-    Displays buttons for:
-    - Scraper
-    - TTS
-    - Audio Merger
-    - Full Automation (URL to Audio)
+    Enhanced landing page with genre customization support.
     """
+    
+    genre_changed = Signal(str)  # Emitted when genre changes
     
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.navigation_callback: Optional[Callable[[str], None]] = None
+        self.current_genre: str = "default"
+        self.cards: list[GenreCard] = []
         self.setup_ui()
         logger.info("Landing page initialized")
     
     def set_navigation_callback(self, callback: Callable[[str], None]) -> None:
-        """Set callback for navigation (called with mode name)."""
+        """Set callback for navigation."""
         self.navigation_callback = callback
     
     def setup_ui(self):
         """Set up the landing page UI."""
         main_layout = QVBoxLayout()
-        main_layout.setSpacing(30)
-        main_layout.setContentsMargins(40, 40, 40, 40)
+        main_layout.setSpacing(40)
+        main_layout.setContentsMargins(60, 50, 60, 50)
         
-        # Set background color
+        # Apply background with lighter color
+        self.update_background()
+        
+        # Header section with genre selector
+        header_layout = QVBoxLayout()
+        header_layout.setSpacing(15)
+        header_layout.setContentsMargins(0, 0, 0, 20)
+        
+        # Top bar with genre selector
+        top_bar = QHBoxLayout()
+        top_bar.addStretch()
+        
+        # Genre selector
+        genre_label = QLabel("Genre Style:")
+        genre_label.setFont(QFont(get_font_family(), 10))
+        genre_label.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
+        
+        self.genre_combo = QComboBox()
+        self.genre_combo.setMinimumWidth(200)
+        genres = get_available_genres()
+        for genre_id, genre_data in genres.items():
+            self.genre_combo.addItem(genre_data['name'], genre_id)
+        self.genre_combo.setCurrentText("Default")
+        self.genre_combo.currentIndexChanged.connect(self._on_genre_changed)
+        
+        # Style the combo box
+        from ui.styles import get_combo_box_style
+        self.genre_combo.setStyleSheet(get_combo_box_style())
+        
+        top_bar.addWidget(genre_label)
+        top_bar.addWidget(self.genre_combo)
+        top_bar.addStretch()
+        
+        header_layout.addLayout(top_bar)
+        
+        # Logo
+        self.add_logo(header_layout)
+        
+        # Title with subtitle
+        title_container = QVBoxLayout()
+        title_container.setSpacing(5)
+        
+        title_label = QLabel("Choose Your Tool")
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title_font = QFont(get_font_family(), 32, QFont.Weight.Bold)
+        title_label.setFont(title_font)
+        title_label.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent; padding: 10px;")
+        
+        subtitle_label = QLabel("Select a mode to begin your audiobook creation journey")
+        subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        subtitle_label.setFont(QFont(get_font_family(), 13))
+        subtitle_label.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
+        
+        title_container.addWidget(title_label)
+        title_container.addWidget(subtitle_label)
+        header_layout.addLayout(title_container)
+        
+        main_layout.addLayout(header_layout)
+        
+        # Mode cards - use vertical layout
+        cards_container = QWidget()
+        cards_layout = QVBoxLayout()
+        cards_layout.setSpacing(20)
+        cards_layout.setContentsMargins(80, 0, 80, 0)
+        
+        # Create mode cards
+        modes = [
+            ("Scraper", "Extract text content from webnovels and stories", "📖", "scraper"),
+            ("Text-to-Speech", "Convert text files into natural-sounding audio", "🎙️", "tts"),
+            ("Audio Merger", "Combine multiple audio files into seamless chapters", "🔊", "merger"),
+            ("Full Automation", "Complete pipeline: Scrape → TTS → Merge in one go", "⚡", "full_auto"),
+        ]
+        
+        for title, desc, icon, mode_id in modes:
+            card = GenreCard(
+                title, desc, icon,
+                callback=lambda m=mode_id: self.navigate_to_mode(m)
+            )
+            self.cards.append(card)
+            cards_layout.addWidget(card)
+        
+        cards_layout.addStretch()
+        cards_container.setLayout(cards_layout)
+        main_layout.addWidget(cards_container, 1)
+        
+        self.setLayout(main_layout)
+    
+    def update_background(self):
+        """Update background with current theme/genre settings."""
+        # Use bg_content for a lighter, more vibrant background instead of pure bg_dark
+        bg_color = COLORS.get('bg_content', COLORS['bg_dark'])
+        
         self.setStyleSheet(f"""
             QWidget {{
-                background-color: {COLORS['bg_dark']};
+                background-color: {bg_color};
             }}
         """)
-        
-        # Logo - add at the top
-        # Try multiple possible filenames and paths
+    
+    def add_logo(self, layout: QVBoxLayout):
+        """Add logo to layout."""
         possible_filenames = ["logo atc 1.png", "logo.png", "logo_atc_1.png"]
         possible_paths = [
-            Path(__file__).parent / "images",  # Relative to this file
-            Path(__file__).parent.parent.parent / "src" / "ui" / "images",  # From project root
+            Path(__file__).parent / "images",
+            Path(__file__).parent.parent.parent / "src" / "ui" / "images",
         ]
         
         logo_path = None
@@ -150,79 +293,56 @@ class LandingPage(QWidget):
             logo_label = QLabel()
             pixmap = QPixmap(str(logo_path))
             if not pixmap.isNull():
-                # Scale logo to reasonable size (max 200px height, maintain aspect ratio)
-                original_height = pixmap.height()
-                original_width = pixmap.width()
-                
-                if original_height > 200:
+                if pixmap.height() > 200:
                     pixmap = pixmap.scaledToHeight(200, Qt.TransformationMode.SmoothTransformation)
-                elif original_width > 400:
+                elif pixmap.width() > 400:
                     pixmap = pixmap.scaledToWidth(400, Qt.TransformationMode.SmoothTransformation)
                 
                 logo_label.setPixmap(pixmap)
                 logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 logo_label.setStyleSheet("background: transparent; padding: 20px;")
-                logo_label.setScaledContents(False)  # We handle scaling manually
-                logo_label.setMinimumHeight(pixmap.height() + 40)  # Ensure space for logo
+                logo_label.setScaledContents(False)
+                logo_label.setMinimumHeight(pixmap.height() + 40)
                 logo_label.setMinimumWidth(pixmap.width() + 40)
-                logo_label.show()  # Explicitly show the label
-                main_layout.addWidget(logo_label)
-                logger.info(f"✓ Loaded logo from {logo_path.absolute()} (original: {original_width}x{original_height}, displayed: {pixmap.width()}x{pixmap.height()})")
-            else:
-                logger.error(f"✗ Failed to load logo pixmap from {logo_path.absolute()} - pixmap is null")
-        else:
-            # Log all attempted paths for debugging
-            logger.warning(f"✗ Logo not found. Tried paths:")
-            for path in possible_paths:
-                abs_path = path.absolute()
-                exists = path.exists()
-                logger.warning(f"  - {abs_path} (exists: {exists})")
+                layout.addWidget(logo_label)
+                logger.info(f"✓ Loaded logo from {logo_path.absolute()}")
+    
+    def _on_genre_changed(self, index: int):
+        """Handle genre selection change."""
+        genre_id = self.genre_combo.itemData(index)
+        if genre_id:
+            self.current_genre = genre_id
+            self.genre_changed.emit(genre_id)
+            logger.info(f"Genre changed to: {genre_id}")
+    
+    def refresh_styles(self):
+        """Refresh styles after theme change."""
+        from ui.styles import COLORS, get_combo_box_style
         
-        # Title
-        title_label = QLabel("Choose Your Mode")
-        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title_label.setFont(QFont(FONT_FAMILY, 24, QFont.Weight.Bold))
-        title_label.setStyleSheet(f"color: {COLORS['text_primary']};")
-        main_layout.addWidget(title_label)
+        self.update_background()
         
-        # Mode buttons - vertical list
-        buttons_layout = QVBoxLayout()
-        buttons_layout.setSpacing(15)
-        buttons_layout.setContentsMargins(100, 20, 100, 20)
+        # Update genre combo box
+        if hasattr(self, 'genre_combo'):
+            self.genre_combo.setStyleSheet(get_combo_box_style())
         
-        scraper_btn = ModeButton(
-            "Scraper",
-            "Extract text content from webnovels",
-            callback=lambda: self.navigate_to_mode("scraper")
-        )
-        tts_btn = ModeButton(
-            "Text-to-Speech",
-            "Convert text files to audio",
-            callback=lambda: self.navigate_to_mode("tts")
-        )
-        merger_btn = ModeButton(
-            "Audio Merger",
-            "Combine multiple audio files into one",
-            callback=lambda: self.navigate_to_mode("merger")
-        )
-        full_auto_btn = ModeButton(
-            "Full Automation",
-            "Complete pipeline: Scrape → TTS → Merge",
-            callback=lambda: self.navigate_to_mode("full_auto")
-        )
+        # Update all cards
+        for card in self.cards:
+            card.update_style()
         
-        buttons_layout.addWidget(scraper_btn)
-        buttons_layout.addWidget(tts_btn)
-        buttons_layout.addWidget(merger_btn)
-        buttons_layout.addWidget(full_auto_btn)
-        buttons_layout.addStretch()
+        # Update labels
+        for widget in self.findChildren(QLabel):
+            text = widget.text()
+            if "Choose Your Tool" in text:
+                widget.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent; padding: 10px;")
+            elif "Select a mode" in text:
+                widget.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
+            elif "Genre Style" in text:
+                widget.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
         
-        main_layout.addLayout(buttons_layout)
-        
-        # Add stretch to center everything
-        main_layout.addStretch()
-        
-        self.setLayout(main_layout)
+        self.style().unpolish(self)
+        self.style().polish(self)
+        self.update()
+        self.repaint()
     
     def navigate_to_mode(self, mode: str):
         """Navigate to the specified mode."""
