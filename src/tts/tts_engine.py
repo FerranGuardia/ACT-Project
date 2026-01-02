@@ -43,21 +43,8 @@ def format_chapter_intro(chapter_title: str, content: str, provider: Optional[st
     # Providers that support SSML (like Edge TTS) will handle breaks via SSML elsewhere
     # Format: "... " (ellipsis space) creates pause, then title with period, then another pause
     # Note: The text cleaner normalizes ". . ." to "...", so we use "..." directly
-    
-    # Check provider capabilities if provider name is provided
-    use_ellipsis = True  # Default to ellipsis for backward compatibility
-    if provider:
-        try:
-            from .providers.provider_manager import TTSProviderManager
-            temp_manager = TTSProviderManager()
-            provider_instance = temp_manager.get_provider(provider)
-            if provider_instance and provider_instance.supports_ssml():
-                # Provider supports SSML, but we still use ellipsis here for consistency
-                # SSML breaks are handled in build_ssml() function
-                use_ellipsis = True
-        except Exception:
-            # If provider check fails, default to ellipsis
-            pass
+    # The provider parameter is kept for API compatibility but doesn't affect the output format
+    # as SSML breaks are handled in build_ssml() function
     
     # Use ellipsis format (works for all providers)
     return f"... {chapter_title}. ... {content}"

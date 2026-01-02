@@ -21,7 +21,7 @@ from core.logger import get_logger
 from ui.styles import (
     get_button_primary_style, get_button_standard_style, get_line_edit_style,
     get_group_box_style, get_list_widget_style, get_progress_bar_style,
-    get_spin_box_style, COLORS, FONT_FAMILY
+    get_spin_box_style, get_status_label_style, COLORS, get_font_family
 )
 
 logger = get_logger("ui.merger_view")
@@ -236,6 +236,29 @@ class MergerView(QWidget):
         self._connect_handlers()
         logger.info("Merger view initialized")
     
+    def refresh_styles(self):
+        """Refresh styles after theme change."""
+        # Get fresh colors
+        from ui.styles import COLORS, get_button_primary_style
+        
+        # Update background - clear first to force refresh
+        self.setStyleSheet("")
+        self.setStyleSheet(f"QWidget {{ background-color: {COLORS['bg_dark']}; }}")
+        
+        # Update back button
+        self.back_button.setStyleSheet("")  # Clear first
+        self.back_button.setStyleSheet(get_button_primary_style())
+        
+        # Refresh all child widgets if they have refresh_styles method
+        from PySide6.QtWidgets import QWidget
+        for widget in self.findChildren(QWidget):
+            if hasattr(widget, 'refresh_styles'):
+                widget.refresh_styles()
+        
+        # Force Qt update
+        self.update()
+        self.repaint()
+    
     def setup_ui(self):
         """Set up the merger view UI."""
         main_layout = QVBoxLayout()
@@ -324,7 +347,7 @@ class MergerView(QWidget):
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self.status_label = QLabel("Ready")
-        self.status_label.setStyleSheet("color: white;")
+        self.status_label.setStyleSheet(get_status_label_style())
         progress_layout.addWidget(self.progress_bar)
         progress_layout.addWidget(self.status_label)
         progress_group.setLayout(progress_layout)

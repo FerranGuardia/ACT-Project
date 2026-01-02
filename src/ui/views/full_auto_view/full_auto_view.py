@@ -52,6 +52,29 @@ class FullAutoView(QWidget):
         self._load_queue()  # Load saved queue on startup
         logger.info("Full Auto view initialized")
     
+    def refresh_styles(self):
+        """Refresh styles after theme change."""
+        # Get fresh colors
+        from ui.styles import COLORS, get_button_primary_style
+        
+        # Update background - clear first to force refresh
+        self.setStyleSheet("")
+        self.setStyleSheet(f"QWidget {{ background-color: {COLORS['bg_dark']}; }}")
+        
+        # Update back button
+        self.back_button.setStyleSheet("")  # Clear first
+        self.back_button.setStyleSheet(get_button_primary_style())
+        
+        # Refresh all child widgets if they have refresh_styles method
+        from PySide6.QtWidgets import QWidget
+        for widget in self.findChildren(QWidget):
+            if hasattr(widget, 'refresh_styles'):
+                widget.refresh_styles()
+        
+        # Force Qt update
+        self.update()
+        self.repaint()
+    
     def setup_ui(self):
         """Set up the full automation view UI."""
         main_layout = QVBoxLayout()

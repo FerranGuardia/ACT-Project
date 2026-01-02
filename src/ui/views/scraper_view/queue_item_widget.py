@@ -7,6 +7,11 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
+from ui.styles import (
+    get_queue_item_style, get_icon_container_style,
+    get_status_label_style, get_secondary_text_style,
+    get_font_family, get_font_size_large
+)
 
 
 class ScraperQueueItemWidget(QWidget):
@@ -29,22 +34,25 @@ class ScraperQueueItemWidget(QWidget):
         icon_label = QLabel("📄")
         icon_label.setMinimumSize(60, 60)
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_label.setStyleSheet("background-color: #3a3a3a; border-radius: 5px;")
+        icon_label.setStyleSheet(get_icon_container_style())
         layout.addWidget(icon_label)
         
         # Info section
         info_layout = QVBoxLayout()
         url_label = QLabel(self.url)
-        url_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        # Use theme font instead of hardcoded Arial
+        font_family = get_font_family()
+        font_size = int(get_font_size_large().replace('pt', ''))
+        url_label.setFont(QFont(font_family, font_size, QFont.Weight.Bold))
         url_label.setWordWrap(True)
         info_layout.addWidget(url_label)
         
         chapter_label = QLabel(f"Chapters: {self.chapter_selection}")
-        chapter_label.setStyleSheet("color: #888;")
+        chapter_label.setStyleSheet(get_secondary_text_style())
         info_layout.addWidget(chapter_label)
         
         self.status_label = QLabel(f"Status: {self.status}")
-        self.status_label.setStyleSheet("color: white;")
+        self.status_label.setStyleSheet(get_status_label_style())
         info_layout.addWidget(self.status_label)
         
         # Progress bar (always show, but may be hidden)
@@ -72,13 +80,35 @@ class ScraperQueueItemWidget(QWidget):
         layout.addLayout(actions_layout)
         
         self.setLayout(layout)
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #2d2d2d;
-                border: 1px solid #3a3a3a;
-                border-radius: 5px;
-            }
-        """)
+        self.setStyleSheet(get_queue_item_style())
+    
+    def refresh_styles(self):
+        """Refresh styles after theme change."""
+        from PySide6.QtGui import QFont
+        from ui.styles import get_font_family, get_font_size_base, get_font_size_large
+        
+        # Get current theme fonts
+        font_family = get_font_family()
+        font_size = int(get_font_size_base().replace('pt', ''))
+        large_font_size = int(get_font_size_large().replace('pt', ''))
+        
+        # Refresh all labels
+        for widget in self.findChildren(QLabel):
+            widget.setStyleSheet("")
+            if widget.text() == self.url:
+                # URL label uses larger bold font
+                widget.setFont(QFont(font_family, large_font_size, QFont.Weight.Bold))
+            else:
+                widget.setStyleSheet(get_status_label_style() if "Status:" in widget.text() else get_secondary_text_style())
+                widget.setFont(QFont(font_family, font_size))
+        
+        # Refresh widget style
+        self.setStyleSheet("")
+        self.setStyleSheet(get_queue_item_style())
+        
+        # Force update
+        self.update()
+        self.repaint()
 
 
 

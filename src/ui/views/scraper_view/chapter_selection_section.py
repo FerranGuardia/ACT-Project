@@ -76,6 +76,62 @@ class ChapterSelectionSection(QGroupBox):
         self.setLayout(layout)
         self.setStyleSheet(get_group_box_style())
     
+    def refresh_styles(self):
+        """Refresh styles after theme change."""
+        from PySide6.QtGui import QFont
+        from ui.styles import get_font_family, get_font_size_base, get_font_size_large
+        
+        # Get current theme fonts
+        font_family = get_font_family()
+        font_size = int(get_font_size_base().replace('pt', ''))
+        title_font_size = int(get_font_size_large().replace('pt', ''))
+        
+        # Refresh radio buttons
+        self.all_chapters_radio.setStyleSheet("")
+        self.all_chapters_radio.setStyleSheet(get_radio_button_style())
+        self.all_chapters_radio.setFont(QFont(font_family, font_size))
+        
+        self.range_radio.setStyleSheet("")
+        self.range_radio.setStyleSheet(get_radio_button_style())
+        self.range_radio.setFont(QFont(font_family, font_size))
+        
+        self.specific_radio.setStyleSheet("")
+        self.specific_radio.setStyleSheet(get_radio_button_style())
+        self.specific_radio.setFont(QFont(font_family, font_size))
+        
+        # Refresh spin boxes
+        self.from_spin.setStyleSheet("")
+        self.from_spin.setStyleSheet(get_spin_box_style())
+        self.from_spin.setFont(QFont(font_family, font_size))
+        
+        self.to_spin.setStyleSheet("")
+        self.to_spin.setStyleSheet(get_spin_box_style())
+        self.to_spin.setFont(QFont(font_family, font_size))
+        
+        # Refresh input
+        self.specific_input.setStyleSheet("")
+        self.specific_input.setStyleSheet(get_line_edit_style())
+        self.specific_input.setFont(QFont(font_family, font_size))
+        
+        # Refresh labels
+        for widget in self.findChildren(QLabel):
+            widget.setStyleSheet("")
+            widget.setStyleSheet(f"color: {COLORS['text_primary']};")
+            widget.setFont(QFont(font_family, font_size))
+        
+        # Refresh group box
+        self.setStyleSheet("")
+        self.setStyleSheet(get_group_box_style())
+        
+        # Set font for group box title
+        group_font = QFont(font_family, title_font_size)
+        group_font.setBold(True)
+        self.setFont(group_font)
+        
+        # Force update
+        self.update()
+        self.repaint()
+    
     def get_chapter_selection(self) -> Dict[str, Any]:
         """Get chapter selection parameters."""
         if self.all_chapters_radio.isChecked():

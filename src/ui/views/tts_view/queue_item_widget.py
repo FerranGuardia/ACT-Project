@@ -7,6 +7,10 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
+from ui.styles import (
+    get_queue_item_style, get_icon_container_style,
+    get_status_label_style, get_secondary_text_style, COLORS
+)
 
 
 class TTSQueueItemWidget(QWidget):
@@ -30,7 +34,7 @@ class TTSQueueItemWidget(QWidget):
         icon_label = QLabel("🔊")
         icon_label.setMinimumSize(60, 60)
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_label.setStyleSheet("background-color: #3a3a3a; border-radius: 5px;")
+        icon_label.setStyleSheet(get_icon_container_style())
         layout.addWidget(icon_label)
         
         # Info section
@@ -41,16 +45,16 @@ class TTSQueueItemWidget(QWidget):
         info_layout.addWidget(title_label)
         
         voice_label = QLabel(f"Voice: {self.voice}")
-        voice_label.setStyleSheet("color: #888;")
+        voice_label.setStyleSheet(get_secondary_text_style())
         info_layout.addWidget(voice_label)
         
         if self.file_count > 0:
             file_count_label = QLabel(f"Files: {self.file_count}")
-            file_count_label.setStyleSheet("color: #888;")
+            file_count_label.setStyleSheet(get_secondary_text_style())
             info_layout.addWidget(file_count_label)
         
         self.status_label = QLabel(f"Status: {self.status}")
-        self.status_label.setStyleSheet("color: white;")
+        self.status_label.setStyleSheet(get_status_label_style())
         info_layout.addWidget(self.status_label)
         
         # Progress bar (always show, but may be hidden)
@@ -78,13 +82,7 @@ class TTSQueueItemWidget(QWidget):
         layout.addLayout(actions_layout)
         
         self.setLayout(layout)
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #2d2d2d;
-                border: 1px solid #3a3a3a;
-                border-radius: 5px;
-            }
-        """)
+        self.setStyleSheet(get_queue_item_style())
 
 
 
