@@ -6,7 +6,7 @@ Separated into individual components for better maintainability.
 
 from typing import Optional, Callable, cast
 from PySide6.QtWidgets import QLabel, QFrame, QGraphicsDropShadowEffect
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal  # type: ignore[attr-defined]
 from PySide6.QtGui import QFont, QColor
 
 from ui.styles import COLORS, get_font_family
@@ -20,7 +20,7 @@ from ui.styles import (
 class ClickableLabel(QLabel):
     """A clickable label that emits a signal when clicked."""
     
-    clicked = Signal()  # Signal is imported from PySide6.QtCore
+    clicked = Signal()  # type: ignore[assignment]
     
     def __init__(self, text: str = "", parent: Optional[QLabel] = None):
         super().__init__(text, parent)
@@ -195,10 +195,10 @@ class GenreCard(QFrame):
     def _setup_shadow(self):
         """Set up shadow effect for the card."""
         shadow: QGraphicsDropShadowEffect = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(LandingPageConfig.SHADOW_BLUR_RADIUS)
+        shadow.setBlurRadius(LandingPageConfig.SHADOW_BLUR_RADIUS)  # type: ignore[attr-defined]
         shadow.setXOffset(LandingPageConfig.SHADOW_X_OFFSET)
         shadow.setYOffset(LandingPageConfig.SHADOW_Y_OFFSET)
-        shadow.setColor(LandingPageConfig.SHADOW_COLOR)
+        shadow.setColor(LandingPageConfig.SHADOW_COLOR)  # type: ignore[attr-defined]
         self.setGraphicsEffect(shadow)
     
     def update_style(self):
@@ -221,8 +221,8 @@ class GenreCard(QFrame):
         if isinstance(shadow, QGraphicsDropShadowEffect):
             # Explicit cast for Pylance type narrowing
             shadow_effect = cast(QGraphicsDropShadowEffect, shadow)
-            shadow_effect.setBlurRadius(LandingPageConfig.SHADOW_BLUR_RADIUS_HOVER)
-            shadow_effect.setColor(LandingPageConfig.SHADOW_COLOR_HOVER)
+            shadow_effect.setBlurRadius(LandingPageConfig.SHADOW_BLUR_RADIUS_HOVER)  # type: ignore[attr-defined]
+            shadow_effect.setColor(LandingPageConfig.SHADOW_COLOR_HOVER)  # type: ignore[attr-defined]
         super().enterEvent(event)
     
     def leaveEvent(self, event):
@@ -231,7 +231,7 @@ class GenreCard(QFrame):
         if isinstance(shadow, QGraphicsDropShadowEffect):
             # Explicit cast for Pylance type narrowing
             shadow_effect = cast(QGraphicsDropShadowEffect, shadow)
-            shadow_effect.setBlurRadius(LandingPageConfig.SHADOW_BLUR_RADIUS)
-            shadow_effect.setColor(LandingPageConfig.SHADOW_COLOR)
+            shadow_effect.setBlurRadius(LandingPageConfig.SHADOW_BLUR_RADIUS)  # type: ignore[attr-defined]
+            shadow_effect.setColor(LandingPageConfig.SHADOW_COLOR)  # type: ignore[attr-defined]
         super().leaveEvent(event)
 
