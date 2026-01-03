@@ -206,9 +206,9 @@ class GenreCard(QFrame):
         self.setStyleSheet(get_card_style())
         
         # Update title label color if it exists
-        # Type check ensures title_label is CardTitle which has update_style method
-        if self.title_label and isinstance(self.title_label, CardTitle):
-            self.title_label.update_style()
+        # title_label is typed as Optional[CardTitle], and CardTitle inherits update_style from ClickableLabel
+        if self.title_label is not None:
+            self.title_label.update_style()  # type: ignore[attr-defined]
     
     def _on_title_clicked(self):
         """Handle title click."""
