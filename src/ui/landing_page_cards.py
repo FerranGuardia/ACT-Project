@@ -48,6 +48,7 @@ class CardsSection(QWidget):
         """Refresh styles for all cards."""
         for card in self.cards:
             card.update_style()
-            if card.title_label:
-                card.title_label.update_style()
+            if card.title_label is not None:
+                # title_label is CardTitle which has update_style method
+                card.title_label.update_style()  # type: ignore[attr-defined]
 
