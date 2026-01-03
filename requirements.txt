@@ -1,7 +1,6 @@
 # Core dependencies
-# edge-tts: Both providers use system edge-tts installation
+# edge-tts: Edge TTS provider uses system edge-tts installation
 #   - Main provider (edge_tts): Standard API method
-#   - Working provider (edge_tts_working): Hugging Face demo's working API method (standalone)
 # NOTE: Version 7.2.3 has a bug causing "NoAudioReceived" errors. Pin to 7.2.0 until fixed.
 edge-tts==7.2.0
 pyttsx3>=2.90  # Offline TTS provider

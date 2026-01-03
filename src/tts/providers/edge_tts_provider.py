@@ -235,7 +235,7 @@ class EdgeTTSProvider(TTSProvider):
                 if volume_str is not None:
                     communicate_kwargs["volume"] = volume_str
                 
-                communicate = edge_tts.Communicate(**communicate_kwargs)
+                communicate = edge_tts.Communicate(**communicate_kwargs)  # type: ignore[arg-type]
                 
                 # Save to file
                 output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -377,7 +377,7 @@ class EdgeTTSProvider(TTSProvider):
             if volume_str is not None:
                 communicate_kwargs["volume"] = volume_str
             
-            communicate = edge_tts.Communicate(**communicate_kwargs)
+            communicate = edge_tts.Communicate(**communicate_kwargs)  # type: ignore[arg-type]
             
             # Save to file (async operation)
             output_path.parent.mkdir(parents=True, exist_ok=True)

@@ -27,10 +27,9 @@ class TestTTSMultiProvider:
         assert isinstance(providers, list)
         assert len(providers) > 0
         
-        # Should have at least Edge TTS providers
+        # Should have at least Edge TTS provider
         # get_providers() returns list of provider names (strings)
         assert any('edge' in name.lower() for name in providers)
-        # Should have both edge_tts and edge_tts_working if available
         edge_providers = [p for p in providers if 'edge' in p.lower()]
         assert len(edge_providers) > 0, "At least one Edge TTS provider should be available"
         # pyttsx3 may not be available on all systems
@@ -41,28 +40,6 @@ class TestTTSMultiProvider:
     def test_edge_tts_provider_loads_voices(self, real_provider_manager):
         """Test that Edge TTS provider can load voices"""
         voices = real_provider_manager.get_voices_by_provider(provider='edge_tts')
-        
-        assert isinstance(voices, list)
-        assert len(voices) > 0
-        
-        # Check voice structure
-        voice = voices[0]
-        assert isinstance(voice, dict)
-        assert "ShortName" in voice or "Name" in voice or "name" in voice
-    
-    @pytest.mark.network
-    def test_edge_tts_working_provider_loads_voices(self, real_provider_manager):
-        """Test that Edge TTS Working provider can load voices
-        
-        Note: This provider is not initialized by default in TTSProviderManager.
-        It's an alternative implementation that can be used manually.
-        """
-        # Check if provider is available first
-        provider_instance = real_provider_manager.get_provider('edge_tts_working')
-        if not provider_instance:
-            pytest.skip("edge_tts_working provider not initialized by default in ProviderManager")
-        
-        voices = real_provider_manager.get_voices_by_provider(provider='edge_tts_working')
         
         assert isinstance(voices, list)
         assert len(voices) > 0
@@ -113,31 +90,6 @@ class TestTTSMultiProvider:
             assert output_path.stat().st_size > 0, "Output file should not be empty"
         else:
             pytest.skip("Edge TTS service unavailable - check network connection")
-    
-    @pytest.mark.slow
-    @pytest.mark.network
-    @pytest.mark.real
-    def test_tts_engine_with_edge_tts_working_provider(self, real_tts_engine, temp_dir, sample_text):
-        """Test TTS conversion with Edge TTS Working provider (real network call)"""
-        # Check if provider is available first
-        provider_instance = real_tts_engine.provider_manager.get_provider('edge_tts_working')
-        if not provider_instance:
-            pytest.skip("edge_tts_working provider not initialized by default in ProviderManager")
-        
-        output_path = temp_dir / "test_edge_tts_working_output.mp3"
-        
-        result = real_tts_engine.convert_text_to_speech(
-            text=sample_text,
-            output_path=output_path,
-            voice="en-US-AndrewNeural",
-            provider="edge_tts_working"
-        )
-        
-        if result:
-            assert output_path.exists(), "Output file should be created"
-            assert output_path.stat().st_size > 0, "Output file should not be empty"
-        else:
-            pytest.skip("Edge TTS Working service unavailable - check network connection")
     
     @pytest.mark.slow
     @pytest.mark.real
@@ -229,7 +181,7 @@ class TestTTSMultiProvider:
         test_text = "This is a comparison test between different TTS providers."
         
         results = {}
-        providers_to_test = ["edge_tts", "edge_tts_working"]
+        providers_to_test = ["edge_tts"]
         
         # Try pyttsx3 if available
         try:
@@ -241,8 +193,8 @@ class TestTTSMultiProvider:
         for provider in providers_to_test:
             output_path = temp_dir / f"test_{provider}_comparison.mp3"
             
-            # Use Edge TTS voices for both edge_tts providers
-            voice = "en-US-AndrewNeural" if provider in ["edge_tts", "edge_tts_working"] else None
+            # Use Edge TTS voices for edge_tts provider
+            voice = "en-US-AndrewNeural" if provider == "edge_tts" else None
             
             result = real_tts_engine.convert_text_to_speech(
                 text=test_text,

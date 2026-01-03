@@ -33,15 +33,7 @@ Implement a multi-provider TTS system that can automatically fallback to alterna
 - **Library**: `edge-tts==7.2.0` (pinned due to bug in 7.2.3)
 - **Implementation**: `edge_tts_provider.py`
 
-### 2. **Edge TTS Working** (Alternative Method)
-- **Type**: Cloud-based (Microsoft)
-- **Status**:  Implemented (fallback for standard method)
-- **Pros**: Same quality as standard Edge TTS, alternative API approach
-- **Cons**: Requires internet, can have outages
-- **Library**: `edge-tts==7.2.0` (uses Hugging Face demo method)
-- **Implementation**: `edge_tts_working_provider.py`
-
-### 3. **pyttsx3** (Offline Fallback)
+### 2. **pyttsx3** (Offline Fallback)
 - **Type**: Offline (System TTS)
 - **Status**:  Implemented (final fallback)
 - **Pros**: Works offline, no internet needed, free
@@ -231,7 +223,6 @@ src/tts/
 │   ├── __init__.py
 │   ├── base_provider.py        #  TTSProvider base class
 │   ├── edge_tts_provider.py    #  Edge TTS (standard method)
-│   ├── edge_tts_working_provider.py  #  Edge TTS (alternative method)
 │   ├── pyttsx3_provider.py     #  System TTS provider
 │   └── provider_manager.py     #  Provider manager with fallback
 ├── ssml_builder.py             # SSML building utilities
