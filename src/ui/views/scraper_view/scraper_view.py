@@ -14,10 +14,8 @@ from PySide6.QtWidgets import (
 )
 
 from core.logger import get_logger
-from ui.styles import (
-    get_button_primary_style, get_button_standard_style,
-    COLORS
-)
+from ui.styles import COLORS
+from ui.views.base_view import BaseView
 
 from ui.views.scraper_view.scraping_thread import ScrapingThread
 from ui.views.scraper_view.url_input_section import URLInputSection
@@ -33,41 +31,24 @@ from ui.views.scraper_view.queue_item_widget import ScraperQueueItemWidget
 logger = get_logger("ui.scraper_view")
 
 
-class ScraperView(QWidget):
+class ScraperView(BaseView):
     """Scraper mode view for extracting text from webnovels."""
     
     def __init__(self, parent=None):
-        super().__init__(parent)
         self.scraping_thread: Optional[ScrapingThread] = None
         self.queue_items: list = []  # List of queue items
         
         # Initialize handlers
         self.handlers = ScraperViewHandlers(self)
         
-        # Initialize UI components
-        self.setup_ui()
+        # Initialize UI components (BaseView calls setup_ui)
+        super().__init__(parent)
         self._connect_handlers()
         logger.info("Scraper view initialized")
     
     def setup_ui(self):
         """Set up the scraper view UI."""
-        main_layout = QVBoxLayout()
-        main_layout.setSpacing(20)
-        main_layout.setContentsMargins(30, 30, 30, 30)
-        
-        # Set background
-        self.setStyleSheet(f"QWidget {{ background-color: {COLORS['bg_dark']}; }}")
-        
-        # Back button at the top
-        back_button_layout = QHBoxLayout()
-        self.back_button = QPushButton("← Back to Home")
-        self.back_button.clicked.connect(self._go_back)
-        self.back_button.setMinimumHeight(35)
-        self.back_button.setMinimumWidth(140)
-        self.back_button.setStyleSheet(get_button_primary_style())
-        back_button_layout.addWidget(self.back_button)
-        back_button_layout.addStretch()
-        main_layout.addLayout(back_button_layout)
+        main_layout = self.get_main_layout()
         
         # Controls section (with queue management buttons)
         self.controls_section = ScraperControlsSection()
@@ -108,7 +89,6 @@ class ScraperView(QWidget):
         main_layout.addWidget(self.output_files_section)
         
         main_layout.addStretch()
-        self.setLayout(main_layout)
     
     def _connect_handlers(self):
         """Connect all button handlers."""
@@ -119,26 +99,6 @@ class ScraperView(QWidget):
         self.controls_section.stop_button.clicked.connect(self.stop_scraping)
         self.output_settings.browse_button.clicked.connect(self.browse_output_dir)
         self.output_files_section.open_folder_button.clicked.connect(self.open_output_folder)
-    
-    def _go_back(self) -> None:
-        """Navigate back to landing page."""
-        from ui.main_window import MainWindow
-        parent = self.parent()
-        while parent:
-            if isinstance(parent, MainWindow):
-                parent.show_landing_page()
-                return
-            parent = parent.parent()
-        
-        # Fallback: try to find MainWindow in the widget hierarchy
-        from PySide6.QtWidgets import QWidget
-        widget: Optional[QWidget] = self
-        while widget:
-            if isinstance(widget, MainWindow):
-                widget.show_landing_page()
-                return
-            parent = widget.parent()
-            widget = parent if isinstance(parent, QWidget) else None
     
     def start_scraping(self):
         """Start the scraping operation."""

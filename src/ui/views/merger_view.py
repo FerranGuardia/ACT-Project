@@ -19,9 +19,9 @@ from PySide6.QtGui import QFont
 
 from core.logger import get_logger
 from ui.styles import (
-    get_button_primary_style, get_button_standard_style, get_line_edit_style,
-    get_group_box_style, get_list_widget_style, get_progress_bar_style,
-    get_spin_box_style, get_status_label_style, COLORS, get_font_family
+    get_line_edit_style, get_group_box_style, get_list_widget_style,
+    get_progress_bar_style, get_spin_box_style, get_status_label_style,
+    set_button_primary, COLORS, get_font_family
 )
 
 logger = get_logger("ui.merger_view")
@@ -186,7 +186,6 @@ class AudioFileItem(QWidget):
         super().__init__(parent)
         self.file_path = file_path
         self.index = index
-        self.button_style = get_button_standard_style()
         self.setup_ui()
     
     def setup_ui(self):
@@ -207,15 +206,12 @@ class AudioFileItem(QWidget):
         name_label.setStyleSheet(f"color: {COLORS['text_primary']};")
         layout.addWidget(name_label, 1)
         
-        # Move buttons
+        # Move buttons (standard style from global stylesheet)
         up_button = QPushButton("↑")
-        up_button.setStyleSheet(self.button_style)
         up_button.setMaximumWidth(30)
         down_button = QPushButton("↓")
-        down_button.setStyleSheet(self.button_style)
         down_button.setMaximumWidth(30)
         remove_button = QPushButton("✖️")
-        remove_button.setStyleSheet(self.button_style)
         remove_button.setMaximumWidth(30)
         
         layout.addWidget(up_button)
@@ -238,23 +234,13 @@ class MergerView(QWidget):
     
     def setup_ui(self):
         """Set up the merger view UI."""
+        from ui.view_config import ViewConfig
+        
         main_layout = QVBoxLayout()
-        main_layout.setSpacing(20)
-        main_layout.setContentsMargins(30, 30, 30, 30)
+        main_layout.setSpacing(ViewConfig.SPACING)
+        main_layout.setContentsMargins(*ViewConfig.MARGINS)
         
-        # Back button at the top
-        back_button_layout = QHBoxLayout()
-        # Set background
-        self.setStyleSheet(f"QWidget {{ background-color: {COLORS['bg_dark']}; }}")
-        
-        self.back_button = QPushButton("← Back to Home")
-        self.back_button.clicked.connect(self._go_back)
-        self.back_button.setMinimumHeight(35)
-        self.back_button.setMinimumWidth(140)
-        self.back_button.setStyleSheet(get_button_primary_style())
-        back_button_layout.addWidget(self.back_button)
-        back_button_layout.addStretch()
-        main_layout.addLayout(back_button_layout)
+        # Background handled by global stylesheet - no need to set here
         
         # Audio files
         files_group = QGroupBox("Audio Files")
@@ -262,11 +248,11 @@ class MergerView(QWidget):
         
         buttons_layout = QHBoxLayout()
         self.add_files_button = QPushButton("➕ Add Files")
-        self.add_files_button.setStyleSheet(get_button_standard_style())
+        # Standard buttons use default style from global stylesheet
         self.add_folder_button = QPushButton("➕ Add Folder")
-        self.add_folder_button.setStyleSheet(get_button_standard_style())
+        # Standard buttons use default style from global stylesheet
         self.auto_sort_button = QPushButton("Auto-sort by filename")
-        self.auto_sort_button.setStyleSheet(get_button_standard_style())
+        # Standard buttons use default style from global stylesheet
         buttons_layout.addWidget(self.add_files_button)
         buttons_layout.addWidget(self.add_folder_button)
         buttons_layout.addWidget(self.auto_sort_button)
@@ -292,7 +278,7 @@ class MergerView(QWidget):
         self.output_file_input.setStyleSheet(get_line_edit_style())
         self.output_file_input.setPlaceholderText("Select output file...")
         self.browse_file_button = QPushButton("Browse")
-        self.browse_file_button.setStyleSheet(get_button_standard_style())
+        # Standard buttons use default style from global stylesheet
         # Connection will be made in _connect_handlers() to avoid duplicate
         output_file_layout.addWidget(output_file_label)
         output_file_layout.addWidget(self.output_file_input)
@@ -334,12 +320,12 @@ class MergerView(QWidget):
         # Control buttons
         control_layout = QHBoxLayout()
         self.start_button = QPushButton("▶️ Start Merging")
-        self.start_button.setStyleSheet(get_button_primary_style())
+        set_button_primary(self.start_button)
         self.pause_button = QPushButton("⏸️ Pause")
-        self.pause_button.setStyleSheet(get_button_standard_style())
+        # Standard buttons use default style from global stylesheet
         self.pause_button.setEnabled(False)
         self.stop_button = QPushButton("⏹️ Stop")
-        self.stop_button.setStyleSheet(get_button_standard_style())
+        # Standard buttons use default style from global stylesheet
         self.stop_button.setEnabled(False)
         control_layout.addWidget(self.start_button)
         control_layout.addWidget(self.pause_button)
@@ -359,26 +345,6 @@ class MergerView(QWidget):
         self.pause_button.clicked.connect(self.pause_merging)
         self.stop_button.clicked.connect(self.stop_merging)
         self.browse_file_button.clicked.connect(self.browse_output_file)
-    
-    def _go_back(self) -> None:
-        """Navigate back to landing page."""
-        # Find the main window parent
-        from ui.main_window import MainWindow
-        parent = self.parent()
-        while parent:
-            if isinstance(parent, MainWindow):
-                parent.show_landing_page()
-                return
-            parent = parent.parent()
-        
-        # Fallback: try to find MainWindow in the widget hierarchy
-        from PySide6.QtWidgets import QMainWindow
-        widget: Optional[QWidget] = self
-        while widget:
-            if isinstance(widget, MainWindow):
-                widget.show_landing_page()
-                return
-            widget = widget.parent()
     
     def add_files(self):
         """Add audio files via file dialog."""

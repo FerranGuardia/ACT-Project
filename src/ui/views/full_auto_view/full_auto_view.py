@@ -16,10 +16,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import QTimer
 
 from core.logger import get_logger
-from ui.styles import (
-    get_button_primary_style, get_button_standard_style,
-    COLORS
-)
+from ui.styles import COLORS
+from ui.views.base_view import BaseView
 
 from ui.views.full_auto_view.add_queue_dialog import AddQueueDialog
 from ui.views.full_auto_view.queue_item_widget import QueueItemWidget
@@ -33,11 +31,10 @@ from ui.views.full_auto_view.handlers import FullAutoViewHandlers
 logger = get_logger("ui.full_auto_view")
 
 
-class FullAutoView(QWidget):
+class FullAutoView(BaseView):
     """Full automation view with queue system."""
     
     def __init__(self, parent=None):
-        super().__init__(parent)
         self.queue_items: List[Dict] = []
         self.current_processing: Optional[ProcessingThread] = None
         self._queue_file = Path.home() / ".act" / "queue.json"
@@ -46,31 +43,15 @@ class FullAutoView(QWidget):
         self.queue_manager = QueueManager(self._queue_file)
         self.handlers = FullAutoViewHandlers(self)
         
-        # Initialize UI components
-        self.setup_ui()
+        # Initialize UI components (BaseView calls setup_ui)
+        super().__init__(parent)
         self._connect_handlers()
         self._load_queue()  # Load saved queue on startup
         logger.info("Full Auto view initialized")
     
     def setup_ui(self):
         """Set up the full automation view UI."""
-        main_layout = QVBoxLayout()
-        main_layout.setSpacing(20)
-        main_layout.setContentsMargins(30, 30, 30, 30)
-        
-        # Set background
-        self.setStyleSheet(f"QWidget {{ background-color: {COLORS['bg_dark']}; }}")
-        
-        # Back button at the top
-        back_button_layout = QHBoxLayout()
-        self.back_button = QPushButton("← Back to Home")
-        self.back_button.clicked.connect(self._go_back)
-        self.back_button.setMinimumHeight(35)
-        self.back_button.setMinimumWidth(140)
-        self.back_button.setStyleSheet(get_button_primary_style())
-        back_button_layout.addWidget(self.back_button)
-        back_button_layout.addStretch()
-        main_layout.addLayout(back_button_layout)
+        main_layout = self.get_main_layout()
         
         # Controls section
         self.controls_section = ControlsSection()
@@ -87,16 +68,15 @@ class FullAutoView(QWidget):
         # Global controls
         global_controls_layout = QHBoxLayout()
         self.pause_all_button = QPushButton("⏸️ Pause All")
-        self.pause_all_button.setStyleSheet(get_button_standard_style())
+        # Standard buttons use default style from global stylesheet
         self.stop_all_button = QPushButton("⏹️ Stop All")
-        self.stop_all_button.setStyleSheet(get_button_standard_style())
+        # Standard buttons use default style from global stylesheet
         global_controls_layout.addWidget(self.pause_all_button)
         global_controls_layout.addWidget(self.stop_all_button)
         global_controls_layout.addStretch()
         main_layout.addLayout(global_controls_layout)
         
         main_layout.addStretch()
-        self.setLayout(main_layout)
     
     def _connect_handlers(self):
         """Connect all button handlers."""
@@ -106,25 +86,6 @@ class FullAutoView(QWidget):
         self.controls_section.pause_button.clicked.connect(self.pause_processing)
         self.pause_all_button.clicked.connect(self.pause_all)
         self.stop_all_button.clicked.connect(self.stop_all)
-    
-    def _go_back(self) -> None:
-        """Navigate back to landing page."""
-        from ui.main_window import MainWindow
-        parent = self.parent()
-        while parent:
-            if isinstance(parent, MainWindow):
-                parent.show_landing_page()
-                return
-            parent = parent.parent()
-        
-        # Fallback: try to find MainWindow in the widget hierarchy
-        from PySide6.QtWidgets import QWidget
-        widget: Optional[QWidget] = self
-        while widget:
-            if isinstance(widget, MainWindow):
-                widget.show_landing_page()
-                return
-            widget = widget.parent()
     
     def add_to_queue(self):
         """Add a new item to the queue."""

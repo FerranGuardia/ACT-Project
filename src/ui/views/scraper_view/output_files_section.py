@@ -6,10 +6,7 @@ from PySide6.QtWidgets import (
     QGroupBox, QVBoxLayout, QListWidget, QPushButton
 )
 
-from ui.styles import (
-    get_button_standard_style, get_list_widget_style,
-    get_group_box_style
-)
+from ui.styles import get_list_widget_style, get_group_box_style
 
 
 class OutputFilesSection(QGroupBox):
@@ -27,7 +24,7 @@ class OutputFilesSection(QGroupBox):
         self.files_list.setStyleSheet(get_list_widget_style())
         
         self.open_folder_button = QPushButton("📂 Open Folder")
-        self.open_folder_button.setStyleSheet(get_button_standard_style())
+        # Standard buttons use default style from global stylesheet
         
         layout.addWidget(self.files_list)
         layout.addWidget(self.open_folder_button)

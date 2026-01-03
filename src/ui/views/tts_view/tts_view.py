@@ -17,10 +17,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 
 from core.logger import get_logger
-from ui.styles import (
-    get_button_primary_style, get_button_standard_style,
-    get_group_box_style, COLORS
-)
+from ui.styles import get_group_box_style, COLORS
+from ui.views.base_view import BaseView
 
 from ui.views.tts_view.conversion_thread import TTSConversionThread
 from ui.views.tts_view.input_section import InputSection
@@ -35,11 +33,10 @@ from ui.views.tts_view.queue_item_widget import TTSQueueItemWidget
 logger = get_logger("ui.tts_view")
 
 
-class TTSView(QWidget):
+class TTSView(BaseView):
     """TTS mode view for converting text to audio."""
     
     def __init__(self, parent=None):
-        super().__init__(parent)
         self.file_paths: List[str] = []
         self.conversion_thread: Optional[TTSConversionThread] = None
         self.queue_items: list = []  # List of queue items
@@ -47,8 +44,8 @@ class TTSView(QWidget):
         # Initialize handlers
         self.handlers = TTSViewHandlers(self)
         
-        # Initialize UI components
-        self.setup_ui()
+        # Initialize UI components (BaseView calls setup_ui)
+        super().__init__(parent)
         self._connect_handlers()
         
         # Set preview UI elements for handlers
@@ -64,23 +61,7 @@ class TTSView(QWidget):
     
     def setup_ui(self):
         """Set up the TTS view UI."""
-        main_layout = QVBoxLayout()
-        main_layout.setSpacing(20)
-        main_layout.setContentsMargins(30, 30, 30, 30)
-        
-        # Set background
-        self.setStyleSheet(f"QWidget {{ background-color: {COLORS['bg_dark']}; }}")
-        
-        # Back button at the top
-        back_button_layout = QHBoxLayout()
-        self.back_button = QPushButton("← Back to Home")
-        self.back_button.clicked.connect(self._go_back)
-        self.back_button.setMinimumHeight(35)
-        self.back_button.setMinimumWidth(140)
-        self.back_button.setStyleSheet(get_button_primary_style())
-        back_button_layout.addWidget(self.back_button)
-        back_button_layout.addStretch()
-        main_layout.addLayout(back_button_layout)
+        main_layout = self.get_main_layout()
         
         # Controls section (with queue management buttons)
         self.controls_section = TTSControlsSection()
@@ -116,7 +97,6 @@ class TTSView(QWidget):
         main_layout.addWidget(self.progress_section)
         
         main_layout.addStretch()
-        self.setLayout(main_layout)
     
     def _connect_handlers(self):
         """Connect all button handlers."""
@@ -139,29 +119,6 @@ class TTSView(QWidget):
         self.controls_section.start_button.clicked.connect(self.start_conversion)
         self.controls_section.pause_button.clicked.connect(self.pause_conversion)
         self.controls_section.stop_button.clicked.connect(self.stop_conversion)
-    
-    def _go_back(self) -> None:
-        """Navigate back to landing page."""
-        from ui.main_window import MainWindow
-        parent_obj = self.parent()
-        while parent_obj:
-            if isinstance(parent_obj, MainWindow):
-                parent_obj.show_landing_page()
-                return
-            parent_obj = parent_obj.parent()
-        
-        # Fallback: try to find MainWindow in the widget hierarchy
-        from PySide6.QtWidgets import QMainWindow
-        widget: Optional[QWidget] = self
-        while widget:
-            if isinstance(widget, MainWindow):
-                widget.show_landing_page()
-                return
-            parent_obj = widget.parent()
-            if isinstance(parent_obj, QWidget):
-                widget = parent_obj
-            else:
-                break
     
     def _load_providers(self):
         """Load available providers into the combo box."""

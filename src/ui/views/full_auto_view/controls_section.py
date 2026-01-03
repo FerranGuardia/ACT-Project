@@ -4,7 +4,7 @@ Controls Section - Control buttons for queue management.
 
 from PySide6.QtWidgets import QGroupBox, QHBoxLayout, QPushButton
 
-from ui.styles import get_group_box_style, get_button_primary_style, get_button_standard_style
+from ui.styles import get_group_box_style, set_button_primary
 
 
 class ControlsSection(QGroupBox):
@@ -19,16 +19,16 @@ class ControlsSection(QGroupBox):
         layout = QHBoxLayout()
         
         self.add_queue_button = QPushButton("➕ Add to Queue")
-        self.add_queue_button.setStyleSheet(get_button_primary_style())
+        set_button_primary(self.add_queue_button)
         self.clear_queue_button = QPushButton("🗑️ Clear Queue")
-        self.clear_queue_button.setStyleSheet(get_button_standard_style())
+        # Standard buttons use default style from global stylesheet
         self.start_button = QPushButton("▶️ Start Processing")
-        self.start_button.setStyleSheet(get_button_primary_style())
+        set_button_primary(self.start_button)
         self.pause_button = QPushButton("⏸️ Pause")
-        self.pause_button.setStyleSheet(get_button_standard_style())
+        # Standard buttons use default style from global stylesheet
         self.pause_button.setEnabled(False)
         self.stop_button = QPushButton("⏹️ Stop")
-        self.stop_button.setStyleSheet(get_button_standard_style())
+        # Standard buttons use default style from global stylesheet
         self.stop_button.setEnabled(False)
         
         layout.addWidget(self.add_queue_button)

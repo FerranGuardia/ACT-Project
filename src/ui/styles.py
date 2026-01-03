@@ -4,7 +4,10 @@ Centralized UI styles for ACT application.
 Simple, clean styling system with a single hardcoded theme.
 """
 
-from typing import Dict, Final
+from typing import TYPE_CHECKING, Dict, Final
+
+if TYPE_CHECKING:
+    from PySide6.QtWidgets import QPushButton
 
 # Global font family mapping: maps expected names to actual Qt font family names
 _font_family_map: dict[str, str] = {}
@@ -94,9 +97,10 @@ __all__ = [
     'get_font_size_small',
     'get_global_style',
     'register_font_family_mapping',
-    # Style getters
+    # Style getters (deprecated - kept for backward compatibility)
     'get_button_primary_style',
     'get_button_standard_style',
+    'set_button_primary',
     'get_line_edit_style',
     'get_group_box_style',
     'get_list_widget_style',
@@ -525,14 +529,25 @@ def get_global_style() -> str:
 
 
 # Backward compatibility - keep these for existing code that uses them
+def set_button_primary(button: "QPushButton") -> None:
+    """Set a button as primary style using setProperty.
+    
+    Args:
+        button: The QPushButton to style as primary.
+    """
+    button.setProperty("class", "primary")
+    button.style().unpolish(button)
+    button.style().polish(button)
+
+
 def get_button_primary_style() -> str:
-    """Get primary button style (for backward compatibility)."""
-    return "/* Use QPushButton[class='primary'] in global stylesheet */"
+    """Get primary button style (DEPRECATED - use set_button_primary instead)."""
+    return "/* Use set_button_primary() or button.setProperty('class', 'primary') */"
 
 
 def get_button_standard_style() -> str:
-    """Get standard button style (for backward compatibility)."""
-    return "/* Use QPushButton in global stylesheet */"
+    """Get standard button style (DEPRECATED - buttons use default style)."""
+    return "/* Buttons use default QPushButton style from global stylesheet */"
 
 
 def get_toolbar_style() -> str:
