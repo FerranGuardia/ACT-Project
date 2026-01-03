@@ -20,7 +20,7 @@ from ui.styles import (
 class ClickableLabel(QLabel):
     """A clickable label that emits a signal when clicked."""
     
-    clicked: Signal = Signal()  # Type annotation for Pylance
+    clicked = Signal()  # Signal is imported from PySide6.QtCore
     
     def __init__(self, text: str = "", parent: Optional[QLabel] = None):
         super().__init__(text, parent)
@@ -194,7 +194,7 @@ class GenreCard(QFrame):
     
     def _setup_shadow(self):
         """Set up shadow effect for the card."""
-        shadow = QGraphicsDropShadowEffect(self)
+        shadow: QGraphicsDropShadowEffect = QGraphicsDropShadowEffect(self)
         shadow.setBlurRadius(LandingPageConfig.SHADOW_BLUR_RADIUS)
         shadow.setXOffset(LandingPageConfig.SHADOW_X_OFFSET)
         shadow.setYOffset(LandingPageConfig.SHADOW_Y_OFFSET)
@@ -206,7 +206,8 @@ class GenreCard(QFrame):
         self.setStyleSheet(get_card_style())
         
         # Update title label color if it exists
-        if self.title_label:
+        # Type check ensures title_label is CardTitle which has update_style method
+        if self.title_label and isinstance(self.title_label, CardTitle):
             self.title_label.update_style()
     
     def _on_title_clicked(self):
