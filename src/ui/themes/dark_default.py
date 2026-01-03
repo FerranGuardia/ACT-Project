@@ -14,7 +14,7 @@ THEME = {
     'font_size_large': '12pt',
     'font_size_small': '9pt',
     # Colors
-    'bg_dark': 'rgb(27, 29, 35)',
+    'bg_dark': 'rgb(30, 30, 30)',
     'bg_medium': 'rgb(39, 44, 54)',
     'bg_light': 'rgb(44, 49, 60)',
     'bg_lighter': 'rgb(52, 59, 72)',

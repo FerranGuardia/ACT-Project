@@ -81,34 +81,6 @@ class ScraperQueueItemWidget(QWidget):
         
         self.setLayout(layout)
         self.setStyleSheet(get_queue_item_style())
-    
-    def refresh_styles(self):
-        """Refresh styles after theme change."""
-        from PySide6.QtGui import QFont
-        from ui.styles import get_font_family, get_font_size_base, get_font_size_large
-        
-        # Get current theme fonts
-        font_family = get_font_family()
-        font_size = int(get_font_size_base().replace('pt', ''))
-        large_font_size = int(get_font_size_large().replace('pt', ''))
-        
-        # Refresh all labels
-        for widget in self.findChildren(QLabel):
-            widget.setStyleSheet("")
-            if widget.text() == self.url:
-                # URL label uses larger bold font
-                widget.setFont(QFont(font_family, large_font_size, QFont.Weight.Bold))
-            else:
-                widget.setStyleSheet(get_status_label_style() if "Status:" in widget.text() else get_secondary_text_style())
-                widget.setFont(QFont(font_family, font_size))
-        
-        # Refresh widget style
-        self.setStyleSheet("")
-        self.setStyleSheet(get_queue_item_style())
-        
-        # Force update
-        self.update()
-        self.repaint()
 
 
 

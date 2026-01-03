@@ -49,54 +49,6 @@ class ScraperView(QWidget):
         self._connect_handlers()
         logger.info("Scraper view initialized")
     
-    def refresh_styles(self):
-        """Refresh styles after theme change."""
-        # Get fresh colors and theme ID
-        from ui.styles import COLORS, get_button_primary_style, get_current_theme_id
-        from PySide6.QtWidgets import QApplication, QWidget
-        from PySide6.QtGui import QFont
-        from ui.styles import get_font_family, get_font_size_base
-        
-        theme_id = get_current_theme_id()
-        font_family = get_font_family()
-        font_size = int(get_font_size_base().replace('pt', ''))
-        
-        # Update background - add theme ID comment to force refresh
-        bg_style = f"""
-        /* Theme: {theme_id} */
-        QWidget {{
-            background-color: {COLORS['bg_dark']};
-        }}
-        """
-        self.setStyleSheet("")  # Clear first
-        self.setStyleSheet(bg_style)  # Apply with theme identifier
-        
-        # Update back button
-        self.back_button.setStyleSheet("")  # Clear first
-        self.back_button.setStyleSheet(get_button_primary_style())
-        
-        # Set font for back button
-        button_font = QFont(font_family, font_size)
-        button_font.setBold(True)
-        self.back_button.setFont(button_font)
-        
-        # Refresh all child sections if they have refresh_styles method
-        # Use a more aggressive approach to ensure all widgets refresh
-        for widget in self.findChildren(QWidget):
-            if hasattr(widget, 'refresh_styles'):
-                widget.refresh_styles()
-                QApplication.processEvents()  # Process events after each refresh
-        
-        # Force Qt update multiple times
-        QApplication.processEvents()
-        self.update()
-        self.repaint()
-        
-        # Force update of all child widgets
-        for widget in self.findChildren(QWidget):
-            widget.update()
-            widget.repaint()
-    
     def setup_ui(self):
         """Set up the scraper view UI."""
         main_layout = QVBoxLayout()
