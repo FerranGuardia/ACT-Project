@@ -1,0 +1,14 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.black-formatter",
+    "ms-python.isort",
+    "eamodio.gitlens",
+    "ms-vscode.vscode-json",
+    "redhat.vscode-xml",
+    "ms-vscode.powershell"
+  ],
+  "unwantedRecommendations": []
+}
+
