@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ui.main_window import MainWindow
+    from ui.main_window import MainWindow  # type: ignore[unused-import]
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFileDialog,
@@ -23,6 +23,7 @@ from ui.styles import (
     get_progress_bar_style, get_spin_box_style, get_status_label_style,
     set_button_primary, COLORS, get_font_family
 )
+from ui.view_config import ViewConfig
 
 logger = get_logger("ui.merger_view")
 
@@ -111,9 +112,6 @@ class AudioMergerThread(QThread):
                         file_path_obj = abs_path
                     
                     # Use Path object directly - pydub handles Path objects better than strings with special chars
-                    # Convert to string only if needed, but use the resolved Path
-                    normalized_path = str(file_path_obj)
-                    
                     # Load audio file - pydub can handle Path objects or properly encoded strings
                     audio = AudioSegment.from_file(file_path_obj)
                     
@@ -191,11 +189,11 @@ class AudioFileItem(QWidget):
     def setup_ui(self):
         """Set up the file item UI."""
         layout = QHBoxLayout()
-        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setContentsMargins(*ViewConfig.MERGER_FILE_ITEM_MARGINS)
         
         # Index label
         index_label = QLabel(f"{self.index}.")
-        index_label.setMinimumWidth(30)
+        index_label.setMinimumWidth(ViewConfig.MERGER_INDEX_LABEL_WIDTH)
         index_label.setStyleSheet(f"color: {COLORS['text_primary']};")
         layout.addWidget(index_label)
         
@@ -208,11 +206,11 @@ class AudioFileItem(QWidget):
         
         # Move buttons (standard style from global stylesheet)
         up_button = QPushButton("↑")
-        up_button.setMaximumWidth(30)
+        up_button.setMaximumWidth(ViewConfig.QUEUE_ACTION_BUTTON_WIDTH)
         down_button = QPushButton("↓")
-        down_button.setMaximumWidth(30)
+        down_button.setMaximumWidth(ViewConfig.QUEUE_ACTION_BUTTON_WIDTH)
         remove_button = QPushButton("✖️")
-        remove_button.setMaximumWidth(30)
+        remove_button.setMaximumWidth(ViewConfig.QUEUE_ACTION_BUTTON_WIDTH)
         
         layout.addWidget(up_button)
         layout.addWidget(down_button)

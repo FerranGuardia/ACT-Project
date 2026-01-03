@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Tuple, Dict, Any
 from urllib.parse import urlparse
 
 if TYPE_CHECKING:
-    from PySide6.QtWidgets import QWidget
+    from PySide6.QtWidgets import QWidget  # type: ignore[unused-import]
 
 from PySide6.QtWidgets import QMessageBox, QPushButton, QListWidgetItem
 

@@ -5,14 +5,14 @@ This is the main window that will contain the landing page with mode selection.
 """
 
 from pathlib import Path
-from PySide6.QtWidgets import QMainWindow, QStackedWidget, QToolBar, QPushButton, QWidget
+from PySide6.QtWidgets import QMainWindow, QStackedWidget, QToolBar, QPushButton, QApplication
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFontDatabase, QCloseEvent
+from PySide6.QtGui import QFontDatabase, QCloseEvent, QFont
 
 from core.logger import get_logger
 from ui.landing_page import LandingPage
 from ui.views import ScraperView, TTSView, MergerView, FullAutoView
-from ui.styles import get_global_style, get_button_primary_style, get_toolbar_style
+from ui.styles import get_global_style
 
 logger = get_logger("ui.main_window")
 
@@ -38,7 +38,8 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("ACT - Audiobook Creator Tools")
-        self.setMinimumSize(1200, 700)  # Increased width from 1000 to 1200 to accommodate wider combo boxes
+        from ui.view_config import ViewConfig
+        self.setMinimumSize(ViewConfig.MAIN_WINDOW_MIN_WIDTH, ViewConfig.MAIN_WINDOW_MIN_HEIGHT)
         
         # Load fonts
         self._load_fonts()
@@ -51,12 +52,11 @@ class MainWindow(QMainWindow):
         
         # Apply global styles AFTER creating widgets
         self._apply_global_style()
-        
-        self.back_button = QPushButton("← Back to Home")
+        self.back_button = QPushButton(ViewConfig.BACK_BUTTON_TEXT)
         self.back_button.clicked.connect(self.show_landing_page)
         self.back_button.setVisible(False)  # Hidden on landing page
-        self.back_button.setMinimumHeight(35)
-        self.back_button.setMinimumWidth(140)
+        self.back_button.setMinimumHeight(ViewConfig.BACK_BUTTON_HEIGHT)
+        self.back_button.setMinimumWidth(ViewConfig.BACK_BUTTON_WIDTH)
         self.back_button.setProperty("class", "primary")  # Use property for primary button style
         self.toolbar.addWidget(self.back_button)
         self.toolbar.setVisible(True)  # Always show toolbar
@@ -160,14 +160,20 @@ class MainWindow(QMainWindow):
     
     def _set_global_font(self) -> None:
         """Set global application font."""
-        from PySide6.QtWidgets import QApplication
         from ui.styles import get_font_family, get_font_size_base
         
         try:
-            app = QApplication.instance()
-            if not app:
+            app_instance = QApplication.instance()
+            if not app_instance:
                 logger.warning("QApplication instance not found")
                 return
+            
+            # Type narrowing: ensure it's QApplication, not QCoreApplication
+            if not isinstance(app_instance, QApplication):
+                logger.warning("Application instance is not QApplication")
+                return
+            
+            app: QApplication = app_instance
             
             # Get font
             font_family = get_font_family()

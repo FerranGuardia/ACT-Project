@@ -7,7 +7,7 @@ Separated into individual components for better maintainability.
 from typing import Callable, cast, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Optional
+    from typing import Optional  # type: ignore[unused-import]
 else:
     from typing import Optional
 

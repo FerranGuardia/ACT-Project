@@ -1,13 +1,14 @@
 """
 Centralized UI styles for ACT application.
 
-Simple, clean styling system with a single hardcoded theme.
+Simple, clean styling system with a single theme loaded from themes directory.
 """
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Final
 
 if TYPE_CHECKING:
-    from PySide6.QtWidgets import QPushButton
+    from PySide6.QtWidgets import QPushButton  # type: ignore[unused-import]
 
 # Global font family mapping: maps expected names to actual Qt font family names
 _font_family_map: dict[str, str] = {}
@@ -19,26 +20,68 @@ def register_font_family_mapping(mapping: dict[str, str]) -> None:
     _font_family_map.update(mapping)
 
 
-# Hardcoded theme - Dark Default
-_THEME = {
-    'font_family': 'Segoe UI',
-    'font_size_base': '10pt',
-    'font_size_large': '12pt',
-    'font_size_small': '9pt',
-    'bg_dark': 'rgb(30, 30, 30)',
-    'bg_medium': 'rgb(39, 44, 54)',
-    'bg_light': 'rgb(44, 49, 60)',
-    'bg_lighter': 'rgb(52, 59, 72)',
-    'bg_hover': 'rgb(33, 37, 43)',
-    'bg_content': 'rgb(40, 44, 52)',
-    'text_primary': 'rgb(210, 210, 210)',
-    'text_secondary': 'rgb(98, 103, 111)',
-    'accent': 'rgb(85, 170, 255)',
-    'accent_hover': 'rgb(105, 180, 255)',
-    'accent_pressed': 'rgb(65, 130, 195)',
-    'border': 'rgb(64, 71, 88)',
-    'border_focus': 'rgb(91, 101, 124)',
-}
+def _load_theme(theme_name: str = "dark_default") -> Dict[str, str]:
+    """
+    Load theme from themes directory.
+    
+    Args:
+        theme_name: Name of the theme file (without .py extension)
+        
+    Returns:
+        Theme dictionary with all color and font settings
+    """
+    try:
+        # Get the themes directory path
+        themes_dir = Path(__file__).parent / "themes"
+        theme_path = themes_dir / f"{theme_name}.py"
+        
+        if not theme_path.exists():
+            raise FileNotFoundError(f"Theme file not found: {theme_path}")
+        
+        # Load the theme module dynamically
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("theme_module", theme_path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Could not load theme spec from {theme_path}")
+        
+        theme_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(theme_module)
+        
+        # Get THEME dict from the module
+        if not hasattr(theme_module, 'THEME'):
+            raise AttributeError(f"Theme file {theme_path} does not contain THEME dictionary")
+        
+        return theme_module.THEME
+    except Exception as e:
+        # Fallback to default theme values if loading fails
+        from core.logger import get_logger
+        logger = get_logger("ui.styles")
+        logger.warning(f"Failed to load theme '{theme_name}': {e}. Using fallback theme.")
+        
+        # Fallback theme (same as dark_default)
+        return {
+            'font_family': 'Segoe UI',
+            'font_size_base': '10pt',
+            'font_size_large': '12pt',
+            'font_size_small': '9pt',
+            'bg_dark': 'rgb(30, 30, 30)',
+            'bg_medium': 'rgb(39, 44, 54)',
+            'bg_light': 'rgb(44, 49, 60)',
+            'bg_lighter': 'rgb(52, 59, 72)',
+            'bg_hover': 'rgb(33, 37, 43)',
+            'bg_content': 'rgb(40, 44, 52)',
+            'text_primary': 'rgb(210, 210, 210)',
+            'text_secondary': 'rgb(98, 103, 111)',
+            'accent': 'rgb(85, 170, 255)',
+            'accent_hover': 'rgb(105, 180, 255)',
+            'accent_pressed': 'rgb(65, 130, 195)',
+            'border': 'rgb(64, 71, 88)',
+            'border_focus': 'rgb(91, 101, 124)',
+        }
+
+
+# Load theme from themes directory (default: dark_default)
+_THEME = _load_theme("dark_default")
 
 
 def _get_colors() -> Dict[str, str]:

@@ -23,6 +23,7 @@ from ui.styles import (
     get_group_box_style, get_list_widget_style, get_line_edit_style,
     COLORS
 )
+from ui.view_config import ViewConfig
 
 logger = get_logger("ui.dialogs.theme_selection")
 
@@ -35,7 +36,8 @@ class ThemeSelectionDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Select Theme")
-        self.setMinimumSize(700, 600)
+        from ui.view_config import ViewConfig
+        self.setMinimumSize(ViewConfig.DIALOG_THEME_MIN_WIDTH, ViewConfig.DIALOG_THEME_MIN_HEIGHT)
         self.setModal(False)  # Non-modal so user can see changes
         
         # Store the theme that was active when dialog opened
@@ -55,8 +57,8 @@ class ThemeSelectionDialog(QDialog):
     def setup_ui(self):
         """Set up the dialog UI."""
         layout = QVBoxLayout()
-        layout.setSpacing(15)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(ViewConfig.DIALOG_SPACING)
+        layout.setContentsMargins(*ViewConfig.DIALOG_MARGINS)
         
         # Title
         title_label = QLabel("Select UI Theme")
@@ -73,7 +75,7 @@ class ThemeSelectionDialog(QDialog):
         
         # Theme list and preview side by side
         content_layout = QHBoxLayout()
-        content_layout.setSpacing(15)
+        content_layout.setSpacing(ViewConfig.DIALOG_CONTENT_SPACING)
         
         # Theme list
         theme_group = QGroupBox("Available Themes")
@@ -93,7 +95,7 @@ class ThemeSelectionDialog(QDialog):
         
         self.preview_text = QTextEdit()
         self.preview_text.setReadOnly(True)
-        self.preview_text.setMaximumHeight(200)
+        self.preview_text.setMaximumHeight(ViewConfig.DIALOG_PREVIEW_MAX_HEIGHT)
         preview_layout.addWidget(self.preview_text)
         
         # Preview widgets

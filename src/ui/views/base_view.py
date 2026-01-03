@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ui.main_window import MainWindow
+    from ui.main_window import MainWindow  # type: ignore[unused-import]
 
 from PySide6.QtWidgets import QWidget, QVBoxLayout
 

@@ -6,7 +6,7 @@ to reduce code duplication.
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional, List
+from typing import List
 
 from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QProgressBar
@@ -31,7 +31,7 @@ class BaseQueueItemWidget(QWidget, ABC):
         self.progress = progress
         self.setup_ui()
     
-    def setup_ui(self):
+    def setup_ui(self) -> None:
         """Set up the queue item UI with common structure."""
         layout = QHBoxLayout()
         layout.setContentsMargins(*ViewConfig.QUEUE_ITEM_MARGINS)
@@ -96,7 +96,7 @@ class BaseQueueItemWidget(QWidget, ABC):
         self.setLayout(layout)
         self.setStyleSheet(get_queue_item_style())
     
-    def update_status(self, status: str, progress: int = 0):
+    def update_status(self, status: str, progress: int = 0) -> None:
         """Update the status and progress of the queue item."""
         self.status = status
         self.progress = progress
@@ -107,9 +107,13 @@ class BaseQueueItemWidget(QWidget, ABC):
         if self.status == "Processing":
             if self.progress_bar not in self.findChildren(QProgressBar, options=Qt.FindChildOption.FindDirectChildrenOnly):
                 # Find the info layout and add progress bar
-                info_layout = self.layout().itemAt(1).layout()
-                if info_layout:
-                    info_layout.addWidget(self.progress_bar)
+                main_layout = self.layout()
+                if main_layout is not None:
+                    layout_item = main_layout.itemAt(1)
+                    if layout_item is not None:
+                        info_layout = layout_item.layout()
+                        if info_layout is not None:
+                            info_layout.addWidget(self.progress_bar)
             self.progress_bar.show()
         else:
             self.progress_bar.hide()

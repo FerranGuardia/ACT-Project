@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Optional
+    from typing import Optional  # type: ignore[unused-import]
 else:
     from typing import Optional
 
@@ -20,6 +20,7 @@ from core.logger import get_logger
 from ui.styles import COLORS, get_font_family
 from ui.landing_page_config import LandingPageConfig
 from ui.landing_page_utils import LayoutHelper
+from ui.view_config import ViewConfig
 
 __all__ = ['LandingPageHeader']
 
@@ -106,7 +107,7 @@ class LandingPageHeader(QWidget):
             QFont.Weight.Bold
         )
         title_label.setFont(title_font)
-        title_label.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent; padding: 10px;")
+        title_label.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent; padding: {ViewConfig.HEADER_TITLE_PADDING}px;")
         
         # Subtitle
         subtitle_label = QLabel("Select a mode to begin your audiobook creation journey")

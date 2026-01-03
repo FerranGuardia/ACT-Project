@@ -177,3 +177,6 @@ tests/legacy/
 # GUI test directory - experimental Qt Designer conversions
 gui_test/
 
+# Private documentation - not committed to repository
+docs/private/
+

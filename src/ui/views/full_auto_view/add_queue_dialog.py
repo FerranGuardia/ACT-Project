@@ -15,6 +15,7 @@ from PySide6.QtCore import Qt
 from core.logger import get_logger
 from tts import VoiceManager
 from ui.dialogs import ProviderSelectionDialog
+from ui.view_config import ViewConfig
 
 logger = get_logger("ui.full_auto_view.add_queue_dialog")
 
@@ -25,7 +26,7 @@ class AddQueueDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Add to Queue")
-        self.setMinimumWidth(600)  # Increased from 500 to accommodate wider combo boxes
+        self.setMinimumWidth(ViewConfig.DIALOG_MIN_WIDTH)
         self.voice_manager = VoiceManager()
         self.selected_provider: Optional[str] = None
         self.setup_ui()
@@ -68,9 +69,9 @@ class AddQueueDialog(QDialog):
         provider_layout.addWidget(QLabel("Provider:"))
         self.provider_button = QPushButton("Select Provider...")
         self.provider_button.clicked.connect(self._select_provider)
-        self.provider_button.setMinimumWidth(300)  # Ensure readable width for provider names
+        self.provider_button.setMinimumWidth(ViewConfig.DIALOG_PROVIDER_BUTTON_MIN_WIDTH)
         self.provider_status_label = QLabel("")
-        self.provider_status_label.setMinimumWidth(20)
+        self.provider_status_label.setMinimumWidth(ViewConfig.DIALOG_STATUS_LABEL_MIN_WIDTH)
         provider_layout.addWidget(self.provider_button, 1)
         provider_layout.addWidget(self.provider_status_label)
         voice_layout.addLayout(provider_layout)
@@ -78,7 +79,7 @@ class AddQueueDialog(QDialog):
         voice_select_layout = QHBoxLayout()
         voice_select_layout.addWidget(QLabel("Voice:"))
         self.voice_combo = QComboBox()
-        self.voice_combo.setMinimumWidth(350)  # Ensure readable width for voice names (e.g., "en-US-AndrewNeural - Male")
+        self.voice_combo.setMinimumWidth(ViewConfig.COMBO_BOX_VOICE_DIALOG_MIN_WIDTH)
         voice_select_layout.addWidget(self.voice_combo, 1)
         voice_layout.addLayout(voice_select_layout)
         

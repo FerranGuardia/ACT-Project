@@ -5,20 +5,27 @@ Main orchestrator that combines all components.
 
 import os
 import tempfile
-from pathlib import Path
-from typing import Optional, List, TYPE_CHECKING, Any
+from typing import Optional, List, TYPE_CHECKING, Dict, Any
 
 if TYPE_CHECKING:
-    from ui.main_window import MainWindow
+    from ui.main_window import MainWindow  # type: ignore[unused-import]
 
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QMessageBox
-)
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QVBoxLayout, QListWidgetItem
 
 from core.logger import get_logger
-from ui.styles import get_group_box_style, COLORS
+from ui.styles import get_group_box_style
 from ui.views.base_view import BaseView
+from ui.ui_constants import (
+    StatusMessages,
+    DialogMessages,
+)
+from ui.utils.error_handling import (
+    show_validation_error,
+    show_already_running_error,
+    show_success,
+    show_error,
+    show_confirmation,
+)
 
 from ui.views.tts_view.conversion_thread import TTSConversionThread
 from ui.views.tts_view.input_section import InputSection
@@ -39,7 +46,7 @@ class TTSView(BaseView):
     def __init__(self, parent=None):
         self.file_paths: List[str] = []
         self.conversion_thread: Optional[TTSConversionThread] = None
-        self.queue_items: list = []  # List of queue items
+        self.queue_items: List[Dict[str, Any]] = []  # List of queue items
         
         # Initialize handlers
         self.handlers = TTSViewHandlers(self)
@@ -59,7 +66,7 @@ class TTSView(BaseView):
         self._load_voices()
         logger.info("TTS view initialized")
     
-    def setup_ui(self):
+    def setup_ui(self) -> None:
         """Set up the TTS view UI."""
         main_layout = self.get_main_layout()
         
@@ -98,7 +105,7 @@ class TTSView(BaseView):
         
         main_layout.addStretch()
     
-    def _connect_handlers(self):
+    def _connect_handlers(self) -> None:
         """Connect all button handlers."""
         # Input section handlers
         self.input_section.add_files_button.clicked.connect(self.add_files)
@@ -120,31 +127,31 @@ class TTSView(BaseView):
         self.controls_section.pause_button.clicked.connect(self.pause_conversion)
         self.controls_section.stop_button.clicked.connect(self.stop_conversion)
     
-    def _load_providers(self):
+    def _load_providers(self) -> None:
         """Load available providers into the combo box."""
         self.handlers.load_providers(self.voice_settings.provider_combo)
     
-    def _on_provider_changed(self):
+    def _on_provider_changed(self) -> None:
         """Handle provider selection change."""
         self._load_voices()
     
-    def _load_voices(self):
+    def _load_voices(self) -> None:
         """Load available voices into the combo box based on selected provider."""
         self.handlers.load_voices(self.voice_settings.voice_combo, self.voice_settings.provider_combo)
     
-    def add_files(self):
+    def add_files(self) -> None:
         """Add text files via file dialog."""
         self.handlers.add_files(self.file_paths, self.input_section.files_list)
     
-    def add_folder(self):
+    def add_folder(self) -> None:
         """Add all text files from a folder."""
         self.handlers.add_folder(self.file_paths, self.input_section.files_list)
     
-    def remove_selected_files(self):
+    def remove_selected_files(self) -> None:
         """Remove selected files from the list."""
         self.handlers.remove_selected_files(self.file_paths, self.input_section.files_list)
     
-    def preview_voice(self):
+    def preview_voice(self) -> None:
         """Preview the selected voice with sample text."""
         self.handlers.preview_voice(
             self.voice_settings.voice_combo,
@@ -159,7 +166,7 @@ class TTSView(BaseView):
             self.voice_settings.stop_preview_button
         )
     
-    def stop_preview(self):
+    def stop_preview(self) -> None:
         """Stop the currently playing preview."""
         self.handlers.stop_preview(
             self.progress_section.status_label,
@@ -167,7 +174,7 @@ class TTSView(BaseView):
             self.voice_settings.stop_preview_button
         )
     
-    def browse_output_dir(self):
+    def browse_output_dir(self) -> None:
         """Open directory browser for output."""
         self.handlers.browse_output_dir(self.output_settings.output_dir_input)
     
@@ -181,12 +188,12 @@ class TTSView(BaseView):
             self.output_settings.output_dir_input
         )
         if not valid:
-            QMessageBox.warning(self, "Validation Error", error_msg)
+            show_validation_error(self, error_msg)
             return
         
         # Check if already running
         if self.conversion_thread and self.conversion_thread.isRunning():
-            QMessageBox.warning(self, "Already Running", "Conversion is already in progress")
+            show_already_running_error(self)
             return
         
         # Get parameters
@@ -204,7 +211,7 @@ class TTSView(BaseView):
             # Create a temporary file from editor text
             editor_text = self.input_section.get_editor_text()
             if not editor_text.strip():
-                QMessageBox.warning(self, "Validation Error", "Please enter text in the editor to convert")
+                show_validation_error(self, DialogMessages.NO_TEXT_IN_EDITOR_MSG)
                 return
             
             # Create temporary file
@@ -233,10 +240,8 @@ class TTSView(BaseView):
         self.conversion_thread.finished.connect(self._on_finished)
         self.conversion_thread.file_created.connect(self._on_file_created)
         
-        # Update UI
-        self.controls_section.start_button.setEnabled(False)
-        self.controls_section.pause_button.setEnabled(True)
-        self.controls_section.stop_button.setEnabled(True)
+        # Update UI state
+        self.controls_section.set_processing_state()
         self.input_section.add_files_button.setEnabled(False)
         self.input_section.add_folder_button.setEnabled(False)
         self.input_section.input_tabs.setEnabled(False)
@@ -247,23 +252,31 @@ class TTSView(BaseView):
         self.conversion_thread.start()
         logger.info(f"Started TTS conversion: {len(file_paths_to_convert)} file(s)")
     
-    def pause_conversion(self):
-        """Pause the conversion operation."""
+    def pause_conversion(self) -> None:
+        """
+        Pause or resume the conversion operation.
+        
+        Toggles between paused and resumed states, updating the UI accordingly.
+        """
         if self.conversion_thread and self.conversion_thread.isRunning():
             if self.conversion_thread.is_paused:
                 self.conversion_thread.resume()
-                self.controls_section.pause_button.setText("⏸️ Pause")
+                self.controls_section.set_resumed_state()
                 logger.info("Resumed conversion")
             else:
                 self.conversion_thread.pause()
-                self.controls_section.pause_button.setText("▶️ Resume")
+                self.controls_section.set_paused_state()
                 logger.info("Paused conversion")
     
-    def stop_conversion(self):
-        """Stop the conversion operation."""
+    def stop_conversion(self) -> None:
+        """
+        Stop the conversion operation.
+        
+        Stops the current conversion thread and updates the UI status.
+        """
         if self.conversion_thread and self.conversion_thread.isRunning():
             self.conversion_thread.stop()
-            self.progress_section.set_status("Stopping...")
+            self.progress_section.set_status(StatusMessages.STOPPING)
             logger.info("Stopping conversion")
     
     def _on_progress(self, value: int):
@@ -274,13 +287,16 @@ class TTSView(BaseView):
         """Handle status update."""
         self.progress_section.set_status(message)
     
-    def _on_finished(self, success: bool, message: str):
-        """Handle conversion completion."""
-        # Reset UI
-        self.controls_section.start_button.setEnabled(True)
-        self.controls_section.pause_button.setEnabled(False)
-        self.controls_section.pause_button.setText("⏸️ Pause")
-        self.controls_section.stop_button.setEnabled(False)
+    def _on_finished(self, success: bool, message: str) -> None:
+        """
+        Handle conversion completion.
+        
+        Args:
+            success: Whether the operation completed successfully
+            message: Completion message to display
+        """
+        # Reset UI state
+        self.controls_section.set_idle_state()
         self.input_section.add_files_button.setEnabled(True)
         self.input_section.add_folder_button.setEnabled(True)
         self.input_section.input_tabs.setEnabled(True)
@@ -301,17 +317,21 @@ class TTSView(BaseView):
                         logger.warning(f"Failed to cleanup temp file {file_path}: {e}")
         
         if success:
-            QMessageBox.information(self, "Success", message)
-            self.progress_section.set_status("Ready")
+            show_success(self, message)
+            self.progress_section.set_status(StatusMessages.READY)
         else:
-            QMessageBox.warning(self, "Error", message)
-            self.progress_section.set_status("Error occurred")
+            show_error(self, message)
+            self.progress_section.set_status(StatusMessages.ERROR_OCCURRED)
         
         logger.info(f"TTS conversion finished: {message}")
     
-    def _on_file_created(self, filepath: str):
-        """Handle new file creation."""
-        filename = os.path.basename(filepath)
+    def _on_file_created(self, filepath: str) -> None:
+        """
+        Handle new file creation.
+        
+        Args:
+            filepath: Path to the newly created file
+        """
         logger.debug(f"File created: {filepath}")
     
     def add_to_queue(self):
@@ -324,7 +344,7 @@ class TTSView(BaseView):
             self.output_settings.output_dir_input
         )
         if not valid:
-            QMessageBox.warning(self, "Validation Error", error_msg)
+            show_validation_error(self, error_msg)
             return
         
         # Get parameters
@@ -374,28 +394,27 @@ class TTSView(BaseView):
         self.input_section.text_editor.clear()
         logger.info(f"Added to queue: {title} - Voice: {voice}")
     
-    def clear_queue(self):
-        """Clear all items from the queue."""
+    def clear_queue(self) -> None:
+        """
+        Clear all items from the queue.
+        
+        Shows a confirmation dialog before clearing the queue.
+        """
         if not self.queue_items:
             return
         
-        reply = QMessageBox.question(
+        if show_confirmation(
             self,
-            "Clear Queue",
-            "Are you sure you want to clear the entire queue?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        
-        if reply == QMessageBox.StandardButton.Yes:
+            DialogMessages.CLEAR_QUEUE_TITLE,
+            DialogMessages.CLEAR_QUEUE_MESSAGE
+        ):
             self.queue_items.clear()
             self.queue_section.clear()
             logger.info("Queue cleared")
     
-    def _update_queue_display(self):
+    def _update_queue_display(self) -> None:
         """Update the queue list display."""
         self.queue_section.clear()
-        
-        from PySide6.QtWidgets import QListWidgetItem
         
         for idx, item in enumerate(self.queue_items):
             queue_widget = TTSQueueItemWidget(
@@ -406,33 +425,35 @@ class TTSView(BaseView):
                 item['progress']
             )
             
-            # Connect action buttons
-            for button in queue_widget.findChildren(QPushButton):
-                if button.text() == "↑":
-                    button.clicked.connect(lambda checked, row=idx: self._move_queue_item_up(row))
-                elif button.text() == "↓":
-                    button.clicked.connect(lambda checked, row=idx: self._move_queue_item_down(row))
-                elif "Remove" in button.text():
-                    button.clicked.connect(lambda checked, row=idx: self._remove_queue_item(row))
+            # Connect action buttons using object references (robust)
+            queue_widget.up_button.clicked.connect(
+                lambda checked, row=idx: self._move_queue_item_up(row)
+            )
+            queue_widget.down_button.clicked.connect(
+                lambda checked, row=idx: self._move_queue_item_down(row)
+            )
+            queue_widget.remove_button.clicked.connect(
+                lambda checked, row=idx: self._remove_queue_item(row)
+            )
             
             list_item = QListWidgetItem()
             list_item.setSizeHint(queue_widget.sizeHint())
             self.queue_section.queue_list.addItem(list_item)
             self.queue_section.queue_list.setItemWidget(list_item, queue_widget)
     
-    def _move_queue_item_up(self, row: int):
+    def _move_queue_item_up(self, row: int) -> None:
         """Move a queue item up."""
         if row > 0:
             self.queue_items[row], self.queue_items[row - 1] = self.queue_items[row - 1], self.queue_items[row]
             self._update_queue_display()
     
-    def _move_queue_item_down(self, row: int):
+    def _move_queue_item_down(self, row: int) -> None:
         """Move a queue item down."""
         if row < len(self.queue_items) - 1:
             self.queue_items[row], self.queue_items[row + 1] = self.queue_items[row + 1], self.queue_items[row]
             self._update_queue_display()
     
-    def _remove_queue_item(self, row: int):
+    def _remove_queue_item(self, row: int) -> None:
         """Remove a queue item."""
         if 0 <= row < len(self.queue_items):
             self.queue_items.pop(row)

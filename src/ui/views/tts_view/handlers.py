@@ -10,7 +10,7 @@ from typing import Optional, Any, TYPE_CHECKING
 from contextlib import contextmanager
 
 if TYPE_CHECKING:
-    from PySide6.QtWidgets import QWidget
+    from PySide6.QtWidgets import QWidget  # type: ignore[unused-import]
 
 from PySide6.QtWidgets import QMessageBox, QFileDialog
 from PySide6.QtCore import QUrl, QTimer

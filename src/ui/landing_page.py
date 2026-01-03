@@ -8,8 +8,8 @@ Uses separated components and configuration.
 from typing import Callable, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Optional
-    from PySide6.QtWidgets import QWidget
+    from typing import Optional  # type: ignore[unused-import]
+    from PySide6.QtWidgets import QWidget  # type: ignore[unused-import]
 else:
     # Runtime fallback for Optional (used in type hints only)
     from typing import Optional
