@@ -65,6 +65,11 @@
     "reportUnusedFunction": "information",
     "reportUnusedVariable": "information"
   },
+  // Ignore unused imports that are used for type hints or dynamic access
+  "python.analysis.ignore": [
+    "**/__pycache__/**",
+    "**/node_modules/**"
+  ],
   
   // File encoding
   "files.encoding": "utf8",

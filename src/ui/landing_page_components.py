@@ -7,7 +7,7 @@ Separated into individual components for better maintainability.
 from typing import Optional, Callable, cast
 from PySide6.QtWidgets import QLabel, QFrame, QGraphicsDropShadowEffect
 from PySide6.QtCore import Qt, Signal  # type: ignore[attr-defined]
-from PySide6.QtGui import QFont, QColor
+from PySide6.QtGui import QFont
 
 from ui.styles import COLORS, get_font_family
 from ui.landing_page_config import LandingPageConfig

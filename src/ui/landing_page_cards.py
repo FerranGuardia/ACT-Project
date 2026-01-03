@@ -5,7 +5,7 @@ Handles the display of mode selection cards.
 """
 
 from typing import Optional, Callable
-from PySide6.QtWidgets import QWidget, QVBoxLayout
+from PySide6.QtWidgets import QWidget
 
 from ui.landing_page_config import LandingPageConfig
 from ui.landing_page_modes import MODES_CONFIG, ModeConfig

@@ -16,7 +16,6 @@ from ..chapter_parser import (
     sort_chapters_by_number,
 )
 from .url_extractor_session import SessionManager
-from .url_extractor_validators import is_chapter_url
 from .url_extractor_extractors import ChapterUrlExtractors
 from core.logger import get_logger
 from ..config import REQUEST_TIMEOUT, REQUEST_DELAY
