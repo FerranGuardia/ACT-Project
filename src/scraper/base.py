@@ -11,8 +11,10 @@ from pathlib import Path
 from core.logger import get_logger
 from core.config_manager import get_config
 from .text_cleaner import clean_text
-from .chapter_parser import extract_chapter_number, sort_chapters_by_number
+from .chapter_parser import extract_chapter_number as _extract_chapter_number, sort_chapters_by_number
 from .config import REQUEST_TIMEOUT, REQUEST_DELAY, MAX_RETRIES
+
+__all__ = ['BaseScraper']
 
 logger = get_logger("scraper.base")
 
@@ -98,7 +100,7 @@ class BaseScraper(ABC):
         Returns:
             Chapter number, or None if not found
         """
-        return extract_chapter_number(url)
+        return _extract_chapter_number(url)
 
     def sort_chapters(self, chapter_urls: List[str]) -> List[str]:
         """

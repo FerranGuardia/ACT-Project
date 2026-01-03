@@ -4,7 +4,7 @@ Centralized UI styles for ACT application.
 Simple, clean styling system with a single hardcoded theme.
 """
 
-from typing import Dict
+from typing import Dict, Final
 
 # Global font family mapping: maps expected names to actual Qt font family names
 _font_family_map: dict[str, str] = {}
@@ -83,8 +83,37 @@ class _ColorsDict(dict):
         return _get_colors().items()
 
 
-# Global COLORS object
-COLORS = _ColorsDict()
+# Global COLORS object - explicitly typed as Final for static analysis
+COLORS: Final[_ColorsDict] = _ColorsDict()
+
+__all__ = [
+    'COLORS',
+    'get_font_family',
+    'get_font_size_base',
+    'get_font_size_large',
+    'get_font_size_small',
+    'get_global_style',
+    'register_font_family_mapping',
+    # Style getters
+    'get_button_primary_style',
+    'get_button_standard_style',
+    'get_line_edit_style',
+    'get_group_box_style',
+    'get_list_widget_style',
+    'get_progress_bar_style',
+    'get_spin_box_style',
+    'get_status_label_style',
+    'get_combo_box_style',
+    'get_plain_text_edit_style',
+    'get_tab_widget_style',
+    'get_radio_button_style',
+    'get_slider_style',
+    'get_card_style',
+    'get_card_title_style',
+    'get_card_description_style',
+    'get_card_icon_style',
+    'get_card_arrow_style',
+]
 
 
 def get_font_family() -> str:

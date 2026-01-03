@@ -5,8 +5,15 @@ Refactored for better maintainability and modifiability.
 Uses separated components and configuration.
 """
 
-from typing import Optional, Callable
-from PySide6.QtWidgets import QWidget
+from typing import Callable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Optional
+    from PySide6.QtWidgets import QWidget
+else:
+    # Runtime fallback for Optional (used in type hints only)
+    from typing import Optional
+    from PySide6.QtWidgets import QWidget
 
 from core.logger import get_logger
 from ui.styles import COLORS
@@ -15,6 +22,8 @@ from ui.landing_page_modes import MODES_CONFIG
 from ui.landing_page_utils import LayoutHelper
 from ui.landing_page_header import LandingPageHeader
 from ui.landing_page_cards import CardsSection
+
+__all__ = ['LandingPage']
 
 logger = get_logger("ui.landing_page")
 

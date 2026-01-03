@@ -5,7 +5,7 @@ Separates data from presentation logic.
 """
 
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, Optional, Final
 
 
 @dataclass
@@ -35,8 +35,8 @@ class ModeConfig:
         )
 
 
-# Mode configurations
-MODES_CONFIG: list[ModeConfig] = [
+# Mode configurations - explicitly typed as Final for static analysis
+MODES_CONFIG: Final[list[ModeConfig]] = [
     ModeConfig(
         id="scraper",
         title="Scraper",
@@ -62,4 +62,6 @@ MODES_CONFIG: list[ModeConfig] = [
         icon="⚡"
     ),
 ]
+
+__all__ = ['ModeConfig', 'MODES_CONFIG']
 

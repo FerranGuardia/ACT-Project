@@ -60,16 +60,20 @@
   "python.analysis.diagnosticSeverityOverrides": {
     "reportMissingImports": "warning",
     "reportMissingTypeStubs": "none",
-    "reportUnusedImport": "information",
+    "reportUnusedImport": "warning",  // Changed from "information" to "warning" for better visibility
     "reportUnusedClass": "information",
     "reportUnusedFunction": "information",
-    "reportUnusedVariable": "information"
+    "reportUnusedVariable": "warning",  // Changed to "warning" for better visibility
+    // Suppress false positives for type-only imports
+    "reportUnusedTypeIgnoreComment": "none"
   },
   // Ignore unused imports that are used for type hints or dynamic access
   "python.analysis.ignore": [
     "**/__pycache__/**",
     "**/node_modules/**"
   ],
+  // Better type inference for constants
+  "python.analysis.useLibraryCodeForTypes": true,
   
   // File encoding
   "files.encoding": "utf8",

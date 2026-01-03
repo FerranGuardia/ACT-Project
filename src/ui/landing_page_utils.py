@@ -4,6 +4,8 @@ Utility classes for landing page layout management.
 
 from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout
 
+__all__ = ['LayoutHelper']
+
 
 class LayoutHelper:
     """Helper for creating common layouts with consistent spacing."""

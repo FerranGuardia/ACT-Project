@@ -4,7 +4,13 @@ Reusable components for the landing page.
 Separated into individual components for better maintainability.
 """
 
-from typing import Optional, Callable, cast
+from typing import Callable, cast, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Optional
+else:
+    from typing import Optional
+
 from PySide6.QtWidgets import QLabel, QFrame, QGraphicsDropShadowEffect
 from PySide6.QtCore import Qt, Signal  # type: ignore[attr-defined]
 from PySide6.QtGui import QFont
@@ -15,6 +21,8 @@ from ui.styles import (
     get_card_style, get_card_title_style, get_card_description_style,
     get_card_icon_style, get_card_arrow_style
 )
+
+__all__ = ['ClickableLabel', 'CardTitle', 'CardDescription', 'CardIcon', 'CardArrow', 'GenreCard']
 
 
 class ClickableLabel(QLabel):

@@ -4,13 +4,21 @@ Cards section component for the landing page.
 Handles the display of mode selection cards.
 """
 
-from typing import Optional, Callable
-from PySide6.QtWidgets import QWidget
+from typing import Callable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Optional
+    from PySide6.QtWidgets import QWidget
+else:
+    from typing import Optional
+    from PySide6.QtWidgets import QWidget
 
 from ui.landing_page_config import LandingPageConfig
 from ui.landing_page_modes import MODES_CONFIG, ModeConfig
 from ui.landing_page_utils import LayoutHelper
 from ui.landing_page_components import GenreCard
+
+__all__ = ['CardsSection']
 
 
 class CardsSection(QWidget):

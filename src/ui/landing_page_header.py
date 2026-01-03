@@ -5,7 +5,13 @@ Separated from main landing page for better organization.
 """
 
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Optional
+else:
+    from typing import Optional
+
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QPixmap
@@ -14,6 +20,8 @@ from core.logger import get_logger
 from ui.styles import COLORS, get_font_family
 from ui.landing_page_config import LandingPageConfig
 from ui.landing_page_utils import LayoutHelper
+
+__all__ = ['LandingPageHeader']
 
 logger = get_logger("ui.landing_page_header")
 
