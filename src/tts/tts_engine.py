@@ -5,6 +5,12 @@ Handles conversion of text to audio files using Edge-TTS.
 """
 
 import asyncio
+import gc
+import re
+import shutil
+import subprocess
+import tempfile
+import time
 from pathlib import Path
 from typing import Optional, Callable, List, Dict, Any
 
@@ -20,38 +26,37 @@ from .providers.base_provider import TTSProvider
 logger = get_logger("tts.tts_engine")
 
 
-def format_chapter_intro(chapter_title: str, content: str, provider: Optional[str] = None) -> str:
+def format_chapter_intro(chapter_title: str, content: str) -> str:
     """
     Format chapter text with introduction and pauses for TTS.
     
     Adds 1s pause, chapter title, 1s pause, then content.
-    Format varies by provider:
-    - pyttsx3: Uses ellipsis (...) to create natural pauses (approximately 1 second)
-    - edge_tts: Can use SSML break tags (handled separately)
-    - Other: Uses ellipsis for natural pauses
+    Works by using ellipsis (...) to create natural pauses (approximately 1 second).
+    Providers supporting SSML (like Edge TTS) handle SSML breaks separately via build_ssml().
     
     Args:
         chapter_title: Chapter title to announce
         content: Chapter content
-        provider: TTS provider name (None for auto-detect)
     
     Returns:
         Formatted text with chapter introduction and pauses
     """
-    # Use ellipsis (...) to create natural pauses (approximately 1 second)
-    # This works for providers that don't support SSML (like pyttsx3)
-    # Providers that support SSML (like Edge TTS) will handle breaks via SSML elsewhere
-    # Format: "... " (ellipsis space) creates pause, then title with period, then another pause
-    # Note: The text cleaner normalizes ". . ." to "...", so we use "..." directly
-    # The provider parameter is kept for API compatibility but doesn't affect the output format
-    # as SSML breaks are handled in build_ssml() function
-    
-    # Use ellipsis format (works for all providers)
     return f"... {chapter_title}. ... {content}"
 
 
 class TTSEngine:
     """Main TTS engine for converting text to speech."""
+    
+    # Configuration constants
+    DEFAULT_MAX_CHUNK_BYTES = 3000
+    DEFAULT_CHUNK_RETRIES = 5
+    DEFAULT_CHUNK_RETRY_DELAY = 5.0
+    DEFAULT_VOICE = "en-US-AndrewNeural"
+    DEFAULT_RATE = "+0%"
+    DEFAULT_PITCH = "+0Hz"
+    DEFAULT_VOLUME = "+0%"
+    FILE_CLEANUP_RETRIES = 3
+    FILE_CLEANUP_DELAY = 0.2
 
     def __init__(self, base_text_cleaner: Optional[Callable[[str], str]] = None, 
                  provider_manager: Optional[TTSProviderManager] = None):
@@ -82,21 +87,6 @@ class TTSEngine:
         # VoiceManager returns List[Dict] without type args, but we know it's List[Dict[str, Any]]
         # Suppress warnings about partially unknown types from VoiceManager
         return self.voice_manager.get_voices(locale=locale, provider=provider)  # type: ignore[return-value, arg-type]
-
-    def get_voice_list(self, locale: Optional[str] = None, provider: Optional[str] = None) -> List[str]:
-        """
-        Get formatted list of voices for display.
-
-        Args:
-            locale: Optional locale filter (e.g., "en-US")
-            provider: Optional provider name ("edge_tts" or "pyttsx3")
-
-        Returns:
-            List of formatted voice strings
-        """
-        # VoiceManager returns List[str]
-        # Suppress warnings about partially unknown types from VoiceManager
-        return self.voice_manager.get_voice_list(locale=locale, provider=provider)  # type: ignore[return-value, arg-type]
 
     def convert_text_to_speech(
         self,
@@ -445,7 +435,6 @@ class TTSEngine:
         logger.info(f"Split text into {len(chunks)} chunks")
         
         # Convert chunks in parallel
-        import tempfile
         temp_dir = Path(tempfile.gettempdir())
         chunk_files: List[Path] = []
         
@@ -550,7 +539,6 @@ class TTSEngine:
             
             # Clean up chunk files
             # Add a small delay to ensure file handles are released
-            import time
             time.sleep(0.1)
             
             for cf in chunk_files:
@@ -620,7 +608,6 @@ class TTSEngine:
         
         # Split by sentences first (try to break at natural points)
         # Use multiple sentence delimiters
-        import re
         sentences = re.split(r'([.!?]\s+)', text)
         
         # Recombine sentences with their punctuation
@@ -721,7 +708,6 @@ class TTSEngine:
                 # Explicitly delete references to ensure file handles are released
                 del combined
                 del audio_segments
-                import gc
                 gc.collect()
                 
                 logger.info(f"✓ Merged {len(chunk_files)} audio chunks using pydub")
@@ -731,10 +717,8 @@ class TTSEngine:
                 logger.warning("pydub not available, trying alternative merge method...")
                 
                 # Try using ffmpeg if available
-                import subprocess
                 try:
                     # Create file list for ffmpeg concat
-                    import tempfile
                     temp_dir = Path(tempfile.gettempdir())
                     file_list = temp_dir / f"concat_list_{output_path.stem}.txt"
                     
@@ -765,7 +749,6 @@ class TTSEngine:
                 logger.warning("No audio merging library available. Using first chunk only (incomplete audio).")
                 logger.warning("Install pydub for proper audio merging: pip install pydub")
                 if chunk_files and chunk_files[0].exists():
-                    import shutil
                     shutil.copy2(chunk_files[0], output_path)
                     return True
                 
