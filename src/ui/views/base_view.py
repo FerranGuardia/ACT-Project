@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from ui.main_window import MainWindow  # type: ignore[unused-import]
 
 from PySide6.QtCore import QObject
-from PySide6.QtWidgets import QWidget, QVBoxLayout
+from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from core.logger import get_logger
 from ui.view_config import ViewConfig

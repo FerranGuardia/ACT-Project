@@ -8,17 +8,14 @@ to reduce code duplication.
 from abc import ABCMeta, abstractmethod
 from typing import List
 
-from PySide6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QProgressBar
-)
-from PySide6.QtCore import Qt, QObject
+from PySide6.QtCore import QObject, Qt
 from PySide6.QtGui import QFont
+from PySide6.QtWidgets import (QHBoxLayout, QLabel, QProgressBar, QPushButton,
+                               QVBoxLayout, QWidget)
 
-from ui.styles import (
-    get_queue_item_style, get_icon_container_style,
-    get_status_label_style, get_secondary_text_style,
-    get_font_family, get_font_size_large
-)
+from ui.styles import (get_font_family, get_font_size_large,
+                       get_icon_container_style, get_queue_item_style,
+                       get_secondary_text_style, get_status_label_style)
 from ui.view_config import ViewConfig
 
 
