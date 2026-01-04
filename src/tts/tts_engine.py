@@ -233,6 +233,229 @@ class TTSEngine:
         # Suppress warnings about partially unknown types from VoiceManager
         return self.voice_manager.get_voices(locale=locale, provider=provider)  # type: ignore[return-value, arg-type]
 
+    def _validate_and_resolve_voice(self, voice: Optional[str], provider: Optional[str]) -> Optional[tuple[str, Optional[str], Dict[str, Any]]]:
+        """
+        Validate and resolve voice parameters.
+        
+        Handles:
+        - Voice lookup and ID resolution
+        - Provider validation and fallback logic
+        - Locale and gender extraction for logging
+        
+        Args:
+            voice: Voice ID or name (e.g., "en-US-AndrewNeural"). If None, uses config default.
+            provider: Optional provider name ("edge_tts" or "pyttsx3").
+        
+        Returns:
+            Tuple of (voice_id: str, resolved_provider: Optional[str], voice_dict: Dict[str, Any])
+            or None if voice validation fails
+        """
+        # Get voice with config fallback
+        if voice is None:
+            voice = self.config.get("tts.voice", "en-US-AndrewNeural")
+        
+        # Clean voice name (remove any extra formatting)
+        if voice is not None:
+            voice = voice.strip()
+        else:
+            voice = "en-US-AndrewNeural"  # Fallback if config returns None
+        
+        # Ensure voice is a string at this point
+        if not isinstance(voice, str):
+            logger.error(f"Invalid voice type: {type(voice)}")
+            return None
+        
+        # Validate provider if specified
+        provider_instance: Optional[TTSProvider] = self._get_provider_instance(provider)
+        if provider and not provider_instance:
+            # Provider was specified but not available
+            return None
+        
+        # Look up voice in provider(s)
+        # Suppress warnings about partially unknown return type from VoiceManager
+        voice_dict: Optional[Dict[str, Any]] = self.voice_manager.get_voice_by_name(voice, provider=provider)  # type: ignore[assignment]
+        if not voice_dict:
+            if provider:
+                # If provider is specified and voice not found, fail (no fallback)
+                logger.error(f"Voice '{voice}' not found in provider '{provider}'")
+                return None
+            else:
+                # If no provider specified, try to find voice in any provider
+                logger.warning(f"Voice '{voice}' not found, searching all providers...")
+                # Suppress warnings about partially unknown return type from VoiceManager
+                voice_dict = self.voice_manager.get_voice_by_name(voice, provider=None)  # type: ignore[assignment]
+                if not voice_dict:
+                    logger.error(f"Voice '{voice}' not found in any provider")
+                    return None
+        
+        # Resolve voice ID (prefer id, then ShortName for backward compatibility)
+        # Type ignore because voice_dict is Dict[str, Any] but Pylance sees Dict[Unknown, Unknown]
+        voice_id_raw = voice_dict.get("id") or voice_dict.get("ShortName", voice)  # type: ignore[arg-type]
+        voice_id: str = str(voice_id_raw) if voice_id_raw is not None else voice
+        if voice_id != voice:
+            logger.info(f"Using voice ID '{voice_id}' instead of '{voice}'")
+        
+        # Determine provider from voice metadata if not already specified
+        resolved_provider = provider
+        if resolved_provider is None and "provider" in voice_dict:
+            provider_value = voice_dict.get("provider")  # type: ignore[arg-type]
+            if isinstance(provider_value, str):
+                resolved_provider = provider_value
+                # Validate the provider from metadata
+                metadata_provider_instance = self._get_provider_instance(resolved_provider)
+                if not metadata_provider_instance:
+                    logger.warning(f"Provider '{resolved_provider}' from voice metadata is not available, will use fallback")
+                    resolved_provider = None
+                else:
+                    logger.info(f"Using provider '{resolved_provider}' from voice metadata")
+        
+        # Extract and log locale and gender
+        # Type ignore because voice_dict is Dict[str, Any] but Pylance sees Dict[Unknown, Unknown]
+        locale_raw = voice_dict.get('language') or voice_dict.get('Locale', 'unknown')  # type: ignore[arg-type]
+        gender_raw = voice_dict.get('gender') or voice_dict.get('Gender', 'unknown')  # type: ignore[arg-type]
+        locale_value: str = str(locale_raw) if locale_raw is not None else 'unknown'
+        gender_value: str = str(gender_raw) if gender_raw is not None else 'unknown'
+        logger.info(f"Voice '{voice_id}' validated successfully (Locale: {locale_value}, Gender: {gender_value})")
+        
+        return voice_id, resolved_provider, voice_dict
+
+    def _prepare_text(self, text: str) -> Optional[str]:
+        """
+        Clean and validate text for TTS conversion.
+        
+        Args:
+            text: Raw text to prepare
+        
+        Returns:
+            Cleaned text suitable for TTS, or None if validation fails
+        """
+        # Clean text for TTS
+        cleaned_text = clean_text_for_tts(text, self.base_text_cleaner)
+        
+        # Validate text is not empty
+        if not cleaned_text or not cleaned_text.strip():
+            logger.error(f"Text is empty after cleaning - cannot convert to speech")
+            return None
+        
+        # Log text length for debugging
+        text_length = len(cleaned_text)
+        text_bytes = len(cleaned_text.encode('utf-8'))
+        logger.info(f"Text length after cleaning: {text_length} characters ({text_bytes} bytes)")
+        if text_length > 0:
+            preview = cleaned_text[:100].replace('\n', ' ').strip()
+            logger.info(f"Text preview (first 100 chars): {preview}...")
+        
+        return cleaned_text
+
+    def _build_text_for_conversion(self, text: str, provider_instance: Optional[TTSProvider], 
+                                    rate: Optional[float] = None, pitch: Optional[float] = None, 
+                                    volume: Optional[float] = None) -> tuple[str, bool]:
+        """
+        Build final text for conversion with SSML if supported.
+        
+        Args:
+            text: Cleaned text to convert
+            provider_instance: Provider instance to check SSML support
+            rate: Speech rate adjustment
+            pitch: Pitch adjustment
+            volume: Volume adjustment
+        
+        Returns:
+            Tuple of (text_to_convert: str, use_ssml: bool)
+        """
+        # Determine if SSML is supported
+        use_ssml_for_provider: bool = False
+        if provider_instance:
+            # Provider was already validated above
+            use_ssml_for_provider = provider_instance.supports_ssml()
+        else:
+            # If no provider specified, check if default provider supports SSML
+            default_provider = self.provider_manager.get_available_provider()
+            if default_provider:
+                use_ssml_for_provider = default_provider.supports_ssml()
+        
+        # Build SSML if supported
+        if use_ssml_for_provider:
+            ssml_text = build_ssml(text, rate=rate, pitch=pitch, volume=volume)
+            use_ssml = ssml_text != text
+            text_to_convert = ssml_text if use_ssml else text
+        else:
+            # For other providers, use plain text (SSML not supported)
+            text_to_convert = text
+            use_ssml = False
+        
+        return text_to_convert, use_ssml
+
+    def _route_conversion(self, text: str, voice_id: str, output_path: Path, 
+                         provider: Optional[str], provider_instance: Optional[TTSProvider],
+                         rate: Optional[float] = None, pitch: Optional[float] = None, 
+                         volume: Optional[float] = None) -> bool:
+        """
+        Route text to appropriate conversion method (chunked vs direct).
+        
+        Determines if chunking is needed and delegates to the appropriate conversion method.
+        
+        Args:
+            text: Prepared text to convert
+            voice_id: Voice identifier
+            output_path: Path for output audio file
+            provider: Provider name (optional)
+            provider_instance: Provider instance (optional)
+            rate: Speech rate adjustment
+            pitch: Pitch adjustment
+            volume: Volume adjustment
+        
+        Returns:
+            True if conversion successful, False otherwise
+        """
+        text_bytes_size = len(text.encode('utf-8'))
+        
+        logger.info(f"Converting text to speech: {output_path.name}")
+        logger.info(f"Voice: {voice_id}, Provider: {provider or 'auto'}, Rate: {rate}%, Pitch: {pitch}%, Volume: {volume}%")
+        logger.info(f"Text size: {text_bytes_size} bytes")
+        
+        # Determine which provider will be used and check if chunking is needed
+        provider_for_chunking = provider_instance if provider_instance else self.provider_manager.get_available_provider()
+        
+        # Check if chunking is needed based on provider capabilities
+        needs_chunking = False
+        max_bytes = None
+        if provider_for_chunking:
+            if provider_for_chunking.supports_chunking():
+                max_bytes = provider_for_chunking.get_max_text_bytes()
+                if max_bytes and text_bytes_size > max_bytes:
+                    needs_chunking = True
+        
+        if needs_chunking and max_bytes:
+            # Use chunking for providers that support it
+            logger.info(f"Text exceeds {max_bytes} bytes ({text_bytes_size} bytes), using chunking...")
+            return self._convert_with_chunking(text, voice_id, output_path, rate, pitch, volume, provider)
+        else:
+            # Use direct conversion
+            if provider_instance:
+                # Provider was already validated
+                logger.info(f"Attempting conversion with provider '{provider}' (no fallback)")
+                return provider_instance.convert_text_to_speech(
+                    text=text,
+                    voice=voice_id,
+                    output_path=output_path,
+                    rate=rate,
+                    pitch=pitch,
+                    volume=volume
+                )
+            else:
+                # No provider specified - use fallback logic
+                logger.info(f"Attempting conversion with provider manager (auto fallback)")
+                return self.provider_manager.convert_with_fallback(
+                    text=text,
+                    voice=voice_id,
+                    output_path=output_path,
+                    preferred_provider=None,
+                    rate=rate,
+                    pitch=pitch,
+                    volume=volume
+                )
+
     def convert_text_to_speech(
         self,
         text: str,
@@ -260,173 +483,39 @@ class TTSEngine:
         Returns:
             True if successful, False otherwise
         """
-        # Get voice
-        if voice is None:
-            voice = self.config.get("tts.voice", "en-US-AndrewNeural")
-        
-        # Clean voice name (remove any extra formatting)
-        if voice is not None:
-            voice = voice.strip()
-        else:
-            voice = "en-US-AndrewNeural"  # Fallback if config returns None
-        
-        # Ensure voice is a string at this point
-        if not isinstance(voice, str):
-            logger.error(f"Invalid voice type: {type(voice)}")
+        # Step 1: Validate and resolve voice parameters
+        voice_validation_result = self._validate_and_resolve_voice(voice, provider)
+        if voice_validation_result is None:
             return False
         
-        # Get provider instance once and reuse it (avoid redundant lookups)
-        # get_provider() already returns None if provider is unavailable
-        provider_instance: Optional[TTSProvider] = self._get_provider_instance(provider)
-        if provider and not provider_instance:
-            # Provider was specified but not available
-            return False
+        voice_id, provider, voice_dict = voice_validation_result
         
-        # Determine which provider to use for voice lookup
-        # If provider is specified, look up voice in that provider only
-        # Otherwise, search all providers
-        # Suppress warnings about partially unknown return type from VoiceManager
-        voice_dict: Optional[Dict[str, Any]] = self.voice_manager.get_voice_by_name(voice, provider=provider)  # type: ignore[assignment]
-        if not voice_dict:
-            if provider:
-                # If provider is specified and voice not found, fail (no fallback)
-                logger.error(f"Voice '{voice}' not found in provider '{provider}'")
-                return False
-            else:
-                # If no provider specified, try to find voice in any provider
-                logger.warning(f"Voice '{voice}' not found, searching all providers...")
-                # Suppress warnings about partially unknown return type from VoiceManager
-                voice_dict = self.voice_manager.get_voice_by_name(voice, provider=None)  # type: ignore[assignment]
-                if not voice_dict:
-                    logger.error(f"Voice '{voice}' not found in any provider")
-                    return False
-        
-        # Get the voice ID (prefer id, then ShortName for backward compatibility)
-        # Type ignore because voice_dict is Dict[str, Any] but Pylance sees Dict[Unknown, Unknown]
-        voice_id_raw = voice_dict.get("id") or voice_dict.get("ShortName", voice)  # type: ignore[arg-type]
-        voice_id: str = str(voice_id_raw) if voice_id_raw is not None else voice
-        if voice_id != voice:
-            logger.info(f"Using voice ID '{voice_id}' instead of '{voice}'")
-            voice = voice_id
-        
-        # If provider wasn't specified, try to determine it from voice_dict
-        if provider is None and "provider" in voice_dict:
-            provider_value = voice_dict.get("provider")  # type: ignore[arg-type]
-            if isinstance(provider_value, str):
-                provider = provider_value
-                # Update provider_instance when provider is determined from voice metadata
-                provider_instance = self._get_provider_instance(provider)
-                if not provider_instance:
-                    logger.warning(f"Provider '{provider}' from voice metadata is not available, will use fallback")
-                else:
-                    logger.info(f"Using provider '{provider}' from voice metadata")
-        
-        # Get locale and gender for logging
-        # Type ignore because voice_dict is Dict[str, Any] but Pylance sees Dict[Unknown, Unknown]
-        locale_raw = voice_dict.get('language') or voice_dict.get('Locale', 'unknown')  # type: ignore[arg-type]
-        gender_raw = voice_dict.get('gender') or voice_dict.get('Gender', 'unknown')  # type: ignore[arg-type]
-        locale_value: str = str(locale_raw) if locale_raw is not None else 'unknown'
-        gender_value: str = str(gender_raw) if gender_raw is not None else 'unknown'
-        logger.info(f"Voice '{voice}' validated successfully (Locale: {locale_value}, Gender: {gender_value})")
+        # Get provider instance for later use if not already resolved
+        provider_instance: Optional[TTSProvider] = self._get_provider_instance(provider) if provider else None
 
-        # Get rate, pitch, volume from config if not provided
+        # Step 2: Get rate, pitch, volume from config if not provided
         rate, pitch, volume = self._get_speech_params(rate, pitch, volume)
 
-        # Clean text for TTS
-        cleaned_text = clean_text_for_tts(text, self.base_text_cleaner)
-        
-        # Validate text is not empty
-        if not cleaned_text or not cleaned_text.strip():
-            logger.error(f"Text is empty after cleaning - cannot convert to speech")
+        # Step 3: Prepare text for conversion
+        cleaned_text = self._prepare_text(text)
+        if cleaned_text is None:
             return False
-        
-        # Log text length for debugging
-        text_length = len(cleaned_text)
-        text_bytes = len(cleaned_text.encode('utf-8'))
-        logger.info(f"Text length after cleaning: {text_length} characters ({text_bytes} bytes)")
-        if text_length > 0:
-            preview = cleaned_text[:100].replace('\n', ' ').strip()
-            logger.info(f"Text preview (first 100 chars): {preview}...")
 
-        # Build SSML (only for providers that support it)
-        # Reuse provider_instance if already fetched, otherwise get default
-        use_ssml_for_provider: bool = False
-        if provider_instance:
-            # Provider was already fetched and validated above
-            use_ssml_for_provider = provider_instance.supports_ssml()
-        else:
-            # If no provider specified, check if default provider supports SSML
-            default_provider = self.provider_manager.get_available_provider()
-            if default_provider:
-                use_ssml_for_provider = default_provider.supports_ssml()
+        # Step 4: Build text for conversion (with SSML if supported)
+        text_to_convert, use_ssml = self._build_text_for_conversion(
+            cleaned_text, provider_instance, rate, pitch, volume
+        )
         
-        if use_ssml_for_provider:
-            ssml_text = build_ssml(cleaned_text, rate=rate, pitch=pitch, volume=volume)
-            use_ssml = ssml_text != cleaned_text
-            text_to_convert = ssml_text if use_ssml else cleaned_text
-        else:
-            # For other providers, use plain text (SSML not supported)
-            text_to_convert = cleaned_text
-            use_ssml = False
+        logger.info(f"Using SSML: {use_ssml}")
 
         # Ensure output directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        text_bytes_size = len(text_to_convert.encode('utf-8'))
-        
-        logger.info(f"Converting text to speech: {output_path.name}")
-        logger.info(f"Voice: {voice}, Provider: {provider or 'auto'}, Rate: {rate}%, Pitch: {pitch}%, Volume: {volume}%")
-        logger.info(f"Using SSML: {use_ssml}")
-        logger.info(f"Text size: {text_bytes_size} bytes")
 
-        # Determine which provider will be used and check if chunking is needed
-        # Reuse provider_instance if already fetched, otherwise get default
-        provider_for_chunking = provider_instance if provider_instance else self.provider_manager.get_available_provider()
-        
-        # Check if chunking is needed based on provider capabilities
-        # get_provider() and get_available_provider() already filter unavailable providers
-        needs_chunking = False
-        max_bytes = None
-        if provider_for_chunking:
-            if provider_for_chunking.supports_chunking():
-                max_bytes = provider_for_chunking.get_max_text_bytes()
-                if max_bytes and text_bytes_size > max_bytes:
-                    needs_chunking = True
-        
-        if needs_chunking and max_bytes:
-            # Use chunking for providers that support it
-            # Voice is already validated as string at line 159
-            logger.info(f"Text exceeds {max_bytes} bytes ({text_bytes_size} bytes), using chunking...")
-            return self._convert_with_chunking(text_to_convert, voice, output_path, rate, pitch, volume, provider)
-        else:
-            # Use provider manager for conversion
-            # If provider is specified, use it directly (no fallback)
-            # If not specified, use fallback logic
-            if provider_instance:
-                # Provider was already fetched and validated above
-                # Voice is already validated as string at line 159
-                logger.info(f"Attempting conversion with provider '{provider}' (no fallback)")
-                return provider_instance.convert_text_to_speech(
-                    text=text_to_convert,
-                    voice=voice,
-                    output_path=output_path,
-                    rate=rate,
-                    pitch=pitch,
-                    volume=volume
-                )
-            else:
-                # No provider specified - use fallback logic
-                # Voice is already validated as string at line 159
-                logger.info(f"Attempting conversion with provider manager (auto fallback)")
-                return self.provider_manager.convert_with_fallback(
-                    text=text_to_convert,
-                    voice=voice,
-                    output_path=output_path,
-                    preferred_provider=None,
-                    rate=rate,
-                    pitch=pitch,
-                    volume=volume
-                )
+        # Step 5: Route to appropriate conversion method
+        return self._route_conversion(
+            text_to_convert, voice_id, output_path, provider, provider_instance,
+            rate, pitch, volume
+        )
     async def _convert_chunks_parallel(
         self,
         chunks: List[str],
