@@ -73,6 +73,151 @@ class TTSEngine:
         self.voice_manager = VoiceManager(provider_manager=self.provider_manager)
         self.base_text_cleaner = base_text_cleaner
 
+    def _cleanup_files(self, file_paths: List[Path], max_retries: Optional[int] = None) -> None:
+        """
+        Safely delete files with retries for locked files.
+        
+        Attempts to delete each file, retrying if file is locked (PermissionError, OSError).
+        Uses FILE_CLEANUP_RETRIES and FILE_CLEANUP_DELAY from class constants.
+        
+        Args:
+            file_paths: List of Path objects to delete
+            max_retries: Maximum retry attempts (defaults to FILE_CLEANUP_RETRIES)
+        """
+        if max_retries is None:
+            max_retries = self.FILE_CLEANUP_RETRIES
+        
+        for fpath in file_paths:
+            if not isinstance(fpath, Path) or not fpath.exists():
+                continue
+            
+            for retry in range(max_retries):
+                try:
+                    fpath.unlink()
+                    break
+                except (PermissionError, OSError) as e:
+                    if retry < max_retries - 1:
+                        time.sleep(self.FILE_CLEANUP_DELAY)
+                    else:
+                        logger.warning(f"Failed to delete {fpath} after {max_retries} attempts: {e}")
+                except Exception as e:
+                    logger.warning(f"Error deleting {fpath}: {e}")
+                    break
+
+    def _get_provider_instance(self, provider: Optional[str]) -> Optional[TTSProvider]:
+        """
+        Get a provider instance for the specified provider name.
+        
+        Handles logging of errors if provider is not available.
+        
+        Args:
+            provider: Provider name (e.g., "edge_tts"). If None, returns None.
+        
+        Returns:
+            TTSProvider instance or None if provider is unavailable
+        """
+        if not provider:
+            return None
+        
+        instance = self.provider_manager.get_provider(provider)
+        if not instance:
+            logger.error(f"Provider '{provider}' is not available")
+        return instance
+
+    def _get_speech_params(self, rate: Optional[float] = None, pitch: Optional[float] = None, 
+                           volume: Optional[float] = None) -> tuple[Optional[float], Optional[float], Optional[float]]:
+        """
+        Resolve speech parameters (rate, pitch, volume) with config defaults.
+        
+        Uses provided values if not None, otherwise falls back to config values.
+        
+        Args:
+            rate: Speech rate or None to use config
+            pitch: Pitch adjustment or None to use config
+            volume: Volume adjustment or None to use config
+        
+        Returns:
+            Tuple of (rate, pitch, volume)
+        """
+        if rate is None:
+            rate_str = self.config.get("tts.rate", self.DEFAULT_RATE)
+            rate = parse_rate(rate_str)
+        
+        if pitch is None:
+            pitch_str = self.config.get("tts.pitch", self.DEFAULT_PITCH)
+            pitch = parse_pitch(pitch_str)
+        
+        if volume is None:
+            volume_str = self.config.get("tts.volume", self.DEFAULT_VOLUME)
+            volume = parse_volume(volume_str)
+        
+        return rate, pitch, volume
+
+    def _run_async_task(self, coro):
+        """
+        Run an async coroutine safely with proper event loop management and cleanup.
+        
+        Creates a new event loop, runs the coroutine, cancels pending tasks, and closes the loop.
+        Handles cases where an event loop is already running.
+        
+        Args:
+            coro: Coroutine to execute
+        
+        Returns:
+            Result of the coroutine
+        """
+        # Check if there's already a running event loop
+        try:
+            existing_loop = asyncio.get_running_loop()
+            # If we're in an async context, we can't create a new loop
+            logger.warning("Event loop already running, this may cause issues")
+            return existing_loop.run_until_complete(coro)
+        except RuntimeError:
+            # No running loop, proceed with creating a new one
+            pass
+        
+        # Create new event loop and run with proper cleanup
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(coro)
+        finally:
+            # Cancel all pending tasks before closing
+            try:
+                if not loop.is_closed():
+                    pending = asyncio.all_tasks(loop)
+                    if pending:
+                        for task in pending:
+                            task.cancel()
+                        
+                        # Wait for tasks to complete cancellation
+                        try:
+                            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                        except Exception:
+                            pass  # Ignore errors during task cancellation
+            except Exception:
+                pass  # Ignore errors getting tasks
+            
+            # Close the loop
+            try:
+                if not loop.is_closed():
+                    loop.close()
+            except Exception:
+                pass  # Ignore errors closing loop
+            
+            # Reset event loop
+            try:
+                current_loop = None
+                try:
+                    current_loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    pass
+                
+                if current_loop is loop:
+                    asyncio.set_event_loop(None)
+            except Exception:
+                pass  # Ignore errors resetting event loop
+
     def get_available_voices(self, locale: Optional[str] = None, provider: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Get list of available voices.
@@ -132,12 +277,10 @@ class TTSEngine:
         
         # Get provider instance once and reuse it (avoid redundant lookups)
         # get_provider() already returns None if provider is unavailable
-        provider_instance: Optional[TTSProvider] = None
-        if provider:
-            provider_instance = self.provider_manager.get_provider(provider)
-            if not provider_instance:
-                logger.error(f"Provider '{provider}' is not available")
-                return False
+        provider_instance: Optional[TTSProvider] = self._get_provider_instance(provider)
+        if provider and not provider_instance:
+            # Provider was specified but not available
+            return False
         
         # Determine which provider to use for voice lookup
         # If provider is specified, look up voice in that provider only
@@ -172,7 +315,7 @@ class TTSEngine:
             if isinstance(provider_value, str):
                 provider = provider_value
                 # Update provider_instance when provider is determined from voice metadata
-                provider_instance = self.provider_manager.get_provider(provider)
+                provider_instance = self._get_provider_instance(provider)
                 if not provider_instance:
                     logger.warning(f"Provider '{provider}' from voice metadata is not available, will use fallback")
                 else:
@@ -187,17 +330,7 @@ class TTSEngine:
         logger.info(f"Voice '{voice}' validated successfully (Locale: {locale_value}, Gender: {gender_value})")
 
         # Get rate, pitch, volume from config if not provided
-        if rate is None:
-            rate_str = self.config.get("tts.rate", "+0%")
-            rate = parse_rate(rate_str)
-        
-        if pitch is None:
-            pitch_str = self.config.get("tts.pitch", "+0Hz")
-            pitch = parse_pitch(pitch_str)
-        
-        if volume is None:
-            volume_str = self.config.get("tts.volume", "+0%")
-            volume = parse_volume(volume_str)
+        rate, pitch, volume = self._get_speech_params(rate, pitch, volume)
 
         # Clean text for TTS
         cleaned_text = clean_text_for_tts(text, self.base_text_cleaner)
@@ -447,66 +580,7 @@ class TTSEngine:
             # Convert all chunks in parallel using provider abstraction
             logger.info(f"Converting {len(chunks)} chunks in parallel using {provider_name} provider...")
             
-            # Use a helper function to properly clean up event loop
-            def run_async_with_cleanup(coro):
-                """Run async coroutine with proper cleanup"""
-                # Check if there's a running event loop
-                try:
-                    # Python 3.7+ has get_running_loop()
-                    existing_loop = asyncio.get_running_loop()
-                    # If we're in an async context, we can't use asyncio.run()
-                    # This shouldn't happen in normal usage, but log a warning
-                    logger.warning("Event loop already running, this may cause issues")
-                    # Try to use the existing loop (may fail)
-                    return existing_loop.run_until_complete(coro)
-                except RuntimeError:
-                    # No running loop, proceed with creating a new one
-                    pass
-                
-                # Create new event loop and run with proper cleanup
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    return loop.run_until_complete(coro)
-                finally:
-                    # Cancel all pending tasks before closing
-                    try:
-                        if not loop.is_closed():
-                            pending = asyncio.all_tasks(loop)
-                            if pending:
-                                for task in pending:
-                                    task.cancel()
-                                
-                                # Wait for tasks to complete cancellation
-                                try:
-                                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-                                except Exception:
-                                    pass  # Ignore errors during task cancellation
-                    except Exception:
-                        pass  # Ignore errors getting tasks
-                    
-                    # Close the loop
-                    try:
-                        if not loop.is_closed():
-                            loop.close()
-                    except Exception:
-                        pass  # Ignore errors closing loop
-                    
-                    # Reset event loop
-                    try:
-                        # Only reset if this loop is still the current one
-                        current_loop = None
-                        try:
-                            current_loop = asyncio.get_event_loop()
-                        except RuntimeError:
-                            pass
-                        
-                        if current_loop is loop:
-                            asyncio.set_event_loop(None)
-                    except Exception:
-                        pass  # Ignore errors resetting event loop
-            
-            chunk_files = run_async_with_cleanup(
+            chunk_files = self._run_async_task(
                 self._convert_chunks_parallel(
                     chunks=chunks,
                     voice=voice,
@@ -532,33 +606,13 @@ class TTSEngine:
             if not self._merge_audio_chunks(chunk_files, output_path):
                 logger.error("Failed to merge audio chunks")
                 # Clean up partial chunks
-                for cf in chunk_files:
-                    if isinstance(cf, Path) and cf.exists():
-                        cf.unlink()
+                self._cleanup_files(chunk_files)
                 return False
             
             # Clean up chunk files
             # Add a small delay to ensure file handles are released
             time.sleep(0.1)
-            
-            for cf in chunk_files:
-                if not isinstance(cf, Path):
-                    continue
-                try:
-                    if cf.exists():
-                        # Try multiple times with delays if file is locked
-                        max_retries = 3
-                        for retry in range(max_retries):
-                            try:
-                                cf.unlink()
-                                break
-                            except (PermissionError, OSError) as e:
-                                if retry < max_retries - 1:
-                                    time.sleep(0.2)
-                                else:
-                                    logger.warning(f"Failed to cleanup chunk file {cf} after {max_retries} attempts: {e}")
-                except Exception as e:
-                    logger.warning(f"Failed to cleanup chunk file {cf}: {e}")
+            self._cleanup_files(chunk_files)
             
             # Verify file was created
             if not output_path.exists():
@@ -580,15 +634,7 @@ class TTSEngine:
             logger.error(f"Error in chunked conversion: {error_type}: {error_msg}")
             
             # Clean up partial chunks
-            for cf in chunk_files:
-                if not isinstance(cf, Path):
-                    continue
-                try:
-                    if cf.exists():
-                        cf.unlink()
-                except Exception:
-                    pass
-            
+            self._cleanup_files(chunk_files)
             return False
 
     def _chunk_text(self, text: str, max_bytes: int) -> List[str]:
