@@ -7,24 +7,31 @@ when resuming a queue item.
 
 Run from ACT project root:
     pytest tests/integration/test_gap_detection_integration.py -v
+    
+Skip network tests:
+    pytest tests/integration/test_gap_detection_integration.py -v -m "not network"
 """
 
-import pytest
 import sys
-from pathlib import Path
 import tempfile
 import time
+from pathlib import Path
+
+import pytest
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "src"))
 
-from processor.pipeline import ProcessingPipeline
-from processor.gap_detector import GapDetector
 from core.logger import get_logger
+from processor.gap_detector import GapDetector
+from processor.pipeline import ProcessingPipeline
 
 logger = get_logger("test.gap_detection_integration")
+
+# Pytest markers
+pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
@@ -43,6 +50,8 @@ def test_novel_url():
 class TestGapDetectionIntegration:
     """Integration tests for gap detection feature."""
     
+    @pytest.mark.network
+    @pytest.mark.timeout(300)  # 5 minute timeout for network test
     def test_gap_detection_finds_missing_audio_files(self, temp_output_dir, test_novel_url):
         """Test that gap detection finds missing audio files when resuming."""
         logger.info("="*60)
@@ -171,6 +180,8 @@ class TestGapDetectionIntegration:
         
         logger.info("✅ Gap Detection Integration Test PASSED")
     
+    @pytest.mark.network
+    @pytest.mark.timeout(300)  # 5 minute timeout for network test
     def test_gap_detection_no_gaps_scenario(self, temp_output_dir, test_novel_url):
         """Test gap detection when no gaps exist (all files present)."""
         logger.info("="*60)

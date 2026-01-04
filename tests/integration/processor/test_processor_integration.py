@@ -7,14 +7,15 @@ Tests the integration between:
 - Save/load/resume workflow
 """
 
-import pytest
-import tempfile
 import json
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-
 # Add ACT project to path
 import sys
+import tempfile
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
+
 # Path setup: go up from tests/integration/processor/ to project root
 project_root = Path(__file__).parent.parent.parent.parent
 src_path = project_root / "src"
@@ -23,11 +24,11 @@ if str(project_root) not in sys.path:
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
-from processor.project_manager import ProjectManager
+from processor.chapter_manager import Chapter, ChapterManager, ChapterStatus
 from processor.file_manager import FileManager
-from processor.chapter_manager import ChapterManager, Chapter, ChapterStatus
-from processor.progress_tracker import ProgressTracker, ProcessingStatus
 from processor.pipeline import ProcessingPipeline
+from processor.progress_tracker import ProcessingStatus, ProgressTracker
+from processor.project_manager import ProjectManager
 
 
 class TestProjectFileManagerIntegration:
@@ -312,6 +313,10 @@ class TestErrorHandlingIntegration:
         pipeline.initialize_project(toc_url="https://example.com/toc")
         pipeline.fetch_chapter_urls("https://example.com/toc")
         
+        # Initialize progress tracker (required for process_all_chapters)
+        from processor.progress_tracker import ProgressTracker
+        pipeline.progress_tracker = ProgressTracker(total_chapters=3)
+        
         # Mock scraper: chapter 2 fails, others succeed
         def mock_scrape(url):
             if "2" in url:
@@ -345,15 +350,15 @@ class TestErrorHandlingIntegration:
         result = pipeline.process_all_chapters(ignore_errors=True)
         
         # Should process all chapters despite one failure
-        assert result["total"] == 3
-        assert result["failed"] == 1  # Chapter 2 failed
-        assert result["completed"] == 2  # Chapters 1 and 3 succeeded
+        assert result["total"] == 3, f"Expected total=3, got {result['total']}"
+        assert result["failed"] == 1, f"Expected failed=1, got {result['failed']}"  # Chapter 2 failed
+        assert result["completed"] == 2, f"Expected completed=2, got {result['completed']}"  # Chapters 1 and 3 succeeded
     
     def test_failure_callback_integration(self, pipeline, temp_dir):
         """Test failure callback integration with cleanup (Phase 1 - RQ pattern)."""
         import tempfile
         from pathlib import Path
-        
+
         # Setup
         pipeline.initialize_project(toc_url="https://example.com/toc")
         chapter_manager = pipeline.project_manager.get_chapter_manager()
