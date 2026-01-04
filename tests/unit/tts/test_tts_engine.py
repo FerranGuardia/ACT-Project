@@ -320,8 +320,8 @@ class TestTTSEngine:
         try:
             from src.tts.tts_engine import format_chapter_intro  # type: ignore
             
-            # Test with pyttsx3 provider
-            result = format_chapter_intro("Chapter 1", "This is the content.", provider="pyttsx3")
+            # Test formatting with chapter title and content
+            result = format_chapter_intro("Chapter 1", "This is the content.")
             
             # Should include pauses and chapter title
             assert "Chapter 1" in result
@@ -333,11 +333,11 @@ class TestTTSEngine:
             pytest.skip("TTS module not available")
     
     def test_format_chapter_intro_no_provider(self):
-        """Test formatting chapter introduction without provider (defaults to pyttsx3 format)"""
+        """Test formatting chapter introduction without provider parameter"""
         try:
             from src.tts.tts_engine import format_chapter_intro  # type: ignore
             
-            result = format_chapter_intro("Chapter 2", "Content here.", provider=None)
+            result = format_chapter_intro("Chapter 2", "Content here.")
             
             # Should format the same way as pyttsx3
             assert "Chapter 2" in result
@@ -348,11 +348,11 @@ class TestTTSEngine:
             pytest.skip("TTS module not available")
     
     def test_format_chapter_intro_edge_tts(self):
-        """Test formatting chapter introduction for Edge TTS provider"""
+        """Test formatting chapter introduction (same format regardless of provider)"""
         try:
             from src.tts.tts_engine import format_chapter_intro  # type: ignore
             
-            result = format_chapter_intro("Chapter 3", "More content.", provider="edge_tts")
+            result = format_chapter_intro("Chapter 3", "More content.")
             
             # Should still format with pauses (SSML breaks handled separately)
             assert "Chapter 3" in result

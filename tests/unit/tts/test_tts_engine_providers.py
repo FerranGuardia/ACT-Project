@@ -190,7 +190,7 @@ class TestTTSEngineProviders:
     @patch('tts.tts_engine.TTSProviderManager')
     @patch('tts.tts_engine.VoiceManager')
     def test_get_voice_list_with_provider(self, mock_vm_class, mock_pm_class):
-        """Test get_voice_list with provider parameter"""
+        """Test getting voice list directly from VoiceManager"""
         mock_pm = MagicMock()
         mock_pm_class.return_value = mock_pm
         mock_vm = MagicMock()
@@ -199,9 +199,10 @@ class TestTTSEngineProviders:
         mock_vm_class.return_value = mock_vm
         
         engine = TTSEngine(provider_manager=mock_pm)
-        voice_list = engine.get_voice_list(provider="pyttsx3")
+        # Since get_voice_list was removed from TTSEngine, test that voice_manager has it
+        voice_list = engine.voice_manager.get_voice_list(provider="pyttsx3")
         
-        mock_vm.get_voice_list.assert_called_once_with(locale=None, provider="pyttsx3")
+        mock_vm.get_voice_list.assert_called_once_with(provider="pyttsx3")
         assert voice_list == mock_voice_list
     
     @patch('tts.tts_engine.TTSProviderManager')
