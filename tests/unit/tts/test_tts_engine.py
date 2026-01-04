@@ -390,10 +390,14 @@ class TestTTSEngine:
                 # Mock convert_chunk_async to create files
                 async def mock_convert_chunk(text, voice, output_path, rate=None, pitch=None, volume=None):
                     # Ensure file exists and has content
+                    # Convert Path to Path if string
+                    if isinstance(output_path, str):
+                        output_path = Path(output_path)
                     output_path.parent.mkdir(parents=True, exist_ok=True)
                     output_path.write_bytes(b'fake audio data')
                     return True
                 
+                # Use a proper AsyncMock that returns an awaitable
                 mock_provider.convert_chunk_async = AsyncMock(side_effect=mock_convert_chunk)
                 
                 # Run the parallel conversion
@@ -450,6 +454,8 @@ class TestTTSEngine:
                     nonlocal call_count
                     call_count += 1
                     # First call creates empty file, second call creates valid file
+                    if isinstance(output_path, str):
+                        output_path = Path(output_path)
                     output_path.parent.mkdir(parents=True, exist_ok=True)
                     if call_count == 1:
                         output_path.write_bytes(b'')  # Empty file
@@ -512,6 +518,8 @@ class TestTTSEngine:
                     if call_count == 1:
                         raise Exception("Network error")
                     else:
+                        if isinstance(output_path, str):
+                            output_path = Path(output_path)
                         output_path.parent.mkdir(parents=True, exist_ok=True)
                         output_path.write_bytes(b'valid audio data')
                     return True
@@ -615,6 +623,8 @@ class TestTTSEngine:
                     start_times.append(time.time())
                     # Small delay to simulate processing
                     await asyncio.sleep(0.1)
+                    if isinstance(output_path, str):
+                        output_path = Path(output_path)
                     output_path.parent.mkdir(parents=True, exist_ok=True)
                     output_path.write_bytes(b'audio data')
                     return True

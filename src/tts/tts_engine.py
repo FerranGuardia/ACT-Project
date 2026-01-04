@@ -5,23 +5,20 @@ Handles conversion of text to audio files using Edge-TTS.
 """
 
 import asyncio
-import gc
-import re
-import shutil
-import subprocess
 import tempfile
-import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from core.config_manager import get_config
+from core.config_manager import ConfigManager
 from core.logger import get_logger
 
+from .audio_merger import AudioMerger
 from .providers.base_provider import TTSProvider
 from .providers.provider_manager import TTSProviderManager
-from .ssml_builder import build_ssml, parse_pitch, parse_rate, parse_volume
-from .text_cleaner import clean_text_for_tts
+from .text_processor import TextProcessor
+from .tts_utils import TTSUtils
 from .voice_manager import VoiceManager
+from .voice_validator import VoiceValidator
 
 logger = get_logger("tts.tts_engine")
 
@@ -68,327 +65,52 @@ class TTSEngine:
                                (e.g., scraper text cleaner)
             provider_manager: Optional TTSProviderManager instance. If None, creates a new one.
         """
-        self.config = get_config()
+        self.config = ConfigManager()
         self.provider_manager = provider_manager or TTSProviderManager()
-        self.voice_manager = VoiceManager(provider_manager=self.provider_manager)
         self.base_text_cleaner = base_text_cleaner
+        
+        # Initialize sub-modules
+        self.voice_manager = VoiceManager(provider_manager=self.provider_manager)
+        
+        self.voice_validator = VoiceValidator(self.voice_manager, self.provider_manager)
+        self.text_processor = TextProcessor(self.provider_manager, base_text_cleaner)
+        self.tts_utils = TTSUtils(self.provider_manager)
+        self.audio_merger = AudioMerger(self.provider_manager, self._cleanup_files)
 
     def _cleanup_files(self, file_paths: List[Path], max_retries: Optional[int] = None) -> None:
-        """
-        Safely delete files with retries for locked files.
-        
-        Attempts to delete each file, retrying if file is locked (PermissionError, OSError).
-        Uses FILE_CLEANUP_RETRIES and FILE_CLEANUP_DELAY from class constants.
-        
-        Args:
-            file_paths: List of Path objects to delete
-            max_retries: Maximum retry attempts (defaults to FILE_CLEANUP_RETRIES)
-        """
-        if max_retries is None:
-            max_retries = self.FILE_CLEANUP_RETRIES
-        
-        for fpath in file_paths:
-            if not isinstance(fpath, Path) or not fpath.exists():
-                continue
-            
-            for retry in range(max_retries):
-                try:
-                    fpath.unlink()
-                    break
-                except (PermissionError, OSError) as e:
-                    if retry < max_retries - 1:
-                        time.sleep(self.FILE_CLEANUP_DELAY)
-                    else:
-                        logger.warning(f"Failed to delete {fpath} after {max_retries} attempts: {e}")
-                except Exception as e:
-                    logger.warning(f"Error deleting {fpath}: {e}")
-                    break
+        """Delegate to TTSUtils for file cleanup."""
+        self.tts_utils.cleanup_files(file_paths, max_retries)
 
     def _get_provider_instance(self, provider: Optional[str]) -> Optional[TTSProvider]:
-        """
-        Get a provider instance for the specified provider name.
-        
-        Handles logging of errors if provider is not available.
-        
-        Args:
-            provider: Provider name (e.g., "edge_tts"). If None, returns None.
-        
-        Returns:
-            TTSProvider instance or None if provider is unavailable
-        """
-        if not provider:
-            return None
-        
-        instance = self.provider_manager.get_provider(provider)
-        if not instance:
-            logger.error(f"Provider '{provider}' is not available")
-        return instance
+        """Delegate to TTSUtils for provider instance retrieval."""
+        return self.tts_utils.get_provider_instance(provider)
 
     def _get_speech_params(self, rate: Optional[float] = None, pitch: Optional[float] = None, 
                            volume: Optional[float] = None) -> tuple[Optional[float], Optional[float], Optional[float]]:
-        """
-        Resolve speech parameters (rate, pitch, volume) with config defaults.
-        
-        Uses provided values if not None, otherwise falls back to config values.
-        
-        Args:
-            rate: Speech rate or None to use config
-            pitch: Pitch adjustment or None to use config
-            volume: Volume adjustment or None to use config
-        
-        Returns:
-            Tuple of (rate, pitch, volume)
-        """
-        if rate is None:
-            rate_str = self.config.get("tts.rate", self.DEFAULT_RATE)
-            rate = parse_rate(rate_str)
-        
-        if pitch is None:
-            pitch_str = self.config.get("tts.pitch", self.DEFAULT_PITCH)
-            pitch = parse_pitch(pitch_str)
-        
-        if volume is None:
-            volume_str = self.config.get("tts.volume", self.DEFAULT_VOLUME)
-            volume = parse_volume(volume_str)
-        
-        return rate, pitch, volume
+        """Delegate to TTSUtils for speech parameter resolution."""
+        return self.tts_utils.get_speech_params(rate, pitch, volume)
 
     def _run_async_task(self, coro):
-        """
-        Run an async coroutine safely with proper event loop management and cleanup.
-        
-        Creates a new event loop, runs the coroutine, cancels pending tasks, and closes the loop.
-        Handles cases where an event loop is already running.
-        
-        Args:
-            coro: Coroutine to execute
-        
-        Returns:
-            Result of the coroutine
-        """
-        # Check if there's already a running event loop
-        try:
-            existing_loop = asyncio.get_running_loop()
-            # If we're in an async context, we can't create a new loop
-            logger.warning("Event loop already running, this may cause issues")
-            return existing_loop.run_until_complete(coro)
-        except RuntimeError:
-            # No running loop, proceed with creating a new one
-            pass
-        
-        # Create new event loop and run with proper cleanup
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            return loop.run_until_complete(coro)
-        finally:
-            # Cancel all pending tasks before closing
-            try:
-                if not loop.is_closed():
-                    pending = asyncio.all_tasks(loop)
-                    if pending:
-                        for task in pending:
-                            task.cancel()
-                        
-                        # Wait for tasks to complete cancellation
-                        try:
-                            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-                        except Exception:
-                            pass  # Ignore errors during task cancellation
-            except Exception:
-                pass  # Ignore errors getting tasks
-            
-            # Close the loop
-            try:
-                if not loop.is_closed():
-                    loop.close()
-            except Exception:
-                pass  # Ignore errors closing loop
-            
-            # Reset event loop
-            try:
-                current_loop = None
-                try:
-                    current_loop = asyncio.get_event_loop()
-                except RuntimeError:
-                    pass
-                
-                if current_loop is loop:
-                    asyncio.set_event_loop(None)
-            except Exception:
-                pass  # Ignore errors resetting event loop
+        """Delegate to TTSUtils for async task execution."""
+        return self.tts_utils.run_async_task(coro)
 
     def get_available_voices(self, locale: Optional[str] = None, provider: Optional[str] = None) -> List[Dict[str, Any]]:
-        """
-        Get list of available voices.
-
-        Args:
-            locale: Optional locale filter (e.g., "en-US")
-            provider: Optional provider name ("edge_tts" or "pyttsx3")
-
-        Returns:
-            List of voice dictionaries
-        """
-        # VoiceManager returns List[Dict] without type args, but we know it's List[Dict[str, Any]]
-        # Suppress warnings about partially unknown types from VoiceManager
-        return self.voice_manager.get_voices(locale=locale, provider=provider)  # type: ignore[return-value, arg-type]
+        """Delegate to VoiceValidator."""
+        return self.voice_validator.get_available_voices(locale=locale, provider=provider)  # type: ignore[return-value, arg-type]
 
     def _validate_and_resolve_voice(self, voice: Optional[str], provider: Optional[str]) -> Optional[tuple[str, Optional[str], Dict[str, Any]]]:
-        """
-        Validate and resolve voice parameters.
-        
-        Handles:
-        - Voice lookup and ID resolution
-        - Provider validation and fallback logic
-        - Locale and gender extraction for logging
-        
-        Args:
-            voice: Voice ID or name (e.g., "en-US-AndrewNeural"). If None, uses config default.
-            provider: Optional provider name ("edge_tts" or "pyttsx3").
-        
-        Returns:
-            Tuple of (voice_id: str, resolved_provider: Optional[str], voice_dict: Dict[str, Any])
-            or None if voice validation fails
-        """
-        # Get voice with config fallback
-        if voice is None:
-            voice = self.config.get("tts.voice", "en-US-AndrewNeural")
-        
-        # Clean voice name (remove any extra formatting)
-        if voice is not None:
-            voice = voice.strip()
-        else:
-            voice = "en-US-AndrewNeural"  # Fallback if config returns None
-        
-        # Ensure voice is a string at this point
-        if not isinstance(voice, str):
-            logger.error(f"Invalid voice type: {type(voice)}")
-            return None
-        
-        # Validate provider if specified
-        provider_instance: Optional[TTSProvider] = self._get_provider_instance(provider)
-        if provider and not provider_instance:
-            # Provider was specified but not available
-            return None
-        
-        # Look up voice in provider(s)
-        # Suppress warnings about partially unknown return type from VoiceManager
-        voice_dict: Optional[Dict[str, Any]] = self.voice_manager.get_voice_by_name(voice, provider=provider)  # type: ignore[assignment]
-        if not voice_dict:
-            if provider:
-                # If provider is specified and voice not found, fail (no fallback)
-                logger.error(f"Voice '{voice}' not found in provider '{provider}'")
-                return None
-            else:
-                # If no provider specified, try to find voice in any provider
-                logger.warning(f"Voice '{voice}' not found, searching all providers...")
-                # Suppress warnings about partially unknown return type from VoiceManager
-                voice_dict = self.voice_manager.get_voice_by_name(voice, provider=None)  # type: ignore[assignment]
-                if not voice_dict:
-                    logger.error(f"Voice '{voice}' not found in any provider")
-                    return None
-        
-        # Resolve voice ID (prefer id, then ShortName for backward compatibility)
-        # Type ignore because voice_dict is Dict[str, Any] but Pylance sees Dict[Unknown, Unknown]
-        voice_id_raw = voice_dict.get("id") or voice_dict.get("ShortName", voice)  # type: ignore[arg-type]
-        voice_id: str = str(voice_id_raw) if voice_id_raw is not None else voice
-        if voice_id != voice:
-            logger.info(f"Using voice ID '{voice_id}' instead of '{voice}'")
-        
-        # Determine provider from voice metadata if not already specified
-        resolved_provider = provider
-        if resolved_provider is None and "provider" in voice_dict:
-            provider_value = voice_dict.get("provider")  # type: ignore[arg-type]
-            if isinstance(provider_value, str):
-                resolved_provider = provider_value
-                # Validate the provider from metadata
-                metadata_provider_instance = self._get_provider_instance(resolved_provider)
-                if not metadata_provider_instance:
-                    logger.warning(f"Provider '{resolved_provider}' from voice metadata is not available, will use fallback")
-                    resolved_provider = None
-                else:
-                    logger.info(f"Using provider '{resolved_provider}' from voice metadata")
-        
-        # Extract and log locale and gender
-        # Type ignore because voice_dict is Dict[str, Any] but Pylance sees Dict[Unknown, Unknown]
-        locale_raw = voice_dict.get('language') or voice_dict.get('Locale', 'unknown')  # type: ignore[arg-type]
-        gender_raw = voice_dict.get('gender') or voice_dict.get('Gender', 'unknown')  # type: ignore[arg-type]
-        locale_value: str = str(locale_raw) if locale_raw is not None else 'unknown'
-        gender_value: str = str(gender_raw) if gender_raw is not None else 'unknown'
-        logger.info(f"Voice '{voice_id}' validated successfully (Locale: {locale_value}, Gender: {gender_value})")
-        
-        return voice_id, resolved_provider, voice_dict
+        """Delegate to VoiceValidator."""
+        return self.voice_validator.validate_and_resolve_voice(voice, provider)
 
     def _prepare_text(self, text: str) -> Optional[str]:
-        """
-        Clean and validate text for TTS conversion.
-        
-        Args:
-            text: Raw text to prepare
-        
-        Returns:
-            Cleaned text suitable for TTS, or None if validation fails
-        """
-        # Clean text for TTS
-        cleaned_text = clean_text_for_tts(text, self.base_text_cleaner)
-        
-        # Validate text is not empty
-        if not cleaned_text or not cleaned_text.strip():
-            logger.error(f"Text is empty after cleaning - cannot convert to speech")
-            return None
-        
-        # Log text length for debugging
-        text_length = len(cleaned_text)
-        text_bytes = len(cleaned_text.encode('utf-8'))
-        logger.info(f"Text length after cleaning: {text_length} characters ({text_bytes} bytes)")
-        if text_length > 0:
-            preview = cleaned_text[:100].replace('\n', ' ').strip()
-            logger.info(f"Text preview (first 100 chars): {preview}...")
-        
-        return cleaned_text
+        """Delegate to TextProcessor."""
+        return self.text_processor.prepare_text(text)
 
     def _build_text_for_conversion(self, text: str, provider_instance: Optional[TTSProvider], 
                                     rate: Optional[float] = None, pitch: Optional[float] = None, 
                                     volume: Optional[float] = None) -> tuple[str, bool]:
-        """
-        Build final text for conversion with SSML if supported.
-        
-        Args:
-            text: Cleaned text to convert
-            provider_instance: Provider instance to check SSML support
-            rate: Speech rate adjustment (or None for default)
-            pitch: Pitch adjustment (or None for default)
-            volume: Volume adjustment (or None for default)
-        
-        Returns:
-            Tuple of (text_to_convert: str, use_ssml: bool)
-        """
-        # Determine if SSML is supported
-        use_ssml_for_provider: bool = False
-        if provider_instance:
-            # Provider was already validated above
-            use_ssml_for_provider = provider_instance.supports_ssml()
-        else:
-            # If no provider specified, check if default provider supports SSML
-            default_provider = self.provider_manager.get_available_provider()
-            if default_provider:
-                use_ssml_for_provider = default_provider.supports_ssml()
-        
-        # Build SSML if supported
-        if use_ssml_for_provider:
-            # Ensure we pass float values (use 0.0 as default if None)
-            rate_val = rate if rate is not None else 0.0
-            pitch_val = pitch if pitch is not None else 0.0
-            volume_val = volume if volume is not None else 0.0
-            ssml_text = build_ssml(text, rate=rate_val, pitch=pitch_val, volume=volume_val)
-            use_ssml = ssml_text != text
-            text_to_convert = ssml_text if use_ssml else text
-        else:
-            # For other providers, use plain text (SSML not supported)
-            text_to_convert = text
-            use_ssml = False
-        
-        return text_to_convert, use_ssml
+        """Delegate to TextProcessor."""
+        return self.text_processor.build_text_for_conversion(text, provider_instance, rate, pitch, volume)
 
     def _route_conversion(self, text: str, voice_id: str, output_path: Path, 
                          provider: Optional[str], provider_instance: Optional[TTSProvider],
@@ -526,76 +248,25 @@ class TTSEngine:
         voice: str,
         temp_dir: Path,
         output_stem: str,
-        provider: Optional[TTSProvider],
+        provider: Optional[str | TTSProvider] = None,
         rate: Optional[float] = None,
         pitch: Optional[float] = None,
         volume: Optional[float] = None
     ) -> List[Path]:
-        """Convert chunks in parallel using provider abstraction.
+        """Delegate to AudioMerger for parallel chunk conversion."""
+        # Handle both string provider names and TTSProvider objects (for backward compatibility with tests)
+        provider_instance: Optional[TTSProvider] = None
+        if provider:
+            if isinstance(provider, str):
+                provider_instance = self._get_provider_instance(provider)
+            else:
+                # Assume it's already a TTSProvider object
+                provider_instance = provider
         
-        Note: The provider must already be validated to support async chunk conversion
-        (i.e., have convert_chunk_async method) before calling this method. This is
-        typically done by the caller (_convert_with_chunking).
-        
-        Args:
-            chunks: List of text chunks to convert
-            voice: Voice identifier
-            temp_dir: Temporary directory for chunk files
-            output_stem: Stem name for chunk files
-            provider: TTS provider instance (must support async chunk conversion via convert_chunk_async)
-            rate: Speech rate adjustment
-            pitch: Pitch adjustment
-            volume: Volume adjustment
-        
-        Returns:
-            List of Path objects for converted chunk files
-            
-        Raises:
-            ValueError: If provider is None
-        """
-        if not provider:
-            raise ValueError("Provider is required for parallel chunk conversion")
-        
-        # Provider validation (availability and convert_chunk_async support) is done
-        # by the caller (_convert_with_chunking) to avoid redundancy
-        
-        async def convert_chunk(chunk: str, index: int) -> Path:
-            """Convert a single chunk using the provider's async method"""
-            chunk_path = temp_dir / f"{output_stem}_chunk_{index}.mp3"
-            max_retries = 5
-            retry_delay = 5.0
-            
-            for retry in range(max_retries):
-                try:
-                    # Use provider's async chunk conversion method
-                    success = await provider.convert_chunk_async(  # type: ignore[attr-defined]
-                        text=chunk,
-                        voice=voice,
-                        output_path=chunk_path,
-                        rate=rate,
-                        pitch=pitch,
-                        volume=volume
-                    )
-                    
-                    if success and chunk_path.exists() and chunk_path.stat().st_size > 0:
-                        return chunk_path
-                    else:
-                        logger.warning(f"Chunk {index+1} attempt {retry+1} produced empty file, retrying...")
-                except Exception as retry_error:
-                    if retry < max_retries - 1:
-                        await asyncio.sleep(retry_delay)
-                        retry_delay *= 1.5
-                        logger.debug(f"Retrying chunk {index+1} after error: {retry_error}")
-                    else:
-                        logger.error(f"Failed to convert chunk {index+1} after {max_retries} retries: {retry_error}")
-                        raise retry_error
-            
-            raise Exception(f"Failed to convert chunk {index+1} after {max_retries} retries")
-        
-        # Convert all chunks concurrently
-        tasks = [convert_chunk(chunk, i) for i, chunk in enumerate(chunks)]
-        chunk_files = await asyncio.gather(*tasks)
-        return chunk_files
+        # audio_merger.convert_chunks_parallel is async and returns List[Path]
+        return await self.audio_merger.convert_chunks_parallel(
+            chunks, voice, temp_dir, output_stem, provider_instance, rate, pitch, volume
+        )
 
     def _convert_with_chunking(
         self,
@@ -607,293 +278,75 @@ class TTSEngine:
         volume: Optional[float],
         provider: Optional[str]
     ) -> bool:
-        """
-        Convert text to speech with chunking using provider abstraction.
-        
-        Chunking is used when text exceeds provider limits.
-        Text is split into chunks, converted in parallel, then merged.
-        
-        Args:
-            text: Text to convert (may be SSML)
-            voice: Voice ID
-            output_path: Output file path
-            rate: Speech rate
-            pitch: Pitch adjustment
-            volume: Volume adjustment
-            provider: Provider name (None for auto-detect)
-        
-        Returns:
-            True if successful, False otherwise
-        """
-        # Determine which provider to use for chunking
-        # Use specified provider or get first available provider that supports chunking
-        if provider:
-            provider_name = provider
-            tts_provider = self.provider_manager.get_provider(provider_name)
-            # get_provider() already returns None if provider is unavailable
-        else:
-            # Find first available provider that supports chunking
-            tts_provider = None
-            # Try edge_tts first (supports chunking)
-            # get_provider() already filters unavailable providers
-            candidate = self.provider_manager.get_provider("edge_tts")
-            if candidate and candidate.supports_chunking():
-                tts_provider = candidate
-                provider_name = "edge_tts"
-            
-            # If no chunking-capable provider found, try to get any available provider
-            if not tts_provider:
-                tts_provider = self.provider_manager.get_available_provider()
-                provider_name = tts_provider.get_provider_name() if tts_provider else "unknown"
-        
-        # get_provider() and get_available_provider() already filter unavailable providers
-        if not tts_provider:
-            logger.error(f"Provider '{provider_name}' is not available for chunking")
-            return False
-        
-        # Check if provider supports async chunk conversion
-        if not hasattr(tts_provider, 'convert_chunk_async'):
-            logger.error(f"Provider '{provider_name}' does not support async chunk conversion (required for parallel chunking)")
-            return False
-        
-        MAX_BYTES = 3000
-        chunks = self._chunk_text(text, MAX_BYTES)
-        logger.info(f"Split text into {len(chunks)} chunks")
-        
-        # Convert chunks in parallel
-        temp_dir = Path(tempfile.gettempdir())
-        chunk_files: List[Path] = []
-        
+        """Delegate to AudioMerger for chunked conversion with merging."""
         try:
-            # Log chunk details
-            for i, chunk in enumerate(chunks):
-                chunk_bytes = len(chunk.encode('utf-8'))
-                logger.info(f"Chunk {i+1}/{len(chunks)}: {chunk_bytes} bytes, {len(chunk)} chars")
+            # Use temp directory for chunks
+            import time
+            temp_dir = Path(tempfile.gettempdir()) / f"tts_chunks_{int(time.time() * 1000)}"
+            temp_dir.mkdir(parents=True, exist_ok=True)
             
-            # Convert all chunks in parallel using provider abstraction
-            logger.info(f"Converting {len(chunks)} chunks in parallel using {provider_name} provider...")
-            
-            chunk_files = self._run_async_task(
-                self._convert_chunks_parallel(
-                    chunks=chunks,
-                    voice=voice,
-                    temp_dir=temp_dir,
-                    output_stem=output_path.stem,
-                    provider=tts_provider,
-                    rate=rate,
-                    pitch=pitch,
-                    volume=volume
+            try:
+                # Chunk the text
+                chunks = self._chunk_text(text, self.DEFAULT_MAX_CHUNK_BYTES)
+                logger.info(f"Split text into {len(chunks)} chunks")
+                
+                # Convert chunks in parallel
+                chunk_files = self._run_async_task(
+                    self._convert_chunks_parallel(
+                        chunks, voice, temp_dir, output_path.stem,
+                        provider=provider, rate=rate, pitch=pitch, volume=volume
+                    )
                 )
-            )
-            
-            # Log successful conversions
-            for i, chunk_file in enumerate(chunk_files):
-                if chunk_file.exists():
-                    file_size = chunk_file.stat().st_size
-                    logger.info(f"✓ Chunk {i+1} converted successfully ({file_size} bytes)")
-                else:
-                    logger.warning(f"Chunk {i+1} file not found: {chunk_file}")
-            
-            # Merge audio chunks
-            logger.info(f"Merging {len(chunk_files)} audio chunks...")
-            if not self._merge_audio_chunks(chunk_files, output_path):
-                logger.error("Failed to merge audio chunks")
-                # Clean up partial chunks
+                
+                # Merge the chunks
+                if not self._merge_audio_chunks(chunk_files, output_path):
+                    logger.error("Failed to merge audio chunks")
+                    self._cleanup_files(chunk_files)
+                    return False
+                
+                # Clean up chunk files
                 self._cleanup_files(chunk_files)
-                return False
+                
+                # Verify output
+                if not output_path.exists():
+                    logger.error(f"Audio file was not created: {output_path}")
+                    return False
+                
+                file_size = output_path.stat().st_size
+                if file_size == 0:
+                    logger.error(f"Audio file is empty (0 bytes): {output_path}")
+                    output_path.unlink()
+                    return False
+                
+                logger.info(f"✓ Created audio file: {output_path} ({file_size} bytes)")
+                return True
             
-            # Clean up chunk files
-            # Add a small delay to ensure file handles are released
-            time.sleep(0.1)
-            self._cleanup_files(chunk_files)
-            
-            # Verify file was created
-            if not output_path.exists():
-                logger.error(f"Audio file was not created: {output_path}")
-                return False
-            
-            file_size = output_path.stat().st_size
-            if file_size == 0:
-                logger.error(f"Audio file is empty (0 bytes): {output_path}")
-                output_path.unlink()
-                return False
-            
-            logger.info(f"✓ Created audio file: {output_path} ({file_size} bytes)")
-            return True
-            
+            finally:
+                # Clean up temp directory
+                try:
+                    import shutil
+                    shutil.rmtree(temp_dir)
+                    logger.info(f"Cleaned up temp directory: {temp_dir}")
+                except Exception as e:
+                    logger.warning(f"Failed to clean up temp directory {temp_dir}: {e}")
+        
         except Exception as e:
             error_msg = str(e)
             error_type = type(e).__name__
             logger.error(f"Error in chunked conversion: {error_type}: {error_msg}")
-            
-            # Clean up partial chunks
-            self._cleanup_files(chunk_files)
             return False
 
-    def _chunk_text(self, text: str, max_bytes: int) -> List[str]:
-        """
-        Split text into chunks that don't exceed max_bytes when UTF-8 encoded.
-        
-        Args:
-            text: Text to chunk
-            max_bytes: Maximum bytes per chunk
-            
-        Returns:
-            List of text chunks
-        """
-        chunks: List[str] = []
-        current_chunk = ""
-        current_bytes = 0
-        
-        # Split by sentences first (try to break at natural points)
-        # Use multiple sentence delimiters
-        sentences = re.split(r'([.!?]\s+)', text)
-        
-        # Recombine sentences with their punctuation
-        combined_sentences: List[str] = []
-        for i in range(0, len(sentences) - 1, 2):
-            if i + 1 < len(sentences):
-                combined_sentences.append(sentences[i] + sentences[i + 1])
-            else:
-                combined_sentences.append(sentences[i])
-        
-        if len(combined_sentences) == 1:
-            # No sentence breaks, split by spaces
-            combined_sentences = text.split(' ')
-        
-        for sentence in combined_sentences:
-            # Ensure sentence is a string (it should be from List[str])
-            if not isinstance(sentence, str):
-                continue
-            # Ensure sentence has trailing space if it's not the last one
-            if sentence != combined_sentences[-1] and not sentence.endswith((' ', '.', '!', '?')):
-                sentence += ' '
-            
-            sentence_bytes = len(sentence.encode('utf-8'))
-            
-            if current_bytes + sentence_bytes <= max_bytes:
-                # Add to current chunk
-                current_chunk += sentence
-                current_bytes += sentence_bytes
-            else:
-                # Current chunk is full, start new one
-                if current_chunk:
-                    chunks.append(current_chunk.strip())
-                current_chunk = sentence
-                current_bytes = sentence_bytes
-                
-                # If single sentence is too long, split by words
-                if sentence_bytes > max_bytes:
-                    words = sentence.split(' ')
-                    for word in words:
-                        if not word:
-                            continue
-                        word_with_space = word + ' '
-                        word_bytes = len(word_with_space.encode('utf-8'))
-                        if current_bytes + word_bytes <= max_bytes:
-                            current_chunk += word_with_space
-                            current_bytes += word_bytes
-                        else:
-                            if current_chunk:
-                                chunks.append(current_chunk.strip())
-                            current_chunk = word_with_space
-                            current_bytes = word_bytes
-        
-        # Add remaining chunk
-        if current_chunk.strip():
-            chunks.append(current_chunk.strip())
-        
-        # Verify all chunks are within limit
-        verified_chunks: List[str] = []
-        for chunk in chunks:
-            if not isinstance(chunk, str):
-                continue
-            chunk_bytes = len(chunk.encode('utf-8'))
-            if chunk_bytes > max_bytes:
-                logger.warning(f"Chunk exceeds limit ({chunk_bytes} > {max_bytes} bytes), splitting further...")
-                # Recursively split oversized chunks
-                sub_chunks = self._chunk_text(chunk, max_bytes // 2)
-                verified_chunks.extend(sub_chunks)
-            else:
-                verified_chunks.append(chunk)
-        
-        return verified_chunks
+    def _chunk_text(self, text: str, max_bytes: int = 3000) -> List[str]:
+        """Delegate to AudioMerger for text chunking."""
+        return self.audio_merger.chunk_text(text, max_bytes)
 
     def _merge_audio_chunks(self, chunk_files: List[Path], output_path: Path) -> bool:
-        """
-        Merge multiple audio files into one.
-        
-        Args:
-            chunk_files: List of paths to audio chunk files
-            output_path: Path for merged output file
-            
-        Returns:
-            True if successful, False otherwise
-        """
+        """Delegate to AudioMerger for audio merging."""
         try:
-            # Try using pydub if available
-            try:
-                from pydub import AudioSegment  # type: ignore[import-untyped]
-                
-                combined = AudioSegment.empty()  # type: ignore[attr-defined]
-                audio_segments = []
-                for chunk_file in chunk_files:
-                    audio = AudioSegment.from_mp3(str(chunk_file))  # type: ignore[attr-defined]
-                    audio_segments.append(audio)
-                    combined += audio  # type: ignore[assignment]
-                
-                combined.export(str(output_path), format="mp3")  # type: ignore[attr-defined]
-                
-                # Explicitly delete references to ensure file handles are released
-                del combined
-                del audio_segments
-                gc.collect()
-                
-                logger.info(f"✓ Merged {len(chunk_files)} audio chunks using pydub")
-                return True
-            except ImportError:
-                # pydub not available, try using ffmpeg directly or simple concatenation
-                logger.warning("pydub not available, trying alternative merge method...")
-                
-                # Try using ffmpeg if available
-                try:
-                    # Create file list for ffmpeg concat
-                    temp_dir = Path(tempfile.gettempdir())
-                    file_list = temp_dir / f"concat_list_{output_path.stem}.txt"
-                    
-                    with open(file_list, 'w', encoding='utf-8') as f:
-                        for chunk_file in chunk_files:
-                            f.write(f"file '{chunk_file.absolute()}'\n")
-                    
-                    # Use ffmpeg to concatenate
-                    result = subprocess.run(
-                        ['ffmpeg', '-f', 'concat', '-safe', '0', '-i', str(file_list), '-c', 'copy', str(output_path)],
-                        capture_output=True,
-                        text=True
-                    )
-                    
-                    # Clean up file list
-                    if file_list.exists():
-                        file_list.unlink()
-                    
-                    if result.returncode == 0 and output_path.exists():
-                        logger.info(f"✓ Merged {len(chunk_files)} audio chunks using ffmpeg")
-                        return True
-                    else:
-                        logger.error(f"ffmpeg merge failed: {result.stderr}")
-                except (FileNotFoundError, subprocess.SubprocessError) as e:
-                    logger.error(f"ffmpeg not available or failed: {e}")
-                
-                # Last resort: just copy the first chunk (not ideal, but better than nothing)
-                logger.warning("No audio merging library available. Using first chunk only (incomplete audio).")
-                logger.warning("Install pydub for proper audio merging: pip install pydub")
-                if chunk_files and chunk_files[0].exists():
-                    shutil.copy2(chunk_files[0], output_path)
-                    return True
-                
-                return False
+            self.audio_merger.merge_audio_chunks(chunk_files, output_path)
+            return True
         except Exception as e:
-            logger.error(f"Error merging audio chunks: {e}")
+            logger.error(f"Failed to merge audio chunks: {e}")
             return False
 
     def convert_file_to_speech(

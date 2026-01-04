@@ -126,6 +126,42 @@ if "tts.ssml_builder" not in sys.modules:
     setattr(ssml_builder_module, "parse_volume", lambda s: 0.0)  # type: ignore[attr-defined]
     sys.modules["tts.ssml_builder"] = ssml_builder_module
 
+# Load voice_validator module
+voice_validator_path = act_src / "tts" / "voice_validator.py"
+spec_vv = importlib.util.spec_from_file_location("tts.voice_validator", voice_validator_path)
+if spec_vv is None or spec_vv.loader is None:
+    raise ImportError(f"Could not load spec for voice_validator from {voice_validator_path}")
+voice_validator_module = importlib.util.module_from_spec(spec_vv)
+sys.modules["tts.voice_validator"] = voice_validator_module
+spec_vv.loader.exec_module(voice_validator_module)
+
+# Load text_processor module
+text_processor_path = act_src / "tts" / "text_processor.py"
+spec_tp = importlib.util.spec_from_file_location("tts.text_processor", text_processor_path)
+if spec_tp is None or spec_tp.loader is None:
+    raise ImportError(f"Could not load spec for text_processor from {text_processor_path}")
+text_processor_module = importlib.util.module_from_spec(spec_tp)
+sys.modules["tts.text_processor"] = text_processor_module
+spec_tp.loader.exec_module(text_processor_module)
+
+# Load tts_utils module
+tts_utils_path = act_src / "tts" / "tts_utils.py"
+spec_tu = importlib.util.spec_from_file_location("tts.tts_utils", tts_utils_path)
+if spec_tu is None or spec_tu.loader is None:
+    raise ImportError(f"Could not load spec for tts_utils from {tts_utils_path}")
+tts_utils_module = importlib.util.module_from_spec(spec_tu)
+sys.modules["tts.tts_utils"] = tts_utils_module
+spec_tu.loader.exec_module(tts_utils_module)
+
+# Load audio_merger module
+audio_merger_path = act_src / "tts" / "audio_merger.py"
+spec_am = importlib.util.spec_from_file_location("tts.audio_merger", audio_merger_path)
+if spec_am is None or spec_am.loader is None:
+    raise ImportError(f"Could not load spec for audio_merger from {audio_merger_path}")
+audio_merger_module = importlib.util.module_from_spec(spec_am)
+sys.modules["tts.audio_merger"] = audio_merger_module
+spec_am.loader.exec_module(audio_merger_module)
+
 # Load tts_engine
 tts_engine_path = act_src / "tts" / "tts_engine.py"
 spec_engine = importlib.util.spec_from_file_location("tts.tts_engine", tts_engine_path)
