@@ -356,9 +356,9 @@ class TTSEngine:
         Args:
             text: Cleaned text to convert
             provider_instance: Provider instance to check SSML support
-            rate: Speech rate adjustment
-            pitch: Pitch adjustment
-            volume: Volume adjustment
+            rate: Speech rate adjustment (or None for default)
+            pitch: Pitch adjustment (or None for default)
+            volume: Volume adjustment (or None for default)
         
         Returns:
             Tuple of (text_to_convert: str, use_ssml: bool)
@@ -376,7 +376,11 @@ class TTSEngine:
         
         # Build SSML if supported
         if use_ssml_for_provider:
-            ssml_text = build_ssml(text, rate=rate, pitch=pitch, volume=volume)
+            # Ensure we pass float values (use 0.0 as default if None)
+            rate_val = rate if rate is not None else 0.0
+            pitch_val = pitch if pitch is not None else 0.0
+            volume_val = volume if volume is not None else 0.0
+            ssml_text = build_ssml(text, rate=rate_val, pitch=pitch_val, volume=volume_val)
             use_ssml = ssml_text != text
             text_to_convert = ssml_text if use_ssml else text
         else:
@@ -488,7 +492,7 @@ class TTSEngine:
         if voice_validation_result is None:
             return False
         
-        voice_id, provider, voice_dict = voice_validation_result
+        voice_id, provider, _ = voice_validation_result  # voice_dict not needed in main method
         
         # Get provider instance for later use if not already resolved
         provider_instance: Optional[TTSProvider] = self._get_provider_instance(provider) if provider else None
