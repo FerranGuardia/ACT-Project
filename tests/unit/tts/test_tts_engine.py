@@ -3,10 +3,11 @@ Unit tests for TTSEngine
 Tests text-to-speech conversion, voice management, and error handling
 """
 
-import pytest
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, AsyncMock
 import asyncio
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
+import pytest
 
 
 class TestTTSEngine:
@@ -16,7 +17,7 @@ class TestTTSEngine:
         """Test that TTSEngine initializes correctly"""
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
-            
+
             # Mock provider manager and voice manager to avoid real provider initialization
             with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
                  patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
@@ -39,7 +40,7 @@ class TestTTSEngine:
         """Test getting available voices"""
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
-            
+
             # Mock provider manager and voice manager to avoid real provider initialization
             with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
                  patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
@@ -64,7 +65,7 @@ class TestTTSEngine:
         """Test filtering voices by locale"""
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
-            
+
             # Mock provider manager and voice manager to avoid real provider initialization
             with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
                  patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
@@ -92,7 +93,7 @@ class TestTTSEngine:
         """Test successful text-to-speech conversion with mocked providers (unit test)"""
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
-            
+
             # Mock provider manager and voice manager to avoid real provider initialization
             with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
                  patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
@@ -138,7 +139,7 @@ class TestTTSEngine:
         """Test conversion with empty text"""
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
-            
+
             # Mock provider manager and voice manager to avoid real provider initialization
             with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
                  patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
@@ -166,7 +167,7 @@ class TestTTSEngine:
         """Test conversion with invalid voice falls back to default"""
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
-            
+
             # Mock provider manager and voice manager to avoid real provider initialization
             with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
                  patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
@@ -197,7 +198,7 @@ class TestTTSEngine:
         """Test converting text file to speech"""
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
-            
+
             # Mock provider manager and voice manager to avoid real provider initialization
             with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
                  patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
@@ -232,7 +233,7 @@ class TestTTSEngine:
         """Test converting non-existent file"""
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
-            
+
             # Mock provider manager and voice manager to avoid real provider initialization
             with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
                  patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
@@ -259,7 +260,7 @@ class TestTTSEngine:
         """Test text chunking for long text"""
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
-            
+
             # Mock provider manager and voice manager to avoid real provider initialization
             with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
                  patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
@@ -288,7 +289,7 @@ class TestTTSEngine:
         """Test audio merging without pydub (should use ffmpeg or fail gracefully)"""
         try:
             from src.tts.tts_engine import TTSEngine  # type: ignore
-            
+
             # Mock provider manager and voice manager to avoid real provider initialization
             with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
                  patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
@@ -319,9 +320,9 @@ class TestTTSEngine:
         """Test formatting chapter introduction with pauses"""
         try:
             from src.tts.tts_engine import format_chapter_intro  # type: ignore
-            
-            # Test with pyttsx3 provider
-            result = format_chapter_intro("Chapter 1", "This is the content.", provider="pyttsx3")
+
+            # Test formatting with chapter title and content
+            result = format_chapter_intro("Chapter 1", "This is the content.")
             
             # Should include pauses and chapter title
             assert "Chapter 1" in result
@@ -333,11 +334,11 @@ class TestTTSEngine:
             pytest.skip("TTS module not available")
     
     def test_format_chapter_intro_no_provider(self):
-        """Test formatting chapter introduction without provider (defaults to pyttsx3 format)"""
+        """Test formatting chapter introduction without provider parameter"""
         try:
             from src.tts.tts_engine import format_chapter_intro  # type: ignore
             
-            result = format_chapter_intro("Chapter 2", "Content here.", provider=None)
+            result = format_chapter_intro("Chapter 2", "Content here.")
             
             # Should format the same way as pyttsx3
             assert "Chapter 2" in result
@@ -348,11 +349,11 @@ class TestTTSEngine:
             pytest.skip("TTS module not available")
     
     def test_format_chapter_intro_edge_tts(self):
-        """Test formatting chapter introduction for Edge TTS provider"""
+        """Test formatting chapter introduction (same format regardless of provider)"""
         try:
             from src.tts.tts_engine import format_chapter_intro  # type: ignore
             
-            result = format_chapter_intro("Chapter 3", "More content.", provider="edge_tts")
+            result = format_chapter_intro("Chapter 3", "More content.")
             
             # Should still format with pauses (SSML breaks handled separately)
             assert "Chapter 3" in result
@@ -366,9 +367,10 @@ class TestTTSEngine:
     async def test_convert_chunks_parallel_success(self, temp_dir, mock_config):
         """Test successful parallel chunk conversion"""
         try:
+            from src.tts.providers.base_provider import \
+                TTSProvider  # type: ignore
             from src.tts.tts_engine import TTSEngine  # type: ignore
-            from src.tts.providers.base_provider import TTSProvider  # type: ignore
-            
+
             # Mock provider manager and voice manager to avoid real provider initialization
             with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
                  patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
@@ -388,10 +390,14 @@ class TestTTSEngine:
                 # Mock convert_chunk_async to create files
                 async def mock_convert_chunk(text, voice, output_path, rate=None, pitch=None, volume=None):
                     # Ensure file exists and has content
+                    # Convert Path to Path if string
+                    if isinstance(output_path, str):
+                        output_path = Path(output_path)
                     output_path.parent.mkdir(parents=True, exist_ok=True)
                     output_path.write_bytes(b'fake audio data')
                     return True
                 
+                # Use a proper AsyncMock that returns an awaitable
                 mock_provider.convert_chunk_async = AsyncMock(side_effect=mock_convert_chunk)
                 
                 # Run the parallel conversion
@@ -422,9 +428,10 @@ class TestTTSEngine:
     async def test_convert_chunks_parallel_retry_on_empty_file(self, temp_dir, mock_config):
         """Test that parallel conversion retries when empty file is produced"""
         try:
+            from src.tts.providers.base_provider import \
+                TTSProvider  # type: ignore
             from src.tts.tts_engine import TTSEngine  # type: ignore
-            from src.tts.providers.base_provider import TTSProvider  # type: ignore
-            
+
             # Mock provider manager and voice manager to avoid real provider initialization
             with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
                  patch('src.tts.tts_engine.VoiceManager') as mock_vm_class, \
@@ -447,6 +454,8 @@ class TestTTSEngine:
                     nonlocal call_count
                     call_count += 1
                     # First call creates empty file, second call creates valid file
+                    if isinstance(output_path, str):
+                        output_path = Path(output_path)
                     output_path.parent.mkdir(parents=True, exist_ok=True)
                     if call_count == 1:
                         output_path.write_bytes(b'')  # Empty file
@@ -480,9 +489,10 @@ class TestTTSEngine:
     async def test_convert_chunks_parallel_retry_on_exception(self, temp_dir, mock_config):
         """Test that parallel conversion retries on exception"""
         try:
+            from src.tts.providers.base_provider import \
+                TTSProvider  # type: ignore
             from src.tts.tts_engine import TTSEngine  # type: ignore
-            from src.tts.providers.base_provider import TTSProvider  # type: ignore
-            
+
             # Mock provider manager and voice manager to avoid real provider initialization
             with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
                  patch('src.tts.tts_engine.VoiceManager') as mock_vm_class, \
@@ -508,6 +518,8 @@ class TestTTSEngine:
                     if call_count == 1:
                         raise Exception("Network error")
                     else:
+                        if isinstance(output_path, str):
+                            output_path = Path(output_path)
                         output_path.parent.mkdir(parents=True, exist_ok=True)
                         output_path.write_bytes(b'valid audio data')
                     return True
@@ -538,9 +550,10 @@ class TestTTSEngine:
     async def test_convert_chunks_parallel_all_retries_fail(self, temp_dir, mock_config):
         """Test that parallel conversion raises exception after all retries fail"""
         try:
+            from src.tts.providers.base_provider import \
+                TTSProvider  # type: ignore
             from src.tts.tts_engine import TTSEngine  # type: ignore
-            from src.tts.providers.base_provider import TTSProvider  # type: ignore
-            
+
             # Mock provider manager and voice manager to avoid real provider initialization
             with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
                  patch('src.tts.tts_engine.VoiceManager') as mock_vm_class, \
@@ -585,9 +598,10 @@ class TestTTSEngine:
     async def test_convert_chunks_parallel_multiple_chunks(self, temp_dir, mock_config):
         """Test parallel conversion with multiple chunks runs concurrently"""
         try:
+            from src.tts.providers.base_provider import \
+                TTSProvider  # type: ignore
             from src.tts.tts_engine import TTSEngine  # type: ignore
-            from src.tts.providers.base_provider import TTSProvider  # type: ignore
-            
+
             # Mock provider manager and voice manager to avoid real provider initialization
             with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
                  patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
@@ -609,6 +623,8 @@ class TestTTSEngine:
                     start_times.append(time.time())
                     # Small delay to simulate processing
                     await asyncio.sleep(0.1)
+                    if isinstance(output_path, str):
+                        output_path = Path(output_path)
                     output_path.parent.mkdir(parents=True, exist_ok=True)
                     output_path.write_bytes(b'audio data')
                     return True

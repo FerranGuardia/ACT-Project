@@ -5,6 +5,7 @@ Queue Section - Displays the processing queue list.
 from PySide6.QtWidgets import QGroupBox, QVBoxLayout, QListWidget
 
 from ui.styles import get_group_box_style, get_list_widget_style
+from ui.view_config import ViewConfig
 
 
 class QueueSection(QGroupBox):
@@ -20,7 +21,7 @@ class QueueSection(QGroupBox):
         
         self.queue_list = QListWidget()
         self.queue_list.setStyleSheet(get_list_widget_style())
-        self.queue_list.setSpacing(5)
+        self.queue_list.setSpacing(ViewConfig.QUEUE_LIST_SPACING)
         
         layout.addWidget(self.queue_list)
         self.setLayout(layout)

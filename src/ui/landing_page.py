@@ -1,231 +1,115 @@
 """
 Landing page for ACT - Mode selection screen.
 
-This is the first page users see, with buttons for each tool/mode.
+Refactored for better maintainability and modifiability.
+Uses separated components and configuration.
 """
 
-from pathlib import Path
-from typing import Optional, Callable
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont, QPixmap
+from typing import Callable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Optional  # type: ignore[unused-import]
+    from PySide6.QtWidgets import QWidget  # type: ignore[unused-import]
+else:
+    # Runtime fallback for Optional (used in type hints only)
+    from typing import Optional
+    from PySide6.QtWidgets import QWidget
 
 from core.logger import get_logger
-from ui.styles import COLORS, FONT_FAMILY
+from ui.styles import COLORS
+from ui.landing_page_config import LandingPageConfig
+from ui.landing_page_modes import MODES_CONFIG
+from ui.landing_page_utils import LayoutHelper
+from ui.landing_page_header import LandingPageHeader
+from ui.landing_page_cards import CardsSection
+
+__all__ = ['LandingPage']
 
 logger = get_logger("ui.landing_page")
 
 
-class ModeButton(QPushButton):
-    """
-    Large button for mode selection with title and description.
-    
-    Each button has:
-    - Title
-    - Description
-    - Click action
-    """
-    
-    def __init__(self, title: str, description: str, callback: Optional[Callable[[], None]] = None, parent: Optional[QWidget] = None):
-        super().__init__(parent)
-        self.title = title
-        self.callback = callback
-        self.setup_ui(title, description)
-    
-    def setup_ui(self, title: str, description: str):
-        """Set up the button UI."""
-        # Create custom layout for button content
-        button_layout = QVBoxLayout()
-        button_layout.setSpacing(5)
-        button_layout.setContentsMargins(20, 15, 20, 15)
-        
-        # Title
-        title_label = QLabel(title)
-        title_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        title_label.setFont(QFont(FONT_FAMILY, 16, QFont.Weight.Bold))
-        title_label.setStyleSheet("color: white; background: transparent;")
-        
-        # Description
-        desc_label = QLabel(description)
-        desc_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        desc_label.setFont(QFont(FONT_FAMILY, 11))
-        desc_label.setStyleSheet("color: rgb(200, 200, 200); background: transparent;")
-        desc_label.setWordWrap(True)
-        
-        button_layout.addWidget(title_label)
-        button_layout.addWidget(desc_label)
-        
-        # Create container widget
-        container = QWidget()
-        container.setLayout(button_layout)
-        container.setStyleSheet("background: transparent;")
-        
-        # Set button properties
-        self.setMinimumHeight(100)
-        self.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLORS['bg_medium']};
-                border: 2px solid {COLORS['bg_light']};
-                border-radius: 8px;
-                text-align: left;
-                padding: 0px;
-            }}
-            QPushButton:hover {{
-                background-color: {COLORS['bg_light']};
-                border: 2px solid {COLORS['accent']};
-            }}
-            QPushButton:pressed {{
-                background-color: {COLORS['accent']};
-                border: 2px solid {COLORS['accent_hover']};
-            }}
-        """)
-        
-        # Set the container as button content
-        layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(container)
-        self.setLayout(layout)
-        
-        self.clicked.connect(self._on_clicked)
-    
-    def _on_clicked(self):
-        """Handle button click."""
-        if self.callback:
-            self.callback()
-
-
 class LandingPage(QWidget):
     """
-    Landing page with mode selection buttons.
+    Landing page with mode selection cards.
     
-    Displays buttons for:
-    - Scraper
-    - TTS
-    - Audio Merger
-    - Full Automation (URL to Audio)
+    Main component that orchestrates header and cards sections.
     """
     
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.navigation_callback: Optional[Callable[[str], None]] = None
+        self.header: Optional[LandingPageHeader] = None
+        self.cards_section: Optional[CardsSection] = None
         self.setup_ui()
         logger.info("Landing page initialized")
     
     def set_navigation_callback(self, callback: Callable[[str], None]) -> None:
-        """Set callback for navigation (called with mode name)."""
+        """
+        Set callback for navigation.
+        
+        Args:
+            callback: Function to call when a mode is selected
+        """
         self.navigation_callback = callback
     
     def setup_ui(self):
-        """Set up the landing page UI."""
-        main_layout = QVBoxLayout()
-        main_layout.setSpacing(30)
-        main_layout.setContentsMargins(40, 40, 40, 40)
+        """
+        Set up the landing page UI.
         
-        # Set background color
-        self.setStyleSheet(f"""
-            QWidget {{
-                background-color: {COLORS['bg_dark']};
-            }}
-        """)
-        
-        # Logo - add at the top
-        # Try multiple possible filenames and paths
-        possible_filenames = ["logo atc 1.png", "logo.png", "logo_atc_1.png"]
-        possible_paths = [
-            Path(__file__).parent / "images",  # Relative to this file
-            Path(__file__).parent.parent.parent / "src" / "ui" / "images",  # From project root
-        ]
-        
-        logo_path = None
-        for base_path in possible_paths:
-            for filename in possible_filenames:
-                path = base_path / filename
-                if path.exists():
-                    logo_path = path
-                    break
-            if logo_path:
-                break
-        
-        if logo_path and logo_path.exists():
-            logo_label = QLabel()
-            pixmap = QPixmap(str(logo_path))
-            if not pixmap.isNull():
-                # Scale logo to reasonable size (max 200px height, maintain aspect ratio)
-                original_height = pixmap.height()
-                original_width = pixmap.width()
-                
-                if original_height > 200:
-                    pixmap = pixmap.scaledToHeight(200, Qt.TransformationMode.SmoothTransformation)
-                elif original_width > 400:
-                    pixmap = pixmap.scaledToWidth(400, Qt.TransformationMode.SmoothTransformation)
-                
-                logo_label.setPixmap(pixmap)
-                logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                logo_label.setStyleSheet("background: transparent; padding: 20px;")
-                logo_label.setScaledContents(False)  # We handle scaling manually
-                logo_label.setMinimumHeight(pixmap.height() + 40)  # Ensure space for logo
-                logo_label.setMinimumWidth(pixmap.width() + 40)
-                logo_label.show()  # Explicitly show the label
-                main_layout.addWidget(logo_label)
-                logger.info(f"✓ Loaded logo from {logo_path.absolute()} (original: {original_width}x{original_height}, displayed: {pixmap.width()}x{pixmap.height()})")
-            else:
-                logger.error(f"✗ Failed to load logo pixmap from {logo_path.absolute()} - pixmap is null")
-        else:
-            # Log all attempted paths for debugging
-            logger.warning(f"✗ Logo not found. Tried paths:")
-            for path in possible_paths:
-                abs_path = path.absolute()
-                exists = path.exists()
-                logger.warning(f"  - {abs_path} (exists: {exists})")
-        
-        # Title
-        title_label = QLabel("Choose Your Mode")
-        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title_label.setFont(QFont(FONT_FAMILY, 24, QFont.Weight.Bold))
-        title_label.setStyleSheet(f"color: {COLORS['text_primary']};")
-        main_layout.addWidget(title_label)
-        
-        # Mode buttons - vertical list
-        buttons_layout = QVBoxLayout()
-        buttons_layout.setSpacing(15)
-        buttons_layout.setContentsMargins(100, 20, 100, 20)
-        
-        scraper_btn = ModeButton(
-            "Scraper",
-            "Extract text content from webnovels",
-            callback=lambda: self.navigate_to_mode("scraper")
-        )
-        tts_btn = ModeButton(
-            "Text-to-Speech",
-            "Convert text files to audio",
-            callback=lambda: self.navigate_to_mode("tts")
-        )
-        merger_btn = ModeButton(
-            "Audio Merger",
-            "Combine multiple audio files into one",
-            callback=lambda: self.navigate_to_mode("merger")
-        )
-        full_auto_btn = ModeButton(
-            "Full Automation",
-            "Complete pipeline: Scrape → TTS → Merge",
-            callback=lambda: self.navigate_to_mode("full_auto")
+        Creates the main layout structure:
+        1. Header (logo + title)
+        2. Cards section (mode selection cards)
+        """
+        main_layout = LayoutHelper.create_vertical(
+            spacing=LandingPageConfig.MAIN_SPACING,
+            margins=LandingPageConfig.MAIN_MARGINS
         )
         
-        buttons_layout.addWidget(scraper_btn)
-        buttons_layout.addWidget(tts_btn)
-        buttons_layout.addWidget(merger_btn)
-        buttons_layout.addWidget(full_auto_btn)
-        buttons_layout.addStretch()
+        # Apply background
+        self.update_background()
         
-        main_layout.addLayout(buttons_layout)
+        # Header section
+        self.header = LandingPageHeader()
+        main_layout.addWidget(self.header)
         
-        # Add stretch to center everything
-        main_layout.addStretch()
+        # Cards section
+        self.cards_section = CardsSection(
+            modes_config=MODES_CONFIG,
+            navigation_callback=self.navigate_to_mode
+        )
+        main_layout.addWidget(self.cards_section, 1)
         
         self.setLayout(main_layout)
     
+    def update_background(self):
+        """Update background color."""
+        bg_color = COLORS.get('bg_content', COLORS['bg_dark'])
+        self.setStyleSheet(f"""
+            QWidget {{
+                background-color: {bg_color};
+            }}
+        """)
+    
+    def refresh_styles(self):
+        """
+        Refresh styles for all components.
+        
+        Updates background and all card styles.
+        """
+        # Update background
+        self.update_background()
+        
+        # Update cards section
+        if self.cards_section:
+            self.cards_section.refresh_styles()
+    
     def navigate_to_mode(self, mode: str):
-        """Navigate to the specified mode."""
+        """
+        Navigate to the specified mode.
+        
+        Args:
+            mode: Mode identifier (e.g., "scraper", "tts", "merger", "full_auto")
+        """
         logger.info(f"Navigating to {mode} mode")
         if self.navigation_callback:
             self.navigation_callback(mode)

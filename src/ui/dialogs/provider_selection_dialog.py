@@ -198,7 +198,8 @@ class ProviderSelectionDialog(QDialog):
     def __init__(self, parent=None, current_provider: Optional[str] = None):
         super().__init__(parent)
         self.setWindowTitle("TTS Provider Selection")
-        self.setMinimumSize(600, 500)
+        from ui.view_config import ViewConfig
+        self.setMinimumSize(ViewConfig.DIALOG_MIN_WIDTH, ViewConfig.DIALOG_MIN_HEIGHT)
         self.setModal(True)
         
         self.provider_manager = TTSProviderManager()
@@ -217,9 +218,10 @@ class ProviderSelectionDialog(QDialog):
     
     def setup_ui(self):
         """Set up the dialog UI."""
+        from ui.view_config import ViewConfig
         layout = QVBoxLayout()
-        layout.setSpacing(15)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(ViewConfig.DIALOG_SPACING)
+        layout.setContentsMargins(*ViewConfig.DIALOG_MARGINS)
         
         # Title
         title_label = QLabel("Select TTS Provider")
@@ -252,9 +254,10 @@ class ProviderSelectionDialog(QDialog):
         details_group = QGroupBox("Provider Details")
         details_layout = QVBoxLayout()
         
+        from ui.view_config import ViewConfig
         self.details_text = QTextEdit()
         self.details_text.setReadOnly(True)
-        self.details_text.setMaximumHeight(150)
+        self.details_text.setMaximumHeight(ViewConfig.DIALOG_DETAILS_MAX_HEIGHT)
         self.details_text.setPlaceholderText("Select a provider to see details...")
         details_layout.addWidget(self.details_text)
         
@@ -279,7 +282,8 @@ class ProviderSelectionDialog(QDialog):
         # Select current provider if provided (after a short delay to allow status checks to start)
         if self.current_provider:
             def select_provider():
-                self._select_provider_by_name(self.current_provider)
+                if self.current_provider:  # Type narrowing for Pylance
+                    self._select_provider_by_name(self.current_provider)
             QTimer.singleShot(500, select_provider)
     
     def _populate_provider_list(self):
@@ -372,6 +376,9 @@ class ProviderSelectionDialog(QDialog):
             impl_indicator = " (Standard Method)"
         elif implementation == "alternative":
             impl_indicator = " (Alternative Method)"
+        
+        # Preferred marker (empty for now, can be enhanced later)
+        preferred_marker = ""
         
         # Build item text
         item_text = f"{indicator}{preferred_marker} {name}{impl_indicator} {version} ({type_str}) - {message}"

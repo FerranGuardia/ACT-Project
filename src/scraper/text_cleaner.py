@@ -177,9 +177,6 @@ def clean_text(text: Optional[str]) -> str:
 
         is_ui_line = any(re.search(pattern, line, re.IGNORECASE) for pattern in ui_indicators)
 
-        # Skip very short lines that are likely UI (but keep if they look like dialogue)
-        is_too_short = len(line) < 15 and not re.search(r'[.!?]["\']', line)
-
         # Keep the line if it's not UI and has reasonable length
         if not is_ui_line and (len(line) >= 15 or re.search(r"[.!?]", line)):
             cleaned_lines.append(line)

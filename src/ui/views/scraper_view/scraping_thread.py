@@ -85,7 +85,7 @@ class ScrapingThread(QThread):
                 
                 try:
                     self.status.emit(f"Scraping chapter {idx + 1}/{total}...")
-                    content, title, error_msg = scraper.scrape_chapter(chapter_url)
+                    content, _, error_msg = scraper.scrape_chapter(chapter_url)
                     
                     if content:
                         # Save chapter

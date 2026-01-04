@@ -9,10 +9,10 @@
   ],
   "reportMissingImports": "warning",
   "reportMissingTypeStubs": false,
-  "reportUnusedImport": true,
-  "reportUnusedClass": true,
-  "reportUnusedFunction": true,
-  "reportUnusedVariable": true,
+  "reportUnusedImport": "information",
+  "reportUnusedClass": "information",
+  "reportUnusedFunction": "information",
+  "reportUnusedVariable": "information",
   "pythonVersion": "3.12",
   "typeCheckingMode": "basic",
   "stubPath": "",
@@ -23,6 +23,10 @@
     "**/__pycache__",
     ".pytest_cache"
   ],
-  "reportMissingModuleSource": false
+  "reportMissingModuleSource": false,
+  "reportPrivateUsage": "none",
+  "reportUnknownMemberType": "none",
+  "reportUnknownArgumentType": "none",
+  "reportUnknownVariableType": "none"
 }
 

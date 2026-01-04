@@ -96,14 +96,13 @@ Manages multiple TTS providers and implements fallback logic.
 **Features**:
 - Automatic provider initialization
 - Provider availability checking
-- Fallback chain: Edge TTS → Edge TTS Working → pyttsx3
+- Fallback chain: Edge TTS → pyttsx3
 - Provider preference support
 - Voice aggregation from all providers
 
 **Fallback Order**:
 1. **Edge TTS** (standard method) - Cloud, high quality
-2. **Edge TTS Working** (alternative method) - Cloud, high quality (fallback for broken standard method)
-3. **pyttsx3** - Offline, system voices
+2. **pyttsx3** - Offline, system voices
 
 **Usage**:
 ```python
@@ -131,18 +130,6 @@ Microsoft Edge TTS provider using standard API method.
 - Requires internet connection
 
 **Status**: Primary provider (preferred when available)
-
-#### Edge TTS Working Provider (`edge_tts_working_provider.py`)
-
-Alternative Edge TTS implementation using Hugging Face demo method.
-
-**Features**:
-- Same library (edge-tts 7.2.0) but different API approach
-- Fallback when standard Edge TTS method fails
-- Same voice quality and features
-- Cloud-based, requires internet
-
-**Status**: Fallback provider for Edge TTS when standard method has issues
 
 #### pyttsx3 Provider (`pyttsx3_provider.py`)
 
@@ -223,15 +210,6 @@ from tts.providers import (
 - **Library**: `edge-tts==7.2.0` (pinned due to bug in 7.2.3)
 - **Status**: Primary provider
 
-### Edge TTS (Alternative Method)
-
-- **Type**: Cloud
-- **Quality**: High
-- **Voices**: Same as standard method
-- **Features**: Same as standard method
-- **Library**: `edge-tts==7.2.0` (uses Hugging Face demo API approach)
-- **Status**: Fallback for standard Edge TTS
-
 ### pyttsx3
 
 - **Type**: Offline
@@ -248,14 +226,13 @@ from tts.providers import (
 The system automatically falls back between providers:
 
 1. **User specifies preferred provider**: Tries preferred first, then fallback chain
-2. **No preference**: Tries Edge TTS → Edge TTS Working → pyttsx3
+2. **No preference**: Tries Edge TTS → pyttsx3
 3. **Provider unavailable**: Automatically tries next provider in chain
 4. **All providers fail**: Returns error
 
 **Example Flow**:
 ```
-User requests Edge TTS → Edge TTS fails → Tries Edge TTS Working → 
-Edge TTS Working fails → Tries pyttsx3 → Success
+User requests Edge TTS → Edge TTS fails → Tries pyttsx3 → Success
 ```
 
 ---

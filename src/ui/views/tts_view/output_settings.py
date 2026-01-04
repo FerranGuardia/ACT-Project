@@ -8,8 +8,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.styles import (
-    get_button_standard_style, get_line_edit_style,
-    get_combo_box_style, get_group_box_style, COLORS
+    get_line_edit_style, get_combo_box_style, get_group_box_style, COLORS
 )
 
 
@@ -32,7 +31,7 @@ class OutputSettings(QGroupBox):
         self.output_dir_input.setStyleSheet(get_line_edit_style())
         self.output_dir_input.setPlaceholderText("Select output directory...")
         self.browse_button = QPushButton("Browse")
-        self.browse_button.setStyleSheet(get_button_standard_style())
+        # Standard buttons use default style from global stylesheet
         output_dir_layout.addWidget(output_dir_label)
         output_dir_layout.addWidget(self.output_dir_input)
         output_dir_layout.addWidget(self.browse_button)

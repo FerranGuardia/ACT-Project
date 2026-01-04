@@ -7,18 +7,22 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ui.main_window import MainWindow
+    from ui.main_window import MainWindow  # type: ignore[unused-import]
 
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QMessageBox,
-    QListWidgetItem
-)
+from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QPushButton, QListWidgetItem, QMessageBox
 from PySide6.QtCore import QTimer
 
 from core.logger import get_logger
-from ui.styles import (
-    get_button_primary_style, get_button_standard_style,
-    COLORS
+from ui.views.base_view import BaseView
+from ui.ui_constants import (
+    StatusMessages,
+    DialogMessages,
+)
+from ui.utils.error_handling import (
+    show_validation_error,
+    show_success,
+    show_error,
+    show_confirmation,
 )
 
 from ui.views.full_auto_view.add_queue_dialog import AddQueueDialog
@@ -33,11 +37,10 @@ from ui.views.full_auto_view.handlers import FullAutoViewHandlers
 logger = get_logger("ui.full_auto_view")
 
 
-class FullAutoView(QWidget):
+class FullAutoView(BaseView):
     """Full automation view with queue system."""
     
     def __init__(self, parent=None):
-        super().__init__(parent)
         self.queue_items: List[Dict] = []
         self.current_processing: Optional[ProcessingThread] = None
         self._queue_file = Path.home() / ".act" / "queue.json"
@@ -46,31 +49,15 @@ class FullAutoView(QWidget):
         self.queue_manager = QueueManager(self._queue_file)
         self.handlers = FullAutoViewHandlers(self)
         
-        # Initialize UI components
-        self.setup_ui()
+        # Initialize UI components (BaseView calls setup_ui)
+        super().__init__(parent)
         self._connect_handlers()
         self._load_queue()  # Load saved queue on startup
         logger.info("Full Auto view initialized")
     
-    def setup_ui(self):
+    def setup_ui(self) -> None:
         """Set up the full automation view UI."""
-        main_layout = QVBoxLayout()
-        main_layout.setSpacing(20)
-        main_layout.setContentsMargins(30, 30, 30, 30)
-        
-        # Set background
-        self.setStyleSheet(f"QWidget {{ background-color: {COLORS['bg_dark']}; }}")
-        
-        # Back button at the top
-        back_button_layout = QHBoxLayout()
-        self.back_button = QPushButton("← Back to Home")
-        self.back_button.clicked.connect(self._go_back)
-        self.back_button.setMinimumHeight(35)
-        self.back_button.setMinimumWidth(140)
-        self.back_button.setStyleSheet(get_button_primary_style())
-        back_button_layout.addWidget(self.back_button)
-        back_button_layout.addStretch()
-        main_layout.addLayout(back_button_layout)
+        main_layout = self.get_main_layout()
         
         # Controls section
         self.controls_section = ControlsSection()
@@ -87,18 +74,17 @@ class FullAutoView(QWidget):
         # Global controls
         global_controls_layout = QHBoxLayout()
         self.pause_all_button = QPushButton("⏸️ Pause All")
-        self.pause_all_button.setStyleSheet(get_button_standard_style())
+        # Standard buttons use default style from global stylesheet
         self.stop_all_button = QPushButton("⏹️ Stop All")
-        self.stop_all_button.setStyleSheet(get_button_standard_style())
+        # Standard buttons use default style from global stylesheet
         global_controls_layout.addWidget(self.pause_all_button)
         global_controls_layout.addWidget(self.stop_all_button)
         global_controls_layout.addStretch()
         main_layout.addLayout(global_controls_layout)
         
         main_layout.addStretch()
-        self.setLayout(main_layout)
     
-    def _connect_handlers(self):
+    def _connect_handlers(self) -> None:
         """Connect all button handlers."""
         self.controls_section.add_queue_button.clicked.connect(self.add_to_queue)
         self.controls_section.clear_queue_button.clicked.connect(self.clear_queue)
@@ -107,26 +93,7 @@ class FullAutoView(QWidget):
         self.pause_all_button.clicked.connect(self.pause_all)
         self.stop_all_button.clicked.connect(self.stop_all)
     
-    def _go_back(self) -> None:
-        """Navigate back to landing page."""
-        from ui.main_window import MainWindow
-        parent = self.parent()
-        while parent:
-            if isinstance(parent, MainWindow):
-                parent.show_landing_page()
-                return
-            parent = parent.parent()
-        
-        # Fallback: try to find MainWindow in the widget hierarchy
-        from PySide6.QtWidgets import QWidget
-        widget: Optional[QWidget] = self
-        while widget:
-            if isinstance(widget, MainWindow):
-                widget.show_landing_page()
-                return
-            widget = widget.parent()
-    
-    def add_to_queue(self):
+    def add_to_queue(self) -> None:
         """Add a new item to the queue."""
         dialog = AddQueueDialog(self)
         if dialog.exec():
@@ -135,13 +102,13 @@ class FullAutoView(QWidget):
             # Validate URL
             valid, error_msg = self.handlers.validate_url(url)
             if not valid:
-                QMessageBox.warning(self, "Validation Error", error_msg)
+                show_validation_error(self, error_msg)
                 return
             
             # Validate chapter selection
             valid, error_msg = self.handlers.validate_chapter_selection(chapter_selection)
             if not valid:
-                QMessageBox.warning(self, "Validation Error", error_msg)
+                show_validation_error(self, error_msg)
                 return
             
             # Generate title from URL if not provided
@@ -155,7 +122,7 @@ class FullAutoView(QWidget):
                 'voice': voice,
                 'provider': provider,
                 'chapter_selection': chapter_selection,
-                'status': 'Pending',
+                'status': StatusMessages.PENDING,
                 'progress': 0
             }
             self.queue_items.append(queue_item)
@@ -163,25 +130,26 @@ class FullAutoView(QWidget):
             self._save_queue()
             logger.info(f"Added to queue: {title} ({url}) - Voice: {voice}, Provider: {provider}, Chapters: {chapter_selection}")
     
-    def clear_queue(self):
-        """Clear all items from the queue."""
+    def clear_queue(self) -> None:
+        """
+        Clear all items from the queue.
+        
+        Shows a confirmation dialog before clearing the queue.
+        """
         if not self.queue_items:
             return
         
-        reply = QMessageBox.question(
+        if show_confirmation(
             self,
-            "Clear Queue",
-            "Are you sure you want to clear the entire queue?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        
-        if reply == QMessageBox.StandardButton.Yes:
+            DialogMessages.CLEAR_QUEUE_TITLE,
+            DialogMessages.CLEAR_QUEUE_MESSAGE
+        ):
             self.queue_items.clear()
             self.queue_section.clear()
             self._save_queue()
             logger.info("Queue cleared")
     
-    def _update_queue_display(self):
+    def _update_queue_display(self) -> None:
         """Update the queue list display."""
         self.queue_section.clear()
         
@@ -207,43 +175,47 @@ class FullAutoView(QWidget):
             self.queue_section.queue_list.addItem(list_item)
             self.queue_section.queue_list.setItemWidget(list_item, queue_widget)
     
-    def _move_queue_item_up(self, row: int):
+    def _move_queue_item_up(self, row: int) -> None:
         """Move a queue item up."""
         if row > 0:
             self.queue_items[row], self.queue_items[row - 1] = self.queue_items[row - 1], self.queue_items[row]
             self._update_queue_display()
     
-    def _move_queue_item_down(self, row: int):
+    def _move_queue_item_down(self, row: int) -> None:
         """Move a queue item down."""
         if row < len(self.queue_items) - 1:
             self.queue_items[row], self.queue_items[row + 1] = self.queue_items[row + 1], self.queue_items[row]
             self._update_queue_display()
     
-    def _remove_queue_item(self, row: int):
+    def _remove_queue_item(self, row: int) -> None:
         """Remove a queue item."""
         if 0 <= row < len(self.queue_items):
             self.queue_items.pop(row)
             self._update_queue_display()
             self._save_queue()
     
-    def start_processing(self):
-        """Start processing the first item in the queue."""
+    def start_processing(self) -> None:
+        """
+        Start processing the first item in the queue.
+        
+        Validates queue state and starts processing the first pending item.
+        """
         if not self.queue_items:
-            QMessageBox.warning(self, "Empty Queue", "Queue is empty. Please add items to process.")
+            show_error(self, DialogMessages.EMPTY_QUEUE_MSG)
             return
         
         if self.current_processing and self.current_processing.isRunning():
-            QMessageBox.warning(self, "Already Processing", "Processing is already in progress.")
+            show_error(self, DialogMessages.ALREADY_PROCESSING_MSG)
             return
         
         # Get first pending item
-        pending_items = [item for item in self.queue_items if item['status'] == 'Pending']
+        pending_items = [item for item in self.queue_items if item['status'] == StatusMessages.PENDING]
         if not pending_items:
-            QMessageBox.information(self, "No Pending Items", "No pending items in queue.")
+            show_error(self, DialogMessages.NO_PENDING_ITEMS_MSG)
             return
         
         item = pending_items[0]
-        item['status'] = 'Processing'
+        item['status'] = StatusMessages.PROCESSING
         
         # Update display
         self._update_queue_display()
@@ -270,9 +242,8 @@ class FullAutoView(QWidget):
         self.current_processing.chapter_update.connect(self._on_chapter_update)
         self.current_processing.finished.connect(lambda success, msg: self._on_finished(item, success, msg))
         
-        # Update UI
-        self.controls_section.start_button.setEnabled(False)
-        self.controls_section.pause_button.setEnabled(True)
+        # Update UI state
+        self.controls_section.set_processing_state()
         self.pause_all_button.setEnabled(True)
         self.stop_all_button.setEnabled(True)
         
@@ -280,24 +251,28 @@ class FullAutoView(QWidget):
         self.current_processing.start()
         logger.info(f"Started processing: {item['title']}")
     
-    def pause_processing(self):
-        """Pause the current processing."""
+    def pause_processing(self) -> None:
+        """
+        Pause or resume the current processing.
+        
+        Toggles between paused and resumed states, updating the UI accordingly.
+        """
         if self.current_processing and self.current_processing.isRunning():
             if self.current_processing.is_paused:
                 self.current_processing.resume()
-                self.controls_section.pause_button.setText("⏸️ Pause")
+                self.controls_section.set_resumed_state()
                 logger.info("Resumed processing")
             else:
                 self.current_processing.pause()
-                self.controls_section.pause_button.setText("▶️ Resume")
+                self.controls_section.set_paused_state()
                 logger.info("Paused processing")
     
-    def pause_all(self):
+    def pause_all(self) -> None:
         """Pause all processing."""
         if self.current_processing and self.current_processing.isRunning():
             self.pause_processing()
     
-    def stop_all(self):
+    def stop_all(self) -> None:
         """Stop all processing with option to erase process data."""
         if self.current_processing and self.current_processing.isRunning():
             # Create custom dialog with options
@@ -344,12 +319,12 @@ class FullAutoView(QWidget):
                     logger.warning("Pipeline not available for clearing data")
                     self.current_processing_section.set_status("Stopped - Pipeline not available")
     
-    def _update_current_processing(self, item: Dict):
+    def _update_current_processing(self, item: Dict[str, Any]) -> None:
         """Update the current processing display."""
         self.current_processing_section.set_status(f"Processing: {item['title']}")
         self.current_processing_section.set_progress(0)
     
-    def _on_progress(self, value: int):
+    def _on_progress(self, value: int) -> None:
         """Handle progress update."""
         self.current_processing_section.set_progress(value)
         # Update current item progress
@@ -358,18 +333,25 @@ class FullAutoView(QWidget):
                 item['progress'] = value
                 break
     
-    def _on_status(self, message: str):
+    def _on_status(self, message: str) -> None:
         """Handle status update."""
         self.current_processing_section.set_status(message)
     
-    def _on_chapter_update(self, chapter_num: int, status: str, message: str):
+    def _on_chapter_update(self, chapter_num: int, status: str, message: str) -> None:
         """Handle chapter update."""
         status_text = f"Chapter {chapter_num}: {message}"
         self.current_processing_section.set_status(status_text)
         logger.debug(f"Chapter {chapter_num} update: {status} - {message}")
     
-    def _on_finished(self, item: Dict, success: bool, message: str):
-        """Handle processing completion."""
+    def _on_finished(self, item: Dict[str, Any], success: bool, message: str) -> None:
+        """
+        Handle processing completion.
+        
+        Args:
+            item: The queue item that finished processing
+            success: Whether the operation completed successfully
+            message: Completion message to display
+        """
         # Update item status
         if success:
             item['status'] = 'Completed'
@@ -377,38 +359,37 @@ class FullAutoView(QWidget):
         else:
             item['status'] = 'Failed'
         
-        # Reset UI
-        self.controls_section.start_button.setEnabled(True)
-        self.controls_section.pause_button.setEnabled(False)
-        self.controls_section.pause_button.setText("⏸️ Pause")
+        # Reset UI state
+        self.controls_section.set_idle_state()
         
         # Update display
         self._update_queue_display()
         self._save_queue()
         
+        display_message = f"{item['title']}: {message}"
         if success:
             self.current_processing_section.set_status("Processing completed")
             self.current_processing_section.set_progress(100)
-            QMessageBox.information(self, "Success", f"{item['title']}: {message}")
+            show_success(self, display_message)
         else:
             self.current_processing_section.set_status("Processing failed")
-            QMessageBox.warning(self, "Error", f"{item['title']}: {message}")
+            show_error(self, display_message)
         
         # Auto-start next item if available
         self._try_start_next()
         
         logger.info(f"Processing finished: {item['title']} - {message}")
     
-    def _try_start_next(self):
+    def _try_start_next(self) -> None:
         """Try to start the next item in the queue."""
         # Small delay to allow UI to update
         QTimer.singleShot(1000, self.start_processing)
     
-    def _save_queue(self):
+    def _save_queue(self) -> None:
         """Save queue state to disk."""
         self.queue_manager.save_queue(self.queue_items)
     
-    def _load_queue(self):
+    def _load_queue(self) -> None:
         """Load queue state from disk."""
         self.queue_items = self.queue_manager.load_queue()
         self._update_queue_display()

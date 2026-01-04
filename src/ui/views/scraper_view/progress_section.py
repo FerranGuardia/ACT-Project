@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.styles import (
-    get_progress_bar_style, get_group_box_style
+    get_progress_bar_style, get_group_box_style, get_status_label_style
 )
 
 
@@ -28,7 +28,7 @@ class ProgressSection(QGroupBox):
         self.progress_bar.setValue(0)
         
         self.status_label = QLabel("Ready")
-        self.status_label.setStyleSheet("color: white;")
+        self.status_label.setStyleSheet(get_status_label_style())
         
         layout.addWidget(self.progress_bar)
         layout.addWidget(self.status_label)

@@ -11,9 +11,9 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 
 from ui.styles import (
-    get_button_standard_style, get_combo_box_style,
-    get_slider_style, get_group_box_style, COLORS
+    get_combo_box_style, get_slider_style, get_group_box_style, COLORS
 )
+from ui.view_config import ViewConfig
 
 
 class VoiceSettings(QGroupBox):
@@ -34,7 +34,7 @@ class VoiceSettings(QGroupBox):
         provider_layout.addWidget(provider_label)
         self.provider_combo = QComboBox()
         self.provider_combo.setStyleSheet(get_combo_box_style())
-        self.provider_combo.setMinimumWidth(250)  # Ensure readable width for provider names
+        self.provider_combo.setMinimumWidth(ViewConfig.COMBO_BOX_PROVIDER_MIN_WIDTH)
         provider_layout.addWidget(self.provider_combo)
         provider_layout.addStretch()
         layout.addLayout(provider_layout)
@@ -46,11 +46,11 @@ class VoiceSettings(QGroupBox):
         voice_select_layout.addWidget(voice_label)
         self.voice_combo = QComboBox()
         self.voice_combo.setStyleSheet(get_combo_box_style())
-        self.voice_combo.setMinimumWidth(300)  # Ensure readable width for voice names (e.g., "en-US-AndrewNeural - Male")
+        self.voice_combo.setMinimumWidth(ViewConfig.COMBO_BOX_VOICE_MIN_WIDTH)
         self.preview_button = QPushButton("🔊 Preview")
-        self.preview_button.setStyleSheet(get_button_standard_style())
+        # Standard buttons use default style from global stylesheet
         self.stop_preview_button = QPushButton("⏹️ Stop Preview")
-        self.stop_preview_button.setStyleSheet(get_button_standard_style())
+        # Standard buttons use default style from global stylesheet
         self.stop_preview_button.setEnabled(False)
         voice_select_layout.addWidget(self.voice_combo)
         voice_select_layout.addWidget(self.preview_button)

@@ -4,7 +4,10 @@ Current Processing Section - Displays current processing status.
 
 from PySide6.QtWidgets import QGroupBox, QVBoxLayout, QLabel, QProgressBar
 
-from ui.styles import get_group_box_style, get_progress_bar_style, COLORS
+from ui.styles import (
+    get_group_box_style, get_progress_bar_style,
+    get_status_label_style, COLORS
+)
 
 
 class CurrentProcessingSection(QGroupBox):
@@ -19,7 +22,7 @@ class CurrentProcessingSection(QGroupBox):
         layout = QVBoxLayout()
         
         self.current_status = QLabel("No active processing")
-        self.current_status.setStyleSheet("color: white;")
+        self.current_status.setStyleSheet(get_status_label_style())
         
         self.current_progress = QProgressBar()
         self.current_progress.setStyleSheet(get_progress_bar_style())

@@ -10,8 +10,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.styles import (
-    get_button_standard_style, get_list_widget_style,
-    get_plain_text_edit_style, get_tab_widget_style, COLORS
+    get_list_widget_style, get_plain_text_edit_style, get_tab_widget_style, COLORS
 )
 
 
@@ -39,11 +38,11 @@ class InputSection(QWidget):
         
         buttons_layout = QHBoxLayout()
         self.add_files_button = QPushButton("➕ Add Files")
-        self.add_files_button.setStyleSheet(get_button_standard_style())
+        # Standard buttons use default style from global stylesheet
         self.add_folder_button = QPushButton("➕ Add Folder")
-        self.add_folder_button.setStyleSheet(get_button_standard_style())
+        # Standard buttons use default style from global stylesheet
         self.remove_button = QPushButton("Remove Selected")
-        self.remove_button.setStyleSheet(get_button_standard_style())
+        # Standard buttons use default style from global stylesheet
         self.remove_button.setEnabled(False)
         buttons_layout.addWidget(self.add_files_button)
         buttons_layout.addWidget(self.add_folder_button)
