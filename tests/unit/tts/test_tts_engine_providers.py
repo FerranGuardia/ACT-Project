@@ -4,13 +4,12 @@ Unit tests for TTSEngine provider integration.
 Tests TTSEngine with ProviderManager integration.
 """
 
-import sys
 import importlib.util
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
-
+import sys
 # Set up package structure for relative imports
 import types
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
 # Path setup is handled by conftest.py
 act_src = Path(__file__).parent.parent.parent.parent / "src"
@@ -18,6 +17,7 @@ act_src = Path(__file__).parent.parent.parent.parent / "src"
 # Mock external dependencies before importing
 # Create proper async mock for edge_tts.list_voices()
 import asyncio
+
 
 async def mock_list_voices():
     """Mock async function that returns a list of voices"""
