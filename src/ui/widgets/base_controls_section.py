@@ -5,15 +5,21 @@ Provides common structure and functionality for control sections
 to reduce code duplication and ensure consistency.
 """
 
-from abc import ABC
+from abc import ABCMeta
 
+from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QGroupBox, QHBoxLayout, QPushButton
 
 from ui.styles import get_group_box_style, set_button_primary
 from ui.ui_constants import ButtonText
 
 
-class BaseControlsSection(QGroupBox, ABC):
+class CombinedMeta(type(QObject), ABCMeta):  # type: ignore
+    """Metaclass that combines QObject metaclass with ABCMeta."""
+    pass
+
+
+class BaseControlsSection(QGroupBox, metaclass=CombinedMeta):
     """
     Base class for control sections with common buttons.
     

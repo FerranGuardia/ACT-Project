@@ -5,12 +5,13 @@ Provides common structure and functionality for all views
 to reduce code duplication and ensure consistency.
 """
 
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ui.main_window import MainWindow  # type: ignore[unused-import]
 
+from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QWidget, QVBoxLayout
 
 from core.logger import get_logger
@@ -19,7 +20,12 @@ from ui.view_config import ViewConfig
 logger = get_logger("ui.base_view")
 
 
-class BaseView(QWidget, ABC):
+class CombinedMeta(type(QObject), ABCMeta):  # type: ignore
+    """Metaclass that combines QObject metaclass with ABCMeta."""
+    pass
+
+
+class BaseView(QWidget, metaclass=CombinedMeta):
     """Base class for all views."""
     
     def __init__(self, parent=None):

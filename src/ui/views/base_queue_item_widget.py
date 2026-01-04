@@ -5,13 +5,13 @@ Provides common structure and functionality for all queue item widgets
 to reduce code duplication.
 """
 
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 from typing import List
 
 from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QProgressBar
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QObject
 from PySide6.QtGui import QFont
 
 from ui.styles import (
@@ -22,7 +22,12 @@ from ui.styles import (
 from ui.view_config import ViewConfig
 
 
-class BaseQueueItemWidget(QWidget, ABC):
+class CombinedMeta(type(QObject), ABCMeta):  # type: ignore
+    """Metaclass that combines QObject metaclass with ABCMeta."""
+    pass
+
+
+class BaseQueueItemWidget(QWidget, metaclass=CombinedMeta):
     """Base class for queue item widgets."""
     
     def __init__(self, status: str = "Pending", progress: int = 0, parent=None):
