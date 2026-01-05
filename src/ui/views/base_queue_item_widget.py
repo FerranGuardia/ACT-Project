@@ -5,10 +5,9 @@ Provides common structure and functionality for all queue item widgets
 to reduce code duplication.
 """
 
-from abc import ABCMeta, abstractmethod
 from typing import List
 
-from PySide6.QtCore import QObject, Qt
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (QHBoxLayout, QLabel, QProgressBar, QPushButton,
                                QVBoxLayout, QWidget)
@@ -19,12 +18,7 @@ from ui.styles import (get_font_family, get_font_size_large,
 from ui.view_config import ViewConfig
 
 
-class CombinedMeta(type(QObject), ABCMeta):  # type: ignore
-    """Metaclass that combines QObject metaclass with ABCMeta."""
-    pass
-
-
-class BaseQueueItemWidget(QWidget, metaclass=CombinedMeta):
+class BaseQueueItemWidget(QWidget):
     """Base class for queue item widgets."""
     
     def __init__(self, status: str = "Pending", progress: int = 0, parent=None):
@@ -120,16 +114,13 @@ class BaseQueueItemWidget(QWidget, metaclass=CombinedMeta):
         else:
             self.progress_bar.hide()
     
-    # Abstract methods that subclasses must implement
-    @abstractmethod
     def get_icon(self) -> str:
         """Return the emoji/icon for this queue item."""
-        pass
+        raise NotImplementedError("Subclasses must implement get_icon")
     
-    @abstractmethod
     def get_title_text(self) -> str:
         """Return the main title text for this queue item."""
-        pass
+        raise NotImplementedError("Subclasses must implement get_title_text")
     
     def get_secondary_labels(self) -> List[str]:
         """Return a list of secondary label texts. Override in subclass if needed."""

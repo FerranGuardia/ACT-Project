@@ -58,15 +58,7 @@ if src_path.exists():
     sys.path.insert(0, str(project_root))
     sys.path.insert(0, str(src_path))
 
-# Mock ui.main_window BEFORE trying to import ui (since ui.__init__ imports it)
-# This allows UI tests to import ui.views without MainWindow dependencies failing
-if "ui.main_window" not in sys.modules:
-    main_window_module = types.ModuleType("ui.main_window")
-    # Create a mock MainWindow class
-    class MockMainWindow:
-        pass
-    main_window_module.MainWindow = MockMainWindow  # type: ignore[attr-defined]
-    sys.modules["ui.main_window"] = main_window_module
+# Do NOT mock ui.main_window for new UI tests; rely on real MainWindow.
 
 
 @pytest.fixture(scope="session")
@@ -85,13 +77,14 @@ def qt_application():
         yield app
         
         # Cleanup: Wait for all threads to finish before destroying QApplication
-        # This prevents "QThread: Destroyed while thread is still running" warnings
-        import time
-        threads = QThread.allThreads()
-        for thread in threads:
-            if thread != QThread.currentThread() and thread.isRunning():
-                thread.quit()
-                thread.wait(1000)  # Wait up to 1 second for thread to finish
+        # Guard for Qt versions that lack allThreads
+        all_threads_fn = getattr(QThread, "allThreads", None)
+        if callable(all_threads_fn):
+            threads = all_threads_fn()
+            for thread in threads:
+                if thread != QThread.currentThread() and thread.isRunning():
+                    thread.quit()
+                    thread.wait(1000)  # Wait up to 1 second for thread to finish
         
         # Process any pending events
         app.processEvents()

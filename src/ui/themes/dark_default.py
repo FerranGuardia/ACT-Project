@@ -1,31 +1,31 @@
 """
-Dark Default Theme
+YouTube Light-Inspired Theme (Orange Accent)
 
-Original dark theme - the default theme for ACT.
+Bright, clean palette with high readability and a soft orange accent.
 """
 
 THEME = {
-    'name': 'Dark Default',
-    'description': 'Original dark theme - comfortable and familiar',
+    'name': 'YouTube Light',
+    'description': 'Bright, simple, high-contrast palette with orange accent',
     'author': 'ACT',
     # Font settings
-    'font_family': 'Segoe UI',
-    'font_size_base': '10pt',
-    'font_size_large': '12pt',
-    'font_size_small': '9pt',
-    # Colors
-    'bg_dark': 'rgb(30, 30, 30)',
-    'bg_medium': 'rgb(39, 44, 54)',
-    'bg_light': 'rgb(44, 49, 60)',
-    'bg_lighter': 'rgb(52, 59, 72)',
-    'bg_hover': 'rgb(33, 37, 43)',
-    'bg_content': 'rgb(40, 44, 52)',
-    'text_primary': 'rgb(210, 210, 210)',
-    'text_secondary': 'rgb(98, 103, 111)',
-    'accent': 'rgb(85, 170, 255)',
-    'accent_hover': 'rgb(105, 180, 255)',
-    'accent_pressed': 'rgb(65, 130, 195)',
-    'border': 'rgb(64, 71, 88)',
-    'border_focus': 'rgb(91, 101, 124)',
+    'font_family': 'Roboto, Segoe UI, sans-serif',
+    'font_size_base': '11pt',
+    'font_size_large': '13pt',
+    'font_size_small': '10pt',
+    # Colors (aligned to YouTube light feel)
+    'bg_dark': 'rgb(249, 249, 249)',      # app background
+    'bg_medium': 'rgb(242, 242, 242)',    # panels
+    'bg_light': 'rgb(235, 235, 235)',
+    'bg_lighter': 'rgb(225, 225, 225)',
+    'bg_hover': 'rgb(240, 240, 240)',
+    'bg_content': 'rgb(255, 255, 255)',   # cards/surfaces
+    'text_primary': 'rgb(15, 15, 15)',    # near-black
+    'text_secondary': 'rgb(96, 96, 96)',
+    'accent': 'rgb(255, 140, 0)',         # soft orange
+    'accent_hover': 'rgb(255, 160, 40)',
+    'accent_pressed': 'rgb(210, 120, 10)',
+    'border': 'rgb(230, 230, 230)',
+    'border_focus': 'rgb(255, 140, 0)',
 }
 

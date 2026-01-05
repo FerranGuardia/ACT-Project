@@ -5,8 +5,17 @@ This is the main window that will contain the landing page with mode selection.
 """
 
 from pathlib import Path
-from PySide6.QtWidgets import QMainWindow, QStackedWidget, QToolBar, QPushButton, QApplication
+from PySide6.QtWidgets import (
+    QMainWindow,
+    QStackedWidget,
+    QPushButton,
+    QApplication,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+)
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QFontDatabase, QCloseEvent, QFont, QShortcut, QKeySequence
 from PySide6.QtGui import QFontDatabase, QCloseEvent, QFont
 
 from core.logger import get_logger
@@ -44,27 +53,33 @@ class MainWindow(QMainWindow):
         # Load fonts
         self._load_fonts()
         
-        # Create toolbar with back button
-        self.toolbar = QToolBar("Navigation")
-        self.toolbar.setMovable(False)
-        self.toolbar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.toolbar)
-        
         # Apply global styles AFTER creating widgets
         self._apply_global_style()
+
+        # Build central container with an in-view back button for visibility
+        central = QWidget()
+        central_layout = QVBoxLayout()
+        central_layout.setContentsMargins(0, 0, 0, 0)
+        central_layout.setSpacing(0)
+
+        back_row = QHBoxLayout()
+        back_row.setContentsMargins(12, 12, 12, 0)
+        back_row.setSpacing(10)
         self.back_button = QPushButton(ViewConfig.BACK_BUTTON_TEXT)
         self.back_button.clicked.connect(self.show_landing_page)
         self.back_button.setVisible(False)  # Hidden on landing page
         self.back_button.setMinimumHeight(ViewConfig.BACK_BUTTON_HEIGHT)
         self.back_button.setMinimumWidth(ViewConfig.BACK_BUTTON_WIDTH)
-        self.back_button.setProperty("class", "primary")  # Use property for primary button style
-        self.toolbar.addWidget(self.back_button)
-        self.toolbar.setVisible(True)  # Always show toolbar
-        
-        
+        self.back_button.setProperty("class", "primary")
+        back_row.addWidget(self.back_button)
+        back_row.addStretch(1)
+        central_layout.addLayout(back_row)
+
         # Create stacked widget for different views
         self.stacked_widget = QStackedWidget()
-        self.setCentralWidget(self.stacked_widget)
+        central_layout.addWidget(self.stacked_widget, 1)
+        central.setLayout(central_layout)
+        self.setCentralWidget(central)
         
         # Add all views
         self.landing_page = LandingPage()
@@ -88,6 +103,10 @@ class MainWindow(QMainWindow):
         
         # Connect stacked widget changes to update back button visibility
         self.stacked_widget.currentChanged.connect(self._on_view_changed)
+
+        # Keyboard shortcut: Left Arrow to go back when not on landing
+        self.back_shortcut = QShortcut(QKeySequence(Qt.Key_Left), self)
+        self.back_shortcut.activated.connect(self._handle_back_shortcut)
         
         logger.info("Main window initialized")
     
@@ -200,6 +219,11 @@ class MainWindow(QMainWindow):
             self.back_button.setVisible(False)
         else:
             self.back_button.setVisible(True)
+
+    def _handle_back_shortcut(self) -> None:
+        """Handle left-arrow shortcut to return to landing when away."""
+        if self.stacked_widget.currentIndex() != self.LANDING_PAGE:
+            self.show_landing_page()
     
     def navigate_to_mode(self, mode: str) -> None:
         """Navigate to the specified mode."""

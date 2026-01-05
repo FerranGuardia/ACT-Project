@@ -231,6 +231,7 @@ class GenreCard(QFrame):
             shadow_effect = cast(QGraphicsDropShadowEffect, shadow)
             shadow_effect.setBlurRadius(LandingPageConfig.SHADOW_BLUR_RADIUS_HOVER)  # type: ignore[attr-defined]
             shadow_effect.setColor(LandingPageConfig.SHADOW_COLOR_HOVER)  # type: ignore[attr-defined]
+            shadow_effect.setYOffset(LandingPageConfig.SHADOW_Y_OFFSET_HOVER)
         super().enterEvent(event)
     
     def leaveEvent(self, event):
@@ -241,5 +242,6 @@ class GenreCard(QFrame):
             shadow_effect = cast(QGraphicsDropShadowEffect, shadow)
             shadow_effect.setBlurRadius(LandingPageConfig.SHADOW_BLUR_RADIUS)  # type: ignore[attr-defined]
             shadow_effect.setColor(LandingPageConfig.SHADOW_COLOR)  # type: ignore[attr-defined]
+            shadow_effect.setYOffset(LandingPageConfig.SHADOW_Y_OFFSET)
         super().leaveEvent(event)
 

@@ -5,13 +5,11 @@ Provides common structure and functionality for all views
 to reduce code duplication and ensure consistency.
 """
 
-from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ui.main_window import MainWindow  # type: ignore[unused-import]
 
-from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from core.logger import get_logger
@@ -20,18 +18,16 @@ from ui.view_config import ViewConfig
 logger = get_logger("ui.base_view")
 
 
-class CombinedMeta(type(QObject), ABCMeta):  # type: ignore
-    """Metaclass that combines QObject metaclass with ABCMeta."""
-    pass
-
-
-class BaseView(QWidget, metaclass=CombinedMeta):
+class BaseView(QWidget):
     """Base class for all views."""
     
     def __init__(self, parent=None):
         super().__init__(parent)
         self._setup_base_ui()
         self.setup_ui()
+        # Ensure the composed layout is applied to the widget so content renders
+        if hasattr(self, '_main_layout'):
+            self.setLayout(self._main_layout)
         logger.debug(f"{self.__class__.__name__} initialized")
     
     def _setup_base_ui(self):
@@ -48,10 +44,9 @@ class BaseView(QWidget, metaclass=CombinedMeta):
         # Store layout for subclasses to use
         self._main_layout = main_layout
     
-    @abstractmethod
     def setup_ui(self):
         """Set up the view-specific UI. Must be implemented by subclasses."""
-        pass
+        raise NotImplementedError("setup_ui must be implemented by subclasses")
     
     def get_main_layout(self) -> QVBoxLayout:
         """Get the main layout for adding widgets."""

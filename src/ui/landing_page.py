@@ -83,7 +83,7 @@ class LandingPage(QWidget):
     
     def update_background(self):
         """Update background color."""
-        bg_color = COLORS.get('bg_content', COLORS['bg_dark'])
+        bg_color = COLORS.get('bg_dark', '#0e1116')
         self.setStyleSheet(f"""
             QWidget {{
                 background-color: {bg_color};

@@ -229,9 +229,11 @@ def get_global_style() -> str:
     
     /* Toolbar */
     QToolBar {{
-        background-color: {colors['bg_dark']};
+        background-color: {colors['bg_medium']};
         border: none;
-        spacing: 5px;
+        border-bottom: 1px solid {colors['border']};
+        padding: 6px 8px;
+        spacing: 6px;
     }}
     
     /* Buttons */
@@ -240,7 +242,7 @@ def get_global_style() -> str:
         border-radius: 5px;
         background-color: {colors['bg_lighter']};
         color: {colors['text_primary']};
-        padding: 5px 10px;
+        padding: 8px 14px;
     }}
     QPushButton:hover {{
         background-color: {colors['bg_light']};
@@ -698,7 +700,7 @@ def get_card_style() -> str:
     return f"""
         QFrame {{
             background-color: {bg_color};
-            border: 2px solid {colors['bg_light']};
+            border: 1px solid {colors['border']};
             border-radius: 12px;
         }}
     """
@@ -718,7 +720,8 @@ def get_card_description_style() -> str:
 
 def get_card_icon_style() -> str:
     """Get card icon style."""
-    return "background: transparent;"
+    colors = _get_colors()
+    return f"color: {colors['accent']}; background: transparent;"
 
 
 def get_card_arrow_style() -> str:

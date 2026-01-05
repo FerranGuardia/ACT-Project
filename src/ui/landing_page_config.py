@@ -24,7 +24,8 @@ class LandingPageConfig:
     HEADER_SPACING = 15
     HEADER_MARGINS = (0, 0, 0, 20)
     TITLE_CONTAINER_SPACING = 5
-    CARDS_CONTAINER_MARGINS = (80, 0, 80, 0)
+    # Constrain card column so it does not span edge-to-edge on wide screens
+    CARDS_CONTAINER_MARGINS = (120, 0, 120, 0)
     
     # Font sizes
     TITLE_FONT_SIZE = 32
@@ -35,12 +36,13 @@ class LandingPageConfig:
     ARROW_FONT_SIZE = 24
     
     # Shadow effects
-    SHADOW_BLUR_RADIUS: ClassVar[int] = 20
+    SHADOW_BLUR_RADIUS: ClassVar[int] = 22
     SHADOW_BLUR_RADIUS_HOVER: ClassVar[int] = 30
     SHADOW_X_OFFSET: ClassVar[int] = 0
-    SHADOW_Y_OFFSET: ClassVar[int] = 4
-    SHADOW_COLOR: ClassVar[QColor] = QColor(0, 0, 0, 80)
-    SHADOW_COLOR_HOVER: ClassVar[QColor] = QColor(0, 0, 0, 100)
+    SHADOW_Y_OFFSET: ClassVar[int] = 6
+    SHADOW_Y_OFFSET_HOVER: ClassVar[int] = 2
+    SHADOW_COLOR: ClassVar[QColor] = QColor(12, 10, 8, 32)
+    SHADOW_COLOR_HOVER: ClassVar[QColor] = QColor(12, 10, 8, 51)
     
     # Icon dimensions
     ICON_WIDTH = 80

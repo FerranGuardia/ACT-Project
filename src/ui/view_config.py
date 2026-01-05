@@ -51,9 +51,9 @@ class ViewConfig:
     MAIN_WINDOW_MIN_HEIGHT: Final[int] = 700
     
     # Back button settings (now only in toolbar, kept for reference)
-    BACK_BUTTON_HEIGHT: Final[int] = 35
-    BACK_BUTTON_WIDTH: Final[int] = 140
-    BACK_BUTTON_TEXT: Final[str] = "← Back to Home"
+    BACK_BUTTON_HEIGHT: Final[int] = 42
+    BACK_BUTTON_WIDTH: Final[int] = 160
+    BACK_BUTTON_TEXT: Final[str] = "← Back"
     
     # Header settings
     HEADER_TITLE_PADDING: Final[int] = 10
