@@ -164,3 +164,30 @@ class TestAddQueueDialog:
 
         except ImportError:
             pytest.skip("UI module not available")
+
+    @patch('ui.views.full_auto_view.add_queue_dialog.VoiceManager')
+    def test_lazy_provider_loading(self, mock_voice_manager_class, qt_application):
+        """Test that providers are loaded lazily when needed"""
+        try:
+            from ui.views.full_auto_view.add_queue_dialog import AddQueueDialog
+
+            # Mock voice manager to return providers
+            mock_vm = Mock()
+            mock_vm.get_providers.return_value = ["edge_tts", "pyttsx3"]
+            mock_voice_manager_class.return_value = mock_vm
+
+            dialog = AddQueueDialog()
+
+            # Initially, providers should not be loaded
+            assert not dialog._providers_loaded
+            assert dialog.selected_provider is None
+
+            # When we call _get_selected_provider, it should trigger loading
+            provider = dialog._get_selected_provider()
+
+            # Now providers should be loaded and a default selected
+            assert dialog._providers_loaded
+            assert provider == "edge_tts"  # First provider in the list
+
+        except ImportError:
+            pytest.skip("UI module not available")

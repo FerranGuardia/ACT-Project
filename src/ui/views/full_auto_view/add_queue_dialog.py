@@ -29,9 +29,9 @@ class AddQueueDialog(QDialog):
         self.setMinimumWidth(ViewConfig.DIALOG_MIN_WIDTH)
         self.voice_manager = VoiceManager()
         self.selected_provider: Optional[str] = None
+        self._providers_loaded = False
         self.setup_ui()
-        self._load_providers()
-        self._load_voices()
+        # Don't load providers/voices on init - do it lazily when needed
     
     def setup_ui(self):
         """Set up the dialog UI."""
@@ -205,20 +205,28 @@ class AddQueueDialog(QDialog):
                 self.provider_button.setText("No Providers Available")
                 self.provider_button.setEnabled(False)
                 self.provider_status_label.setText("🔴")
+                self._providers_loaded = True
                 return
-            
+
             # Set default to first available provider
             if providers:
                 self.selected_provider = providers[0]
                 self._update_provider_display()
+
+            self._providers_loaded = True
         except Exception as e:
             logger.error(f"Error loading providers: {e}")
             # Fallback to Edge TTS
             self.selected_provider = "edge_tts"
             self._update_provider_display()
+            self._providers_loaded = True
     
     def _select_provider(self):
         """Open provider selection dialog."""
+        # Load providers if not already loaded
+        if not self._providers_loaded:
+            self._load_providers()
+
         dialog = ProviderSelectionDialog(self, current_provider=self.selected_provider)
         if dialog.exec():
             self.selected_provider = dialog.get_selected_provider()
@@ -260,6 +268,9 @@ class AddQueueDialog(QDialog):
     
     def _get_selected_provider(self) -> Optional[str]:
         """Get the currently selected provider name."""
+        # If no provider selected yet, try to load providers and pick default
+        if self.selected_provider is None and not self._providers_loaded:
+            self._load_providers()
         return self.selected_provider
     
     def _load_voices(self):
@@ -267,15 +278,15 @@ class AddQueueDialog(QDialog):
         try:
             # Clear existing voices
             self.voice_combo.clear()
-            
-            # Get selected provider
+
+            # Get selected provider (this will load providers if needed)
             provider = self._get_selected_provider()
-            
+
             if not provider:
                 self.voice_combo.addItems(["Please select a provider first"])
                 self.voice_combo.setEnabled(False)
                 return
-            
+
             # Check if provider is available
             from tts.providers.provider_manager import TTSProviderManager
             provider_manager = TTSProviderManager()
@@ -285,19 +296,19 @@ class AddQueueDialog(QDialog):
                 self.voice_combo.setEnabled(False)
                 logger.warning(f"Provider '{provider}' is not available - voice selection disabled")
                 return
-            
+
             # Load voices for the selected provider (filtered to en-US only)
             voices = self.voice_manager.get_voice_list(locale="en-US", provider=provider)
-            
+
             if not voices:
                 logger.warning(f"No voices available for provider: {provider}")
                 self.voice_combo.addItems(["No voices available for this provider"])
                 self.voice_combo.setEnabled(False)
                 return
-            
+
             self.voice_combo.setEnabled(True)
             self.voice_combo.addItems(voices)
-            
+
             # Set default voice
             default_voice = "en-US-AndrewNeural"
             index = self.voice_combo.findText(default_voice, Qt.MatchFlag.MatchContains)
