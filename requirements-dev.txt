@@ -13,7 +13,15 @@ black>=23.11.0
 flake8>=6.1.0
 mypy>=1.7.0
 pylint>=3.0.0
-pylint>=3.0.0
+
+# Phase 1 improvements: Reliability & Fault Tolerance
+circuitbreaker>=1.3.0  # Circuit breaker pattern
+aiohttp>=3.9.0  # Async HTTP client with connection pooling
+tenacity>=8.2.0  # Retry and backoff utilities
+
+# Phase 1 improvements: Security & Validation
+cerberus>=1.3.0  # Data validation
+bleach>=6.1.0  # HTML sanitization and text cleaning
 
 # Type stubs
 types-requests>=2.31.0

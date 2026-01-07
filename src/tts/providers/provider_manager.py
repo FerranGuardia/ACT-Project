@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import List, Dict, Optional
 
 from core.logger import get_logger
+from utils.validation import validate_tts_request
 from .base_provider import TTSProvider, ProviderType
 from .edge_tts_provider import EdgeTTSProvider
 from .pyttsx3_provider import Pyttsx3Provider
@@ -93,9 +94,9 @@ class TTSProviderManager:
         volume: Optional[float] = None
     ) -> bool:
         """Convert text to speech with automatic fallback.
-        
+
         Tries preferred provider first, then falls back to other available providers.
-        
+
         Args:
             text: Text to convert
             voice: Voice identifier (provider-specific)
@@ -104,10 +105,25 @@ class TTSProviderManager:
             rate: Speech rate adjustment
             pitch: Pitch adjustment
             volume: Volume adjustment
-        
+
         Returns:
             True if conversion successful, False if all providers failed
+
+        Raises:
+            ValueError: If input validation fails
         """
+        # Validate input parameters
+        request_data = {
+            'text': text,
+            'voice': voice,
+            'rate': rate,
+            'pitch': pitch,
+            'volume': volume
+        }
+        is_valid, validation_error = validate_tts_request(request_data)
+        if not is_valid:
+            raise ValueError(f"TTS request validation failed: {validation_error}")
+
         # Build list of providers to try
         providers_to_try: List[tuple[str, TTSProvider]] = []
         

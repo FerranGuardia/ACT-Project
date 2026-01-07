@@ -1,14 +1,14 @@
 # Block 1: Base Infrastructure
 
-**Status**: **COMPLETE**  
-**Last Updated**: 2025-12-12  
-**Location**: `src/core/`
+**Status**: **COMPLETE** (Enhanced with Security & Validation)  
+**Last Updated**: 2026-01-08  
+**Location**: `src/core/` and `src/utils/`
 
 ---
 
 ## Overview
 
-Core infrastructure providing logging and configuration management for the entire application.
+Core infrastructure providing logging, configuration management, and enterprise-grade input validation and security utilities for the entire application.
 
 ---
 
@@ -52,13 +52,41 @@ output_dir = config.get("paths.output")
 config.set("paths.output", "/new/path")
 ```
 
+### 3. Input Validation (`utils/validation.py`)
+
+Comprehensive input validation and sanitization utilities for security and reliability.
+
+**Features**:
+- URL validation and sanitization (malicious pattern detection, XSS prevention)
+- TTS request validation (parameter ranges, content analysis)
+- Content sanitization (HTML cleaning, null byte removal)
+- Security analysis (SQL injection, script injection detection)
+- Input normalization (whitespace, encoding)
+
+**Usage**:
+```python
+from utils.validation import validate_url, validate_tts_request
+
+# URL validation
+is_valid, clean_url = validate_url("https://example.com/novel")
+if not is_valid:
+    raise ValueError(f"Invalid URL: {clean_url}")
+
+# TTS request validation
+request = {'text': 'Hello world', 'voice': 'en-US-AndrewNeural'}
+is_valid, error = validate_tts_request(request)
+if not is_valid:
+    raise ValueError(f"Invalid request: {error}")
+```
+
 ---
 
 ## Testing
 
-**Test Location**: `tests/unit/core/`
+**Test Location**: `tests/unit/core/` and `tests/unit/utils/`
 - Unit tests for logger
 - Unit tests for config manager
+- Unit tests for input validation (`test_validation.py`)
 
 ---
 

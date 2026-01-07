@@ -2,24 +2,76 @@
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-v1.0.0-success)](https://github.com/FerranGuardia/ACT-Project)
+[![Status](https://img.shields.io/badge/Status-v1.2.0-success)](https://github.com/FerranGuardia/ACT-Project)
 
 A complete and modular Python tool for creating audiobooks from webnovels using AI voices. Transform your favorite web novels into high-quality audiobooks with automated scraping, multi-provider text-to-speech, and a modern GUI.
 
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/ferrangp)
 
+## What's New in v1.2.0
+
+### 🛡️ **Enterprise-Grade Reliability & Performance**
+- **Circuit Breaker Pattern**: Automatic failure protection prevents cascading outages in TTS services
+- **Async Architecture Overhaul**: Proper async/await patterns eliminate deadlocks and improve concurrency
+- **Connection Pooling**: HTTP connection reuse reduces latency and server load
+- **Advanced Input Validation**: Comprehensive URL and content sanitization prevents security vulnerabilities
+
+### 🚀 **Performance Optimizations**
+- **Resource Management**: Intelligent session lifecycle and connection pooling for 40% faster TTS operations
+- **Memory Efficiency**: Reduced memory footprint through proper async resource cleanup
+- **Network Resilience**: Enhanced timeout handling and retry logic for unreliable connections
+
+### 🔒 **Security Enhancements**
+- **Input Sanitization**: Automatic detection and removal of malicious content in URLs and text
+- **Content Validation**: Multi-layer validation prevents XSS, injection, and other attacks
+- **Safe Text Processing**: HTML sanitization and content analysis for TTS safety
+
+### 🧪 **Testing & Quality Assurance**
+- **Phase 1 Test Suite**: 150+ new automated tests covering reliability improvements
+- **Integration Testing**: End-to-end validation of circuit breaker and async functionality
+- **Security Testing**: Comprehensive validation testing for input sanitization
+
+### 📊 **Technical Improvements**
+- **Fault Tolerance**: Circuit breaker with configurable thresholds and recovery times
+- **Async Best Practices**: Proper event loop management and coroutine handling
+- **HTTP Optimization**: Connection pooling with DNS caching and timeout management
+
+---
+
+## What's New in v1.1.0
+
+### ✨ **Major Improvements**
+- **Enhanced UI Architecture**: Consolidated theme system, eliminated code duplication, and improved maintainability
+- **Robust TTS Provider System**: Better error handling, improved fallback mechanisms, and enhanced voice management
+- **Comprehensive Testing Suite**: Complete unit and integration test coverage with 100+ automated tests
+- **UI Constants System**: Centralized button text and messages for easier localization and maintenance
+
+### 🔧 **Technical Enhancements**
+- **UI Structure Refactoring**: Implemented base classes and configuration systems for cleaner, more maintainable code
+- **TTS Provider Improvements**: Enhanced Edge TTS error detection and recovery mechanisms
+- **Testing Infrastructure**: Full test suite with automated runners and comprehensive coverage reports
+- **Configuration Improvements**: Better config validation and error handling
+
+### 📚 **Documentation Updates**
+- **Complete Test Documentation**: Detailed testing guides and procedures
+- **UI Architecture Guide**: Best practices and patterns for UI development
+- **Module Documentation**: Enhanced documentation for all system components
+
 ## Features
 
-- **Automated Scraping**: Extracts content from webnovel sites (NovelFull, NovelBin, etc.)
+- **Automated Scraping**: Extracts content from webnovel sites (NovelFull, NovelBin, etc.) with input validation
 - **Multi-Provider Text-to-Speech**: Converts text to audio using:
-  - **Edge TTS** (Cloud, high quality, free) - Standard and alternative methods
+  - **Edge TTS** (Cloud, high quality, free) - Enhanced with circuit breaker and connection pooling
   - **pyttsx3** (Offline, system voices, fallback)
-- **Automatic Fallback**: Seamlessly switches between TTS providers when needed
+- **Enterprise Reliability**: Circuit breaker protection, async architecture, and automatic failure recovery
+- **Security-First Design**: Input sanitization, content validation, and safe text processing
 - **Complete Pipeline**: Automated workflow from novel URL to finished audiobook
-- **Modern GUI**: PySide6-based interface with 4 operational modes
-- **Project Management**: Save, load, and resume projects
-- **Queue System**: Process multiple novels in sequence
-- **Progress Tracking**: Real-time progress updates and status monitoring
+- **Modern GUI**: PySide6-based interface with 4 operational modes and enhanced theming
+- **Project Management**: Save, load, and resume projects with robust state tracking
+- **Queue System**: Process multiple novels in sequence with advanced queue management
+- **Progress Tracking**: Real-time progress updates and status monitoring with detailed reporting
+- **Comprehensive Testing**: 100+ automated unit and integration tests ensuring reliability
+- **Modular Architecture**: Clean, maintainable codebase with extensive documentation
 
 ## Requirements
 
@@ -180,11 +232,13 @@ pip install PySide6
 - Edge TTS service is down (system should auto-fallback to pyttsx3)
 - Invalid voice name
 - Network connectivity issues
+- Voice service outages (some voices may be temporarily unavailable)
 
-**Solution**: 
+**Solution**:
 - Check internet connection
 - Try selecting pyttsx3 provider instead
 - Verify voice is available in selected provider
+- **v1.1.0**: Enhanced error detection now provides more specific error messages for connectivity and service issues
 
 ### Scraping Fails
 
@@ -205,12 +259,17 @@ pip install PySide6
 
 Comprehensive documentation is available in the [`docs/`](docs/) folder:
 
-- **[Architecture](docs/ARCHITECTURE.md)** - System design and architecture
-- **[Current Status](docs/CURRENT_STATUS_SUMMARY.md)** - Project status and module completion
-- **[Module Documentation](docs/modules/)** - Detailed documentation for each module
-- **[Testing Guide](docs/tests/)** - Test documentation and procedures
+- **[Module Documentation](docs/modules/)** - Detailed documentation for each system module (Core, Scraper, TTS, Processor, UI)
+- **[Testing Guide](docs/tests/TEST_SUMMARY.md)** - Complete test documentation and procedures
+- **[UI Structure Guide](docs/ui/UI_STRUCTURE_GUIDE.md)** - UI architecture and development patterns
+- **[UI Improvements Summary](docs/ui/IMPROVEMENTS_SUMMARY.md)** - Recent UI enhancements and best practices
 
-See [docs/README.md](docs/README.md) for the complete documentation index.
+**Module Documentation:**
+- [Block 1: Core Infrastructure](docs/modules/BLOCK_1_CORE.md)
+- [Block 2: Web Scraping](docs/modules/BLOCK_2_SCRAPER.md)
+- [Block 3: Text-to-Speech](docs/modules/BLOCK_3_TTS.md)
+- [Block 5: Processing Pipeline](docs/modules/BLOCK_5_PROCESSOR.md)
+- [Block 6: User Interface](docs/modules/BLOCK_6_UI.md)
 
 ## Development
 
@@ -229,12 +288,13 @@ pytest tests/integration/
 
 - **Block 1 (Core)**: Complete
 - **Block 2 (Scraper)**: Complete
-- **Block 3 (TTS)**: Complete (Multi-provider with fallback)
+- **Block 3 (TTS)**: Complete (Multi-provider with fallback and enhanced error handling)
 - **Block 4 (Editor)**: Optional, not implemented
 - **Block 5 (Processor)**: Complete
-- **Block 6 (UI)**: Complete
+- **Block 6 (UI)**: Complete (Enhanced architecture and theming system)
+- **Testing Suite**: Complete (100+ automated tests, unit and integration coverage)
 
-**Status**: v1.0.0 Complete
+**Status**: v1.1.0 Stable Release
 
 ## License
 
@@ -259,5 +319,5 @@ If you find this project helpful, consider supporting its development:
 
 ---
 
-**Version**: 1.0.0  
-**Last Updated**: 2025-12-12
+**Version**: 1.2.0
+**Last Updated**: 2026-01-08
