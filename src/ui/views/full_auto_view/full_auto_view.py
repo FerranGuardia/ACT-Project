@@ -97,7 +97,7 @@ class FullAutoView(BaseView):
         """Add a new item to the queue."""
         dialog = AddQueueDialog(self)
         if dialog.exec():
-            url, title, voice, provider, chapter_selection = dialog.get_data()
+            url, title, voice, provider, chapter_selection, output_format = dialog.get_data()
             
             # Validate URL
             valid, error_msg = self.handlers.validate_url(url)
@@ -122,6 +122,7 @@ class FullAutoView(BaseView):
                 'voice': voice,
                 'provider': provider,
                 'chapter_selection': chapter_selection,
+                'output_format': output_format,
                 'status': StatusMessages.PENDING,
                 'progress': 0
             }
@@ -158,7 +159,8 @@ class FullAutoView(BaseView):
                 item['title'],
                 item['url'],
                 item['status'],
-                item['progress']
+                item['progress'],
+                item.get('output_format', {'type': 'individual_mp3s'})
             )
             
             # Connect action buttons using handlers
@@ -208,8 +210,8 @@ class FullAutoView(BaseView):
             show_error(self, DialogMessages.ALREADY_PROCESSING_MSG)
             return
         
-        # Get first pending item
-        pending_items = [item for item in self.queue_items if item['status'] == StatusMessages.PENDING]
+        # Get first pending item (support both old "Pending" and new StatusMessages.PENDING formats)
+        pending_items = [item for item in self.queue_items if item['status'] in [StatusMessages.PENDING, "Pending"]]
         if not pending_items:
             show_error(self, DialogMessages.NO_PENDING_ITEMS_MSG)
             return
@@ -226,14 +228,16 @@ class FullAutoView(BaseView):
         voice: Optional[str] = item.get('voice', 'en-US-AndrewNeural')
         provider: Optional[str] = item.get('provider')
         chapter_selection: Dict[str, Any] = item.get('chapter_selection', {'type': 'all'})
+        output_format: Dict[str, Any] = item.get('output_format', {'type': 'individual_mp3s'})
         output_folder: Optional[str] = item.get('output_folder', str(Path.home() / "Desktop"))
         novel_title: Optional[str] = item.get('title', project_name)
         self.current_processing = ProcessingThread(
-            item['url'], 
+            item['url'],
             project_name,
             voice=voice,
             provider=provider,
             chapter_selection=chapter_selection,
+            output_format=output_format,
             output_folder=output_folder,
             novel_title=novel_title
         )
