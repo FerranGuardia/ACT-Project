@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import List, Dict
 
 from core.logger import get_logger
+from ui.ui_constants import StatusMessages
 
 logger = get_logger("ui.full_auto_view.queue_manager")
 
@@ -35,8 +36,9 @@ class QueueManager:
                         'voice': item.get('voice', 'en-US-AndrewNeural'),
                         'provider': item.get('provider'),
                         'chapter_selection': item.get('chapter_selection', {'type': 'all'}),
+                        'output_format': item.get('output_format', {'type': 'individual_mp3s', 'batch_size': 50}),
                         'output_folder': item.get('output_folder'),
-                        'status': 'Pending',  # Reset to Pending on save (will resume on load)
+                        'status': StatusMessages.PENDING,  # Reset to Pending on save (will resume on load)
                         'progress': 0
                     })
             

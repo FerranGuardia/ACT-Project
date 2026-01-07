@@ -370,7 +370,7 @@ class ProcessingPipeline:
             chapter_title = f"Chapter {chapter_num}"
             
             # Format text with pauses: 1s pause, chapter title, 1s pause, then content
-            formatted_text = format_chapter_intro(chapter_title, content, provider=self.provider)
+            formatted_text = format_chapter_intro(chapter_title, content)
             
             # Create temporary audio file path
             import tempfile
@@ -734,6 +734,110 @@ class ProcessingPipeline:
         )
         
         return result
+
+    def merge_audio_files(self, output_format: Optional[Dict[str, Any]] = None) -> bool:
+        """
+        Merge processed audio files according to the specified output format.
+
+        Args:
+            output_format: Dictionary specifying output format options
+                          {'type': 'merged_mp3'} for single file
+                          {'type': 'batched_mp3', 'batch_size': N} for batched files
+
+        Returns:
+            True if merging was successful, False otherwise
+        """
+        try:
+            logger.info("Starting audio file merging...")
+
+            # Get all audio files from the project
+            audio_files = self.file_manager.list_audio_files()
+
+            if not audio_files:
+                logger.warning("No audio files found to merge")
+                return False
+
+            # Sort files by chapter number
+            def extract_chapter_num(path):
+                filename = path.name
+                # Extract chapter number from filename patterns like chapter_0001.mp3 or chapter_0001_title.mp3
+                import re
+                match = re.search(r'chapter_(\d+)', filename)
+                return int(match.group(1)) if match else 0
+
+            audio_files_sorted = sorted(audio_files, key=extract_chapter_num)
+
+            if len(audio_files_sorted) <= 1:
+                logger.info("Only one or no audio files found, skipping merge")
+                return True
+
+            # Import and use AudioMerger
+            from tts.audio_merger import AudioMerger
+            from tts.providers.provider_manager import TTSProviderManager
+
+            provider_manager = TTSProviderManager()
+            audio_merger = AudioMerger(provider_manager)
+
+            # Determine merge type
+            output_format = output_format or {'type': 'merged_mp3'}
+
+            if output_format.get('type') == 'batched_mp3':
+                # Batch merging
+                batch_size = output_format.get('batch_size', 50)
+                logger.info(f"Merging {len(audio_files_sorted)} audio files in batches of {batch_size}...")
+
+                success_count = 0
+                total_batches = (len(audio_files_sorted) + batch_size - 1) // batch_size  # Ceiling division
+
+                for batch_num in range(total_batches):
+                    start_idx = batch_num * batch_size
+                    end_idx = min(start_idx + batch_size, len(audio_files_sorted))
+                    batch_files = audio_files_sorted[start_idx:end_idx]
+
+                    # Create output path for this batch
+                    project_name = self.novel_title or self.project_name
+                    safe_name = self.file_manager._sanitize_filename(project_name)
+                    first_chapter = extract_chapter_num(batch_files[0])
+                    last_chapter = extract_chapter_num(batch_files[-1])
+                    batch_filename = f"{safe_name}_chapters_{first_chapter:04d}-{last_chapter:04d}.mp3"
+                    batch_path = self.file_manager.get_audio_dir() / batch_filename
+
+                    logger.info(f"Merging batch {batch_num + 1}/{total_batches} ({len(batch_files)} files)...")
+                    if audio_merger.merge_audio_chunks(batch_files, batch_path):
+                        logger.info(f"✓ Successfully merged batch {batch_num + 1} into: {batch_path}")
+                        success_count += 1
+                    else:
+                        logger.error(f"Failed to merge batch {batch_num + 1}")
+
+                if success_count == total_batches:
+                    logger.info(f"✓ Successfully merged all {total_batches} batches")
+                    return True
+                else:
+                    logger.error(f"Failed to merge {total_batches - success_count} out of {total_batches} batches")
+                    return False
+
+            else:
+                # Single file merging (default behavior)
+                logger.info(f"Merging {len(audio_files_sorted)} audio files into single file...")
+
+                # Create output path for merged file
+                project_name = self.novel_title or self.project_name
+                safe_name = self.file_manager._sanitize_filename(project_name)
+                merged_filename = f"{safe_name}_complete.mp3"
+                merged_path = self.file_manager.get_audio_dir() / merged_filename
+
+                success = audio_merger.merge_audio_chunks(audio_files_sorted, merged_path)
+
+                if success:
+                    logger.info(f"✓ Successfully merged audio files into: {merged_path}")
+                    return True
+                else:
+                    logger.error("Failed to merge audio files")
+                    return False
+
+        except Exception as e:
+            logger.error(f"Error during audio file merging: {e}")
+            return False
 
 
 
