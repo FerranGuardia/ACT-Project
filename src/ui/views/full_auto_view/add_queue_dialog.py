@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any, Tuple
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QDialogButtonBox, QFormLayout, QComboBox, QRadioButton,
-    QButtonGroup, QSpinBox, QFileDialog, QGroupBox
+    QButtonGroup, QSpinBox, QFileDialog, QGroupBox, QWidget
 )
 from PySide6.QtCore import Qt
 
@@ -126,7 +126,57 @@ class AddQueueDialog(QDialog):
         
         chapter_group.setLayout(chapter_layout)
         layout.addWidget(chapter_group)
-        
+
+        # Output Format Selection
+        output_group = QGroupBox("Output Format")
+        output_layout = QVBoxLayout()
+        self.output_group = QButtonGroup()
+
+        self.individual_mp3_radio = QRadioButton("Individual chapter MP3s (separate files)")
+        self.individual_mp3_radio.setChecked(True)
+        self.output_group.addButton(self.individual_mp3_radio, 0)
+        output_layout.addWidget(self.individual_mp3_radio)
+
+        self.batch_mp3_radio = QRadioButton("Batch merged MP3s:")
+        self.output_group.addButton(self.batch_mp3_radio, 1)
+        batch_layout = QHBoxLayout()
+        batch_layout.addWidget(self.batch_mp3_radio)
+        self.batch_size_spin = QSpinBox()
+        self.batch_size_spin.setMinimum(1)
+        self.batch_size_spin.setMaximum(1000)
+        self.batch_size_spin.setValue(50)
+        self.batch_size_spin.setEnabled(False)
+        batch_layout.addWidget(self.batch_size_spin)
+        batch_layout.addWidget(QLabel("chapters per file"))
+        batch_layout.addStretch()
+        output_layout.addLayout(batch_layout)
+
+        self.merged_mp3_radio = QRadioButton("Single merged MP3 (all chapters combined)")
+        self.output_group.addButton(self.merged_mp3_radio, 2)
+        output_layout.addWidget(self.merged_mp3_radio)
+
+        # Connect batch radio to enable/disable spin box
+        self.batch_mp3_radio.toggled.connect(self.batch_size_spin.setEnabled)
+
+        # Batch merging option
+        batch_layout = QHBoxLayout()
+        self.batch_mp3_radio = QRadioButton("Batched merged MP3s:")
+        self.output_group.addButton(self.batch_mp3_radio, 2)
+        self.batch_size_spin = QSpinBox()
+        self.batch_size_spin.setMinimum(1)
+        self.batch_size_spin.setMaximum(1000)
+        self.batch_size_spin.setValue(50)
+        self.batch_size_spin.setEnabled(False)
+        self.batch_mp3_radio.toggled.connect(self.batch_size_spin.setEnabled)
+        batch_layout.addWidget(self.batch_mp3_radio)
+        batch_layout.addWidget(QLabel("chapters per batch"))
+        batch_layout.addWidget(self.batch_size_spin)
+        batch_layout.addStretch()
+        output_layout.addLayout(batch_layout)
+
+        output_group.setLayout(output_layout)
+        layout.addWidget(output_group)
+
         # Buttons
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
@@ -261,14 +311,17 @@ class AddQueueDialog(QDialog):
             self.voice_combo.addItems(["Error loading voices"])
             self.voice_combo.setEnabled(False)
     
-    def get_data(self) -> Tuple[str, str, str, Optional[str], Dict[str, Any]]:
-        """Get the entered URL, title, voice, provider, and chapter selection."""
+    def get_data(self) -> Tuple[str, str, str, Optional[str], Dict[str, Any], Dict[str, Any], Optional[str]]:
+        """Get the entered URL, title, voice, provider, chapter selection, output format, and output folder."""
         url = self.url_input.text().strip()
         title = self.title_input.text().strip()
         # Extract voice name from formatted string
         voice_display = self.voice_combo.currentText()
         voice = voice_display.split(" - ")[0] if " - " in voice_display else voice_display
         provider = self._get_selected_provider()
+
+        # Get output folder
+        output_folder = self.folder_input.text().strip() or None
         
         # Get chapter selection
         if self.all_chapters_radio.isChecked():
@@ -288,6 +341,17 @@ class AddQueueDialog(QDialog):
                 }
             except ValueError:
                 chapter_selection = {'type': 'all'}  # Default to all if invalid
-        
-        return url, title, voice, provider, chapter_selection
+
+        # Get output format selection
+        if self.merged_mp3_radio.isChecked():
+            output_format = {'type': 'merged_mp3'}
+        elif self.batch_mp3_radio.isChecked():
+            output_format = {
+                'type': 'batched_mp3',
+                'batch_size': self.batch_size_spin.value()
+            }
+        else:
+            output_format = {'type': 'individual_mp3s'}
+
+        return url, title, voice, provider, chapter_selection, output_format, output_folder
 

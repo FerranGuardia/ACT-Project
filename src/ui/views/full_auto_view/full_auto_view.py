@@ -97,7 +97,7 @@ class FullAutoView(BaseView):
         """Add a new item to the queue."""
         dialog = AddQueueDialog(self)
         if dialog.exec():
-            url, title, voice, provider, chapter_selection, output_format = dialog.get_data()
+            url, title, voice, provider, chapter_selection, output_format, output_folder = dialog.get_data()
             
             # Validate URL
             valid, error_msg = self.handlers.validate_url(url)
@@ -123,6 +123,7 @@ class FullAutoView(BaseView):
                 'provider': provider,
                 'chapter_selection': chapter_selection,
                 'output_format': output_format,
+                'output_folder': output_folder,
                 'status': StatusMessages.PENDING,
                 'progress': 0
             }
