@@ -101,13 +101,11 @@ class QueueManager:
             return None  # Will be resolved later by provider manager
 
         if not isinstance(provider, str):
-            logger.warning(f"Provider must be a string, got {type(provider).__name__}, ignoring")
-            return None
+            raise ValidationError(f"Provider must be a string, got {type(provider).__name__}")
 
         valid_providers = ['edge_tts', 'pyttsx3']
         if provider not in valid_providers:
-            logger.warning(f"Unknown provider '{provider}', ignoring")
-            return None
+            raise ValidationError(f"Unknown provider '{provider}', must be one of: {valid_providers}")
 
         return provider
 
