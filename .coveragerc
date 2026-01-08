@@ -1,0 +1,14 @@
+[run]
+source = src
+branch = True
+omit =
+    src/ui/*
+    src/main.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:

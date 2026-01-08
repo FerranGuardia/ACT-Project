@@ -46,6 +46,7 @@ class StatusMessages:
     # Common statuses
     READY: Final[str] = "Ready"
     PROCESSING: Final[str] = "Processing"
+    INTERRUPTED: Final[str] = "Interrupted"
     PAUSED: Final[str] = "Paused"
     STOPPING: Final[str] = "Stopping..."
     ERROR_OCCURRED: Final[str] = "Error occurred"

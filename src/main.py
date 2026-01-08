@@ -29,7 +29,7 @@ def main() -> int:
     """
     logger.info("=" * 60)
     logger.info("ACT - Audiobook Creator Tools")
-    logger.info(f"Version: {config.get('app.version', '1.0.0')}")
+    logger.info(f"Version: {config.get('app.version', '1.2.0')}")
     logger.info("=" * 60)
 
     try:

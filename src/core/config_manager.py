@@ -48,9 +48,13 @@ class ConfigManager:
         Returns:
             Dictionary with default configuration
         """
+        # Read version from VERSION file
+        version_file = Path(__file__).parent.parent / "VERSION"
+        version = version_file.read_text().strip() if version_file.exists() else "1.2.0"
+
         return {
             "app": {
-                "version": "1.0.0",
+                "version": version,
                 "theme": "light",
                 "language": "es",
             },

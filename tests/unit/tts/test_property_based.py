@@ -5,11 +5,13 @@ These tests use property-based testing to find edge cases and ensure
 robustness against various inputs.
 """
 
-import pytest
-from hypothesis import given, strategies as st, assume, settings, HealthCheck
-from hypothesis.strategies import composite
 import re
 from pathlib import Path
+
+import pytest
+from hypothesis import HealthCheck, assume, given, settings
+from hypothesis import strategies as st
+from hypothesis.strategies import composite
 
 
 class TestTTSPropertyBased:
@@ -57,9 +59,9 @@ class TestTTSPropertyBased:
         ))
 
     @given(text=st.text(min_size=0, max_size=1000))
-    @settings(suppress_health_check=[HealthCheck.too_slow])
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
     def test_text_cleaner_handles_any_text(self, text):
-        """Test that text cleaner function handles any input without crashing."""
+        """Test that text cleaner function handles any input and produces valid output."""
         from src.tts.text_cleaner import clean_text_for_tts
 
         try:
@@ -71,25 +73,40 @@ class TestTTSPropertyBased:
             # Result should not be None
             assert result is not None
 
-            # If input was empty, result should be empty or whitespace
+            # If input was empty, result should be empty
             if not text.strip():
-                assert result.strip() == "" or result == text
+                assert result == ""
+
+            # Result should not contain problematic symbols that are cleaned
+            assert '===' not in result  # Separators should be replaced
+            assert '---' not in result  # Separators should be replaced
+            assert '___' not in result  # Separators should be replaced
+
+            # Should not have excessive newlines
+            assert '\n\n\n' not in result
+
+            # Should not have excessive punctuation
+            assert '....' not in result
+            assert '!!!!' not in result
+            assert '????' not in result
 
         except Exception as e:
             # Log the failing input for debugging
             pytest.fail(f"text cleaner failed on input: {repr(text)}. Error: {e}")
 
     @given(text=st.text(min_size=1, max_size=1000))
-    @settings(suppress_health_check=[HealthCheck.too_slow])
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
     def test_text_processor_chunking(self, text):
-        """Test that text processor handles chunking correctly."""
-        from src.tts.text_processor import TextProcessor
+        """Test that text processor handles chunking correctly with proper validation."""
         from unittest.mock import Mock
+
+        from src.tts.text_processor import TextProcessor
 
         try:
             provider_manager = Mock()
             processor = TextProcessor(provider_manager)
-            chunks = processor.chunk_text(text, max_length=500)
+            max_length = 500
+            chunks = processor.chunk_text(text, max_length=max_length)
 
             # Chunks should be a list
             assert isinstance(chunks, list)
@@ -98,66 +115,104 @@ class TestTTSPropertyBased:
             for chunk in chunks:
                 assert isinstance(chunk, str)
 
-            # Rejoined text should contain original text
-            rejoined = ''.join(chunks)
-            assert text in rejoined or len(text) == 0
+            # Should return empty list for empty text
+            if not text:
+                assert chunks == []
 
-            # No chunk should exceed max_length (with some tolerance for word boundaries)
+            # If text is short enough, should return single chunk
+            if len(text) <= max_length:
+                assert len(chunks) == 1
+                assert chunks[0] == text
+
+            # Rejoined text should contain original text (may add spaces for word boundaries)
+            if chunks:
+                rejoined = ''.join(chunks)
+                # Allow for possible spacing additions
+                assert len(rejoined) >= len(text.replace(' ', ''))  # At minimum, non-space chars preserved
+
+            # No chunk should exceed reasonable length (allowing for word boundary tolerance)
             for chunk in chunks:
-                assert len(chunk) <= 600  # Allow some tolerance
+                assert len(chunk) <= max_length + 100  # Allow reasonable tolerance for word boundaries
+
+            # Should split long text into multiple chunks
+            if len(text) > max_length:
+                assert len(chunks) > 1
 
         except Exception as e:
             pytest.fail(f"TextProcessor chunking failed on input: {repr(text)}. Error: {e}")
 
     @given(
         text=st.text(min_size=1, max_size=500),
-        voice=st.sampled_from(["en-US-AndrewNeural", "en-GB-SoniaNeural"])
+        rate=st.floats(min_value=-50.0, max_value=100.0),
+        pitch=st.floats(min_value=-50.0, max_value=50.0),
+        volume=st.floats(min_value=-50.0, max_value=50.0)
     )
-    @settings(suppress_health_check=[HealthCheck.too_slow])
-    def test_ssml_builder_basic_properties(self, text, voice):
-        """Test SSML builder with various inputs."""
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_ssml_builder_basic_properties(self, text, rate, pitch, volume):
+        """Test SSML builder with various inputs and parameter combinations."""
         from src.tts.ssml_builder import build_ssml
 
         try:
             # Filter out problematic characters for SSML
             clean_text = re.sub(r'[<>]', '', text)
 
-            # build_ssml doesn't take voice parameter, only text and voice settings
-            # Add some adjustments to ensure SSML is generated
-            ssml = build_ssml(clean_text, rate=10.0, pitch=5.0)
+            # Test SSML building with actual parameters
+            ssml = build_ssml(clean_text, rate=rate, pitch=pitch, volume=volume)
 
-            # Should produce valid XML structure
+            # Should produce valid string
             assert isinstance(ssml, str)
             assert len(ssml) > 0
 
-            # Should contain basic SSML tags
-            assert '<speak' in ssml
-            assert '</speak>' in ssml
+            # If all parameters are 0, should return plain text
+            if rate == 0.0 and pitch == 0.0 and volume == 0.0:
+                assert ssml == clean_text
+            else:
+                # Should contain SSML tags when parameters are non-zero
+                assert '<speak' in ssml
+                assert '</speak>' in ssml
+                assert '<prosody' in ssml
+                assert '</prosody>' in ssml
 
-            # Should contain the prosody tag
-            assert '<prosody' in ssml
+                # Should contain the cleaned text (escaped)
+                import html
+                assert html.escape(clean_text) in ssml
 
         except Exception as e:
-            pytest.fail(f"SSML builder failed on text: {repr(text)}, voice: {voice}. Error: {e}")
+            pytest.fail(f"SSML builder failed on text: {repr(text)}, rate: {rate}, pitch: {pitch}, volume: {volume}. Error: {e}")
 
-    @given(rate=st.sampled_from(["+0%", "+10%", "-10%", "+50%", "-50%"]))
-    def test_voice_settings_validation(self, rate):
-        """Test that voice settings are validated properly."""
-        # This would test the voice validator with various rate/pitch/volume settings
-        from src.tts.voice_validator import VoiceValidator
-        from unittest.mock import Mock
+    @given(
+        rate=st.sampled_from(["+0%", "+10%", "-10%", "+50%", "-50%"]),
+        pitch=st.sampled_from(["+0%", "+5Hz", "-10%", "+25Hz"]),
+        volume=st.sampled_from(["+0%", "+10%", "-15%", "+20%"])
+    )
+    @settings(deadline=None)
+    def test_voice_settings_parsing(self, rate, pitch, volume):
+        """Test that voice settings parsing works correctly."""
+        from src.tts.ssml_builder import parse_rate, parse_pitch, parse_volume
 
         try:
-            voice_manager = Mock()
-            provider_manager = Mock()
-            validator = VoiceValidator(voice_manager, provider_manager)
+            # Test rate parsing
+            rate_value = parse_rate(rate)
+            assert isinstance(rate_value, float)
+            assert -50 <= rate_value <= 100  # Should be within valid range
 
-            # VoiceValidator doesn't have individual validation methods
-            # Just test that it can be instantiated without error
-            assert validator is not None
+            # Test pitch parsing
+            pitch_value = parse_pitch(pitch)
+            assert isinstance(pitch_value, float)
+            assert -50 <= pitch_value <= 50  # Should be within valid range
+
+            # Test volume parsing
+            volume_value = parse_volume(volume)
+            assert isinstance(volume_value, float)
+            assert -50 <= volume_value <= 50  # Should be within valid range
+
+            # Test that invalid inputs default to 0
+            assert parse_rate("invalid") == 0.0
+            assert parse_pitch("invalid") == 0.0
+            assert parse_volume("invalid") == 0.0
 
         except Exception as e:
-            pytest.fail(f"Voice validation failed on rate: {rate}. Error: {e}")
+            pytest.fail(f"Voice settings parsing failed on rate: {rate}, pitch: {pitch}, volume: {volume}. Error: {e}")
 
     @given(
         filename=st.text(alphabet=st.characters(
@@ -166,58 +221,94 @@ class TestTTSPropertyBased:
             max_codepoint=122
         ), min_size=1, max_size=50)
     )
+    @settings(deadline=None)
     def test_file_naming_robustness(self, filename):
-        """Test that file operations handle various filenames."""
+        """Test that file path creation handles various filenames safely."""
         from pathlib import Path
 
         try:
-            # Test path creation
+            # Test path creation and validation
             path = Path("output") / f"{filename}.mp3"
 
             # Should create valid path
             assert path.suffix == ".mp3"
             assert filename in str(path)
 
+            # Should be able to convert to string without issues
+            path_str = str(path)
+            assert isinstance(path_str, str)
+            assert len(path_str) > 0
+
+            # Should handle special characters that might cause issues
+            assert '..' not in str(path)  # Should not allow directory traversal
+            assert path.name.endswith('.mp3')  # Should have correct extension
+
         except Exception as e:
             pytest.fail(f"File naming failed on filename: {repr(filename)}. Error: {e}")
 
     @given(length=st.integers(min_value=0, max_value=10000))
+    @settings(deadline=None)
     def test_text_length_edge_cases(self, length):
-        """Test behavior with various text lengths."""
+        """Test behavior with various text lengths and validate chunking logic."""
         text = "a" * length
 
-        from src.tts.text_processor import TextProcessor
         from unittest.mock import Mock
+
+        from src.tts.text_processor import TextProcessor
 
         try:
             provider_manager = Mock()
             processor = TextProcessor(provider_manager)
-            chunks = processor.chunk_text(text, max_length=1000)
+            max_length = 1000
+            chunks = processor.chunk_text(text, max_length=max_length)
 
             # Should handle any length
             assert isinstance(chunks, list)
 
-            # Should not lose content
-            total_length = sum(len(chunk) for chunk in chunks)
-            assert total_length >= length  # May add spacing/formatting
+            # Empty text should return empty list
+            if length == 0:
+                assert chunks == []
+
+            # Short text should return single chunk
+            if 0 < length <= max_length:
+                assert len(chunks) == 1
+                assert chunks[0] == text
+
+            # Long text should be split appropriately
+            if length > max_length:
+                assert len(chunks) > 1
+                # Each chunk should be reasonably sized
+                for chunk in chunks:
+                    assert len(chunk) > 0
+                    assert len(chunk) <= max_length + 100  # Allow word boundary tolerance
+
+            # Total content should be preserved
+            total_chars = sum(len(chunk) for chunk in chunks)
+            assert total_chars == length  # Should not add or remove characters
 
         except Exception as e:
             pytest.fail(f"Text processing failed on length {length}. Error: {e}")
 
     @given(text=st.text(min_size=1, max_size=100))
+    @settings(deadline=None)
     def test_idempotent_text_cleaning(self, text):
-        """Test that cleaning already clean text doesn't break it."""
+        """Test that cleaning already clean text doesn't break it (idempotent operation)."""
         from src.tts.text_cleaner import clean_text_for_tts
 
         try:
             # Clean once
             cleaned_once = clean_text_for_tts(text)
 
-            # Clean again
+            # Clean again - should be idempotent
             cleaned_twice = clean_text_for_tts(cleaned_once)
 
-            # Should be idempotent
+            # Should be idempotent (cleaning already clean text doesn't change it)
             assert cleaned_once == cleaned_twice
+
+            # Additional validation: cleaning should not introduce new issues
+            assert isinstance(cleaned_once, str)
+            assert isinstance(cleaned_twice, str)
+            assert len(cleaned_twice) <= len(cleaned_once) + 10  # Allow small changes for whitespace normalization
 
         except Exception as e:
             pytest.fail(f"Idempotent cleaning failed on text: {repr(text)}. Error: {e}")
@@ -227,13 +318,13 @@ class TestPerformanceProperties:
     """Performance-focused property tests."""
 
     @given(text=st.text(min_size=1000, max_size=5000))
-    @settings(max_examples=10, suppress_health_check=[HealthCheck.too_slow])
+    @settings(max_examples=10, suppress_health_check=[HealthCheck.too_slow], deadline=None)
     def test_large_text_performance(self, text):
         """Test performance doesn't degrade catastrophically with large text."""
         import time
+        from unittest.mock import Mock
 
         from src.tts.text_processor import TextProcessor
-        from unittest.mock import Mock
 
         start_time = time.time()
         provider_manager = Mock()

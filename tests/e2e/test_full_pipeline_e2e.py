@@ -74,7 +74,10 @@ class TestFullPipelineE2E:
         # Verify result
         if result.get('success') == True and result.get('completed', 0) == 0 and result.get('failed', 0) > 0:
             # Network issue - scraper couldn't fetch chapters
-            pytest.skip(f"Network issue: Could not fetch chapters. Failed: {result.get('failed')}, Completed: {result.get('completed')}")
+            pytest.skip(f"E2E test skipped due to network connectivity issues. "
+                       f"Failed to fetch chapters from {test_novel_url}. "
+                       f"Results: completed={result.get('completed')}, failed={result.get('failed')}. "
+                       f"This may be due to rate limiting, site blocking, or network issues.")
         
         assert result.get('success') == True, f"Pipeline failed: {result.get('error')}"
         assert result.get('completed', 0) == 1, f"Expected exactly 1 chapter to be completed. Result: {result}"
@@ -144,7 +147,10 @@ class TestFullPipelineE2E:
         # Verify result
         if result.get('success') == True and result.get('completed', 0) == 0 and result.get('failed', 0) > 0:
             # Network issue - scraper couldn't fetch chapters
-            pytest.skip(f"Network issue: Could not fetch chapters. Failed: {result.get('failed')}, Completed: {result.get('completed')}")
+            pytest.skip(f"E2E test skipped due to network connectivity issues. "
+                       f"Failed to fetch chapters from {test_novel_url}. "
+                       f"Results: completed={result.get('completed')}, failed={result.get('failed')}. "
+                       f"This may be due to rate limiting, site blocking, or network issues.")
         
         assert result.get('success') == True, f"Pipeline failed: {result.get('error')}"
         logger.info(f"✓ Pipeline completed: {result.get('completed')} chapters")

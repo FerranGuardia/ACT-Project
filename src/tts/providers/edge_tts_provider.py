@@ -179,7 +179,8 @@ class EdgeTTSProvider(TTSProvider):
     @circuit(
         failure_threshold=5,  # Fail after 5 consecutive failures
         recovery_timeout=60,  # Wait 60 seconds before trying again
-        expected_exception=Exception
+        expected_exception=Exception,
+        fallback_function=lambda *args, **kwargs: False  # Return False on circuit breaker open
     )
     def convert_text_to_speech(
         self,
@@ -214,23 +215,10 @@ class EdgeTTSProvider(TTSProvider):
             return False
 
         # Use asyncio.run() for proper async execution
-        try:
-            return asyncio.run(self._async_convert_text_to_speech(
-                text, voice, output_path, rate, pitch, volume
-            ))
-        except Exception as e:
-            error_msg = str(e)
-            logger.error(f"Error in Edge TTS conversion: {error_msg}")
-            # Provide more helpful error messages
-            if "no audio" in error_msg.lower() or "NoAudioReceived" in error_msg:
-                logger.error("Edge TTS returned no audio - service may be experiencing outages")
-                logger.info("This is a known issue with Edge TTS. Some voices may be temporarily unavailable.")
-                logger.info("The system will automatically fall back to pyttsx3 if available.")
-            elif "timeout" in error_msg.lower() or "connection" in error_msg.lower():
-                logger.error("Edge TTS connection timeout - check your internet connection")
-            elif "rate limit" in error_msg.lower():
-                logger.error("Edge TTS rate limit exceeded - too many requests")
-            return False
+        # Circuit breaker will catch exceptions that bubble up
+        return asyncio.run(self._async_convert_text_to_speech(
+            text, voice, output_path, rate, pitch, volume
+        ))
 
     async def _async_convert_text_to_speech(
         self,
@@ -242,7 +230,11 @@ class EdgeTTSProvider(TTSProvider):
         volume: Optional[float] = None
     ) -> bool:
         """Async implementation of text-to-speech conversion"""
-        import edge_tts
+        try:
+            import edge_tts
+        except ImportError as e:
+            logger.error("edge-tts not installed")
+            raise e  # Let circuit breaker catch import errors
 
         # Convert rate, pitch, volume to Edge TTS format
         # Edge TTS expects integer values, not floats
@@ -286,18 +278,43 @@ class EdgeTTSProvider(TTSProvider):
         if volume_str is not None:
             communicate_kwargs["volume"] = volume_str
 
-        communicate = edge_tts.Communicate(**communicate_kwargs)  # type: ignore[arg-type]
+        try:
+            communicate = edge_tts.Communicate(**communicate_kwargs)  # type: ignore[arg-type]
+        except Exception as e:
+            # Validation errors (invalid voice, etc.) should not count against circuit breaker
+            error_msg = str(e)
+            if "voice" in error_msg.lower() or "invalid" in error_msg.lower():
+                logger.error(f"Edge TTS validation error: {error_msg}")
+                return False
+            # Other errors (network, service issues) should trigger circuit breaker
+            raise e
 
         # Save to file
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        await communicate.save(str(output_path))
+        try:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            await communicate.save(str(output_path))
+        except Exception as e:
+            # Network/service errors should trigger circuit breaker
+            error_msg = str(e)
+            logger.error(f"Error in Edge TTS conversion: {error_msg}")
+            # Provide more helpful error messages
+            if "no audio" in error_msg.lower() or "NoAudioReceived" in error_msg:
+                logger.error("Edge TTS returned no audio - service may be experiencing outages")
+                logger.info("This is a known issue with Edge TTS. Some voices may be temporarily unavailable.")
+                logger.info("The system will automatically fall back to pyttsx3 if available.")
+            elif "timeout" in error_msg.lower() or "connection" in error_msg.lower():
+                logger.error("Edge TTS connection timeout - check your internet connection")
+            elif "rate limit" in error_msg.lower():
+                logger.error("Edge TTS rate limit exceeded - too many requests")
+            raise e  # Let circuit breaker catch network/service errors
 
         # Verify file was created
         if output_path.exists() and output_path.stat().st_size > 0:
             return True
         else:
             logger.error(f"Edge TTS conversion failed: file not created or empty")
-            return False
+            # Empty file might indicate service issues, let circuit breaker catch this
+            raise RuntimeError("Edge TTS conversion failed: file not created or empty")
     
     def supports_rate(self) -> bool:
         """Edge TTS supports rate adjustment"""
