@@ -3,23 +3,35 @@ Pytest configuration and shared fixtures for unit tests
 These tests use mocks to test components in isolation
 """
 
-import sys
-import pytest
-from pathlib import Path
-import tempfile
 import shutil
+import sys
+import tempfile
 import types
-from unittest.mock import Mock, MagicMock, patch
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
-# IMPORTANT: Mock tts module BEFORE adding src to path
-# This ensures the mock takes precedence when test files import tts
-# Some UI tests need tts mocked before ui.dialogs imports provider_selection_dialog
+import pytest
+
+# IMPORTANT: Mock tts module for unit tests only
+# This conftest.py is in tests/unit/, so it only affects unit tests
+# Integration tests in tests/integration/ will use real TTS components
 if "tts" not in sys.modules:
     tts_module = types.ModuleType("tts")
     class MockTTSEngine:
-        pass
+        def convert_text_to_speech(self, text, output_path, voice=None, rate=None, pitch=None, volume=None, provider=None):
+            return True
+
+        def get_available_voices(self, locale=None, provider=None):
+            return [{"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male"}]
     class MockVoiceManager:
-        pass
+        def get_providers(self):
+            return ["edge_tts", "pyttsx3"]
+
+        def get_voice_list(self, locale=None, provider=None):
+            return ["en-US-AndrewNeural - Male"]
+
+        def get_voices(self, locale=None, provider=None):
+            return [{"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male"}]
     tts_module.TTSEngine = MockTTSEngine  # type: ignore[attr-defined]
     tts_module.VoiceManager = MockVoiceManager  # type: ignore[attr-defined]
     tts_module.__all__ = ["TTSEngine", "VoiceManager"]  # type: ignore[attr-defined]
@@ -37,7 +49,14 @@ if "tts.providers.provider_manager" not in sys.modules:
 if "tts.voice_manager" not in sys.modules:
     voice_manager_module = types.ModuleType("tts.voice_manager")
     class MockVoiceManagerClass:
-        pass
+        def get_providers(self):
+            return ["edge_tts", "pyttsx3"]
+
+        def get_voice_list(self, locale=None, provider=None):
+            return ["en-US-AndrewNeural - Male"]
+
+        def get_voices(self, locale=None, provider=None):
+            return [{"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male"}]
     voice_manager_module.VoiceManager = MockVoiceManagerClass  # type: ignore[attr-defined]
     sys.modules["tts.voice_manager"] = voice_manager_module
 if "tts.tts_engine" not in sys.modules:
@@ -65,10 +84,11 @@ if src_path.exists():
 def qt_application():
     """Create QApplication instance for UI tests (session-scoped)"""
     try:
-        from PySide6.QtWidgets import QApplication
-        from PySide6.QtCore import QThread
         import sys
-        
+
+        from PySide6.QtCore import QThread
+        from PySide6.QtWidgets import QApplication
+
         # Check if QApplication already exists
         app = QApplication.instance()
         if app is None:
@@ -233,9 +253,20 @@ def pytest_configure(config):
     if "tts" not in sys.modules:
         tts_module = types.ModuleType("tts")
         class MockTTSEngine:
-            pass
+            def convert_text_to_speech(self, text, output_path, voice=None, rate=None, pitch=None, volume=None, provider=None):
+                return True
+
+            def get_available_voices(self, locale=None, provider=None):
+                return [{"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male"}]
         class MockVoiceManager:
-            pass
+            def get_providers(self):
+                return ["edge_tts", "pyttsx3"]
+
+            def get_voice_list(self, locale=None, provider=None):
+                return ["en-US-AndrewNeural - Male"]
+
+            def get_voices(self, locale=None, provider=None):
+                return [{"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male"}]
         tts_module.TTSEngine = MockTTSEngine  # type: ignore[attr-defined]
         tts_module.VoiceManager = MockVoiceManager  # type: ignore[attr-defined]
         tts_module.__all__ = ["TTSEngine", "VoiceManager"]  # type: ignore[attr-defined]
@@ -249,6 +280,7 @@ def pytest_configure(config):
     # Configure pytest-asyncio if available
     try:
         import pytest_asyncio
+
         # Set asyncio mode to auto (automatically detect async test functions)
         config.option.asyncio_mode = "auto"
     except ImportError:
