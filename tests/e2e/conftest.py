@@ -5,7 +5,17 @@ Provides network connectivity checks and other E2E-specific setup.
 """
 
 import socket
+import sys
+from pathlib import Path
 import pytest
+
+# Add ACT project src to path for E2E tests
+project_root = Path(__file__).parent.parent.parent
+src_path = project_root / "src"
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
 
 
 def has_network_connection():
@@ -43,3 +53,46 @@ def network_available():
     Can be used by tests that need to know network status without being skipped.
     """
     return has_network_connection()
+
+
+@pytest.fixture
+def mock_tts_engine():
+    """Mock TTSEngine for testing"""
+    from unittest.mock import MagicMock
+
+    mock_engine = MagicMock()
+    mock_engine.convert_text_to_speech.return_value = True
+    mock_engine.get_available_voices.return_value = [
+        {"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male"}
+    ]
+    return mock_engine
+
+
+@pytest.fixture
+def real_provider_manager():
+    """Real TTSProviderManager instance for E2E tests"""
+    from tts.providers.provider_manager import TTSProviderManager
+
+    # Create real provider manager instance
+    manager = TTSProviderManager()
+    return manager
+
+
+@pytest.fixture
+def real_voice_manager():
+    """Real VoiceManager instance for E2E tests"""
+    from tts.voice_manager import VoiceManager
+
+    # Create real voice manager instance
+    manager = VoiceManager()
+    return manager
+
+
+@pytest.fixture
+def real_tts_engine():
+    """Real TTSEngine instance for E2E tests"""
+    from tts.tts_engine import TTSEngine
+
+    # Create real TTS engine instance
+    engine = TTSEngine()
+    return engine

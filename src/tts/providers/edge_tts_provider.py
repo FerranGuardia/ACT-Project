@@ -10,14 +10,36 @@ and circuit breaker patterns for enhanced reliability.
 
 import asyncio
 from pathlib import Path
-from typing import List, Dict, Optional, Union
+from typing import Dict, List, Optional, Union
+
 import aiohttp
 from circuitbreaker import circuit
 
 from core.logger import get_logger
-from .base_provider import TTSProvider, ProviderType
+
+from .base_provider import ProviderType, TTSProvider
 
 logger = get_logger("tts.providers.edge_tts")
+
+
+class EdgeTTSError(Exception):
+    """Base class for Edge TTS errors"""
+    pass
+
+
+class EdgeTTSValidationError(EdgeTTSError):
+    """User input validation errors (don't trigger circuit breaker)"""
+    pass
+
+
+class EdgeTTSServiceError(EdgeTTSError):
+    """Service/network errors (do trigger circuit breaker)"""
+    pass
+
+
+class EdgeTTSConnectivityError(EdgeTTSServiceError):
+    """Network connectivity issues"""
+    pass
 
 
 class EdgeTTSProvider(TTSProvider):
@@ -28,41 +50,79 @@ class EdgeTTSProvider(TTSProvider):
         self._available = False
         self._voices_cache: Optional[List[Dict]] = None
         self._session: Optional[aiohttp.ClientSession] = None
-        self._check_availability_sync()
+        # Don't check availability in __init__ to avoid async/sync issues
+        # Will be checked lazily on first access
+
+    def _classify_error(self, error: Exception) -> EdgeTTSError:
+        """Classify an exception into appropriate EdgeTTSError type
+
+        Args:
+            error: The original exception
+
+        Returns:
+            Classified EdgeTTSError instance
+        """
+        error_msg = str(error).lower()
+
+        # Validation errors (user input problems - don't trigger circuit breaker)
+        validation_keywords = ["voice", "invalid", "not found", "unsupported"]
+        if any(keyword in error_msg for keyword in validation_keywords):
+            return EdgeTTSValidationError(f"Validation error: {error}")
+
+        # Connectivity errors (network issues - trigger circuit breaker)
+        connectivity_keywords = ["timeout", "connection", "network", "dns", "unreachable"]
+        if any(keyword in error_msg for keyword in connectivity_keywords):
+            return EdgeTTSConnectivityError(f"Connectivity error: {error}")
+
+        # Rate limiting (service protection - trigger circuit breaker)
+        if "rate limit" in error_msg or "too many requests" in error_msg:
+            return EdgeTTSServiceError(f"Rate limit error: {error}")
+
+        # Audio/content issues (service problems - trigger circuit breaker)
+        audio_keywords = ["no audio", "empty", "corrupt", "malformed"]
+        if any(keyword in error_msg for keyword in audio_keywords):
+            return EdgeTTSServiceError(f"Audio error: {error}")
+
+        # Default to service error for any other issues
+        return EdgeTTSServiceError(f"Service error: {error}")
+
+    async def _check_availability_async(self) -> bool:
+        """Check if Edge TTS is available asynchronously"""
+        try:
+            import edge_tts
+            voices = await edge_tts.list_voices()
+            available = len(voices) > 0
+            if available:
+                logger.info(f"Edge TTS service available with {len(voices)} voices")
+            else:
+                logger.warning("Edge TTS service returned no voices - service may be down")
+            return available
+        except ImportError:
+            logger.warning("edge-tts not installed. Install with: pip install edge-tts")
+            return False
+        except Exception as e:
+            classified_error = self._classify_error(e)
+            if isinstance(classified_error, EdgeTTSConnectivityError):
+                logger.warning(f"Connectivity issue during availability check: {classified_error}")
+            else:
+                logger.warning(f"Service issue during availability check: {classified_error}")
+            return False
 
     def _check_availability_sync(self) -> None:
         """Check if Edge TTS is available synchronously"""
         try:
-            import edge_tts
-            # Use asyncio.run() for proper async execution
-            try:
-                voices = asyncio.run(self._async_check_availability())
-                self._available = len(voices) > 0
-                if not self._available:
-                    logger.warning("Edge TTS service returned no voices - service may be down")
-                else:
-                    logger.info(f"Edge TTS service available with {len(voices)} voices")
-            except Exception as e:
-                error_msg = str(e)
-                logger.warning(f"Edge TTS service check failed: {error_msg}")
-                # Check for common error patterns
-                if "timeout" in error_msg.lower() or "connection" in error_msg.lower():
-                    logger.warning("Edge TTS appears to be experiencing connectivity issues")
-                elif "no audio" in error_msg.lower() or "empty" in error_msg.lower():
-                    logger.warning("Edge TTS service may be experiencing outages (some voices may be down)")
-                self._available = False
-        except ImportError:
-            logger.warning("edge-tts not installed. Install with: pip install edge-tts")
-            self._available = False
+            # Use a fresh event loop to avoid conflicts with existing loops
+            self._available = asyncio.run(self._check_availability_async())
         except Exception as e:
-            logger.warning(f"Error checking Edge TTS availability: {e}")
+            logger.error(f"Failed to check Edge TTS availability: {e}")
             self._available = False
 
     async def _async_check_availability(self) -> List[Dict]:
         """Asynchronously check Edge TTS availability and return voices"""
         import edge_tts
         voices = await edge_tts.list_voices()
-        return voices
+        # Convert Voice objects to dicts for our interface
+        return [dict(voice) for voice in voices]
 
     async def _ensure_session(self) -> aiohttp.ClientSession:
         """Ensure we have an active HTTP session"""
@@ -95,8 +155,8 @@ class EdgeTTSProvider(TTSProvider):
                         if asyncio.iscoroutinefunction(close_method):
                             await close_method()
                         else:
-                            # For mocks, just call it
-                            close_method()
+                            # For mocks or sync close methods, just call it
+                            close_method()  # type: ignore[misc]
             except Exception:
                 # If anything goes wrong, just ensure session is cleared
                 pass
@@ -112,7 +172,9 @@ class EdgeTTSProvider(TTSProvider):
         return ProviderType.CLOUD
     
     def is_available(self) -> bool:
-        """Check if provider is available"""
+        """Check if provider is available (lazy loading)"""
+        if not self._available:
+            self._check_availability_sync()
         return self._available
     
     def get_voices(self, locale: Optional[str] = None) -> List[Dict]:
@@ -162,7 +224,10 @@ class EdgeTTSProvider(TTSProvider):
         except ImportError:
             logger.error("edge-tts not installed")
         except Exception as e:
-            logger.error(f"Error loading Edge TTS voices: {e}")
+            classified_error = self._classify_error(e)
+            logger.error(f"Error loading Edge TTS voices: {classified_error}")
+            # For voice loading errors, we don't raise - just return empty list
+            # This allows the provider to still be considered "available" even if voice loading fails
 
         # Filter by locale if specified
         if locale and locale != "en-US":
@@ -174,7 +239,8 @@ class EdgeTTSProvider(TTSProvider):
         """Asynchronously get Edge TTS voices"""
         import edge_tts
         voices = await edge_tts.list_voices()
-        return voices
+        # Convert Voice objects to dicts for our interface
+        return [dict(voice) for voice in voices]
     
     @circuit(
         failure_threshold=5,  # Fail after 5 consecutive failures
@@ -281,40 +347,43 @@ class EdgeTTSProvider(TTSProvider):
         try:
             communicate = edge_tts.Communicate(**communicate_kwargs)  # type: ignore[arg-type]
         except Exception as e:
-            # Validation errors (invalid voice, etc.) should not count against circuit breaker
-            error_msg = str(e)
-            if "voice" in error_msg.lower() or "invalid" in error_msg.lower():
-                logger.error(f"Edge TTS validation error: {error_msg}")
+            # Classify the error and handle appropriately
+            classified_error = self._classify_error(e)
+            if isinstance(classified_error, EdgeTTSValidationError):
+                # Validation errors (user input) don't trigger circuit breaker
+                logger.error(str(classified_error))
                 return False
-            # Other errors (network, service issues) should trigger circuit breaker
-            raise e
+            # Service errors bubble up to trigger circuit breaker
+            raise classified_error
 
         # Save to file
         try:
             output_path.parent.mkdir(parents=True, exist_ok=True)
             await communicate.save(str(output_path))
         except Exception as e:
-            # Network/service errors should trigger circuit breaker
-            error_msg = str(e)
-            logger.error(f"Error in Edge TTS conversion: {error_msg}")
-            # Provide more helpful error messages
-            if "no audio" in error_msg.lower() or "NoAudioReceived" in error_msg:
-                logger.error("Edge TTS returned no audio - service may be experiencing outages")
-                logger.info("This is a known issue with Edge TTS. Some voices may be temporarily unavailable.")
-                logger.info("The system will automatically fall back to pyttsx3 if available.")
-            elif "timeout" in error_msg.lower() or "connection" in error_msg.lower():
-                logger.error("Edge TTS connection timeout - check your internet connection")
-            elif "rate limit" in error_msg.lower():
-                logger.error("Edge TTS rate limit exceeded - too many requests")
-            raise e  # Let circuit breaker catch network/service errors
+            # Classify and handle the error
+            classified_error = self._classify_error(e)
+            logger.error(str(classified_error))
 
-        # Verify file was created
+            # Provide helpful user guidance for common issues
+            if isinstance(classified_error, EdgeTTSConnectivityError):
+                logger.info("Check your internet connection and try again.")
+            elif "rate limit" in str(classified_error).lower():
+                logger.info("Edge TTS rate limit exceeded - please wait before retrying.")
+            elif "no audio" in str(classified_error).lower():
+                logger.info("Edge TTS service may be experiencing outages.")
+                logger.info("The system will automatically fall back to pyttsx3 if available.")
+
+            # All save errors are service errors that should trigger circuit breaker
+            raise classified_error
+
+        # Verify file was created and has content
         if output_path.exists() and output_path.stat().st_size > 0:
             return True
         else:
-            logger.error(f"Edge TTS conversion failed: file not created or empty")
-            # Empty file might indicate service issues, let circuit breaker catch this
-            raise RuntimeError("Edge TTS conversion failed: file not created or empty")
+            error = EdgeTTSServiceError("Edge TTS conversion failed: file not created or empty")
+            logger.error(str(error))
+            raise error
     
     def supports_rate(self) -> bool:
         """Edge TTS supports rate adjustment"""

@@ -20,7 +20,7 @@
   "typeCheckingMode": "basic",
   "stubPath": "",
   "venvPath": ".",
-  "venv": "",
+  "venv": ".venv",
   "ignore": [
     "**/node_modules",
     "**/__pycache__",

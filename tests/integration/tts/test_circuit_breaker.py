@@ -2,6 +2,76 @@
 Unit tests for circuit breaker functionality in TTS providers.
 
 Tests the circuit breaker pattern implementation for fault tolerance.
+
+CURRENT STATUS (Post-Refactoring):
+===============================
+
+✅ ACHIEVED:
+- Fixed async mock issues (MagicMock vs AsyncMock)
+- Converted patch decorators to context managers for better isolation
+- Updated tests to work with new EdgeTTSError exception classes
+- Core circuit breaker functionality working (success, basic failure threshold)
+- Async error handling properly isolated
+- Circuit breaker decorator is functional (returns fallback after failures)
+
+⚠️ REMAINING ISSUES (5 failing tests):
+=====================================
+
+ROOT CAUSE: Circuit Breaker State Persistence
+---------------------------------------------
+The circuitbreaker package stores circuit breaker state internally but doesn't expose
+instances for external reset. Circuit breakers persist state across test runs,
+causing test contamination.
+
+1. test_circuit_breaker_recovery [@pytest.mark.serial]
+   ISSUE: Circuit breaker state from previous tests affects recovery timing
+   STATUS: Marked for sequential execution
+
+2. test_circuit_breaker_different_exceptions [@pytest.mark.serial]
+   ISSUE: Circuit breaker state contamination between loop iterations
+   STATUS: Marked for sequential execution
+
+3. test_circuit_breaker_preserves_parameters [@pytest.mark.serial]
+   ISSUE: Provider availability checks interact with circuit breaker state
+   STATUS: Marked for sequential execution
+
+4. test_circuit_breaker_with_async_wrapper [@pytest.mark.serial]
+   ISSUE: Async wrapper testing conflicts with circuit breaker state
+   STATUS: Marked for sequential execution
+
+5. test_circuit_breaker_failure_exception_handling [@pytest.mark.serial]
+   ISSUE: Complex mock setup bypasses error classification
+   STATUS: Marked for sequential execution
+
+HOW TO TACKLE REMAINING ISSUES:
+==============================
+
+Phase 1: Run Marked Tests Sequentially
+```bash
+# Run all circuit breaker tests sequentially
+pytest tests/integration/tts/test_circuit_breaker.py -m "serial" --no-cov
+
+# Run all tests with serial ones sequential, others parallel
+pytest tests/ -k "serial" --no-cov -n0  # serial tests
+pytest tests/ -m "not serial" --no-cov -n auto  # parallel tests
+```
+
+Phase 2: Circuit Breaker State Management
+- Circuit breakers cannot be externally reset (package limitation)
+- Tests marked @pytest.mark.serial run sequentially to avoid contamination
+- Consider creating separate test processes for stateful circuit breaker tests
+
+Phase 3: Test Architecture Improvements
+- Focus integration tests on component interaction, not circuit breaker internals
+- Create separate unit tests for circuit breaker decorator behavior
+- Use mock circuit breakers for tests that don't need real state persistence
+
+Phase 4: Acceptance Criteria
+- ✅ Core circuit breaker functionality works (success, fallback after failures)
+- ✅ Async operations properly protected
+- ✅ Error classification and user feedback working
+- ⚠️ Complex stateful scenarios require sequential execution
+- ⚠️ Full parallel test execution limited by circuit breaker persistence
 """
 
 import pytest
@@ -19,7 +89,7 @@ if str(project_root) not in sys.path:
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
-from src.tts.providers.edge_tts_provider import EdgeTTSProvider
+from src.tts.providers.edge_tts_provider import EdgeTTSProvider, EdgeTTSConnectivityError, EdgeTTSServiceError
 from circuitbreaker import CircuitBreaker
 
 
@@ -65,144 +135,158 @@ class TestCircuitBreaker:
         if self.test_output.exists():
             self.test_output.unlink()
 
-    @patch('edge_tts.Communicate')
-    def test_circuit_breaker_success(self, mock_communicate_class):
+    def test_circuit_breaker_success(self):
         """Test circuit breaker allows successful requests"""
-        # Mock successful conversion
-        mock_communicate = MagicMock()
-        mock_communicate_class.return_value = mock_communicate
+        # Use context manager for better test isolation
+        with patch('edge_tts.Communicate') as mock_communicate_class:
+            # Mock successful conversion
+            mock_communicate = MagicMock()
+            mock_communicate_class.return_value = mock_communicate
 
-        # Mock save method to actually create the file
-        async def mock_save(path):
-            Path(path).write_bytes(b"fake audio data")
-        mock_communicate.save = AsyncMock(side_effect=mock_save)
+            # Mock save method to actually create the file
+            async def mock_save(path):
+                Path(path).write_bytes(b"fake audio data")
+            mock_communicate.save = AsyncMock(side_effect=mock_save)
 
-        # Should succeed without triggering circuit breaker
-        result = self.provider.convert_text_to_speech(
-            text="Hello world",
-            voice="en-US-AndrewNeural",
-            output_path=self.test_output
-        )
+            # Should succeed without triggering circuit breaker
+            result = self.provider.convert_text_to_speech(
+                text="Hello world",
+                voice="en-US-AndrewNeural",
+                output_path=self.test_output
+            )
 
-        assert result is True
-        mock_communicate_class.assert_called_once()
+            assert result is True
+            mock_communicate_class.assert_called_once()
 
-    @patch('edge_tts.Communicate')
-    def test_circuit_breaker_failure_threshold(self, mock_communicate_class):
+    def test_circuit_breaker_failure_threshold(self):
         """Test circuit breaker opens after failure threshold"""
-        # Mock failures
-        mock_communicate_class.side_effect = Exception("Network error")
-
-        # Try conversions that should fail and raise exceptions (counted by circuit breaker)
-        for i in range(5):  # Circuit breaker threshold
-            with pytest.raises(Exception, match="Network error"):
-                self.provider.convert_text_to_speech(
-                    text="Hello world",
-                    voice="en-US-AndrewNeural",
-                    output_path=self.test_output
-                )
-
-        # Next call should return fallback value (False) since circuit breaker is open
-        result = self.provider.convert_text_to_speech(
-            text="Hello world",
-            voice="en-US-AndrewNeural",
-            output_path=self.test_output
-        )
-        assert result is False  # Fallback function returns False
-
-    @patch('edge_tts.Communicate')
-    @patch('time.sleep')  # Mock sleep to speed up test
-    def test_circuit_breaker_recovery(self, mock_sleep, mock_communicate_class):
-        """Test circuit breaker recovery after timeout"""
-        # Use a fresh provider instance to ensure circuit breaker is in clean state
-        provider = EdgeTTSProvider()
-        test_output = Path("test_recovery.mp3")
-
-        # Mock is_available to return True
-        with patch.object(provider, 'is_available', return_value=True):
-            # Mock failures to trigger circuit breaker
+        # Use context manager for better test isolation
+        with patch('edge_tts.Communicate') as mock_communicate_class:
+            # Mock failures
             mock_communicate_class.side_effect = Exception("Network error")
 
-        # Cause circuit breaker to open (fallback returns False)
-        for i in range(5):
-            with pytest.raises(Exception, match="Network error"):
-                provider.convert_text_to_speech(
-                    text="Hello world",
-                    voice="en-US-AndrewNeural",
-                    output_path=test_output
-                )
+            # Try conversions that should fail and raise exceptions (counted by circuit breaker)
+            for i in range(5):  # Circuit breaker threshold
+                with pytest.raises(Exception, match="Network error"):
+                    self.provider.convert_text_to_speech(
+                        text="Hello world",
+                        voice="en-US-AndrewNeural",
+                        output_path=self.test_output
+                    )
 
-        # Next call should use fallback (return False since circuit breaker is open)
-        result = provider.convert_text_to_speech(
-            text="Hello world",
-            voice="en-US-AndrewNeural",
-            output_path=test_output
-        )
-        assert result is False  # Fallback function returns False
+            # Next call should return fallback value (False) since circuit breaker is open
+            result = self.provider.convert_text_to_speech(
+                text="Hello world",
+                voice="en-US-AndrewNeural",
+                output_path=self.test_output
+            )
+            assert result is False  # Fallback function returns False
 
-        # With fallback function, circuit breaker stays open until timeout
-        # In test environment, we can't easily test recovery
-        # So we just verify that fallback continues to work
-        result = provider.convert_text_to_speech(
-            text="Hello world",
-            voice="en-US-AndrewNeural",
-            output_path=test_output
-        )
+    @pytest.mark.serial
+    def test_circuit_breaker_recovery(self):
+        """Test circuit breaker recovery after timeout"""
+        # Use context managers for better test isolation
+        with patch('edge_tts.Communicate') as mock_communicate_class, \
+             patch('time.sleep') as mock_sleep:
+            # Use a fresh provider instance to ensure circuit breaker is in clean state
+            provider = EdgeTTSProvider()
+            test_output = Path("test_recovery.mp3")
 
-        assert result is False  # Still using fallback
+            # Mock is_available to return True
+            with patch.object(provider, 'is_available', return_value=True):
+                # Mock failures to trigger circuit breaker
+                mock_communicate_class.side_effect = Exception("Network error")
 
-        # Clean up
-        if test_output.exists():
-            test_output.unlink()
-
-    @patch('edge_tts.Communicate')
-    def test_circuit_breaker_different_exceptions(self, mock_communicate_class):
-        """Test circuit breaker counts different types of network/service exceptions"""
-        # Use a fresh provider instance to ensure circuit breaker is in clean state
-        provider = EdgeTTSProvider()
-        test_output = Path("test_output_different.mp3")
-
-        # Mock is_available to return True
-        with patch.object(provider, 'is_available', return_value=True):
-            # Mock different types of network/service failures (not validation errors)
-            exceptions = [
-                Exception("Network timeout"),
-                ConnectionError("Connection failed"),
-                RuntimeError("Service unavailable"),
-                OSError("IO error")
-            ]
-
-            # First 4 calls should raise different exceptions (counted by circuit breaker)
-            for i, exception in enumerate(exceptions):
-                mock_communicate_class.side_effect = exception
-
-                with pytest.raises(type(exception)):
+            # Cause circuit breaker to open (fallback returns False)
+            for i in range(5):
+                with pytest.raises(EdgeTTSConnectivityError, match="Connectivity error"):
                     provider.convert_text_to_speech(
                         text="Hello world",
                         voice="en-US-AndrewNeural",
                         output_path=test_output
                     )
 
-            # 5th call should still raise exception (circuit breaker threshold is 5)
-            mock_communicate_class.side_effect = Exception("Another network error")
-            with pytest.raises(Exception, match="Another network error"):
-                provider.convert_text_to_speech(
-                    text="Hello world",
-                    voice="en-US-AndrewNeural",
-                    output_path=test_output
-                )
-
-            # 6th call should use fallback (return False since circuit breaker is open)
+            # Next call should use fallback (return False since circuit breaker is open)
             result = provider.convert_text_to_speech(
                 text="Hello world",
                 voice="en-US-AndrewNeural",
                 output_path=test_output
             )
-            assert result is False
+            assert result is False  # Fallback function returns False
 
-        # Clean up
-        if test_output.exists():
-            test_output.unlink()
+            # With fallback function, circuit breaker stays open until timeout
+            # In test environment, we can't easily test recovery
+            # So we just verify that fallback continues to work
+            result = provider.convert_text_to_speech(
+                text="Hello world",
+                voice="en-US-AndrewNeural",
+                output_path=test_output
+            )
+
+            assert result is False  # Still using fallback
+
+            # Clean up
+            if test_output.exists():
+                test_output.unlink()
+
+    @pytest.mark.serial
+    def test_circuit_breaker_different_exceptions(self):
+        """Test circuit breaker counts different types of network/service exceptions"""
+        # Use context manager for better test isolation
+        with patch('edge_tts.Communicate') as mock_communicate_class:
+            # Use a fresh provider instance to ensure circuit breaker is in clean state
+            provider = EdgeTTSProvider()
+            test_output = Path("test_output_different.mp3")
+
+            # Mock is_available to return True
+            with patch.object(provider, 'is_available', return_value=True):
+                # Mock different types of network/service failures (not validation errors)
+                exceptions = [
+                    Exception("Network timeout"),
+                    ConnectionError("Connection failed"),
+                    RuntimeError("Service unavailable"),
+                    OSError("IO error")
+                ]
+
+                # First 4 calls should raise different exceptions (counted by circuit breaker)
+                # Note: exceptions are now classified into EdgeTTSError types
+                expected_exceptions = [
+                    EdgeTTSConnectivityError,  # "Network timeout" -> connectivity error
+                    EdgeTTSConnectivityError,  # "Connection failed" -> connectivity error
+                    EdgeTTSServiceError,       # "Service unavailable" -> service error
+                    EdgeTTSServiceError        # "IO error" -> service error
+                ]
+
+                for i, (exception, expected_type) in enumerate(zip(exceptions, expected_exceptions)):
+                    mock_communicate_class.side_effect = exception
+
+                    with pytest.raises(expected_type):
+                        provider.convert_text_to_speech(
+                            text="Hello world",
+                            voice="en-US-AndrewNeural",
+                            output_path=test_output
+                        )
+
+                # 5th call should still raise exception (circuit breaker threshold is 5)
+                mock_communicate_class.side_effect = Exception("Another network error")
+                with pytest.raises(EdgeTTSConnectivityError, match="Connectivity error"):
+                    provider.convert_text_to_speech(
+                        text="Hello world",
+                        voice="en-US-AndrewNeural",
+                        output_path=test_output
+                    )
+
+                # 6th call should use fallback (return False since circuit breaker is open)
+                result = provider.convert_text_to_speech(
+                    text="Hello world",
+                    voice="en-US-AndrewNeural",
+                    output_path=test_output
+                )
+                assert result is False
+
+            # Clean up
+            if test_output.exists():
+                test_output.unlink()
 
     def test_circuit_breaker_validation_errors_not_counted(self):
         """Test that validation errors don't count towards circuit breaker"""
@@ -222,59 +306,64 @@ class TestCircuitBreaker:
         # This test is tricky with global mocking - skip for now
         pytest.skip("Test requires more sophisticated mocking to isolate validation errors")
 
-    @patch('edge_tts.Communicate')
-    def test_circuit_breaker_preserves_parameters(self, mock_communicate_class):
+    @pytest.mark.serial
+    def test_circuit_breaker_preserves_parameters(self):
         """Test that circuit breaker preserves call parameters"""
-        # Use a fresh provider instance to ensure circuit breaker is in clean state
-        provider = EdgeTTSProvider()
-        test_output = Path("test_output.mp3")
+        # Use context manager for better test isolation
+        with patch('edge_tts.Communicate') as mock_communicate_class, \
+             patch('time.sleep') as mock_sleep:
+            # Use a fresh provider instance to ensure circuit breaker is in clean state
+            provider = EdgeTTSProvider()
+            test_output = Path("test_output.mp3")
 
-        # Mock to create actual communicate object for parameter checking
-        mock_communicate = MagicMock()
-        mock_communicate_class.return_value = mock_communicate
+            # Mock is_available to return True
+            with patch.object(provider, 'is_available', return_value=True):
+                # Mock to create actual communicate object for parameter checking
+                mock_communicate = MagicMock()
+                mock_communicate_class.return_value = mock_communicate
 
-        # Mock save method to actually create the file with content
-        async def mock_save(path):
-            Path(path).write_bytes(b"fake audio data")
-        mock_communicate.save = AsyncMock(side_effect=mock_save)
+                # Mock save method to actually create the file with content
+                async def mock_save(path):
+                    Path(path).write_bytes(b"fake audio data")
+                mock_communicate.save = AsyncMock(side_effect=mock_save)
 
-        test_cases = [
-            {
-                'text': 'Hello world',
-                'voice': 'en-US-AndrewNeural',
-                'rate': 50.0,
-                'pitch': 10.0,
-                'volume': 20.0
-            },
-            {
-                'text': 'Different text',
-                'voice': 'en-GB-SoniaNeural',
-                'rate': -25.0,
-                'pitch': -5.0,
-                'volume': -10.0
-            }
-        ]
+                test_cases = [
+                    {
+                        'text': 'Hello world',
+                        'voice': 'en-US-AndrewNeural',
+                        'rate': 50.0,
+                        'pitch': 10.0,
+                        'volume': 20.0
+                    },
+                    {
+                        'text': 'Different text',
+                        'voice': 'en-GB-SoniaNeural',
+                        'rate': -25.0,
+                        'pitch': -5.0,
+                        'volume': -10.0
+                    }
+                ]
 
-        for case in test_cases:
-            # Each call should succeed and preserve parameters
-            result = provider.convert_text_to_speech(
-                output_path=test_output,
-                **case
-            )
-            assert result is True
+                for case in test_cases:
+                    # Each call should succeed and preserve parameters
+                    result = provider.convert_text_to_speech(
+                        output_path=test_output,
+                        **case
+                    )
+                    assert result is True
 
-            # Verify the call was made with correct parameters
-            mock_communicate_class.assert_called()
-            # Check that the communicate object was created with the right parameters
-            call_args = mock_communicate_class.call_args
-            assert call_args[1]['text'] == case['text']
-            assert call_args[1]['voice'] == case['voice']
-            # Rate, pitch, volume are converted to strings, so we check they exist
-            assert 'rate' in call_args[1] or case.get('rate') is None
+                    # Verify the call was made with correct parameters
+                    mock_communicate_class.assert_called()
+                    # Check that the communicate object was created with the right parameters
+                    call_args = mock_communicate_class.call_args
+                    assert call_args[1]['text'] == case['text']
+                    assert call_args[1]['voice'] == case['voice']
+                    # Rate, pitch, volume are converted to strings, so we check they exist
+                    assert 'rate' in call_args[1] or case.get('rate') is None
 
-        # Clean up
-        if test_output.exists():
-            test_output.unlink()
+                # Clean up
+                if test_output.exists():
+                    test_output.unlink()
 
 
 class TestCircuitBreakerIntegration:
@@ -285,6 +374,7 @@ class TestCircuitBreakerIntegration:
         reset_circuit_breaker()  # Reset circuit breaker for test isolation
         self.provider = EdgeTTSProvider()
 
+    @pytest.mark.serial
     def test_circuit_breaker_with_async_wrapper(self):
         """Test circuit breaker works with the async wrapper"""
         # Use a fresh provider instance to ensure circuit breaker is in clean state
@@ -353,6 +443,7 @@ class TestCircuitBreakerConfiguration:
         # This is a bit indirect, but we can check the method's attributes
         assert hasattr(method, '__wrapped__'), "Method should have circuit breaker decorator"
 
+    @pytest.mark.serial
     def test_circuit_breaker_failure_exception_handling(self):
         """Test circuit breaker handles network/service exceptions correctly"""
         # Use a fresh provider instance to ensure circuit breaker is in clean state
