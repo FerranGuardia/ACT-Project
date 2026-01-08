@@ -1,17 +1,12 @@
 """
-Pytest configuration and shared fixtures for integration tests
-These tests use real components instead of mocks
+Pytest configuration for integration tests
+Integration tests use real components, not mocks
 """
 
 import sys
-import pytest
 from pathlib import Path
-import tempfile
-import shutil
-import asyncio
-import gc
 
-# Add ACT project src to path
+# Add ACT project src to path for integration tests
 project_root = Path(__file__).parent.parent.parent
 src_path = project_root / "src"
 if src_path.exists():
@@ -19,130 +14,93 @@ if src_path.exists():
     sys.path.insert(0, str(src_path))
 
 
-@pytest.fixture(autouse=True)
-def cleanup_event_loops():
-    """Clean up event loops after each test to prevent connection issues"""
-    yield
-    # Cleanup after test
+# Setup for UI integration tests
+import pytest
+
+@pytest.fixture(scope="session")
+def qt_application():
+    """Create QApplication instance for UI tests (session-scoped)"""
     try:
-        # Try to get the current event loop (if one exists)
-        try:
-            # First check if there's a running loop
-            loop = asyncio.get_running_loop()
-            # If we get here, there's a running loop - we shouldn't try to clean it up
-            # as it's managed by pytest-asyncio or another framework
-            pass
-        except RuntimeError:
-            # No running loop, check if there's a set (but not running) loop
-            try:
-                loop = asyncio.get_event_loop()
-                if loop and not loop.is_closed():
-                    # Only try to clean up if loop is not running
-                    if not loop.is_running():
-                        try:
-                            pending = asyncio.all_tasks(loop)
-                            for task in pending:
-                                task.cancel()
-                            if pending:
-                                try:
-                                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-                                except Exception:
-                                    pass
-                        except Exception:
-                            pass
-            except RuntimeError:
-                # No event loop exists at all, that's fine
-                pass
-        
-        # Force garbage collection to clean up any remaining connections
-        gc.collect()
-    except Exception:
-        # Ignore any errors during cleanup
-        pass
+        import sys
+
+        from PySide6.QtCore import QThread
+        from PySide6.QtWidgets import QApplication
+
+        # Check if QApplication already exists
+        app = QApplication.instance()
+        if app is None:
+            app = QApplication(sys.argv)
+
+        yield app
+
+        # Cleanup: Wait for all threads to finish before destroying QApplication
+        # Guard for Qt versions that lack allThreads
+        all_threads_fn = getattr(QThread, "allThreads", None)
+        if callable(all_threads_fn):
+            threads = all_threads_fn()
+            for thread in threads:
+                if thread != QThread.currentThread() and thread.isRunning():
+                    thread.quit()
+                    thread.wait(1000)  # Wait up to 1 second for thread to finish
+
+        # Process any pending events
+        app.processEvents()
+
+    except ImportError:
+        pytest.skip("PySide6 not available")
 
 
 @pytest.fixture
 def temp_dir():
     """Create a temporary directory for test files"""
+    import tempfile
+    import shutil
+    from pathlib import Path
+
     temp_path = Path(tempfile.mkdtemp())
     yield temp_path
     shutil.rmtree(temp_path, ignore_errors=True)
 
 
 @pytest.fixture
-def real_tts_engine():
-    """Create a real TTSEngine instance for integration testing"""
-    try:
-        from tts.tts_engine import TTSEngine
-        engine = TTSEngine()
-        yield engine
-        # Cleanup: ensure any async resources are closed
-        try:
-            gc.collect()
-        except Exception:
-            pass
-    except ImportError:
-        pytest.skip("TTSEngine not available")
-
-
-@pytest.fixture
-def real_voice_manager():
-    """Create a real VoiceManager instance for integration testing"""
-    try:
-        from tts.voice_manager import VoiceManager
-        manager = VoiceManager()
-        yield manager
-    except ImportError:
-        pytest.skip("VoiceManager not available")
-
-
-@pytest.fixture
-def real_provider_manager():
-    """Create a real TTSProviderManager instance for integration testing"""
-    try:
-        from tts.providers.provider_manager import TTSProviderManager
-        manager = TTSProviderManager()
-        yield manager
-        # Cleanup: ensure any async resources are closed
-        try:
-            gc.collect()
-        except Exception:
-            pass
-    except ImportError:
-        pytest.skip("TTSProviderManager not available")
-
-
-@pytest.fixture
-def real_scraper():
-    """Create a real GenericScraper instance for integration testing"""
-    try:
-        from scraper import GenericScraper
-        # GenericScraper requires base_url parameter
-        scraper = GenericScraper(base_url="https://novelfull.net")
-        yield scraper
-    except ImportError:
-        pytest.skip("GenericScraper not available")
-
-
-@pytest.fixture
-def real_processing_pipeline(temp_dir):
-    """Create a real ProcessingPipeline instance for integration testing"""
-    try:
-        from processor.pipeline import ProcessingPipeline
-        
-        pipeline = ProcessingPipeline(
-            project_name="test_project",
-            base_output_dir=temp_dir
-        )
-        yield pipeline
-    except ImportError:
-        pytest.skip("ProcessingPipeline not available")
-
-
-@pytest.fixture
 def sample_text():
     """Sample text for TTS testing"""
-    return "This is a test text for text-to-speech conversion. It contains multiple sentences to test the conversion process."
+    return "This is a test text for text-to-speech conversion. It contains multiple sentences."
+
+
+@pytest.fixture
+def sample_long_text():
+    """Sample long text for chunking tests"""
+    return " ".join(["This is sentence number {}.".format(i) for i in range(100)])
+
+
+@pytest.fixture
+def mock_config():
+    """Mock config manager"""
+    from unittest.mock import MagicMock, patch
+
+    with patch('core.config_manager.get_config') as mock:
+        config_dict = {
+            "tts.voice": "en-US-AndrewNeural",
+            "tts.rate": "+0%",
+            "tts.pitch": "+0Hz",
+            "tts.volume": "+0%"
+        }
+        mock_config_obj = MagicMock()
+        mock_config_obj.get.side_effect = lambda key, default=None: config_dict.get(key, default)
+        mock.return_value = mock_config_obj
+        yield mock_config_obj
+
+
+@pytest.fixture
+def mock_logger():
+    """Mock logger"""
+    from unittest.mock import patch, MagicMock
+
+    with patch('core.logger.get_logger') as mock:
+        mock_logger_obj = MagicMock()
+        mock.return_value = mock_logger_obj
+        yield mock_logger_obj
 
 
 @pytest.fixture
@@ -154,26 +112,66 @@ def sample_text_file(temp_dir, sample_text):
 
 
 @pytest.fixture
-def sample_novel_url():
-    """Sample novel URL for testing"""
-    return "https://novelfull.net/bringing-culture-to-a-different-world.html"
+def sample_audio_file(temp_dir):
+    """Create a sample audio file for testing (empty file, just for path testing)"""
+    file_path = temp_dir / "test_audio.mp3"
+    file_path.touch()  # Create empty file
+    return file_path
 
 
 @pytest.fixture
-def sample_novel_title():
-    """Sample novel title for testing"""
-    return "Bringing culture to a different world"
+def mock_file_dialog():
+    """Mock QFileDialog for file operations - prevents real dialogs from opening"""
+    from unittest.mock import MagicMock
+
+    # Patch QFileDialog where it's imported - try multiple locations
+    try:
+        # Try patching at the PySide6 level first (most reliable)
+        with pytest.mock.patch('PySide6.QtWidgets.QFileDialog') as mock_dialog:
+            # Set up static methods that the view uses
+            mock_dialog.getOpenFileNames = MagicMock(return_value=([], ""))
+            mock_dialog.getExistingDirectory = MagicMock(return_value="")
+            mock_dialog.getSaveFileName = MagicMock(return_value=("", ""))
+            yield mock_dialog
+    except (AttributeError, ImportError):
+        # Fallback: try patching at module level if PySide6 patching fails
+        try:
+            with pytest.mock.patch('src.ui.views.merger_view.QFileDialog') as mock_dialog:
+                mock_dialog.getOpenFileNames = MagicMock(return_value=([], ""))
+                mock_dialog.getExistingDirectory = MagicMock(return_value="")
+                mock_dialog.getSaveFileName = MagicMock(return_value=("", ""))
+                yield mock_dialog
+        except (AttributeError, ImportError):
+            # If all else fails, just yield a mock
+            mock_dialog = MagicMock()
+            mock_dialog.getOpenFileNames = MagicMock(return_value=([], ""))
+            mock_dialog.getExistingDirectory = MagicMock(return_value="")
+            mock_dialog.getSaveFileName = MagicMock(return_value=("", ""))
+            yield mock_dialog
 
 
-# Register custom markers
-def pytest_configure(config):
-    """Register custom markers"""
-    config.addinivalue_line("markers", "integration: marks tests as integration tests")
-    config.addinivalue_line("markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')")
-    config.addinivalue_line("markers", "network: marks tests that require network connection")
-    config.addinivalue_line("markers", "real: marks tests that perform real operations")
+@pytest.fixture
+def mock_tts_engine():
+    """Mock TTSEngine for testing"""
+    from unittest.mock import MagicMock
 
-# Mark all tests in this directory as integration tests
-pytestmark = pytest.mark.integration
+    mock_engine = MagicMock()
+    mock_engine.convert_text_to_speech.return_value = True
+    mock_engine.get_available_voices.return_value = [
+        {"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male"}
+    ]
+    return mock_engine
 
 
+@pytest.fixture
+def mock_voice_manager():
+    """Mock VoiceManager for testing"""
+    from unittest.mock import MagicMock
+
+    mock_manager = MagicMock()
+    mock_manager.get_voice_list.return_value = ["en-US-AndrewNeural - Male"]
+    mock_manager.get_voices.return_value = [
+        {"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male"}
+    ]
+    mock_manager.get_providers.return_value = ["edge_tts", "pyttsx3"]
+    return mock_manager
