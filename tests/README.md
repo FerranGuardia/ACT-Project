@@ -148,6 +148,50 @@ pytest tests/integration/test_tts_multi_provider.py -v
 pytest tests/ -v -m "not slow"
 ```
 
+### Run Tests with Coverage Reporting
+
+```bash
+pytest tests/ -v --cov=src --cov-report=html --cov-report=term-missing
+```
+
+### Run Performance Benchmarks
+
+```bash
+pytest tests/unit/tts/test_performance_benchmarks.py --benchmark-only --benchmark-json=results.json
+```
+
+### Run Property-Based Tests
+
+```bash
+pytest tests/unit/tts/test_property_based.py -v
+```
+
+### Run Tests in Parallel (Faster Execution)
+
+```bash
+# Auto-detect CPU cores
+pytest tests/ -n auto --dist worksteal
+
+# Or specify number of workers
+pytest tests/ -n 4 --dist worksteal
+```
+
+### Analyze Test Performance
+
+```bash
+python tests/scripts/analyze_test_performance.py --slow-threshold 2.0 --output report.md
+```
+
+### Automatically Mark Slow Tests
+
+```bash
+# Dry run first
+python tests/scripts/mark_slow_tests.py --dry-run --threshold 5.0
+
+# Apply changes
+python tests/scripts/mark_slow_tests.py --apply --threshold 5.0
+```
+
 ### Run Network Tests Only
 
 ```bash
@@ -262,6 +306,54 @@ All tests have been consolidated from:
 - **Test Documentation**: `ACT REFERENCES/TESTS/COMPREHENSIVE_TEST_DOCUMENTATION.md`
 - **Test Summary**: `ACT REFERENCES/TESTS/TEST_SUMMARY.md`
 - **UI Testing Guide**: `ACT REFERENCES/TESTS/UI_TESTING_GUIDE.md`
+
+---
+
+## 🚀 Performance Optimization Features
+
+### Coverage Reporting
+- **pytest-cov** integration for code coverage analysis
+- HTML reports and terminal output
+- Coverage threshold enforcement (85% minimum)
+- CI/CD integration with Codecov
+
+### Property-Based Testing
+- **Hypothesis** framework for robust edge case testing
+- Generates diverse test inputs automatically
+- Finds bugs that traditional unit tests miss
+- Special focus on text processing and TTS components
+
+### Performance Benchmarking
+- **pytest-benchmark** for performance regression detection
+- Automated benchmark comparisons across runs
+- Memory usage monitoring
+- Scaling performance tests
+
+### Parallel Test Execution
+- **pytest-xdist** for parallel test running
+- Dynamic load balancing with `--dist worksteal`
+- Significant speedup for large test suites
+- Configurable worker count
+
+### Automated Test Analysis
+- **Performance analyzer** script identifies slow tests
+- **Automatic slow test marker** adds `@pytest.mark.slow` decorators
+- Test duration reporting with `--durations`
+- Optimization recommendations
+
+### CI/CD Pipeline
+- **GitHub Actions** workflow for automated testing
+- Multi-platform testing (Windows, Ubuntu)
+- Multi-Python version support (3.9-3.12)
+- Performance regression detection
+- Nightly test runs for comprehensive validation
+
+### Test Optimization Strategies
+1. **Parallel Execution**: Use `-n auto` for faster test runs
+2. **Selective Testing**: Use markers to skip slow/network tests during development
+3. **Mock Heavy Dependencies**: Use mocks for external services in unit tests
+4. **Benchmark Critical Paths**: Monitor performance of core functionality
+5. **Property-Based Testing**: Catch edge cases automatically
 
 ---
 

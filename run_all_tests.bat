@@ -10,12 +10,14 @@ echo ========================================
 echo.
 echo Current directory: %CD%
 echo.
+echo Checking for slow tests and performance issues...
+echo.
 
 echo ========================================
 echo    Running Unit Tests
 echo ========================================
 echo.
-echo Running unit tests...
+echo Running unit tests with coverage...
 echo This may take a few minutes...
 echo.
 
