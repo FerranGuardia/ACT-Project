@@ -9,21 +9,21 @@ from unittest.mock import Mock, MagicMock, patch
 
 class TestVoiceManager:
     """Test cases for VoiceManager"""
-    
-    def test_voice_manager_initialization(self):
+
+    @patch('src.tts.voice_manager.TTSProviderManager')
+    def test_voice_manager_initialization(self, mock_pm_class):
         """Test that VoiceManager initializes correctly"""
-        try:
-            from src.tts.voice_manager import VoiceManager  # type: ignore
-            
-            manager = VoiceManager()
-            
-            assert manager is not None
-            # VoiceManager uses _voices (private) for internal storage
-            assert hasattr(manager, '_voices')
-            assert hasattr(manager, 'provider_manager')
-            
-        except ImportError:
-            pytest.skip("TTS module not available")
+        mock_pm = MagicMock()
+        mock_pm_class.return_value = mock_pm
+
+        from src.tts.voice_manager import VoiceManager
+
+        manager = VoiceManager()
+
+        assert manager is not None
+        # VoiceManager uses _voices (private) for internal storage
+        assert hasattr(manager, '_voices')
+        assert hasattr(manager, 'provider_manager')
     
     @patch('src.tts.voice_manager.TTSProviderManager')
     def test_get_voices(self, mock_pm_class):

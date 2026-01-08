@@ -12,29 +12,26 @@ import pytest
 
 class TestTTSEngine:
     """Test cases for TTSEngine"""
-    
-    def test_tts_engine_initialization(self, mock_config):
-        """Test that TTSEngine initializes correctly"""
-        try:
-            from src.tts.tts_engine import TTSEngine  # type: ignore
 
-            # Mock provider manager and voice manager to avoid real provider initialization
-            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
-                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
-                mock_pm = MagicMock()
-                mock_pm_class.return_value = mock_pm
-                mock_vm = MagicMock()
-                mock_vm_class.return_value = mock_vm
-                
-                engine = TTSEngine()
-                
-                assert engine is not None
-                assert hasattr(engine, 'voice_manager')
-                assert hasattr(engine, 'config')
-                assert engine.provider_manager == mock_pm  # Verify it uses mocked manager
-            
-        except ImportError:
-            pytest.skip("TTS module not available")
+    @patch('src.tts.tts_engine.TTSProviderManager')
+    @patch('src.tts.tts_engine.VoiceManager')
+    def test_tts_engine_initialization(self, mock_vm_class, mock_pm_class, mock_config):
+        """Test that TTSEngine initializes correctly"""
+        # Mock the dependencies
+        mock_pm = MagicMock()
+        mock_pm_class.return_value = mock_pm
+        mock_vm = MagicMock()
+        mock_vm_class.return_value = mock_vm
+
+        # Import and test with mocked dependencies
+        from src.tts.tts_engine import TTSEngine
+
+        engine = TTSEngine()
+
+        assert engine is not None
+        assert hasattr(engine, 'voice_manager')
+        assert hasattr(engine, 'config')
+        assert engine.provider_manager == mock_pm  # Verify it uses mocked manager
     
     def test_get_available_voices(self, mock_config):
         """Test getting available voices"""
