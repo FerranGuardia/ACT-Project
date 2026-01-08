@@ -56,7 +56,8 @@ class TestInputValidator:
         for url in invalid_urls:
             is_valid, result = self.validator.validate_url(url)
             assert not is_valid, f"URL {url} should be invalid"
-            assert "Invalid URL" in result
+            # URL might be rejected for schema validation or malicious content
+            assert ("URL validation failed" in result or "Potentially malicious URL detected" in result)
 
     def test_url_validation_malicious_patterns(self):
         """Test malicious URL patterns are detected"""
@@ -75,10 +76,10 @@ class TestInputValidator:
     def test_url_validation_length_limits(self):
         """Test URL length validation"""
         # Create a very long URL (over 2048 characters)
-        long_url = "https://example.com/" + "a" * 2000
+        long_url = "https://example.com/" + "a" * 2050
         is_valid, result = self.validator.validate_url(long_url)
         assert not is_valid
-        assert "Invalid URL" in result
+        assert "URL validation failed" in result
 
     def test_url_sanitization_removes_null_bytes(self):
         """Test URL sanitization removes null bytes"""
@@ -220,8 +221,14 @@ class TestInputValidator:
         for text in suspicious_texts:
             request = {'text': text, 'voice': 'test'}
             is_valid, error_msg = self.validator.validate_tts_request(request)
-            assert not is_valid
-            assert "suspicious" in error_msg.lower()
+            # Dangerous content should be sanitized and request should be valid
+            assert is_valid
+            # Check that dangerous patterns were removed
+            sanitized_text = request['text']
+            assert '<script>' not in sanitized_text
+            assert 'javascript:' not in sanitized_text
+            assert '<iframe' not in sanitized_text
+            assert 'onclick=' not in sanitized_text
 
 
 class TestValidationConvenienceFunctions:
@@ -289,8 +296,9 @@ class TestValidationIntegration:
         validator = get_validator()
 
         # Test with None input
-        with pytest.raises(AttributeError):
-            validator.validate_url(None)
+        is_valid, result = validator.validate_url(None)
+        assert not is_valid
+        assert "URL cannot be None" in result
 
         # Test with non-string input
         is_valid, result = validator.validate_url(123)

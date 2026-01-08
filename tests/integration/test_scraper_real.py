@@ -9,8 +9,8 @@ import time
 
 
 @pytest.mark.integration
-@pytest.mark.real
-@pytest.mark.network
+@pytest.mark.e2e  # Mark as end-to-end tests that require network
+@pytest.mark.slow
 class TestScraperReal:
     """Integration tests for scraper with real network calls"""
     

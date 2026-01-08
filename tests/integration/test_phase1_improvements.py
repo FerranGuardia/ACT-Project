@@ -32,16 +32,23 @@ class TestPhase1Integration:
         if self.test_output.exists():
             self.test_output.unlink()
 
-    @patch('tts.providers.edge_tts_provider.edge_tts')
-    def test_async_circuit_breaker_integration(self, mock_edge_tts):
+    @patch('edge_tts.Communicate')
+    def test_async_circuit_breaker_integration(self, mock_communicate_class):
         """Test async architecture with circuit breaker integration"""
-        # Mock successful conversion initially
-        mock_communicate = MagicMock()
-        mock_edge_tts.Communicate.return_value = mock_communicate
-        mock_communicate.save = AsyncMock(return_value=None)
+        # Create different mock instances for different calls
+        mock_communicate_success = MagicMock()
+        async def mock_save_success(filepath):
+            Path(filepath).write_bytes(b"mock audio content")
+        mock_communicate_success.save = AsyncMock(side_effect=mock_save_success)
 
-        # Create test file
-        self.test_output.touch()
+        mock_communicate_fail = MagicMock()
+        async def mock_save_fail(filepath):
+            # Create empty file to simulate failure
+            Path(filepath).touch()
+        mock_communicate_fail.save = AsyncMock(side_effect=mock_save_fail)
+
+        # First call succeeds, second call "fails" (creates empty file)
+        mock_communicate_class.side_effect = [mock_communicate_success, mock_communicate_fail]
 
         # Successful conversion
         result = self.provider.convert_text_to_speech(
@@ -51,9 +58,11 @@ class TestPhase1Integration:
         )
         assert result is True
 
-        # Now mock failures to test circuit breaker
-        mock_edge_tts.Communicate.side_effect = Exception("Network error")
+        # Remove the file so the second call creates a new one
+        if self.test_output.exists():
+            self.test_output.unlink()
 
+        # Second call should fail (create empty file)
         # Should fail but not trigger circuit breaker initially
         result = self.provider.convert_text_to_speech(
             text="Hello world",
@@ -100,15 +109,15 @@ class TestPhase1Integration:
         # This tests that validation doesn't break expected workflows
 
     @patch('tts.providers.edge_tts_provider.aiohttp.ClientSession')
-    @patch('tts.providers.edge_tts_provider.edge_tts')
-    def test_connection_pooling_with_async(self, mock_edge_tts, mock_client_session):
+    @patch('edge_tts.Communicate')
+    def test_connection_pooling_with_async(self, mock_communicate_class, mock_client_session):
         """Test connection pooling working with async architecture"""
         mock_session = MagicMock()
         mock_session.closed = False
         mock_client_session.return_value = mock_session
 
         mock_communicate = MagicMock()
-        mock_edge_tts.Communicate.return_value = mock_communicate
+        mock_communicate_class.return_value = mock_communicate
         mock_communicate.save = AsyncMock(return_value=None)
 
         # Create test file
@@ -210,8 +219,8 @@ class TestPhase1EndToEnd:
         assert isinstance(providers, list)
         assert len(providers) > 0
 
-    @patch('tts.providers.edge_tts_provider.edge_tts')
-    def test_error_recovery_workflow(self, mock_edge_tts):
+    @patch('edge_tts.Communicate')
+    def test_error_recovery_workflow(self, mock_communicate_class):
         """Test error recovery through the complete workflow"""
         # Mock progressive failures then success
         call_count = 0
@@ -230,7 +239,7 @@ class TestPhase1EndToEnd:
                 self.test_dir.joinpath("recovery_test.mp3").touch()
                 return mock_communicate
 
-        mock_edge_tts.Communicate.side_effect = progressive_failure
+        mock_communicate_class.side_effect = progressive_failure
 
         # This should eventually succeed (through fallback or retry)
         # or fail gracefully - what matters is it doesn't crash

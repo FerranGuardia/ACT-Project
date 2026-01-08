@@ -11,6 +11,49 @@ Usage:
     python tests/scripts/analyze_test_performance.py --slow-threshold 5.0
 """
 
+import sys
+import os
+
+# Fix Windows console encoding issues
+if os.name == 'nt':  # Windows
+    try:
+        # Try to set console encoding to UTF-8
+        import subprocess
+        subprocess.run(['chcp', '65001'], shell=True, capture_output=True)
+    except:
+        pass
+
+    # Fallback: replace problematic characters
+    import builtins
+    original_print = builtins.print
+
+    def safe_print(*args, **kwargs):
+        # Replace emojis with safe alternatives
+        emoji_map = {
+            '🔍': '[ANALYZING]',
+            '📊': '[REPORT]',
+            '🐌': '[SLOW_TEST]',
+            '🚨': '[HIGH_PRIORITY]',
+            '⚠️': '[MEDIUM_PRIORITY]',
+            'ℹ️': '[INFO]',
+            '✅': '[OK]',
+            '❌': '[ERROR]',
+            '💾': '[SAVED]',
+            '🔧': '[PROCESSING]',
+            '💡': '[TIP]'
+        }
+
+        new_args = []
+        for arg in args:
+            if isinstance(arg, str):
+                for emoji, replacement in emoji_map.items():
+                    arg = arg.replace(emoji, replacement)
+            new_args.append(arg)
+
+        return original_print(*new_args, **kwargs)
+
+    builtins.print = safe_print
+
 import argparse
 import json
 import subprocess

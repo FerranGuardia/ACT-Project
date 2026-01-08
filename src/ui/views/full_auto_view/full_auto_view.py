@@ -161,7 +161,7 @@ class FullAutoView(BaseView):
                 item['url'],
                 item['status'],
                 item['progress'],
-                item.get('output_format', {'type': 'individual_mp3s'})
+                parent=None  # Explicitly set parent
             )
             
             # Connect action buttons using handlers

@@ -175,3 +175,33 @@ def mock_voice_manager():
     ]
     mock_manager.get_providers.return_value = ["edge_tts", "pyttsx3"]
     return mock_manager
+
+
+@pytest.fixture
+def real_provider_manager():
+    """Real TTSProviderManager instance for integration tests"""
+    from tts.providers.provider_manager import TTSProviderManager
+
+    # Create real provider manager instance
+    manager = TTSProviderManager()
+    return manager
+
+
+@pytest.fixture
+def real_voice_manager():
+    """Real VoiceManager instance for integration tests"""
+    from tts.voice_manager import VoiceManager
+
+    # Create real voice manager instance
+    manager = VoiceManager()
+    return manager
+
+
+@pytest.fixture
+def real_tts_engine():
+    """Real TTSEngine instance for integration tests"""
+    from tts.tts_engine import TTSEngine
+
+    # Create real TTS engine instance
+    engine = TTSEngine()
+    return engine

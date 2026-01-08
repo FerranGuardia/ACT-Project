@@ -210,18 +210,19 @@ class TestAsyncIntegration:
         """Test HTTP session lifecycle management"""
         mock_session = MagicMock()
         mock_session.closed = False  # Session starts open
+        mock_session.close = AsyncMock()  # close() is async
         mock_client_session.return_value = mock_session
 
         provider = EdgeTTSProvider()
 
         # Test session creation
         async def test_session():
-            session = provider._ensure_session()
+            session = await provider._ensure_session()
             assert session is not None
             assert provider._session is session
 
             # Test session reuse
-            session2 = provider._ensure_session()
+            session2 = await provider._ensure_session()
             assert session2 is session  # Should reuse
 
             # Test session cleanup

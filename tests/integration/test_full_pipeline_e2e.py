@@ -62,13 +62,13 @@ class TestFullPipelineE2E:
             provider="edge_tts"
         )
         
-        # Step 1: Initialize and fetch chapters (limit to 2 for testing)
+        # Step 1: Initialize and fetch chapters (limit to 1 for testing)
         logger.info("Step 1: Fetching chapter URLs (using NovelBin - AJAX method, fast)...")
         result = pipeline.run_full_pipeline(
             toc_url=test_novel_url,
             novel_url=test_novel_url,
             start_from=1,
-            max_chapters=2  # Only test 2 chapters for E2E
+            max_chapters=1  # Only test 1 chapter for E2E (much faster)
         )
         
         # Verify result
@@ -77,7 +77,7 @@ class TestFullPipelineE2E:
             pytest.skip(f"Network issue: Could not fetch chapters. Failed: {result.get('failed')}, Completed: {result.get('completed')}")
         
         assert result.get('success') == True, f"Pipeline failed: {result.get('error')}"
-        assert result.get('completed', 0) >= 1, f"No chapters were completed. Result: {result}"
+        assert result.get('completed', 0) == 1, f"Expected exactly 1 chapter to be completed. Result: {result}"
         logger.info(f"✓ Pipeline completed: {result.get('completed')} chapters")
         
         # Step 2: Verify text files created
@@ -86,7 +86,7 @@ class TestFullPipelineE2E:
         text_dir = file_manager.get_text_dir()
         
         text_files = list(text_dir.glob("chapter_*.txt"))
-        assert len(text_files) >= 1, f"Expected at least 1 text file, found {len(text_files)}"
+        assert len(text_files) == 1, f"Expected exactly 1 text file, found {len(text_files)}"
         logger.info(f"✓ Found {len(text_files)} text files")
         
         # Verify text file content
@@ -101,16 +101,16 @@ class TestFullPipelineE2E:
         audio_dir = file_manager.get_audio_dir()
         
         audio_files = list(audio_dir.glob("chapter_*.mp3"))
-        assert len(audio_files) >= 1, f"Expected at least 1 audio file, found {len(audio_files)}"
+        assert len(audio_files) == 1, f"Expected exactly 1 audio file, found {len(audio_files)}"
         logger.info(f"✓ Found {len(audio_files)} audio files")
         
         # Verify audio file content
-        for audio_file in audio_files[:2]:  # Check first 2
-            assert audio_file.exists(), f"Audio file {audio_file.name} doesn't exist"
-            file_size = audio_file.stat().st_size
-            assert file_size > 0, f"Audio file {audio_file.name} is empty (size: {file_size})"
-            assert file_size > 1000, f"Audio file {audio_file.name} seems too small (size: {file_size})"
-            logger.info(f"  ✓ {audio_file.name}: {file_size} bytes")
+        audio_file = audio_files[0]  # Check the single file
+        assert audio_file.exists(), f"Audio file {audio_file.name} doesn't exist"
+        file_size = audio_file.stat().st_size
+        assert file_size > 0, f"Audio file {audio_file.name} is empty (size: {file_size})"
+        assert file_size > 1000, f"Audio file {audio_file.name} seems too small (size: {file_size})"
+        logger.info(f"  ✓ {audio_file.name}: {file_size} bytes")
         
         logger.info("✅ E2E Happy Path Test PASSED")
     

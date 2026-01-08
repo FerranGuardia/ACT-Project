@@ -82,17 +82,27 @@ class InputValidator:
             Tuple of (is_valid, error_message_or_clean_url)
         """
         try:
-            # Sanitize URL first
+            # Basic type checking
+            if url is None:
+                return False, "URL cannot be None"
+            if not isinstance(url, str):
+                return False, f"URL must be a string, got {type(url).__name__}"
+
+            # Check for malicious patterns BEFORE sanitization
+            if self._is_malicious_url(url):
+                return False, "Potentially malicious URL detected"
+
+            # Check for null bytes (security risk)
+            if '\x00' in url or '%00' in url:
+                return False, "URL contains null bytes"
+
+            # Sanitize URL
             clean_url = self._sanitize_url(url)
 
             # Validate against schema
             if not self.url_validator.validate({'url': clean_url}):
                 error_msg = "; ".join(self.url_validator.errors.get('url', ['Invalid URL']))
                 return False, f"URL validation failed: {error_msg}"
-
-            # Additional security checks
-            if self._is_malicious_url(clean_url):
-                return False, "Potentially malicious URL detected"
 
             # Check for known novel sites
             if not self._is_supported_site(clean_url):
@@ -174,6 +184,17 @@ class InputValidator:
         Returns:
             Sanitized text
         """
+        # Remove HTML tags and potentially harmful content
+        import bleach
+        text = bleach.clean(text, tags=[], strip=True)
+
+        # Remove dangerous URL schemes
+        import re
+        text = re.sub(r'javascript:[^\s]*', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'data:[^\s]*', '', text, flags=re.IGNORECASE)
+        # Remove event handlers
+        text = re.sub(r'on\w+\s*=\s*[^\s>]*', '', text, flags=re.IGNORECASE)
+
         # Remove potentially harmful characters but preserve readability
         # Allow basic punctuation and common characters
         text = ''.join(char for char in text if ord(char) >= 32 or char in '\n\t')
@@ -204,7 +225,7 @@ class InputValidator:
 
             # Check for suspicious patterns
             suspicious_patterns = [
-                r'\.\.\.?/',  # Directory traversal
+                r'\.\.\.?[/\\]',  # Directory traversal (forward or backward slashes)
                 r'<script',  # Script injection
                 r'javascript:',  # JavaScript URLs
                 r'data:',  # Data URLs (can be dangerous)
