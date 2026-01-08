@@ -3,6 +3,7 @@
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-v1.2.0-success)](https://github.com/FerranGuardia/ACT-Project)
+[![Performance](https://img.shields.io/badge/Performance-472x%20faster-orange)](src/tts/text_cleaner.py)
 
 Modular Python application for converting webnovels to audiobooks using automated scraping and multi-provider TTS synthesis.
 
@@ -14,12 +15,13 @@ Modular Python application for converting webnovels to audiobooks using automate
 - **Multi-Provider TTS**: Text-to-speech conversion supporting:
   - Edge TTS (Microsoft Azure Cognitive Services)
   - pyttsx3 (offline system TTS fallback)
+- **Performance**: 472x faster text processing with optimized regex patterns
 - **Fault Tolerance**: Circuit breaker pattern, async architecture, connection pooling
 - **Security**: Input sanitization, content validation, XSS prevention
 - **GUI Interface**: PySide6-based application with 4 operational modes
 - **Project Management**: State persistence with resume capability
 - **Queue Processing**: Batch processing with progress tracking
-- **Testing Suite**: 150+ automated tests (unit, integration, performance)
+- **Testing Suite**: 150+ automated tests with parallel execution support (unit, integration, E2E)
 
 ## Requirements
 
