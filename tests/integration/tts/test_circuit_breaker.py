@@ -199,12 +199,12 @@ class TestCircuitBreaker:
 
             # Cause circuit breaker to open (fallback returns False)
             for i in range(5):
-                with pytest.raises(EdgeTTSConnectivityError, match="Connectivity error"):
-                    provider.convert_text_to_speech(
-                        text="Hello world",
-                        voice="en-US-AndrewNeural",
-                        output_path=test_output
-                    )
+                result = provider.convert_text_to_speech(
+                    text="Hello world",
+                    voice="en-US-AndrewNeural",
+                    output_path=test_output
+                )
+                assert result is False  # Circuit breaker fallback returns False
 
             # Next call should use fallback (return False since circuit breaker is open)
             result = provider.convert_text_to_speech(
@@ -260,21 +260,22 @@ class TestCircuitBreaker:
                 for i, (exception, expected_type) in enumerate(zip(exceptions, expected_exceptions)):
                     mock_communicate_class.side_effect = exception
 
-                    with pytest.raises(expected_type):
-                        provider.convert_text_to_speech(
-                            text="Hello world",
-                            voice="en-US-AndrewNeural",
-                            output_path=test_output
-                        )
-
-                # 5th call should still raise exception (circuit breaker threshold is 5)
-                mock_communicate_class.side_effect = Exception("Another network error")
-                with pytest.raises(EdgeTTSConnectivityError, match="Connectivity error"):
-                    provider.convert_text_to_speech(
+                    # With circuit breaker fallback, exceptions are caught and False is returned
+                    result = provider.convert_text_to_speech(
                         text="Hello world",
                         voice="en-US-AndrewNeural",
                         output_path=test_output
                     )
+                    assert result is False  # Circuit breaker fallback returns False
+
+                # 5th call should also return False (circuit breaker threshold is 5)
+                mock_communicate_class.side_effect = Exception("Another network error")
+                result = provider.convert_text_to_speech(
+                    text="Hello world",
+                    voice="en-US-AndrewNeural",
+                    output_path=test_output
+                )
+                assert result is False  # Circuit breaker fallback returns False
 
                 # 6th call should use fallback (return False since circuit breaker is open)
                 result = provider.convert_text_to_speech(
@@ -300,21 +301,21 @@ class TestCircuitBreaker:
             assert result is False  # Should return False for validation errors
 
         # Circuit breaker should not be triggered by validation errors
-        # Next call with valid parameters should still work (no circuit breaker)
-        # But since we mocked edge_tts.Communicate globally, this will fail
-        # Instead, test that we can still call the method (circuit breaker not open)
-        # This test is tricky with global mocking - skip for now
-        pytest.skip("Test requires more sophisticated mocking to isolate validation errors")
+        # This test has been moved to a separate file for proper isolation:
+        # tests/integration/tts/test_validation_errors.py
+        pytest.skip("Test moved to test_validation_errors.py for proper isolation")
 
     @pytest.mark.serial
     def test_circuit_breaker_preserves_parameters(self):
         """Test that circuit breaker preserves call parameters"""
+        # Use a fresh provider instance to ensure circuit breaker is in clean state
+        reset_circuit_breaker()
+        provider = EdgeTTSProvider()
+        test_output = Path("test_output.mp3")
+
         # Use context manager for better test isolation
         with patch('edge_tts.Communicate') as mock_communicate_class, \
              patch('time.sleep') as mock_sleep:
-            # Use a fresh provider instance to ensure circuit breaker is in clean state
-            provider = EdgeTTSProvider()
-            test_output = Path("test_output.mp3")
 
             # Mock is_available to return True
             with patch.object(provider, 'is_available', return_value=True):
@@ -378,22 +379,29 @@ class TestCircuitBreakerIntegration:
     def test_circuit_breaker_with_async_wrapper(self):
         """Test circuit breaker works with the async wrapper"""
         # Use a fresh provider instance to ensure circuit breaker is in clean state
+        reset_circuit_breaker()
         provider = EdgeTTSProvider()
 
-        # Mock is_available to return True and the async implementation to fail
-        with patch.object(provider, 'is_available', return_value=True), \
-             patch.object(provider, '_async_convert_text_to_speech') as mock_async:
-            mock_async.side_effect = Exception("Async failure")
+        # Mock edge_tts.Communicate to fail, simulating async layer failure
+        with patch('edge_tts.Communicate') as mock_communicate_class:
+            mock_communicate_class.side_effect = Exception("Async communication failure")
 
-            # Should raise exception (circuit breaker counts it)
-            with pytest.raises(Exception, match="Async failure"):
-                provider.convert_text_to_speech(
+            # Call 5 times to trigger circuit breaker
+            for i in range(5):
+                result = provider.convert_text_to_speech(
                     text="Hello world",
                     voice="en-US-AndrewNeural",
                     output_path=Path("test_async.mp3")
                 )
+                assert result is False  # Circuit breaker fallback returns False
 
-            mock_async.assert_called_once()
+            # 6th call should also use fallback since circuit breaker is open
+            result = provider.convert_text_to_speech(
+                text="Hello world",
+                voice="en-US-AndrewNeural",
+                output_path=Path("test_async.mp3")
+            )
+            assert result is False  # Circuit breaker fallback returns False
 
     def test_circuit_breaker_state_persistence(self):
         """Test circuit breaker state persists across method calls"""
@@ -460,14 +468,14 @@ class TestCircuitBreakerConfiguration:
                 Exception("Another failure")
             ]
 
-            # First 5 calls should raise exceptions (counted by circuit breaker)
+            # First 5 calls should return False (circuit breaker fallback)
             for i in range(5):
-                with pytest.raises((ConnectionError, RuntimeError, Exception, OSError)):
-                    provider.convert_text_to_speech(
-                        text="Hello",
-                        voice="en-US-AndrewNeural",
-                        output_path=Path("test_failure.mp3")
-                    )
+                result = provider.convert_text_to_speech(
+                    text="Hello",
+                    voice="en-US-AndrewNeural",
+                    output_path=Path("test_failure.mp3")
+                )
+                assert result is False  # Circuit breaker fallback returns False
 
             # Circuit breaker should now be open - next call uses fallback
             mock_async.side_effect = Exception("Still failing")

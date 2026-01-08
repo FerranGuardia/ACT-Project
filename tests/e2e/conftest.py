@@ -69,6 +69,18 @@ def mock_tts_engine():
 
 
 @pytest.fixture
+def mock_voice_manager():
+    """Mock VoiceManager for testing"""
+    from unittest.mock import MagicMock
+
+    mock_manager = MagicMock()
+    mock_manager.get_voices.return_value = [
+        {"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "language": "en-US", "gender": "male"}
+    ]
+    return mock_manager
+
+
+@pytest.fixture
 def real_provider_manager():
     """Real TTSProviderManager instance for E2E tests"""
     from tts.providers.provider_manager import TTSProviderManager
@@ -96,3 +108,23 @@ def real_tts_engine():
     # Create real TTS engine instance
     engine = TTSEngine()
     return engine
+
+
+@pytest.fixture
+def temp_dir(tmp_path):
+    """Temporary directory fixture for E2E tests"""
+    return tmp_path
+
+
+@pytest.fixture
+def sample_text():
+    """Sample text for TTS testing"""
+    return "Hello world, this is a test of the text-to-speech system."
+
+
+@pytest.fixture
+def sample_text_file(tmp_path):
+    """Sample text file for TTS testing"""
+    text_file = tmp_path / "sample.txt"
+    text_file.write_text("Hello world, this is a test of the text-to-speech system.")
+    return text_file
