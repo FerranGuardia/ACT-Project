@@ -56,6 +56,7 @@ if "core.config_manager" not in sys.modules:
     mock_get_config = MagicMock(return_value=mock_config)
     config_module = types.ModuleType("core.config_manager")
     setattr(config_module, "get_config", mock_get_config)  # type: ignore[attr-defined]
+    setattr(config_module, "ConfigManager", MagicMock)  # type: ignore[attr-defined]
     sys.modules["core.config_manager"] = config_module
 
 # Set up package structure
@@ -126,6 +127,15 @@ if "tts.ssml_builder" not in sys.modules:
     setattr(ssml_builder_module, "parse_volume", lambda s: 0.0)  # type: ignore[attr-defined]
     sys.modules["tts.ssml_builder"] = ssml_builder_module
 
+# Load audio_merger module (needed by text_processor)
+audio_merger_path = act_src / "tts" / "audio_merger.py"
+spec_am = importlib.util.spec_from_file_location("tts.audio_merger", audio_merger_path)
+if spec_am is None or spec_am.loader is None:
+    raise ImportError(f"Could not load spec for audio_merger from {audio_merger_path}")
+audio_merger_module = importlib.util.module_from_spec(spec_am)
+sys.modules["tts.audio_merger"] = audio_merger_module
+spec_am.loader.exec_module(audio_merger_module)
+
 # Load voice_validator module
 voice_validator_path = act_src / "tts" / "voice_validator.py"
 spec_vv = importlib.util.spec_from_file_location("tts.voice_validator", voice_validator_path)
@@ -152,15 +162,6 @@ if spec_tu is None or spec_tu.loader is None:
 tts_utils_module = importlib.util.module_from_spec(spec_tu)
 sys.modules["tts.tts_utils"] = tts_utils_module
 spec_tu.loader.exec_module(tts_utils_module)
-
-# Load audio_merger module
-audio_merger_path = act_src / "tts" / "audio_merger.py"
-spec_am = importlib.util.spec_from_file_location("tts.audio_merger", audio_merger_path)
-if spec_am is None or spec_am.loader is None:
-    raise ImportError(f"Could not load spec for audio_merger from {audio_merger_path}")
-audio_merger_module = importlib.util.module_from_spec(spec_am)
-sys.modules["tts.audio_merger"] = audio_merger_module
-spec_am.loader.exec_module(audio_merger_module)
 
 # Load tts_engine
 tts_engine_path = act_src / "tts" / "tts_engine.py"

@@ -1,8 +1,10 @@
-# Integration Tests - Refined Real Tests
+# Integration Tests - Component Interaction Tests
 
 **Location**: `ACT/tests/integration/`  
-**Status**: ✅ Created - Ready for Testing  
-**Focus**: Real-world scenarios with actual network calls and file operations
+**Status**: ✅ Refined - Component interactions without external dependencies  
+**Focus**: Internal component integration and real file operations
+
+**📝 Note**: Tests requiring external network calls or complete workflows have been moved to `tests/e2e/` to properly separate integration testing from end-to-end testing.
 
 ---
 
@@ -15,44 +17,19 @@ This directory contains **refined integration tests** that test real scenarios w
 ## 🧪 Test Files
 
 ### 1. `test_tts_multi_provider.py`
-**Focus**: Multi-provider TTS system testing
+**MOVED TO**: `tests/e2e/test_tts_multi_provider.py`
 
-Tests:
-- ✅ ProviderManager initialization and provider listing
-- ✅ Edge TTS provider voice loading and conversion
-- ✅ pyttsx3 provider voice loading and conversion
-- ✅ Automatic fallback from Edge TTS to pyttsx3
-- ✅ Provider-specific voice management
-- ✅ File conversion with different providers
-- ✅ Error handling for invalid providers
-
-**Markers**: `@pytest.mark.integration`, `@pytest.mark.real`, `@pytest.mark.network`, `@pytest.mark.slow`
+This test was moved to E2E testing because it uses real ProviderManager instances which may make network calls to initialize TTS providers. It now resides in the E2E test suite.
 
 ### 2. `test_full_pipeline_real.py`
-**Focus**: End-to-end processing pipeline
+**RENAMED TO**: `tests/e2e/test_full_pipeline_e2e.py`
 
-Tests:
-- ✅ Pipeline initialization
-- ✅ Chapter fetching from real novel URLs
-- ✅ Provider selection in pipeline
-- ✅ Error handling
-- ✅ Progress tracking
-- ✅ Output directory structure creation
-
-**Markers**: `@pytest.mark.integration`, `@pytest.mark.real`, `@pytest.mark.slow`, `@pytest.mark.network`
+This test was already E2E by name and functionality, testing complete workflows from URL scraping to audio file generation. It has been moved to the E2E test suite.
 
 ### 3. `test_scraper_real.py`
-**Focus**: Real network scraping operations
+**MOVED TO**: `tests/e2e/test_scraper_real.py`
 
-Tests:
-- ✅ Scraper initialization
-- ✅ Novel information fetching
-- ✅ Chapter list fetching (tests pagination detection)
-- ✅ Chapter content fetching
-- ✅ Invalid URL handling
-- ✅ Progress callback functionality
-
-**Markers**: `@pytest.mark.integration`, `@pytest.mark.real`, `@pytest.mark.network`, `@pytest.mark.slow`
+This test was moved to E2E testing because it performs real network scraping operations with external websites. It now resides in the E2E test suite where network-dependent tests belong.
 
 ---
 

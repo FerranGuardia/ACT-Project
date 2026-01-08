@@ -37,8 +37,10 @@ class TestTTSPerformanceBenchmarks:
     def test_text_processor_prepare_performance(self, benchmark, sample_long_text):
         """Benchmark text preparation performance."""
         from src.tts.text_processor import TextProcessor
+        from unittest.mock import Mock
 
-        processor = TextProcessor(None)  # Mock provider manager for this test
+        provider_manager = Mock()
+        processor = TextProcessor(provider_manager)
 
         def prepare_text():
             return processor.prepare_text(sample_long_text)
@@ -50,21 +52,40 @@ class TestTTSPerformanceBenchmarks:
         from src.tts.ssml_builder import build_ssml
 
         def build_ssml_func():
-            return build_ssml(sample_text, voice="en-US-AndrewNeural")
+            # build_ssml doesn't take voice parameter, only text and voice settings
+            return build_ssml(sample_text)
 
         benchmark(build_ssml_func)
 
     def test_voice_validator_performance(self, benchmark):
         """Benchmark voice validation performance."""
         from src.tts.voice_validator import VoiceValidator
+        from unittest.mock import Mock
 
-        validator = VoiceValidator()
+        # Mock the required dependencies
+        voice_manager = Mock()
+        provider_manager = Mock()
+
+        # Set up voice_manager to return a proper voice dict
+        voice_manager.get_voice_by_name.return_value = {
+            "id": "en-US-AndrewNeural",
+            "name": "Andrew",
+            "language": "en-US",
+            "gender": "male"
+        }
+
+        # Set up provider_manager to return a mock provider
+        mock_provider = Mock()
+        provider_manager.get_provider.return_value = mock_provider
+
+        validator = VoiceValidator(voice_manager, provider_manager)
 
         voices = ["en-US-AndrewNeural", "en-GB-SoniaNeural", "es-ES-ElviraNeural"]
 
         def validate_voices():
             for voice in voices:
-                validator.validate_voice(voice)
+                # Use the actual method available
+                validator.validate_and_resolve_voice(voice, None)
 
         benchmark(validate_voices)
 
@@ -72,12 +93,14 @@ class TestTTSPerformanceBenchmarks:
     def test_scaling_performance(self, benchmark, text_length):
         """Test how performance scales with text length."""
         from src.tts.text_processor import TextProcessor
+        from unittest.mock import Mock
 
         # Generate text of specific length
         text = "This is a test sentence. " * (text_length // 25)
         text = text[:text_length]  # Trim to exact length
 
-        processor = TextProcessor(None)  # Mock provider manager
+        provider_manager = Mock()
+        processor = TextProcessor(provider_manager)
 
         def process_text():
             return processor.prepare_text(text)
@@ -147,11 +170,13 @@ class TestMemoryPerformanceBenchmarks:
     def test_large_text_memory_usage(self, benchmark):
         """Test memory usage with large texts."""
         from src.tts.text_processor import TextProcessor
+        from unittest.mock import Mock
 
         # Generate very large text
         large_text = "This is a very long text for memory testing. " * 10000
 
-        processor = TextProcessor(None)  # Mock provider manager
+        provider_manager = Mock()
+        processor = TextProcessor(provider_manager)
 
         def process_large_text():
             result = processor.prepare_text(large_text)

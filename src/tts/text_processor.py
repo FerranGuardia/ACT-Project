@@ -13,6 +13,7 @@ from .providers.base_provider import TTSProvider
 from .providers.provider_manager import TTSProviderManager
 from .ssml_builder import build_ssml
 from .text_cleaner import clean_text_for_tts
+from .audio_merger import AudioMerger
 
 logger = get_logger("tts.text_processor")
 
@@ -31,6 +32,7 @@ class TextProcessor:
         self.provider_manager = provider_manager
         self.base_text_cleaner = base_text_cleaner
         self.config = get_config()
+        self.audio_merger = AudioMerger(provider_manager)
     
     def prepare_text(self, text: str) -> Optional[str]:
         """
@@ -102,3 +104,52 @@ class TextProcessor:
             use_ssml = False
         
         return text_to_convert, use_ssml
+
+    def chunk_text(self, text: str, max_length: int) -> list[str]:
+        """
+        Split text into chunks that don't exceed max_length characters.
+
+        Args:
+            text: Text to chunk
+            max_length: Maximum length per chunk in characters
+
+        Returns:
+            List of text chunks
+        """
+        # Handle edge cases
+        if not text:
+            return []
+        if len(text) <= max_length:
+            return [text]
+
+        # Simple chunking by splitting at word boundaries when possible
+        chunks = []
+        current_chunk = ""
+
+        words = text.split()
+        for word in words:
+            # If adding this word would exceed the limit
+            if len(current_chunk) + len(word) + 1 > max_length and current_chunk:
+                chunks.append(current_chunk.strip())
+                current_chunk = word
+            else:
+                if current_chunk:
+                    current_chunk += " " + word
+                else:
+                    current_chunk = word
+
+        # Add the last chunk
+        if current_chunk:
+            chunks.append(current_chunk.strip())
+
+        # If we still have very long chunks (no word boundaries), split them
+        final_chunks = []
+        for chunk in chunks:
+            if len(chunk) <= max_length:
+                final_chunks.append(chunk)
+            else:
+                # Split long chunks at character boundaries
+                for i in range(0, len(chunk), max_length):
+                    final_chunks.append(chunk[i:i + max_length])
+
+        return final_chunks

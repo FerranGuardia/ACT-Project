@@ -22,6 +22,18 @@ if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
 from src.tts.providers.edge_tts_provider import EdgeTTSProvider
+from circuitbreaker import CircuitBreaker
+
+
+def reset_circuit_breaker():
+    """Reset the circuit breaker state for EdgeTTSProvider.convert_text_to_speech"""
+    method = EdgeTTSProvider.convert_text_to_speech
+    if hasattr(method, '_circuit_breaker'):
+        breaker = method._circuit_breaker
+        breaker._failure_count = 0
+        breaker._state = CircuitBreaker.CLOSED
+        breaker._opened_at = None
+        breaker._last_failure_at = None
 
 
 class TestConnectionPooling:
@@ -29,6 +41,7 @@ class TestConnectionPooling:
 
     def setup_method(self, method) -> None:
         """Set up test fixtures"""
+        reset_circuit_breaker()  # Reset circuit breaker for test isolation
         self.provider = EdgeTTSProvider()
 
     def teardown_method(self, method) -> None:
@@ -175,6 +188,7 @@ class TestResourceManagement:
 
     def setup_method(self, method) -> None:
         """Set up test fixtures"""
+        reset_circuit_breaker()  # Reset circuit breaker for test isolation
         self.provider = EdgeTTSProvider()
 
     def teardown_method(self, method) -> None:
@@ -258,6 +272,7 @@ class TestConnectionPoolingIntegration:
 
     def setup_method(self, method) -> None:
         """Set up test fixtures"""
+        reset_circuit_breaker()  # Reset circuit breaker for test isolation
         self.provider = EdgeTTSProvider()
 
     def teardown_method(self, method) -> None:
@@ -336,6 +351,7 @@ class TestConnectionPoolingPerformance:
 
     def setup_method(self, method) -> None:
         """Set up test fixtures"""
+        reset_circuit_breaker()  # Reset circuit breaker for test isolation
         self.provider = EdgeTTSProvider()
 
     def teardown_method(self, method) -> None:

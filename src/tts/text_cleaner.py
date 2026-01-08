@@ -6,69 +6,63 @@ removing symbols and elements that TTS engines read incorrectly.
 """
 
 import re
-from typing import Optional, Callable
+from typing import Callable, Optional
 
 from core.logger import get_logger
 
 logger = get_logger("tts.text_cleaner")
 
+# Precompile regex patterns once for performance
+RE_SEPARATORS = re.compile(r'(=+|-{3,}|_{3,}|\*{3,}|#{2,}|~{2,}|\|{2,})')
+RE_STANDALONE = re.compile(r'\s+[=*#~|_-]+\s+')
+RE_SYMBOL_LINES = re.compile(r'^\s*[=*#~|_-]+\s*$', flags=re.MULTILINE)
+RE_PUNCT = re.compile(r'(\.{4,}|!{3,}|\?{3,})')
+RE_BRACKETS = re.compile(r'[\[\]]')
+RE_SPACES = re.compile(r'[ \t]+')
+RE_NEWLINES = re.compile(r'\n\s*\n\s*\n+')
+
 
 def clean_text_for_tts(text: str, base_cleaner: Optional[Callable[[str], str]] = None) -> str:
     """
     Clean text for TTS conversion.
-    
+
     First applies base cleaner (if provided) to remove UI elements,
     then applies TTS-specific cleaning to remove symbols that TTS reads incorrectly.
-    
+
     Args:
         text: Text to clean
         base_cleaner: Optional function to apply first (e.g., scraper text cleaner)
-    
+
     Returns:
         Cleaned text ready for TTS
     """
     if not text:
         return ""
-    
-    # First, apply base cleaner if provided (removes UI elements, etc.)
+
+    # Apply base cleaner
     if base_cleaner:
         try:
             cleaned = base_cleaner(text)
-            # Ensure result is a string
-            if not isinstance(cleaned, str):
-                logger.warning(f"Base cleaner returned non-string type: {type(cleaned)}, using original text")
-                cleaned = str(cleaned) if cleaned is not None else ""
-            text = cleaned
+            text = cleaned if isinstance(cleaned, str) else str(cleaned or "")
         except Exception as e:
             logger.warning(f"Error applying base cleaner: {e}")
-    
-    # Then apply TTS-specific cleaning
-    
-    # Remove all separator symbols that TTS reads as words
-    text = re.sub(r'=+', '', text)  # Remove all = symbols (=== becomes nothing)
-    text = re.sub(r'-{3,}', ' ', text)  # Remove --- separators
-    text = re.sub(r'_{3,}', ' ', text)  # Remove ___ separators
-    text = re.sub(r'\*{3,}', ' ', text)  # Remove *** separators
-    text = re.sub(r'[#]{2,}', ' ', text)  # Remove ##
-    text = re.sub(r'[~]{2,}', ' ', text)  # Remove ~~
-    text = re.sub(r'[|]{2,}', ' ', text)  # Remove |||
-    
-    # Remove standalone symbols that TTS might read
-    text = re.sub(r'\s+[=*#~|_-]+\s+', ' ', text)  # Standalone symbol groups
-    text = re.sub(r'^\s*[=*#~|_-]+\s*$', '', text, flags=re.MULTILINE)  # Lines with only symbols
-    
-    # Normalize excessive punctuation that TTS reads awkwardly
-    text = re.sub(r'\.{4,}', '...', text)  # More than 3 dots becomes ...
-    text = re.sub(r'!{3,}', '!', text)  # Multiple ! becomes single
-    text = re.sub(r'\?{3,}', '?', text)  # Multiple ? becomes single
-    
-    # Replace square brackets with parentheses (TTS reads brackets better as parentheses)
-    text = re.sub(r'\[', '(', text)
-    text = re.sub(r'\]', ')', text)
-    
-    # Final whitespace cleanup
-    text = re.sub(r'[ \t]+', ' ', text)  # Multiple spaces/tabs to single space
-    text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)  # Multiple newlines to double
-    
+
+    # Remove separators
+    text = RE_SEPARATORS.sub(' ', text)
+
+    # Remove standalone symbol groups
+    text = RE_STANDALONE.sub(' ', text)
+    text = RE_SYMBOL_LINES.sub('', text)
+
+    # Normalize punctuation
+    text = RE_PUNCT.sub(lambda m: m.group(0)[0] * 3 if m.group(0)[0] in '.!?' else m.group(0), text)
+
+    # Replace brackets with parentheses
+    text = RE_BRACKETS.sub(lambda m: '(' if m.group(0) == '[' else ')', text)
+
+    # Whitespace cleanup
+    text = RE_SPACES.sub(' ', text)
+    text = RE_NEWLINES.sub('\n\n', text)
+
     return text.strip()
 
