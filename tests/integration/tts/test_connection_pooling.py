@@ -8,13 +8,13 @@ import asyncio
 import sys
 # Import directly from src to bypass mocking
 from pathlib import Path
-from pathlib import Path as PathLib
+from typing import Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 import pytest
 
-project_root = PathLib(__file__).parent.parent.parent.parent
+project_root = Path(__file__).parent.parent.parent.parent
 src_path = project_root / "src"
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
@@ -27,19 +27,19 @@ from src.tts.providers.edge_tts_provider import EdgeTTSProvider
 class TestConnectionPooling:
     """Test connection pooling functionality"""
 
-    def setup_method(self):
+    def setup_method(self, method) -> None:
         """Set up test fixtures"""
         self.provider = EdgeTTSProvider()
 
-    def teardown_method(self):
+    def teardown_method(self, method) -> None:
         """Clean up test fixtures"""
         # Ensure session is cleaned up
         if hasattr(self.provider, '_session') and self.provider._session:
             try:
                 # Check if there's a running loop
                 asyncio.get_running_loop()
-                # If we're here, there's a running loop - just set session to None
-                # The session will be cleaned up by garbage collection
+                # If we're here, there's a running loop - can't use asyncio.run()
+                # Just set session to None for cleanup by garbage collection
                 self.provider._session = None
             except RuntimeError:
                 # No running loop, safe to use asyncio.run
@@ -52,7 +52,7 @@ class TestConnectionPooling:
         mock_client_session.return_value = mock_session
 
         async def test_session():
-            session = self.provider._ensure_session()
+            session = await self.provider._ensure_session()
 
             # Verify ClientSession was called with connection pooling parameters
             mock_client_session.assert_called_once()
@@ -77,11 +77,11 @@ class TestConnectionPooling:
 
         async def test_reuse():
             # First call should create session
-            session1 = self.provider._ensure_session()
+            session1 = await self.provider._ensure_session()
             assert session1 is mock_session
 
             # Second call should reuse session
-            session2 = self.provider._ensure_session()
+            session2 = await self.provider._ensure_session()
             assert session2 is mock_session
 
             # Should only create one session
@@ -101,14 +101,14 @@ class TestConnectionPooling:
 
         async def test_recreation():
             # First call creates session
-            session1 = self.provider._ensure_session()
+            session1 = await self.provider._ensure_session()
             assert session1 is mock_session1
 
             # Simulate session being closed by setting it on the mock
             mock_session1.closed = True
 
             # Second call should create new session since first is closed
-            session2 = self.provider._ensure_session()
+            session2 = await self.provider._ensure_session()
             assert session2 is mock_session2
 
             # Should have created two sessions
@@ -125,7 +125,7 @@ class TestConnectionPooling:
 
         async def test_cleanup():
             # Create session
-            session = self.provider._ensure_session()
+            session = await self.provider._ensure_session()
             assert self.provider._session is mock_session
 
             # Close session
@@ -137,7 +137,7 @@ class TestConnectionPooling:
 
         asyncio.run(test_cleanup())
 
-    def test_tcp_connector_configuration(self):
+    def test_tcp_connector_configuration(self) -> None:
         """Test TCP connector configuration for connection pooling"""
         async def test_connector():
             # Test that we can create a properly configured connector
@@ -158,7 +158,7 @@ class TestConnectionPooling:
         mock_client_session.return_value = mock_session
 
         async def test_timeout():
-            session = self.provider._ensure_session()
+            session = await self.provider._ensure_session()
 
             # Check that timeout was configured
             call_args = mock_client_session.call_args
@@ -173,11 +173,11 @@ class TestConnectionPooling:
 class TestResourceManagement:
     """Test resource management and cleanup"""
 
-    def setup_method(self):
+    def setup_method(self, method) -> None:
         """Set up test fixtures"""
         self.provider = EdgeTTSProvider()
 
-    def teardown_method(self):
+    def teardown_method(self, method) -> None:
         """Clean up test fixtures"""
         asyncio.run(self.provider._close_session())
 
@@ -225,7 +225,7 @@ class TestResourceManagement:
 
         asyncio.run(test_chunk_cleanup())
 
-    def test_memory_usage_with_pooling(self):
+    def test_memory_usage_with_pooling(self) -> None:
         """Test that connection pooling doesn't cause excessive memory usage"""
         # This is a basic test - real memory profiling would be more thorough
         import gc
@@ -256,11 +256,11 @@ class TestResourceManagement:
 class TestConnectionPoolingIntegration:
     """Integration tests for connection pooling"""
 
-    def setup_method(self):
+    def setup_method(self, method) -> None:
         """Set up test fixtures"""
         self.provider = EdgeTTSProvider()
 
-    def teardown_method(self):
+    def teardown_method(self, method) -> None:
         """Clean up test fixtures"""
         asyncio.run(self.provider._close_session())
 
@@ -275,8 +275,7 @@ class TestConnectionPoolingIntegration:
             # Simulate concurrent session access
             sessions = []
             for i in range(5):
-                # _ensure_session() is not async, so we call it directly
-                session = self.provider._ensure_session()
+                session = await self.provider._ensure_session()
                 sessions.append(session)
 
             # All should return the same session instance
@@ -288,7 +287,7 @@ class TestConnectionPoolingIntegration:
 
         asyncio.run(concurrent_access())
 
-    def test_connection_pool_limits(self):
+    def test_connection_pool_limits(self) -> None:
         """Test that connection pool limits are respected"""
         async def test_limits():
             # Create connector with limits
@@ -312,11 +311,11 @@ class TestConnectionPoolingIntegration:
 
         async def test_connection_error():
             with pytest.raises(aiohttp.ClientError):
-                self.provider._ensure_session()
+                await self.provider._ensure_session()
 
         asyncio.run(test_connection_error())
 
-    def test_dns_caching_configuration(self):
+    def test_dns_caching_configuration(self) -> None:
         """Test DNS caching configuration"""
         async def test_dns():
             connector = aiohttp.TCPConnector(
@@ -335,11 +334,11 @@ class TestConnectionPoolingIntegration:
 class TestConnectionPoolingPerformance:
     """Performance tests for connection pooling"""
 
-    def setup_method(self):
+    def setup_method(self, method) -> None:
         """Set up test fixtures"""
         self.provider = EdgeTTSProvider()
 
-    def teardown_method(self):
+    def teardown_method(self, method) -> None:
         """Clean up test fixtures"""
         asyncio.run(self.provider._close_session())
 
@@ -357,7 +356,7 @@ class TestConnectionPoolingPerformance:
 
             # Create session multiple times
             for i in range(10):
-                self.provider._ensure_session()
+                await self.provider._ensure_session()
 
             end_time = time.time()
             duration = end_time - start_time
@@ -367,7 +366,7 @@ class TestConnectionPoolingPerformance:
 
         asyncio.run(test_performance())
 
-    def test_connection_pool_memory_efficiency(self):
+    def test_connection_pool_memory_efficiency(self) -> None:
         """Test that connection pooling is memory efficient"""
         async def test_memory():
             # Create multiple connectors to test memory usage
