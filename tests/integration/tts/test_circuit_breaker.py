@@ -189,11 +189,11 @@ def reset_circuit_breaker():
 class TestCircuitBreaker:
     """Test circuit breaker functionality in Edge TTS provider"""
 
-    def setup_method(self):
+    def setup_method(self, temp_dir):
         """Set up test fixtures"""
         # Use isolated provider for clean circuit breaker state
         self.provider = create_isolated_provider()
-        self.test_output = Path("test_output.mp3")
+        self.test_output = temp_dir / "test_output.mp3"
 
     def teardown_method(self):
         """Clean up test fixtures"""
@@ -327,7 +327,7 @@ class TestCircuitBreaker:
         with patch('edge_tts.Communicate') as mock_communicate_class:
             # Use a fresh provider instance to ensure circuit breaker is in clean state
             provider = EdgeTTSProvider()
-            test_output = Path("test_output_different.mp3")
+            test_output = temp_dir / "test_output_different.mp3"
 
             # Mock is_available to return True
             with patch.object(provider, 'is_available', return_value=True):
@@ -533,7 +533,7 @@ class TestCircuitBreaker:
         # Use a fresh provider instance to ensure circuit breaker is in clean state
         reset_circuit_breaker()
         provider = EdgeTTSProvider()
-        test_output = Path("test_output.mp3")
+        test_output = temp_dir / "test_output.mp3"
 
         # Use context manager for better test isolation
         with patch('edge_tts.Communicate') as mock_communicate_class, \

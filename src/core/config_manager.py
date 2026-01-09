@@ -52,6 +52,18 @@ class ConfigManager:
         version_file = Path(__file__).parent.parent / "VERSION"
         version = version_file.read_text().strip() if version_file.exists() else "1.2.0"
 
+        # Detect if running in test environment
+        import os
+        import tempfile
+        is_test_env = ("PYTEST_CURRENT_TEST" in os.environ or
+                      "pytest" in str(Path.cwd()) or
+                      any("test" in str(Path.cwd()).lower().split(os.sep)))
+
+        # Use temp directory for tests to avoid desktop pollution
+        if is_test_env:
+            temp_base = Path(tempfile.gettempdir()) / "act_test"
+            temp_base.mkdir(exist_ok=True)
+
         return {
             "app": {
                 "version": version,
@@ -59,9 +71,9 @@ class ConfigManager:
                 "language": "es",
             },
             "paths": {
-                "output_dir": str(Path.home() / "Desktop"),
-                "scraped_dir": str(Path.home() / "Documents" / "ACT" / "scraped"),
-                "projects_dir": str(Path.home() / "Documents" / "ACT" / "projects"),
+                "output_dir": str(temp_base / "output") if is_test_env else str(Path.home() / "Desktop"),
+                "scraped_dir": str(temp_base / "scraped") if is_test_env else str(Path.home() / "Documents" / "ACT" / "scraped"),
+                "projects_dir": str(temp_base / "projects") if is_test_env else str(Path.home() / "Documents" / "ACT" / "projects"),
             },
             "tts": {
                 "voice": "es-ES-ElviraNeural",

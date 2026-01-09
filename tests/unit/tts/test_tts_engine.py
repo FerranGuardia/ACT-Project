@@ -163,7 +163,7 @@ class TestTTSEngine:
         assert "..." in result  # Should have ellipsis for pauses
         assert result.startswith("...")  # Should start with pause
 
-    def test_convert_text_to_speech_workflow(self):
+    def test_convert_text_to_speech_workflow(self, temp_dir):
         """Test the complete convert_text_to_speech workflow"""
         engine = TTSEngine()
 
@@ -190,7 +190,7 @@ class TestTTSEngine:
         # Test successful conversion
         result = engine.convert_text_to_speech(
             text="Hello world",
-            output_path=Path("output.mp3"),
+            output_path=temp_dir / "output.mp3",
             voice="test-voice",
             rate=10.0,
             pitch=5.0,
@@ -205,7 +205,7 @@ class TestTTSEngine:
         engine.text_processor.prepare_text.assert_called_once_with("Hello world")
         engine.text_processor.build_text_for_conversion.assert_called_once()
 
-    def test_convert_text_to_speech_validation_failure(self):
+    def test_convert_text_to_speech_validation_failure(self, temp_dir):
         """Test convert_text_to_speech when voice validation fails"""
         engine = TTSEngine()
 
@@ -215,14 +215,14 @@ class TestTTSEngine:
 
         result = engine.convert_text_to_speech(
             text="Hello world",
-            output_path=Path("output.mp3")
+            output_path=temp_dir / "output.mp3"
         )
 
         assert result is False
         # Should not proceed to other steps
         engine.voice_validator.validate_and_resolve_voice.assert_called_once()
 
-    def test_convert_text_to_speech_text_preparation_failure(self):
+    def test_convert_text_to_speech_text_preparation_failure(self, temp_dir):
         """Test convert_text_to_speech when text preparation fails"""
         engine = TTSEngine()
 
@@ -236,7 +236,7 @@ class TestTTSEngine:
 
         result = engine.convert_text_to_speech(
             text="Hello world",
-            output_path=Path("output.mp3")
+            output_path=temp_dir / "output.mp3"
         )
 
         assert result is False

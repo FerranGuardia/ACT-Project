@@ -59,11 +59,11 @@ def clean_text(text: Optional[str]) -> str:
     for pattern in concatenated_ui_patterns:
         text = re.sub(pattern, "", text, flags=re.IGNORECASE)
 
-    # Step 2.1: Remove common social engagement and rating UI patterns
+    # Step 2.1: Remove common social engagement and rating UI patterns (before individual social media removal)
     social_ui_patterns = [
         r"Like\s+this\s+chapter\?.*?Rate\s+it\s+\d+\s+stars?!?",
         r"Rate\s+this\s+chapter.*?\d+\s+stars?",
-        r"Follow\s+.*?\s+on\s+(Twitter|Facebook|Instagram)",
+        r"Follow\s+@\w+\s+on\s+(Twitter|Facebook|Instagram)",
         r"Contact\s*:\s*\w+@\w+\.\w+",
     ]
     for pattern in social_ui_patterns:

@@ -307,8 +307,9 @@ class TestTTSPropertyBased:
         from pathlib import Path
 
         try:
-            # Test path creation and validation
-            path = Path("output") / f"{filename}.mp3"
+            # Test path creation and validation (using virtual paths, no actual file creation)
+            base_path = Path("output")
+            path = base_path / f"{filename}.mp3"
 
             # Should create valid path
             assert path.suffix == ".mp3"

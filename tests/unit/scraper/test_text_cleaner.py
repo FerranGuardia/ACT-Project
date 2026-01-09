@@ -72,7 +72,8 @@ class TestTextCleaner:
         result = clean_text(input_text)
         assert "@username" not in result
         assert "#hashtag" not in result
-        assert "Follow on Twitter" in result
+        # Social media UI content should be completely removed
+        assert result == ""
 
     def test_clean_text_table_formatting(self):
         """Test that table formatting is cleaned."""

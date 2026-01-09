@@ -138,10 +138,10 @@ class TestTTSProvider:
         voice = provider.get_voice_by_id("voice1", locale="es-ES")
         assert voice is None
     
-    def test_convert_text_to_speech(self):
+    def test_convert_text_to_speech(self, temp_dir):
         """Test convert_text_to_speech method"""
         provider = ConcreteProvider()
-        output_path = Path("/tmp/test_output.mp3")
+        output_path = temp_dir / "test_output.mp3"
         
         result = provider.convert_text_to_speech(
             text="Hello world",
