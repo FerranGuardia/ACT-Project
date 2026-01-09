@@ -22,16 +22,17 @@ if "tts" not in sys.modules:
             return True
 
         def get_available_voices(self, locale=None, provider=None):
-            return [{"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male", "language": "en-US"}]
+            return [{"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male", "language": "en-US", "quality": "high", "provider": "edge_tts"}]
+
     class MockVoiceManager:
-        def get_providers(self):
-            return ["edge_tts", "pyttsx3"]
+            def get_providers(self):
+                return ["edge_tts", "pyttsx3"]
 
-        def get_voice_list(self, locale=None, provider=None):
-            return ["en-US-AndrewNeural - Male"]
+            def get_voice_list(self, locale=None, provider=None):
+                return ["en-US-AndrewNeural - Male"]
 
-        def get_voices(self, locale=None, provider=None):
-            return [{"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male", "language": "en-US"}]
+            def get_voices(self, locale=None, provider=None):
+                return [{"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male", "language": "en-US", "quality": "high", "provider": "edge_tts"}]
     tts_module.TTSEngine = MockTTSEngine  # type: ignore[attr-defined]
     tts_module.VoiceManager = MockVoiceManager  # type: ignore[attr-defined]
     tts_module.__all__ = ["TTSEngine", "VoiceManager"]  # type: ignore[attr-defined]
@@ -44,7 +45,7 @@ if "tts.providers.provider_manager" not in sys.modules:
     provider_manager_module = types.ModuleType("tts.providers.provider_manager")
     class MockTTSProviderManager:
         def get_all_voices(self, locale=None):
-            return [{"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male", "language": "en-US"}]
+            return [{"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male", "language": "en-US", "quality": "high", "provider": "edge_tts"}]
     provider_manager_module.TTSProviderManager = MockTTSProviderManager  # type: ignore[attr-defined]
     sys.modules["tts.providers.provider_manager"] = provider_manager_module
 if "tts.voice_manager" not in sys.modules:
@@ -210,7 +211,7 @@ def mock_tts_engine():
     mock_engine = MagicMock()
     mock_engine.convert_text_to_speech.return_value = True
     mock_engine.get_available_voices.return_value = [
-        {"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male"}
+        {"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male", "language": "en-US", "quality": "high", "provider": "edge_tts"}
     ]
     return mock_engine
 
@@ -221,7 +222,7 @@ def mock_voice_manager():
     mock_manager = MagicMock()
     mock_manager.get_voice_list.return_value = ["en-US-AndrewNeural - Male"]
     mock_manager.get_voices.return_value = [
-        {"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male"}
+        {"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male", "language": "en-US", "quality": "high", "provider": "edge_tts"}
     ]
     mock_manager.get_providers.return_value = ["edge_tts", "pyttsx3"]
     return mock_manager
@@ -251,27 +252,30 @@ def pytest_configure(config):
     """Register custom markers and ensure tts mock is set up before test collection"""
     # Ensure tts mock is set up (in case pytest_configure runs before module-level code)
     import types
-    if "tts" not in sys.modules:
-        tts_module = types.ModuleType("tts")
-        class MockTTSEngine:
-            def convert_text_to_speech(self, text, output_path, voice=None, rate=None, pitch=None, volume=None, provider=None):
-                return True
+if "tts" not in sys.modules:
+    tts_module = types.ModuleType("tts")
 
-            def get_available_voices(self, locale=None, provider=None):
-                return [{"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male", "language": "en-US"}]
-        class MockVoiceManager:
-            def get_providers(self):
-                return ["edge_tts", "pyttsx3"]
+    class MockTTSEngine:
+        def convert_text_to_speech(self, text, output_path, voice=None, rate=None, pitch=None, volume=None, provider=None):
+            return True
 
-            def get_voice_list(self, locale=None, provider=None):
-                return ["en-US-AndrewNeural - Male"]
+        def get_available_voices(self, locale=None, provider=None):
+            return [{"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male", "language": "en-US", "quality": "high", "provider": "edge_tts"}]
 
-            def get_voices(self, locale=None, provider=None):
-                return [{"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male", "language": "en-US"}]
-        tts_module.TTSEngine = MockTTSEngine  # type: ignore[attr-defined]
-        tts_module.VoiceManager = MockVoiceManager  # type: ignore[attr-defined]
-        tts_module.__all__ = ["TTSEngine", "VoiceManager"]  # type: ignore[attr-defined]
-        sys.modules["tts"] = tts_module
+    class MockVoiceManager:
+        def get_providers(self):
+            return ["edge_tts", "pyttsx3"]
+
+        def get_voice_list(self, locale=None, provider=None):
+            return ["en-US-AndrewNeural - Male"]
+
+        def get_voices(self, locale=None, provider=None):
+            return [{"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male", "language": "en-US", "quality": "high", "provider": "edge_tts"}]
+
+    tts_module.TTSEngine = MockTTSEngine  # type: ignore[attr-defined]
+    tts_module.VoiceManager = MockVoiceManager  # type: ignore[attr-defined]
+    tts_module.__all__ = ["TTSEngine", "VoiceManager"]  # type: ignore[attr-defined]
+    sys.modules["tts"] = tts_module
     
     config.addinivalue_line("markers", "unit: marks tests as unit tests")
     config.addinivalue_line("markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')")

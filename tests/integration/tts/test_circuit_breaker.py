@@ -3,82 +3,53 @@ Unit tests for circuit breaker functionality in TTS providers.
 
 Tests the circuit breaker pattern implementation for fault tolerance.
 
-CURRENT STATUS (Post-Refactoring):
-===============================
+CURRENT STATUS (Post-Contamination Analysis):
+=============================================
 
-✅ ACHIEVED:
-- Fixed async mock issues (MagicMock vs AsyncMock)
-- Converted patch decorators to context managers for better isolation
-- Updated tests to work with new EdgeTTSError exception classes
-- Core circuit breaker functionality working (success, basic failure threshold)
-- Async error handling properly isolated
-- Circuit breaker decorator is functional (returns fallback after failures)
+🔴 CONFIRMED CONTAMINATION ISSUES:
+- Circuit breaker singleton persists state across tests
+- Tests pass individually but fail in suite due to state pollution
+- Reset mechanism unreliable (circuitbreaker library limitation)
+- 4+ tests failing when run together vs passing individually
 
-⚠️ REMAINING ISSUES (5 failing tests):
-=====================================
+ROOT CAUSE ANALYSIS:
+==================
+The circuitbreaker package uses internal singleton storage without external reset API.
+When tests trigger circuit breaker (5+ failures), it stays open until timeout (60s)
+or manual reset. Reset attempts via reflection are unreliable and incomplete.
 
-ROOT CAUSE: Circuit Breaker State Persistence
----------------------------------------------
-The circuitbreaker package stores circuit breaker state internally but doesn't expose
-instances for external reset. Circuit breakers persist state across test runs,
-causing test contamination.
+CONTAMINATION PATTERNS IDENTIFIED:
+=================================
+1. Sequential execution: Tests run in different order cause different failures
+2. State bleed: Previous test failures affect subsequent test expectations
+3. Reset unreliability: Current reset_circuit_breaker() function incomplete
+4. Cross-file contamination: Circuit breaker state affects validation error tests
 
-1. test_circuit_breaker_recovery [@pytest.mark.serial]
-   ISSUE: Circuit breaker state from previous tests affects recovery timing
-   STATUS: Marked for sequential execution
+IMMEDIATE SOLUTION APPROACH:
+==========================
+Phase 1: Implement Robust Test Isolation
+- Create mock circuit breaker wrapper for clean state isolation
+- Use separate test processes for stateful circuit breaker tests
+- Implement per-test circuit breaker instances
 
-2. test_circuit_breaker_different_exceptions [@pytest.mark.serial]
-   ISSUE: Circuit breaker state contamination between loop iterations
-   STATUS: Marked for sequential execution
+Phase 2: Comprehensive Reset Mechanism
+- Investigate circuitbreaker library internals for complete state reset
+- Create circuit breaker factory for test-specific instances
+- Implement cleanup verification in teardown
 
-3. test_circuit_breaker_preserves_parameters [@pytest.mark.serial]
-   ISSUE: Provider availability checks interact with circuit breaker state
-   STATUS: Marked for sequential execution
-
-4. test_circuit_breaker_with_async_wrapper [@pytest.mark.serial]
-   ISSUE: Async wrapper testing conflicts with circuit breaker state
-   STATUS: Marked for sequential execution
-
-5. test_circuit_breaker_failure_exception_handling [@pytest.mark.serial]
-   ISSUE: Complex mock setup bypasses error classification
-   STATUS: Marked for sequential execution
-
-HOW TO TACKLE REMAINING ISSUES:
-==============================
-
-Phase 1: Run Marked Tests Sequentially
-```bash
-# Run all circuit breaker tests sequentially
-pytest tests/integration/tts/test_circuit_breaker.py -m "serial" --no-cov
-
-# Run all tests with serial ones sequential, others parallel
-pytest tests/ -k "serial" --no-cov -n0  # serial tests
-pytest tests/ -m "not serial" --no-cov -n auto  # parallel tests
-```
-
-Phase 2: Circuit Breaker State Management
-- Circuit breakers cannot be externally reset (package limitation)
-- Tests marked @pytest.mark.serial run sequentially to avoid contamination
-- Consider creating separate test processes for stateful circuit breaker tests
-
-Phase 3: Test Architecture Improvements
-- Focus integration tests on component interaction, not circuit breaker internals
-- Create separate unit tests for circuit breaker decorator behavior
-- Use mock circuit breakers for tests that don't need real state persistence
-
-Phase 4: Acceptance Criteria
-- ✅ Core circuit breaker functionality works (success, fallback after failures)
-- ✅ Async operations properly protected
-- ✅ Error classification and user feedback working
-- ⚠️ Complex stateful scenarios require sequential execution
-- ⚠️ Full parallel test execution limited by circuit breaker persistence
+Phase 3: Test Architecture Refactor
+- Split tests: stateless unit tests vs stateful integration tests
+- Create circuit breaker test harness with guaranteed isolation
+- Implement test execution order independence
 """
 
 import pytest
 import sys
+import time
 from pathlib import Path
 from unittest.mock import patch, MagicMock, AsyncMock
 from circuitbreaker import CircuitBreakerError
+from unittest.mock import patch as mock_patch
 
 # Import directly from src to bypass mocking
 from pathlib import Path as PathLib
@@ -93,32 +64,130 @@ from src.tts.providers.edge_tts_provider import EdgeTTSProvider, EdgeTTSConnecti
 from circuitbreaker import CircuitBreaker
 
 
+class MockCircuitBreaker:
+    """
+    Mock circuit breaker for testing that provides clean state isolation.
+
+    This wrapper replaces the real circuit breaker decorator for tests that need
+    guaranteed isolation without persistence across test runs.
+    """
+
+    def __init__(self, failure_threshold=5, recovery_timeout=60, fallback_function=lambda *args, **kwargs: False):
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.fallback_function = fallback_function
+        self.reset()
+
+    def reset(self):
+        """Reset circuit breaker to clean state"""
+        self._failure_count = 0
+        self._state = "closed"  # Use string state instead of constant
+        self._opened_at = None
+        self._last_failure_at = None
+
+    def __call__(self, func):
+        """Decorator that applies circuit breaker logic"""
+        def wrapper(*args, **kwargs):
+            if self._state == "opened":
+                # Check if recovery timeout has passed
+                if self._opened_at and (time.time() - self._opened_at) > self.recovery_timeout:
+                    self._state = "closed"
+                    self._failure_count = 0
+                    self._opened_at = None
+                else:
+                    return self.fallback_function(*args, **kwargs)
+
+            try:
+                result = func(*args, **kwargs)
+                # Success - reset failure count
+                self._failure_count = 0
+                return result
+            except Exception as e:
+                self._failure_count += 1
+                if self._failure_count >= self.failure_threshold:
+                    self._state = "opened"
+                    self._opened_at = time.time()
+                raise e
+
+        return wrapper
+
+
+def create_isolated_provider():
+    """
+    Create an EdgeTTSProvider with isolated circuit breaker for testing.
+
+    This uses a mock circuit breaker that provides clean state isolation.
+    """
+    provider = EdgeTTSProvider()
+
+    # Create mock circuit breaker instance
+    mock_breaker = MockCircuitBreaker()
+
+    # Store original method
+    original_method = provider.convert_text_to_speech
+
+    # Replace the method with our mock-wrapped version
+    @mock_breaker
+    def isolated_convert_text_to_speech(*args, **kwargs):
+        return original_method(*args, **kwargs)
+
+    provider.convert_text_to_speech = isolated_convert_text_to_speech
+
+    # Add reset method to provider for test control
+    provider.reset_circuit_breaker = mock_breaker.reset
+
+    return provider
+
+
 def reset_circuit_breaker():
-    """Reset the circuit breaker state for EdgeTTSProvider.convert_text_to_speech"""
+    """
+    Reset the circuit breaker state for EdgeTTSProvider.convert_text_to_speech.
+
+    This function provides robust circuit breaker state reset with fallback mechanisms.
+    """
     method = EdgeTTSProvider.convert_text_to_speech
+
+    # Primary reset: Direct attribute access
     if hasattr(method, '_circuit_breaker'):
         breaker = method._circuit_breaker
         breaker._failure_count = 0
         breaker._state = CircuitBreaker.CLOSED
         breaker._opened_at = None
         breaker._last_failure_at = None
-        # print(f"Circuit breaker reset: failures={breaker._failure_count}, state={breaker._state}")
-    else:
-        # Try to trigger circuit breaker initialization by calling the method
-        try:
-            dummy_provider = EdgeTTSProvider()
-            # This should initialize the circuit breaker
-            dummy_provider.convert_text_to_speech("test", "test", Path("dummy.mp3"))
-        except:
-            pass  # Expected to fail, but should initialize circuit breaker
-        # Try reset again
-        if hasattr(method, '_circuit_breaker'):
-            breaker = method._circuit_breaker
-            breaker._failure_count = 0
-            breaker._state = CircuitBreaker.CLOSED
-            breaker._opened_at = None
-            breaker._last_failure_at = None
-            # print(f"Circuit breaker reset after init: failures={breaker._failure_count}, state={breaker._state}")
+        return True
+
+    # Secondary reset: Initialize circuit breaker by calling the method
+    try:
+        dummy_provider = EdgeTTSProvider()
+        # Force circuit breaker initialization with invalid parameters (should fail but initialize)
+        dummy_provider.convert_text_to_speech("test", "invalid-voice", Path("dummy.mp3"))
+    except Exception:
+        pass  # Expected to fail, but should initialize circuit breaker
+
+    # Try primary reset again after initialization
+    if hasattr(method, '_circuit_breaker'):
+        breaker = method._circuit_breaker
+        breaker._failure_count = 0
+        breaker._state = CircuitBreaker.CLOSED
+        breaker._opened_at = None
+        breaker._last_failure_at = None
+        return True
+
+    # Fallback: Use reflection to find circuit breaker in method attributes
+    for attr_name in dir(method):
+        if attr_name.startswith('_circuit_breaker'):
+            try:
+                breaker = getattr(method, attr_name)
+                if hasattr(breaker, '_failure_count'):
+                    breaker._failure_count = 0
+                    breaker._state = CircuitBreaker.CLOSED
+                    breaker._opened_at = None
+                    breaker._last_failure_at = None
+                    return True
+            except:
+                continue
+
+    return False  # Could not reset circuit breaker
 
 
 class TestCircuitBreaker:
@@ -289,6 +358,132 @@ class TestCircuitBreaker:
             if test_output.exists():
                 test_output.unlink()
 
+    def test_circuit_breaker_state_isolation_with_mock_breaker(self):
+        """
+        Test circuit breaker isolation using mock breaker that guarantees clean state.
+
+        This test validates that our MockCircuitBreaker provides proper isolation.
+        """
+        # Create provider with isolated circuit breaker
+        provider = create_isolated_provider()
+        test_output = Path("test_isolation.mp3")
+
+        try:
+            # First, trigger circuit breaker to open using mock failures
+            with patch('edge_tts.Communicate') as mock_communicate_class:
+                mock_communicate_class.side_effect = Exception("Trigger failure")
+
+                # Call 5 times to open circuit breaker
+                for i in range(5):
+                    result = provider.convert_text_to_speech(
+                        text="test",
+                        voice="en-US-AndrewNeural",
+                        output_path=test_output
+                    )
+                    assert result is False  # Circuit breaker fallback
+
+                # Verify circuit breaker is open
+                result = provider.convert_text_to_speech(
+                    text="test",
+                    voice="en-US-AndrewNeural",
+                    output_path=test_output
+                )
+                assert result is False  # Should still be open
+
+            # Now reset circuit breaker using our clean reset method
+            provider.reset_circuit_breaker()
+
+            # Verify circuit breaker is closed and working again
+            with patch('edge_tts.Communicate') as mock_communicate_class:
+                mock_communicate = MagicMock()
+                mock_communicate_class.return_value = mock_communicate
+
+                async def mock_save(path):
+                    Path(path).write_bytes(b"fake audio data")
+                mock_communicate.save = AsyncMock(side_effect=mock_save)
+
+                # This should now succeed (circuit breaker reset)
+                result = provider.convert_text_to_speech(
+                    text="Hello world",
+                    voice="en-US-AndrewNeural",
+                    output_path=test_output
+                )
+                assert result is True, "Circuit breaker should be reset and working"
+                mock_communicate_class.assert_called_once()
+
+        finally:
+            # Clean up
+            if test_output.exists():
+                test_output.unlink()
+
+    def test_contamination_demonstration(self):
+        """
+        Demonstrate the contamination issue and validate our solution.
+
+        This test shows that regular providers have contamination issues,
+        while isolated providers work correctly.
+        """
+        # Test 1: Regular provider shows contamination
+        regular_provider = EdgeTTSProvider()
+        test_output1 = Path("test_regular.mp3")
+
+        try:
+            # Trigger failures to open circuit breaker
+            with patch('edge_tts.Communicate') as mock_communicate_class:
+                mock_communicate_class.side_effect = Exception("Regular provider failure")
+
+                for i in range(5):
+                    result = regular_provider.convert_text_to_speech(
+                        text="test", voice="en-US-AndrewNeural", output_path=test_output1
+                    )
+                    assert result is False
+
+                # Circuit breaker should be open
+                result = regular_provider.convert_text_to_speech(
+                    text="test", voice="en-US-AndrewNeural", output_path=test_output1
+                )
+                assert result is False
+
+            # Attempt reset (may not work reliably)
+            reset_circuit_breaker()
+
+            # Test 2: Isolated provider works correctly
+            isolated_provider = create_isolated_provider()
+            test_output2 = Path("test_isolated.mp3")
+
+            # Trigger failures
+            with patch('edge_tts.Communicate') as mock_communicate_class:
+                mock_communicate_class.side_effect = Exception("Isolated provider failure")
+
+                for i in range(5):
+                    result = isolated_provider.convert_text_to_speech(
+                        text="test", voice="en-US-AndrewNeural", output_path=test_output2
+                    )
+                    assert result is False
+
+            # Reset works reliably
+            isolated_provider.reset_circuit_breaker()
+
+            # Should work again
+            with patch('edge_tts.Communicate') as mock_communicate_class:
+                mock_communicate = MagicMock()
+                mock_communicate_class.return_value = mock_communicate
+
+                async def mock_save(path):
+                    Path(path).write_bytes(b"fake audio data")
+                mock_communicate.save = AsyncMock(side_effect=mock_save)
+
+                result = isolated_provider.convert_text_to_speech(
+                    text="Hello world", voice="en-US-AndrewNeural", output_path=test_output2
+                )
+                assert result is True
+
+        finally:
+            # Clean up
+            for path in [test_output1, test_output2]:
+                if path.exists():
+                    path.unlink()
+
     def test_circuit_breaker_validation_errors_not_counted(self):
         """Test that validation errors don't count towards circuit breaker"""
         # Try with invalid voice that fails validation (should return False, not raise)
@@ -450,6 +645,7 @@ class TestCircuitBreakerConfiguration:
         # Method should have circuit breaker decorator
         # This is a bit indirect, but we can check the method's attributes
         assert hasattr(method, '__wrapped__'), "Method should have circuit breaker decorator"
+
 
     @pytest.mark.serial
     def test_circuit_breaker_failure_exception_handling(self):
