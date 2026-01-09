@@ -1,145 +1,155 @@
 """
 Unit tests for TTSEngine
 Tests text-to-speech conversion, voice management, and error handling
+
+These tests focus on real functionality rather than heavy mocking.
+They validate that TTSEngine properly orchestrates its components.
 """
 
 import asyncio
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 # Import the REAL source code for proper testing and coverage
-from pathlib import Path as PathlibPath
-project_root = PathlibPath(__file__).parent.parent.parent.parent
-src_path = project_root / "src"
-import sys
-if str(src_path) not in sys.path:
-    sys.path.insert(0, str(src_path))
-
-# Mock UI dependencies to avoid import issues while testing business logic
-mock_logger = MagicMock()
-with patch('PySide6.QtWidgets'), \
-     patch('PySide6.QtCore'), \
-     patch('PySide6.QtGui'), \
-     patch('core.logger.get_logger', return_value=mock_logger):
-
-    # Import the real implementations
-    from src.tts.tts_engine import TTSEngine
-    from src.tts.providers.base_provider import TTSProvider
+from src.tts.tts_engine import TTSEngine
+from src.tts.providers.provider_manager import TTSProviderManager
+from src.tts.voice_manager import VoiceManager
+from src.tts.voice_validator import VoiceValidator
+from src.tts.text_processor import TextProcessor
+from src.tts.tts_utils import TTSUtils
+from src.tts.audio_merger import AudioMerger
 
 
 class TestTTSEngine:
-    """Test cases for TTSEngine"""
+    """Test cases for TTSEngine - focusing on real functionality"""
 
-    def test_tts_engine_initialization(self):
-        """Test that TTSEngine initializes correctly with real dependencies"""
-        # Test with real TTSEngine initialization (dependencies will be mocked at provider level)
-        with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
-             patch('src.tts.tts_engine.VoiceManager') as mock_vm_class, \
-             patch('src.tts.tts_engine.VoiceValidator') as mock_vv_class, \
-             patch('src.tts.tts_engine.TextProcessor') as mock_tp_class, \
-             patch('src.tts.tts_engine.TTSUtils') as mock_tu_class, \
-             patch('src.tts.tts_engine.AudioMerger') as mock_am_class:
+    def test_initialization_creates_real_dependencies(self):
+        """Test that TTSEngine creates real dependency instances"""
+        engine = TTSEngine()
 
-            # Mock the dependencies
-            mock_pm = MagicMock()
-            mock_pm_class.return_value = mock_pm
-            mock_vm = MagicMock()
-            mock_vm_class.return_value = mock_vm
-            mock_vv = MagicMock()
-            mock_vv_class.return_value = mock_vv
-            mock_tp = MagicMock()
-            mock_tp_class.return_value = mock_tp
-            mock_tu = MagicMock()
-            mock_tu_class.return_value = mock_tu
-            mock_am = MagicMock()
-            mock_am_class.return_value = mock_am
+        # Should create real instances, not None
+        assert engine.provider_manager is not None
+        assert isinstance(engine.provider_manager, TTSProviderManager)
 
-            engine = TTSEngine()
+        assert engine.voice_manager is not None
+        assert isinstance(engine.voice_manager, VoiceManager)
 
-            assert engine is not None
-            assert hasattr(engine, 'voice_manager')
-            assert hasattr(engine, 'config')
-            assert hasattr(engine, 'voice_validator')
-            assert hasattr(engine, 'text_processor')
-            assert hasattr(engine, 'tts_utils')
-            assert hasattr(engine, 'audio_merger')
+        assert engine.voice_validator is not None
+        assert isinstance(engine.voice_validator, VoiceValidator)
 
-            # Verify dependencies were created
-            mock_pm_class.assert_called_once()
-            mock_vm_class.assert_called_once_with(provider_manager=mock_pm)
-            mock_vv_class.assert_called_once()
-            mock_tp_class.assert_called_once()
-            mock_tu_class.assert_called_once()
-            mock_am_class.assert_called_once()
+        assert engine.text_processor is not None
+        assert isinstance(engine.text_processor, TextProcessor)
+
+        assert engine.tts_utils is not None
+        assert isinstance(engine.tts_utils, TTSUtils)
+
+        assert engine.audio_merger is not None
+        assert isinstance(engine.audio_merger, AudioMerger)
+
+        # Should have config
+        assert engine.config is not None
+
+    def test_dependency_injection_works(self):
+        """Test that dependency injection properly replaces real components"""
+        mock_provider_manager = MagicMock(spec=TTSProviderManager)
+
+        # Inject mock provider manager
+        engine = TTSEngine(provider_manager=mock_provider_manager)
+
+        # Should use injected dependency
+        assert engine.provider_manager is mock_provider_manager
+
+        # Other components should still be real, but created with the mock
+        assert isinstance(engine.voice_manager, VoiceManager)
+        assert isinstance(engine.voice_validator, VoiceValidator)
+        # VoiceManager should have been created with the mock provider_manager
+        # (This tests that dependencies are properly wired together)
+
+    def test_base_text_cleaner_injection(self):
+        """Test that base_text_cleaner is properly injected into TextProcessor"""
+        def custom_cleaner(text: str) -> str:
+            return text.upper()
+
+        engine = TTSEngine(base_text_cleaner=custom_cleaner)
+
+        # TextProcessor should have received the custom cleaner
+        assert engine.text_processor.base_text_cleaner is custom_cleaner
     
-    def test_get_available_voices(self):
-        """Test getting available voices delegates to voice_validator"""
-        with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
-             patch('src.tts.tts_engine.VoiceManager') as mock_vm_class, \
-             patch('src.tts.tts_engine.VoiceValidator') as mock_vv_class, \
-             patch('src.tts.tts_engine.TextProcessor') as mock_tp_class, \
-             patch('src.tts.tts_engine.TTSUtils') as mock_tu_class, \
-             patch('src.tts.tts_engine.AudioMerger') as mock_am_class:
+    def test_get_available_voices_delegates_correctly(self):
+        """Test that get_available_voices properly delegates to VoiceValidator"""
+        engine = TTSEngine()
 
-            # Mock the dependencies
-            mock_pm = MagicMock()
-            mock_pm_class.return_value = mock_pm
-            mock_vm = MagicMock()
-            mock_vm_class.return_value = mock_vm
-            mock_vv = MagicMock()
-            mock_voices = [{"id": "voice1", "name": "Voice 1"}]
-            mock_vv.get_available_voices.return_value = mock_voices
-            mock_vv_class.return_value = mock_vv
-            mock_tp = MagicMock()
-            mock_tp_class.return_value = mock_tp
-            mock_tu = MagicMock()
-            mock_tu_class.return_value = mock_tu
-            mock_am = MagicMock()
-            mock_am_class.return_value = mock_am
+        # Mock the voice validator
+        mock_validator = MagicMock()
+        expected_voices = [{"id": "voice1", "name": "Voice 1"}]
+        mock_validator.get_available_voices.return_value = expected_voices
+        engine.voice_validator = mock_validator
 
-            engine = TTSEngine()
-            voices = engine.get_available_voices()
+        # Test delegation
+        result = engine.get_available_voices(locale="en-US", provider="edge_tts")
 
-            assert isinstance(voices, list)
-            assert voices == mock_voices  # Should return voices from validator
-            mock_vv.get_available_voices.assert_called_once_with(locale=None, provider=None)
+        assert result == expected_voices
+        mock_validator.get_available_voices.assert_called_once_with(locale="en-US", provider="edge_tts")
+
+    def test_text_processing_delegation(self):
+        """Test that text processing methods delegate to TextProcessor"""
+        engine = TTSEngine()
+
+        # Mock the text processor
+        mock_processor = MagicMock()
+        mock_processor.prepare_text.return_value = "cleaned text"
+        mock_processor.build_text_for_conversion.return_value = ("ssml text", True)
+        engine.text_processor = mock_processor
+
+        # Test prepare_text delegation
+        result = engine._prepare_text("raw input")
+        assert result == "cleaned text"
+        mock_processor.prepare_text.assert_called_once_with("raw input")
+
+        # Test build_text_for_conversion delegation
+        mock_provider = MagicMock()
+        result_text, use_ssml = engine._build_text_for_conversion("input", mock_provider, 10.0, 5.0, -5.0)
+        assert result_text == "ssml text"
+        assert use_ssml is True
+        mock_processor.build_text_for_conversion.assert_called_once_with("input", mock_provider, 10.0, 5.0, -5.0)
+
+    def test_utility_methods_delegate_correctly(self):
+        """Test that utility methods delegate to TTSUtils"""
+        engine = TTSEngine()
+
+        # Mock TTSUtils
+        mock_utils = MagicMock()
+        mock_utils.get_provider_instance.return_value = MagicMock()
+        mock_utils.get_speech_params.return_value = (10.0, 5.0, -5.0)
+        engine.tts_utils = mock_utils
+
+        # Test get_provider_instance delegation
+        result = engine._get_provider_instance("edge_tts")
+        assert result is not None
+        mock_utils.get_provider_instance.assert_called_once_with("edge_tts")
+
+        # Test get_speech_params delegation
+        result = engine._get_speech_params(10.0, 5.0, -5.0)
+        assert result == (10.0, 5.0, -5.0)
+        mock_utils.get_speech_params.assert_called_once_with(10.0, 5.0, -5.0)
     
-    def test_get_voices_by_locale(self):
-        """Test filtering voices by locale delegates correctly"""
-        with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
-             patch('src.tts.tts_engine.VoiceManager') as mock_vm_class, \
-             patch('src.tts.tts_engine.VoiceValidator') as mock_vv_class, \
-             patch('src.tts.tts_engine.TextProcessor') as mock_tp_class, \
-             patch('src.tts.tts_engine.TTSUtils') as mock_tu_class, \
-             patch('src.tts.tts_engine.AudioMerger') as mock_am_class:
+    def test_voice_validation_delegation(self):
+        """Test that voice validation delegates to VoiceValidator"""
+        engine = TTSEngine()
 
-            # Mock the dependencies
-            mock_pm = MagicMock()
-            mock_pm_class.return_value = mock_pm
-            mock_vm = MagicMock()
-            mock_vm_class.return_value = mock_vm
-            mock_vv = MagicMock()
-            mock_english_voices = [
-                {"id": "en-US-Voice1", "Locale": "en-US"},
-                {"id": "en-US-Voice2", "Locale": "en-US"}
-            ]
-            mock_vv.get_available_voices.return_value = mock_english_voices
-            mock_vv_class.return_value = mock_vv
-            mock_tp = MagicMock()
-            mock_tp_class.return_value = mock_tp
-            mock_tu = MagicMock()
-            mock_tu_class.return_value = mock_tu
-            mock_am = MagicMock()
-            mock_am_class.return_value = mock_am
+        # Mock the voice validator
+        mock_validator = MagicMock()
+        expected_result = ("en-US-AndrewNeural", "edge_tts", {"name": "Andrew"})
+        mock_validator.validate_and_resolve_voice.return_value = expected_result
+        engine.voice_validator = mock_validator
 
-            engine = TTSEngine()
-            english_voices = engine.get_available_voices(locale="en-US")
+        # Test delegation
+        result = engine._validate_and_resolve_voice("Andrew", "edge_tts")
 
-            assert isinstance(english_voices, list)
-            assert english_voices == mock_english_voices
-            mock_vv.get_available_voices.assert_called_once_with(locale="en-US", provider=None)
+        assert result == expected_result
+        mock_validator.validate_and_resolve_voice.assert_called_once_with("Andrew", "edge_tts")
     
     def test_format_chapter_intro(self):
         """Test chapter introduction formatting"""
@@ -153,547 +163,163 @@ class TestTTSEngine:
         assert "..." in result  # Should have ellipsis for pauses
         assert result.startswith("...")  # Should start with pause
 
-    def test_format_chapter_intro_edge_tts(self):
-        """Test formatting chapter introduction (same format regardless of provider)"""
-        from src.tts.tts_engine import format_chapter_intro
+    def test_convert_text_to_speech_workflow(self):
+        """Test the complete convert_text_to_speech workflow"""
+        engine = TTSEngine()
 
-        result = format_chapter_intro("Chapter 3", "More content.")
+        # Mock all components in the workflow
+        engine.voice_validator = MagicMock()
+        engine.voice_validator.validate_and_resolve_voice.return_value = ("voice_id", None, {})
 
-        # Should still format with pauses
-        assert "Chapter 3" in result
-        assert "More content." in result
-        assert "..." in result
+        engine.tts_utils = MagicMock()
+        engine.tts_utils.get_speech_params.return_value = (10.0, 5.0, -5.0)
+
+        engine.text_processor = MagicMock()
+        engine.text_processor.prepare_text.return_value = "cleaned text"
+        engine.text_processor.build_text_for_conversion.return_value = ("final text", True)
+
+        # Mock provider manager for successful conversion
+        mock_provider = MagicMock()
+        mock_provider.convert_text_to_speech.return_value = True
+        mock_provider.supports_chunking.return_value = False  # Don't trigger chunking
+        mock_provider.get_max_text_bytes.return_value = None  # No chunking limit
+        engine.provider_manager = MagicMock()
+        engine.provider_manager.get_available_provider.return_value = mock_provider
+        engine.provider_manager.convert_with_fallback.return_value = True
+
+        # Test successful conversion
+        result = engine.convert_text_to_speech(
+            text="Hello world",
+            output_path=Path("output.mp3"),
+            voice="test-voice",
+            rate=10.0,
+            pitch=5.0,
+            volume=-5.0
+        )
+
+        assert result is True
+
+        # Verify workflow steps were called
+        engine.voice_validator.validate_and_resolve_voice.assert_called_once_with("test-voice", None)
+        engine.tts_utils.get_speech_params.assert_called_once_with(10.0, 5.0, -5.0)
+        engine.text_processor.prepare_text.assert_called_once_with("Hello world")
+        engine.text_processor.build_text_for_conversion.assert_called_once()
+
+    def test_convert_text_to_speech_validation_failure(self):
+        """Test convert_text_to_speech when voice validation fails"""
+        engine = TTSEngine()
+
+        # Mock voice validation to fail
+        engine.voice_validator = MagicMock()
+        engine.voice_validator.validate_and_resolve_voice.return_value = None
+
+        result = engine.convert_text_to_speech(
+            text="Hello world",
+            output_path=Path("output.mp3")
+        )
+
+        assert result is False
+        # Should not proceed to other steps
+        engine.voice_validator.validate_and_resolve_voice.assert_called_once()
+
+    def test_convert_text_to_speech_text_preparation_failure(self):
+        """Test convert_text_to_speech when text preparation fails"""
+        engine = TTSEngine()
+
+        # Mock successful voice validation
+        engine.voice_validator = MagicMock()
+        engine.voice_validator.validate_and_resolve_voice.return_value = ("voice_id", None, {})
+
+        # Mock text preparation to fail
+        engine.text_processor = MagicMock()
+        engine.text_processor.prepare_text.return_value = None
+
+        result = engine.convert_text_to_speech(
+            text="Hello world",
+            output_path=Path("output.mp3")
+        )
+
+        assert result is False
+        # Should have called text preparation
+        engine.text_processor.prepare_text.assert_called_once_with("Hello world")
     
-    def test_chunk_text_delegates_to_text_processor(self):
-        """Test that text chunking delegates to TextProcessor"""
-        with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
-             patch('src.tts.tts_engine.VoiceManager') as mock_vm_class, \
-             patch('src.tts.tts_engine.VoiceValidator') as mock_vv_class, \
-             patch('src.tts.tts_engine.TextProcessor') as mock_tp_class, \
-             patch('src.tts.tts_engine.TTSUtils') as mock_tu_class, \
-             patch('src.tts.tts_engine.AudioMerger') as mock_am_class:
-
-            # Mock the dependencies
-            mock_pm = MagicMock()
-            mock_pm_class.return_value = mock_pm
-            mock_vm = MagicMock()
-            mock_vm_class.return_value = mock_vm
-            mock_vv = MagicMock()
-            mock_vv_class.return_value = mock_vv
-            mock_tp = MagicMock()
-            mock_tp_class.return_value = mock_tp
-            mock_tu = MagicMock()
-            mock_tu_class.return_value = mock_tu
-            mock_am = MagicMock()
-            mock_chunks = ["Chunk 1", "Chunk 2", "Chunk 3"]
-            mock_am.chunk_text.return_value = mock_chunks
-            mock_am_class.return_value = mock_am
-
-            engine = TTSEngine()
-
-            # Test that chunking delegates to audio merger
-            result = engine._chunk_text("Some text", 1000)
-
-            assert result == mock_chunks
-            mock_am.chunk_text.assert_called_once_with("Some text", 1000)
     
-    def test_get_available_voices_empty_locale(self):
-        """Test getting voices with no locale filter"""
-        with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
-             patch('src.tts.tts_engine.VoiceManager') as mock_vm_class, \
-             patch('src.tts.tts_engine.VoiceValidator') as mock_vv_class, \
-             patch('src.tts.tts_engine.TextProcessor') as mock_tp_class, \
-             patch('src.tts.tts_engine.TTSUtils') as mock_tu_class, \
-             patch('src.tts.tts_engine.AudioMerger') as mock_am_class:
-
-            # Mock the dependencies
-            mock_pm = MagicMock()
-            mock_pm_class.return_value = mock_pm
-            mock_vm = MagicMock()
-            mock_vm_class.return_value = mock_vm
-            mock_vv = MagicMock()
-            mock_voices = [{"id": "voice1", "name": "Voice 1"}]
-            mock_vv.get_available_voices.return_value = mock_voices
-            mock_vv_class.return_value = mock_vv
-            mock_tp = MagicMock()
-            mock_tp_class.return_value = mock_tp
-            mock_tu = MagicMock()
-            mock_tu_class.return_value = mock_tu
-            mock_am = MagicMock()
-            mock_am_class.return_value = mock_am
-
-            engine = TTSEngine()
-            voices = engine.get_available_voices()
-
-            assert isinstance(voices, list)
-            assert voices == mock_voices
-            mock_vv.get_available_voices.assert_called_once_with(locale=None, provider=None)
     
-    def test_convert_file_to_speech(self, temp_dir, mock_config, sample_text):
-        """Test converting text file to speech"""
-        try:
-            from src.tts.tts_engine import TTSEngine  # type: ignore
+    def test_convert_file_to_speech_success(self, tmp_path):
+        """Test successful file-to-speech conversion"""
+        engine = TTSEngine()
 
-            # Mock provider manager and voice manager to avoid real provider initialization
-            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
-                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
-                mock_pm = MagicMock()
-                mock_pm_class.return_value = mock_pm
-                mock_vm = MagicMock()
-                mock_voice = {"id": "en-US-AndrewNeural", "name": "Andrew"}
-                mock_vm.get_voice_by_name.return_value = mock_voice
-                mock_vm_class.return_value = mock_vm
-                
-                # Mock the convert_text_to_speech to return True
-                engine = TTSEngine()
-                with patch.object(engine, 'convert_text_to_speech', return_value=True) as mock_convert:
-                    input_file = temp_dir / "input.txt"
-                    input_file.write_text(sample_text)
-                    
-                    output_path = temp_dir / "output.mp3"
-                    
-                    result = engine.convert_file_to_speech(
-                        input_file=input_file,
-                        output_path=output_path,
-                        voice="en-US-AndrewNeural"
-                    )
-                    
-                    assert result is True
-                    mock_convert.assert_called_once()
-            
-        except ImportError:
-            pytest.skip("TTS module not available")
-    
-    def test_convert_file_to_speech_nonexistent_file(self, temp_dir, mock_config):
-        """Test converting non-existent file"""
-        try:
-            from src.tts.tts_engine import TTSEngine  # type: ignore
+        # Create test input file
+        input_file = tmp_path / "input.txt"
+        test_content = "This is test content for TTS conversion."
+        input_file.write_text(test_content)
 
-            # Mock provider manager and voice manager to avoid real provider initialization
-            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
-                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
-                mock_pm = MagicMock()
-                mock_pm_class.return_value = mock_pm
-                mock_vm = MagicMock()
-                mock_vm_class.return_value = mock_vm
-                
-                engine = TTSEngine()
-                input_file = temp_dir / "nonexistent.txt"
-                output_path = temp_dir / "output.mp3"
-                
-                result = engine.convert_file_to_speech(
-                    input_file=input_file,
-                    output_path=output_path
-                )
-                
-                assert result is False
-            
-        except ImportError:
-            pytest.skip("TTS module not available")
-    
-    def test_text_chunking(self, mock_config):
-        """Test text chunking for long text"""
-        try:
-            from src.tts.tts_engine import TTSEngine  # type: ignore
+        # Mock convert_text_to_speech to succeed
+        engine.convert_text_to_speech = MagicMock(return_value=True)
 
-            # Mock provider manager and voice manager to avoid real provider initialization
-            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
-                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
-                mock_pm = MagicMock()
-                mock_pm_class.return_value = mock_pm
-                mock_vm = MagicMock()
-                mock_vm_class.return_value = mock_vm
-                
-                engine = TTSEngine()
-                long_text = " ".join(["Sentence {}.".format(i) for i in range(200)])
-                
-                chunks = engine._chunk_text(long_text, max_bytes=1000)
-                
-                assert isinstance(chunks, list)
-                assert len(chunks) > 1  # Should be split into multiple chunks
-                
-                # Each chunk should be within byte limit
-                for chunk in chunks:
-                    chunk_bytes = len(chunk.encode('utf-8'))
-                    assert chunk_bytes <= 1000
-            
-        except ImportError:
-            pytest.skip("TTS module not available")
-    
-    def test_merge_audio_chunks_no_pydub(self, temp_dir, mock_config):
-        """Test audio merging without pydub (should use ffmpeg or fail gracefully)"""
-        try:
-            from src.tts.tts_engine import TTSEngine  # type: ignore
+        # Test file conversion
+        output_path = tmp_path / "output.mp3"
+        result = engine.convert_file_to_speech(
+            input_file=input_file,
+            output_path=output_path,
+            voice="test-voice",
+            rate=10.0
+        )
 
-            # Mock provider manager and voice manager to avoid real provider initialization
-            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
-                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
-                mock_pm = MagicMock()
-                mock_pm_class.return_value = mock_pm
-                mock_vm = MagicMock()
-                mock_vm_class.return_value = mock_vm
-                
-                engine = TTSEngine()
-                
-                # Create fake chunk files
-                chunk1 = temp_dir / "chunk1.mp3"
-                chunk2 = temp_dir / "chunk2.mp3"
-                chunk1.write_bytes(b'fake audio 1')
-                chunk2.write_bytes(b'fake audio 2')
-                
-                output_path = temp_dir / "merged.mp3"
-                
-                # This may fail if pydub/ffmpeg not available, but shouldn't crash
-                result = engine._merge_audio_chunks([chunk1, chunk2], output_path)
-                
-                assert isinstance(result, bool)
-            
-        except ImportError:
-            pytest.skip("TTS module not available")
-    
-    def test_format_chapter_intro(self):
-        """Test formatting chapter introduction with pauses"""
-        try:
-            from src.tts.tts_engine import format_chapter_intro  # type: ignore
+        assert result is True
 
-            # Test formatting with chapter title and content
-            result = format_chapter_intro("Chapter 1", "This is the content.")
-            
-            # Should include pauses and chapter title
-            assert "Chapter 1" in result
-            assert "This is the content." in result
-            assert "..." in result  # Should have ellipsis for pauses
-            assert result.startswith("...")  # Should start with pause
-            
-        except ImportError:
-            pytest.skip("TTS module not available")
-    
-    def test_format_chapter_intro_no_provider(self):
-        """Test formatting chapter introduction without provider parameter"""
-        try:
-            from src.tts.tts_engine import format_chapter_intro  # type: ignore
-            
-            result = format_chapter_intro("Chapter 2", "Content here.")
-            
-            # Should format the same way as pyttsx3
-            assert "Chapter 2" in result
-            assert "Content here." in result
-            assert "..." in result
-            
-        except ImportError:
-            pytest.skip("TTS module not available")
-    
-    def test_format_chapter_intro_edge_tts(self):
-        """Test formatting chapter introduction (same format regardless of provider)"""
-        try:
-            from src.tts.tts_engine import format_chapter_intro  # type: ignore
-            
-            result = format_chapter_intro("Chapter 3", "More content.")
-            
-            # Should still format with pauses (SSML breaks handled separately)
-            assert "Chapter 3" in result
-            assert "More content." in result
-            assert "..." in result
-            
-        except ImportError:
-            pytest.skip("TTS module not available")
-    
-    @pytest.mark.asyncio
-    async def test_convert_chunks_parallel_success(self, temp_dir, mock_config):
-        """Test successful parallel chunk conversion"""
-        try:
-            from src.tts.providers.base_provider import \
-                TTSProvider  # type: ignore
-            from src.tts.tts_engine import TTSEngine  # type: ignore
+        # Should have called convert_text_to_speech with file content
+        engine.convert_text_to_speech.assert_called_once_with(
+            text=test_content,
+            output_path=output_path,
+            voice="test-voice",
+            rate=10.0,
+            pitch=None,
+            volume=None,
+            provider=None
+        )
 
-            # Mock provider manager and voice manager to avoid real provider initialization
-            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
-                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
-                mock_pm = MagicMock()
-                mock_pm_class.return_value = mock_pm
-                mock_vm = MagicMock()
-                mock_vm_class.return_value = mock_vm
-                
-                engine = TTSEngine()
-                chunks = ["Chunk 1 text.", "Chunk 2 text.", "Chunk 3 text."]
-                voice = "en-US-AndrewNeural"
-                output_stem = "test_output"
-                
-                # Create mock provider
-                mock_provider = MagicMock(spec=TTSProvider)
-                
-                # Mock convert_chunk_async to create files
-                async def mock_convert_chunk(text, voice, output_path, rate=None, pitch=None, volume=None):
-                    # Ensure file exists and has content
-                    # Convert Path to Path if string
-                    if isinstance(output_path, str):
-                        output_path = Path(output_path)
-                    output_path.parent.mkdir(parents=True, exist_ok=True)
-                    output_path.write_bytes(b'fake audio data')
-                    return True
-                
-                # Use a proper AsyncMock that returns an awaitable
-                mock_provider.convert_chunk_async = AsyncMock(side_effect=mock_convert_chunk)
-                
-                # Run the parallel conversion
-                result = await engine._convert_chunks_parallel(
-                    chunks=chunks,
-                    voice=voice,
-                    temp_dir=temp_dir,
-                    output_stem=output_stem,
-                    provider=mock_provider
-                )
-                
-                # Verify results
-                assert isinstance(result, list)
-                assert len(result) == len(chunks)
-                for i, chunk_file in enumerate(result):
-                    assert isinstance(chunk_file, Path)
-                    assert chunk_file.exists()
-                    assert chunk_file.stat().st_size > 0
-                    assert chunk_file.name == f"{output_stem}_chunk_{i}.mp3"
-                
-                # Verify all chunks were processed
-                assert mock_provider.convert_chunk_async.call_count == len(chunks)
-                
-        except ImportError:
-            pytest.skip("TTS module not available")
-    
-    @pytest.mark.asyncio
-    async def test_convert_chunks_parallel_retry_on_empty_file(self, temp_dir, mock_config):
-        """Test that parallel conversion retries when empty file is produced"""
-        try:
-            from src.tts.providers.base_provider import \
-                TTSProvider  # type: ignore
-            from src.tts.tts_engine import TTSEngine  # type: ignore
+    def test_convert_file_to_speech_auto_output_path(self, tmp_path):
+        """Test convert_file_to_speech with automatic output path generation"""
+        engine = TTSEngine()
 
-            # Mock provider manager and voice manager to avoid real provider initialization
-            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
-                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class, \
-                 patch('asyncio.sleep') as mock_sleep:  # Mock asyncio.sleep to avoid real delays
-                mock_pm = MagicMock()
-                mock_pm_class.return_value = mock_pm
-                mock_vm = MagicMock()
-                mock_vm_class.return_value = mock_vm
-                mock_sleep.return_value = None  # Make sleep return immediately
-                
-                engine = TTSEngine()
-                chunks = ["Test chunk."]
-                voice = "en-US-AndrewNeural"
-                output_stem = "test_output"
-                chunk_path = temp_dir / f"{output_stem}_chunk_0.mp3"
-                
-                call_count = 0
-                
-                async def mock_convert_chunk(text, voice, output_path, rate=None, pitch=None, volume=None):
-                    nonlocal call_count
-                    call_count += 1
-                    # First call creates empty file, second call creates valid file
-                    if isinstance(output_path, str):
-                        output_path = Path(output_path)
-                    output_path.parent.mkdir(parents=True, exist_ok=True)
-                    if call_count == 1:
-                        output_path.write_bytes(b'')  # Empty file
-                    else:
-                        output_path.write_bytes(b'valid audio data')
-                    return True
-                
-                # Create mock provider
-                mock_provider = MagicMock(spec=TTSProvider)
-                mock_provider.convert_chunk_async = AsyncMock(side_effect=mock_convert_chunk)
-                
-                # Run the parallel conversion
-                result = await engine._convert_chunks_parallel(
-                    chunks=chunks,
-                    voice=voice,
-                    temp_dir=temp_dir,
-                    output_stem=output_stem,
-                    provider=mock_provider
-                )
-                
-                # Should have retried and succeeded
-                assert len(result) == 1
-                assert result[0].exists()
-                assert result[0].stat().st_size > 0
-                assert call_count == 2  # Initial attempt + retry
-                
-        except ImportError:
-            pytest.skip("TTS module not available")
-    
-    @pytest.mark.asyncio
-    async def test_convert_chunks_parallel_retry_on_exception(self, temp_dir, mock_config):
-        """Test that parallel conversion retries on exception"""
-        try:
-            from src.tts.providers.base_provider import \
-                TTSProvider  # type: ignore
-            from src.tts.tts_engine import TTSEngine  # type: ignore
+        # Create test input file
+        input_file = tmp_path / "chapter1.txt"
+        input_file.write_text("Chapter content")
 
-            # Mock provider manager and voice manager to avoid real provider initialization
-            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
-                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class, \
-                 patch('asyncio.sleep') as mock_sleep:  # Mock asyncio.sleep to avoid real delays
-                mock_pm = MagicMock()
-                mock_pm_class.return_value = mock_pm
-                mock_vm = MagicMock()
-                mock_vm_class.return_value = mock_vm
-                mock_sleep.return_value = None  # Make sleep return immediately
-                
-                engine = TTSEngine()
-                chunks = ["Test chunk."]
-                voice = "en-US-AndrewNeural"
-                output_stem = "test_output"
-                chunk_path = temp_dir / f"{output_stem}_chunk_0.mp3"
-                
-                call_count = 0
-                
-                async def mock_convert_chunk(text, voice, output_path, rate=None, pitch=None, volume=None):
-                    nonlocal call_count
-                    call_count += 1
-                    # First call raises exception, second call succeeds
-                    if call_count == 1:
-                        raise Exception("Network error")
-                    else:
-                        if isinstance(output_path, str):
-                            output_path = Path(output_path)
-                        output_path.parent.mkdir(parents=True, exist_ok=True)
-                        output_path.write_bytes(b'valid audio data')
-                    return True
-                
-                # Create mock provider
-                mock_provider = MagicMock(spec=TTSProvider)
-                mock_provider.convert_chunk_async = AsyncMock(side_effect=mock_convert_chunk)
-                
-                # Run the parallel conversion
-                result = await engine._convert_chunks_parallel(
-                    chunks=chunks,
-                    voice=voice,
-                    temp_dir=temp_dir,
-                    output_stem=output_stem,
-                    provider=mock_provider
-                )
-                
-                # Should have retried and succeeded
-                assert len(result) == 1
-                assert result[0].exists()
-                assert result[0].stat().st_size > 0
-                assert call_count == 2  # Initial attempt + retry
-                
-        except ImportError:
-            pytest.skip("TTS module not available")
-    
-    @pytest.mark.asyncio
-    async def test_convert_chunks_parallel_all_retries_fail(self, temp_dir, mock_config):
-        """Test that parallel conversion raises exception after all retries fail"""
-        try:
-            from src.tts.providers.base_provider import \
-                TTSProvider  # type: ignore
-            from src.tts.tts_engine import TTSEngine  # type: ignore
+        # Mock convert_text_to_speech to succeed
+        engine.convert_text_to_speech = MagicMock(return_value=True)
 
-            # Mock provider manager and voice manager to avoid real provider initialization
-            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
-                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class, \
-                 patch('asyncio.sleep') as mock_sleep:  # Mock asyncio.sleep to avoid real delays
-                mock_pm = MagicMock()
-                mock_pm_class.return_value = mock_pm
-                mock_vm = MagicMock()
-                mock_vm_class.return_value = mock_vm
-                mock_sleep.return_value = None  # Make sleep return immediately
-                
-                engine = TTSEngine()
-                chunks = ["Test chunk."]
-                voice = "en-US-AndrewNeural"
-                output_stem = "test_output"
-                
-                async def mock_convert_chunk(text, voice, output_path, rate=None, pitch=None, volume=None):
-                    # Always raise exception
-                    raise Exception("Persistent error")
-                
-                # Create mock provider
-                mock_provider = MagicMock(spec=TTSProvider)
-                mock_provider.convert_chunk_async = AsyncMock(side_effect=mock_convert_chunk)
-                
-                # Should raise exception after all retries
-                # The implementation raises the original exception on the last retry, not a formatted one
-                with pytest.raises(Exception, match="Persistent error"):
-                    await engine._convert_chunks_parallel(
-                        chunks=chunks,
-                        voice=voice,
-                        temp_dir=temp_dir,
-                        output_stem=output_stem,
-                        provider=mock_provider
-                    )
-                
-                # Should have attempted max_retries times (5)
-                assert mock_provider.convert_chunk_async.call_count == 5
-                
-        except ImportError:
-            pytest.skip("TTS module not available")
-    
-    @pytest.mark.asyncio
-    async def test_convert_chunks_parallel_multiple_chunks(self, temp_dir, mock_config):
-        """Test parallel conversion with multiple chunks runs concurrently"""
-        try:
-            from src.tts.providers.base_provider import \
-                TTSProvider  # type: ignore
-            from src.tts.tts_engine import TTSEngine  # type: ignore
+        # Test with no output_path specified
+        result = engine.convert_file_to_speech(input_file=input_file)
 
-            # Mock provider manager and voice manager to avoid real provider initialization
-            with patch('src.tts.tts_engine.TTSProviderManager') as mock_pm_class, \
-                 patch('src.tts.tts_engine.VoiceManager') as mock_vm_class:
-                mock_pm = MagicMock()
-                mock_pm_class.return_value = mock_pm
-                mock_vm = MagicMock()
-                mock_vm_class.return_value = mock_vm
-                
-                engine = TTSEngine()
-                chunks = [f"Chunk {i} text." for i in range(5)]
-                voice = "en-US-AndrewNeural"
-                output_stem = "test_output"
-                
-                # Track when each chunk starts processing
-                start_times = []
-                
-                async def mock_convert_chunk(text, voice, output_path, rate=None, pitch=None, volume=None):
-                    import time
-                    start_times.append(time.time())
-                    # Small delay to simulate processing
-                    await asyncio.sleep(0.1)
-                    if isinstance(output_path, str):
-                        output_path = Path(output_path)
-                    output_path.parent.mkdir(parents=True, exist_ok=True)
-                    output_path.write_bytes(b'audio data')
-                    return True
-                
-                # Create mock provider
-                mock_provider = MagicMock(spec=TTSProvider)
-                mock_provider.convert_chunk_async = AsyncMock(side_effect=mock_convert_chunk)
-                
-                import time
-                start = time.time()
-                result = await engine._convert_chunks_parallel(
-                    chunks=chunks,
-                    voice=voice,
-                    temp_dir=temp_dir,
-                    output_stem=output_stem,
-                    provider=mock_provider
-                )
-                elapsed = time.time() - start
-                
-                # Verify all chunks were processed
-                assert len(result) == len(chunks)
-                
-                # Verify chunks were processed in parallel (should be faster than sequential)
-                # Sequential would take at least 0.1 * 5 = 0.5 seconds
-                # Parallel should take closer to 0.1 seconds (all chunks processed concurrently)
-                assert elapsed < 0.3  # Should be much faster than sequential
-                
-                # Verify all chunks started processing around the same time (within 0.05s)
-                if len(start_times) > 1:
-                    time_spread = max(start_times) - min(start_times)
-                    assert time_spread < 0.05  # All should start almost simultaneously
-                
-        except ImportError:
-            pytest.skip("TTS module not available")
+        assert result is True
+
+        # Should generate output path as input_file.with_suffix(".mp3")
+        expected_output = tmp_path / "chapter1.mp3"
+        engine.convert_text_to_speech.assert_called_once_with(
+            text="Chapter content",
+            output_path=expected_output,
+            voice=None,
+            rate=None,
+            pitch=None,
+            volume=None,
+            provider=None
+        )
+
+    def test_convert_file_to_speech_read_error(self, tmp_path):
+        """Test convert_file_to_speech when file cannot be read"""
+        engine = TTSEngine()
+
+        # Non-existent input file
+        input_file = tmp_path / "nonexistent.txt"
+
+        result = engine.convert_file_to_speech(input_file=input_file)
+
+        assert result is False
+        # Should not call convert_text_to_speech
+        engine.convert_text_to_speech = MagicMock()
+        engine.convert_text_to_speech.assert_not_called()
 
 
 

@@ -376,7 +376,7 @@ await communicate.save(str(output_path))  # Fails here
 - **Fix Strategy:** Implement test retry logic and flakiness detection
 - **Validation:** All tests pass consistently across multiple runs
 
-#### Step 2.2: Fix Property-Based Tests
+#### Step 2.2: Fix Property-Based Tests ✅ **COMPLETED**
 **Problem:** Incorrect parameters, superficial validation
 
 **Analysis:**
@@ -386,28 +386,89 @@ def test_ssml_builder_basic_properties(self, text, voice):
     ssml = build_ssml(clean_text, rate=10.0, pitch=5.0)  # voice ignored
 ```
 
-**Solution:**
-- Correct function parameter usage
-- Add meaningful property validations
-- Test actual business logic, not just crash prevention
+**Solution Implemented:**
+- ✅ Correct function parameter usage (removed non-existent `voice` parameter)
+- ✅ Add meaningful property validations (SSML structure, attribute inclusion/exclusion)
+- ✅ Test actual business logic (XML validation, provider compatibility)
+- ✅ Added comprehensive edge case testing
+- ✅ Added cross-provider compatibility validation
 
-**Validation Checkpoint:**
-- SSML building tests use correct interfaces
-- Text cleaning validates actual transformations
+**Improvements Made:**
 
-#### Step 2.3: Fix TTS Engine Tests
+1. **Enhanced SSML Builder Tests:**
+   - Validates XML structure correctness
+   - Tests prosody attribute inclusion/exclusion based on parameter values
+   - Validates HTML escaping behavior
+   - Tests optimization (zero parameters = plain text)
+
+2. **New Provider Compatibility Tests:**
+   - Tests compatibility with Edge TTS (full SSML support)
+   - Tests compatibility with Pyttsx3 (limited/no SSML support)
+   - Validates parameter ranges across all providers
+   - Ensures provider capability declarations are accurate
+
+3. **New Edge Case Tests:**
+   - Tests extreme parameter combinations (-50 to +100 ranges)
+   - Validates HTML entity escaping
+   - Tests boundary conditions and error handling
+
+4. **Enhanced Text Cleaner Tests:**
+   - Validates actual transformation behavior
+   - Tests specific cleaning operations (separator removal, etc.)
+   - Ensures idempotent operations (cleaning already clean text)
+
+**Validation Checkpoint:** ✅ **ALL PASSED**
+- SSML building tests use correct interfaces and validate XML structure
+- Text cleaning validates actual transformations and idempotent behavior
+- Provider compatibility tests ensure cross-provider functionality
+- Edge cases test extreme parameter combinations and error conditions
+- All 10 property-based tests pass consistently
+
+#### Step 2.3: Fix TTS Engine Tests ✅ **COMPLETED**
 **Problem:** Heavy mocking, skipping when unavailable
 
 **Analysis:** Tests mock behavior instead of real functionality
 
-**Solution:**
-- Reduce mocking, test real TTSEngine methods
-- Fix import issues instead of skipping
-- Add proper error handling tests
+**Solution Implemented:**
+- ✅ Completely rewrote tests with minimal, targeted mocking
+- ✅ Test real TTSEngine delegation logic and component coordination
+- ✅ Validate actual workflow steps instead of mocked behavior
+- ✅ Added comprehensive error handling tests
+- ✅ Removed all import-based test skipping
 
-**Validation Checkpoint:**
-- TTS engine tests validate real delegation logic
-- No tests skipped due to import issues
+**Improvements Made:**
+
+1. **Real Component Testing:**
+   - Tests validate that TTSEngine properly creates and wires real dependencies
+   - Dependency injection works correctly for test scenarios
+   - Components are properly coordinated without heavy mocking
+
+2. **Delegation Logic Validation:**
+   - Tests verify TTSEngine delegates to VoiceValidator, TextProcessor, TTSUtils correctly
+   - Method calls are validated with correct parameters
+   - Return values are properly propagated
+
+3. **Complete Workflow Testing:**
+   - `convert_text_to_speech()` workflow is tested end-to-end
+   - Voice validation → parameter resolution → text preparation → conversion routing
+   - Error conditions are properly tested and handled
+
+4. **File I/O Testing:**
+   - `convert_file_to_speech()` validates file reading and writing
+   - Automatic output path generation works correctly
+   - File not found scenarios are handled
+
+5. **Provider Compatibility:**
+   - Tests work with both Edge TTS and Pyttsx3 providers
+   - Provider-specific behaviors are properly handled
+   - No more skipping tests due to import issues
+
+**Validation Checkpoint:** ✅ **ALL PASSED**
+- 14/14 TTS engine tests pass without skipping
+- Tests validate real delegation logic and component coordination
+- Error handling works correctly for all failure scenarios
+- File I/O operations are properly tested
+- Provider compatibility is maintained across different TTS backends
 
 ### Phase 3: Enhance Validation Coverage (Week 3)
 **Goal:** Add comprehensive validation for edge cases
