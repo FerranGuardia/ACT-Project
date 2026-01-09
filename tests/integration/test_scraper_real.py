@@ -3,9 +3,10 @@ Refined integration test for scraper module
 Tests real network calls and chapter fetching
 """
 
-import pytest
-from pathlib import Path
 import time
+from pathlib import Path
+
+import pytest
 
 
 @pytest.mark.integration

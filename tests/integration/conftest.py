@@ -373,8 +373,9 @@ def real_scraper(sample_novel_url):
         NovelScraper: Configured scraper instance for the test URL
     """
     import shutil
+
     from scraper.novel_scraper import NovelScraper
-    
+
     # Create real scraper with actual Playwright backend
     # Note: NovelScraper doesn't accept timeout/delay in __init__
     # It reads them from config or sets them on extractors
