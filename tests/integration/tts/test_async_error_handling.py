@@ -526,7 +526,7 @@ class TestAsyncResourceCleanup:
             mock_session_class.return_value = mock_session
 
             # Mock connection that fails
-            async def failing_connection():
+            async def failing_connection(url, **kwargs):
                 await asyncio.sleep(0.01)
                 raise ConnectionError("Connection failed")
 
@@ -616,7 +616,7 @@ class TestAsyncConcurrencyScenarios:
             # Multiple tasks accessing voice manager simultaneously
             async def access_voices(task_id):
                 try:
-                    voices = await asyncio.to_thread(voice_manager.get_all_voices)
+                    voices = await asyncio.to_thread(voice_manager.get_voices)
                     return len(voices) if voices else 0
                 except Exception as e:
                     return f"error_{task_id}: {e}"

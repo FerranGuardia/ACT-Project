@@ -59,6 +59,16 @@ def clean_text(text: Optional[str]) -> str:
     for pattern in concatenated_ui_patterns:
         text = re.sub(pattern, "", text, flags=re.IGNORECASE)
 
+    # Step 2.1: Remove common social engagement and rating UI patterns
+    social_ui_patterns = [
+        r"Like\s+this\s+chapter\?.*?Rate\s+it\s+\d+\s+stars?!?",
+        r"Rate\s+this\s+chapter.*?\d+\s+stars?",
+        r"Follow\s+.*?\s+on\s+(Twitter|Facebook|Instagram)",
+        r"Contact\s*:\s*\w+@\w+\.\w+",
+    ]
+    for pattern in social_ui_patterns:
+        text = re.sub(pattern, "", text, flags=re.IGNORECASE | re.DOTALL)
+
     # Step 3: Remove entire UI blocks
     ui_block_patterns = [
         r"What\s+do\s+you\s+think\?.*?Total\s+Responses.*?Sort\s+by.*?",
@@ -88,6 +98,8 @@ def clean_text(text: Optional[str]) -> str:
         # Standalone lines with translator/editor info
         r"^Translator\s*:?\s*[A-Za-z_]+\s*Editor\s*:?\s*[A-Za-z_]+\s*In\s*$",
         r"^Translator\s*:?\s*[A-Za-z_]+\s*_?\s*Editor\s*:?\s*[A-Za-z_]+\s*In\s*$",
+        # Author attribution patterns (common in chapter headers)
+        r"By\s+[A-Za-z\s]+(?:\|.*)?",  # "By Author Name | ..." patterns
     ]
     for pattern in translator_patterns:
         text = re.sub(pattern, "", text, flags=re.IGNORECASE | re.MULTILINE)
@@ -254,7 +266,7 @@ def clean_text(text: Optional[str]) -> str:
     # Also handle cases where there might be more dots with spaces
     text = re.sub(r"\.\s+\.{2,}", "...", text)  # ". ..." or ". ...." → "..."
     text = re.sub(r"\.{2,}\s+\.", "...", text)  # ".. ." or "... ." → "..."
-    text = re.sub(r"\.{4,}", "...", text)  # More than 3 dots becomes ...
+    text = re.sub(r"\.{4,}", ".", text)  # More than 3 dots becomes single dot
     text = re.sub(r"!{3,}", "!", text)  # Multiple ! becomes single (3+ only)
     text = re.sub(r"\?{3,}", "??", text)  # Multiple ? becomes ?? (3+ becomes 2)
     text = re.sub(r",{2,}", ",", text)  # Multiple commas to single
