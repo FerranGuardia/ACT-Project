@@ -51,15 +51,13 @@ if str(project_root) not in sys.path:
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
-from src.tts.providers.edge_tts_provider import EdgeTTSProvider
-from src.tts.tts_engine import TTSEngine
-from src.tts.tts_utils import TTSUtils
-from src.tts.audio_merger import AudioMerger
-from src.tts.providers.provider_manager import TTSProviderManager
 from circuitbreaker import CircuitBreaker
 
-# Import the isolated provider creator for clean circuit breaker testing
-from tests.integration.tts.test_circuit_breaker import create_isolated_provider
+from src.tts.audio_merger import AudioMerger
+from src.tts.providers.edge_tts_provider import EdgeTTSProvider
+from src.tts.providers.provider_manager import TTSProviderManager
+from src.tts.tts_engine import TTSEngine
+from src.tts.tts_utils import TTSUtils
 
 
 def reset_circuit_breaker():

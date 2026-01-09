@@ -1,12 +1,13 @@
 """
-Unit tests for connection pooling functionality in TTS providers.
+Integration tests for connection pooling functionality in TTS providers.
 
 Tests HTTP client management, connection pooling, and resource cleanup.
+
+Uses centralized circuit breaker management from tests/conftest.py.
 """
 
 import asyncio
 import sys
-# Import directly from src to bypass mocking
 from pathlib import Path
 from typing import Optional
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -22,27 +23,17 @@ if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
 from src.tts.providers.edge_tts_provider import EdgeTTSProvider
-from circuitbreaker import CircuitBreaker
-
-
-def reset_circuit_breaker():
-    """Reset the circuit breaker state for EdgeTTSProvider.convert_text_to_speech"""
-    method = EdgeTTSProvider.convert_text_to_speech
-    if hasattr(method, '_circuit_breaker'):
-        breaker = method._circuit_breaker
-        breaker._failure_count = 0
-        breaker._state = CircuitBreaker.CLOSED
-        breaker._opened_at = None
-        breaker._last_failure_at = None
 
 
 class TestConnectionPooling:
     """Test connection pooling functionality"""
 
-    def setup_method(self, method) -> None:
-        """Set up test fixtures"""
-        reset_circuit_breaker()  # Reset circuit breaker for test isolation
-        self.provider = EdgeTTSProvider()
+    @pytest.fixture(autouse=True)
+    def setup(self, isolated_edge_provider):
+        """Set up test fixtures - uses isolated provider from conftest"""
+        self.provider = isolated_edge_provider
+        yield
+        # Cleanup handled by fixture
 
     def teardown_method(self, method) -> None:
         """Clean up test fixtures"""
@@ -186,10 +177,12 @@ class TestConnectionPooling:
 class TestResourceManagement:
     """Test resource management and cleanup"""
 
-    def setup_method(self, method) -> None:
-        """Set up test fixtures"""
-        reset_circuit_breaker()  # Reset circuit breaker for test isolation
-        self.provider = EdgeTTSProvider()
+    @pytest.fixture(autouse=True)
+    def setup(self, isolated_edge_provider):
+        """Set up test fixtures - uses isolated provider from conftest"""
+        self.provider = isolated_edge_provider
+        yield
+        # Cleanup handled by fixture
 
     def teardown_method(self, method) -> None:
         """Clean up test fixtures"""
@@ -268,10 +261,12 @@ class TestResourceManagement:
 class TestConnectionPoolingIntegration:
     """Integration tests for connection pooling"""
 
-    def setup_method(self, method) -> None:
-        """Set up test fixtures"""
-        reset_circuit_breaker()  # Reset circuit breaker for test isolation
-        self.provider = EdgeTTSProvider()
+    @pytest.fixture(autouse=True)
+    def setup(self, isolated_edge_provider):
+        """Set up test fixtures - uses isolated provider from conftest"""
+        self.provider = isolated_edge_provider
+        yield
+        # Cleanup handled by fixture
 
     def teardown_method(self, method) -> None:
         """Clean up test fixtures"""

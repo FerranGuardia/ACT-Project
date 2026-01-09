@@ -33,15 +33,16 @@ Phase 2: Expand Async Test Coverage
 - Validate event loop management across providers
 """
 
-import pytest
-import sys
 import asyncio
+import sys
+# Import directly from src to bypass mocking
 from pathlib import Path
-from unittest.mock import patch, MagicMock, AsyncMock
+from pathlib import Path as PathLib
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from aiohttp import ClientSession, TCPConnector
 
-# Import directly from src to bypass mocking
-from pathlib import Path as PathLib
 project_root = PathLib(__file__).parent.parent.parent.parent
 src_path = project_root / "src"
 if str(project_root) not in sys.path:
@@ -55,15 +56,12 @@ from src.tts.providers.edge_tts_provider import EdgeTTSProvider
 class TestAsyncArchitecture:
     """Test async architecture improvements"""
 
-    def setup_method(self):
+    @pytest.fixture(autouse=True)
+    def setup(self, isolated_edge_provider, temp_dir):
         """Set up test fixtures"""
-        self.provider = EdgeTTSProvider()
-        self.test_output = Path("test_async.mp3")
-
-    def teardown_method(self):
-        """Clean up test fixtures"""
-        if self.test_output.exists():
-            self.test_output.unlink()
+        self.provider = isolated_edge_provider
+        self.test_output = temp_dir / "test_async.mp3"
+        yield
 
     @patch('edge_tts.list_voices', new_callable=AsyncMock)
     def test_async_availability_check(self, mock_list_voices):
@@ -187,13 +185,17 @@ class TestAsyncArchitecture:
 class TestAsyncIntegration:
     """Integration tests for async architecture"""
 
-    def setup_method(self):
+    @pytest.fixture(autouse=True)
+    def setup(self, isolated_edge_provider, temp_dir):
         """Set up test fixtures"""
-        self.provider = EdgeTTSProvider()
+        self.provider = isolated_edge_provider
+        self.test_output = temp_dir / "test_async.mp3"
+        yield
 
     @patch('edge_tts.Communicate')
     def test_async_chunk_conversion(self, mock_communicate_class):
         """Test async chunk conversion maintains proper async patterns"""
+        test_file = self.test_output.parent / "test_chunk.mp3"
         mock_communicate = MagicMock()
         mock_communicate_class.return_value = mock_communicate
 
@@ -205,7 +207,7 @@ class TestAsyncIntegration:
         mock_communicate.save = AsyncMock(side_effect=mock_save)
 
         # Test async chunk conversion
-        test_file = Path("test_chunk.mp3")
+        test_file = self.test_output.parent / "test_chunk.mp3"
         async def test_async():
             result = await self.provider.convert_chunk_async(
                 text="Hello chunk",
@@ -273,15 +275,12 @@ class TestAsyncIntegration:
 class TestAsyncErrorScenarios:
     """Test error scenarios in async architecture"""
 
-    def setup_method(self):
+    @pytest.fixture(autouse=True)
+    def setup(self, isolated_edge_provider, temp_dir):
         """Set up test fixtures"""
-        self.provider = EdgeTTSProvider()
-        self.test_output = Path("test_async.mp3")
-
-    def teardown_method(self):
-        """Clean up test fixtures"""
-        if self.test_output.exists():
-            self.test_output.unlink()
+        self.provider = isolated_edge_provider
+        self.test_output = temp_dir / "test_async.mp3"
+        yield
 
     @patch('edge_tts.list_voices', new_callable=AsyncMock)
     def test_async_import_error_handling(self, mock_list_voices):
@@ -326,7 +325,8 @@ class TestAsyncErrorScenarios:
         # This tests the circuit breaker behavior more than async specifically
         # but ensures async errors are handled properly
         # The provider now properly classifies errors, so we expect the classified error types
-        from src.tts.providers.edge_tts_provider import EdgeTTSConnectivityError, EdgeTTSServiceError
+        from src.tts.providers.edge_tts_provider import (
+            EdgeTTSConnectivityError, EdgeTTSServiceError)
         with pytest.raises((EdgeTTSConnectivityError, EdgeTTSServiceError)):
             self.provider.convert_text_to_speech(
                 text="Test",
@@ -338,15 +338,12 @@ class TestAsyncErrorScenarios:
 class TestAsyncPerformance:
     """Test performance aspects of async architecture"""
 
-    def setup_method(self):
+    @pytest.fixture(autouse=True)
+    def setup(self, isolated_edge_provider, temp_dir):
         """Set up test fixtures"""
-        self.provider = EdgeTTSProvider()
-        self.test_output = Path("test_async.mp3")
-
-    def teardown_method(self):
-        """Clean up test fixtures"""
-        if self.test_output.exists():
-            self.test_output.unlink()
+        self.provider = isolated_edge_provider
+        self.test_output = temp_dir / "test_async.mp3"
+        yield
 
     def test_async_initialization_performance(self):
         """Test that async initialization doesn't cause performance issues"""

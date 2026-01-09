@@ -184,10 +184,10 @@ class TestTTSEngineProviders:
         """Test TTSEngine initialization with ProviderManager"""
         mock_pm_instance = MagicMock()
         mock_pm_class = MagicMock(return_value=mock_pm_instance)
-        monkeypatch.setattr('tts.tts_engine.TTSProviderManager', mock_pm_class)
+        monkeypatch.setattr(tts_engine_module, 'TTSProviderManager', mock_pm_class)
         mock_vm_instance = MagicMock()
         mock_vm_class = MagicMock(return_value=mock_vm_instance)
-        monkeypatch.setattr('tts.tts_engine.VoiceManager', mock_vm_class)
+        monkeypatch.setattr(tts_engine_module, 'VoiceManager', mock_vm_class)
         
         engine = TTSEngine(provider_manager=mock_pm_instance)
 
@@ -198,10 +198,10 @@ class TestTTSEngineProviders:
         """Test TTSEngine initialization creates ProviderManager"""
         mock_pm_instance = MagicMock()
         mock_pm_class = MagicMock(return_value=mock_pm_instance)
-        monkeypatch.setattr('tts.tts_engine.TTSProviderManager', mock_pm_class)
+        monkeypatch.setattr(tts_engine_module, 'TTSProviderManager', mock_pm_class)
         mock_vm_instance = MagicMock()
         mock_vm_class = MagicMock(return_value=mock_vm_instance)
-        monkeypatch.setattr('tts.tts_engine.VoiceManager', mock_vm_class)
+        monkeypatch.setattr(tts_engine_module, 'VoiceManager', mock_vm_class)
         
         engine = TTSEngine()
         
@@ -212,12 +212,12 @@ class TestTTSEngineProviders:
         """Test get_available_voices with provider parameter"""
         mock_pm_instance = MagicMock()
         mock_pm_class = MagicMock(return_value=mock_pm_instance)
-        monkeypatch.setattr('tts.tts_engine.TTSProviderManager', mock_pm_class)
+        monkeypatch.setattr(tts_engine_module, 'TTSProviderManager', mock_pm_class)
         mock_vm_instance = MagicMock()
         mock_voices = [{"id": "voice1", "name": "Voice 1"}]
         mock_vm_instance.get_voices.return_value = mock_voices
         mock_vm_class = MagicMock(return_value=mock_vm_instance)
-        monkeypatch.setattr('tts.tts_engine.VoiceManager', mock_vm_class)
+        monkeypatch.setattr(tts_engine_module, 'VoiceManager', mock_vm_class)
         
         engine = TTSEngine(provider_manager=mock_pm_instance)
         voices = engine.get_available_voices(provider="edge_tts")
@@ -254,12 +254,14 @@ class TestTTSEngineProviders:
 
         mock_pm_instance = MagicMock()
         mock_pm_instance.get_provider.return_value = mock_provider
-        TTSProviderManager.return_value = mock_pm_instance
+        mock_pm_class = MagicMock(return_value=mock_pm_instance)
+        monkeypatch.setattr(tts_engine_module, 'TTSProviderManager', mock_pm_class)
 
         mock_vm_instance = MagicMock()
         mock_voice = {"id": "voice1", "name": "Voice 1", "provider": "edge_tts"}
         mock_vm_instance.get_voice_by_name.return_value = mock_voice
-        VoiceManager.return_value = mock_vm_instance
+        mock_vm_class = MagicMock(return_value=mock_vm_instance)
+        monkeypatch.setattr(tts_engine_module, 'VoiceManager', mock_vm_class)
         
         engine = TTSEngine(provider_manager=mock_pm_instance)
         output_path = temp_dir / "test_output.mp3"
@@ -294,14 +296,14 @@ class TestTTSEngineProviders:
         mock_pm_instance.get_provider.return_value = None  # Should not be called, but if it is, return None
         mock_pm_instance.convert_with_fallback.return_value = True
         mock_pm_class = MagicMock(return_value=mock_pm_instance)
-        monkeypatch.setattr('tts.tts_engine.TTSProviderManager', mock_pm_class)
+        monkeypatch.setattr(tts_engine_module, 'TTSProviderManager', mock_pm_class)
 
         mock_vm_instance = MagicMock()
         # Voice without provider in metadata to test fallback path
         mock_voice = {"id": "voice1", "name": "Voice 1"}
         mock_vm_instance.get_voice_by_name.return_value = mock_voice
         mock_vm_class = MagicMock(return_value=mock_vm_instance)
-        monkeypatch.setattr('tts.tts_engine.VoiceManager', mock_vm_class)
+        monkeypatch.setattr(tts_engine_module, 'VoiceManager', mock_vm_class)
         
         engine = TTSEngine(provider_manager=mock_pm_instance)
         output_path = temp_dir / "test_output.mp3"
@@ -326,13 +328,13 @@ class TestTTSEngineProviders:
         mock_pm_instance = MagicMock()
         mock_pm_instance.get_provider.return_value = None  # Provider unavailable
         mock_pm_class = MagicMock(return_value=mock_pm_instance)
-        monkeypatch.setattr('tts.tts_engine.TTSProviderManager', mock_pm_class)
+        monkeypatch.setattr(tts_engine_module, 'TTSProviderManager', mock_pm_class)
 
         mock_vm_instance = MagicMock()
         mock_voice = {"id": "voice1", "name": "Voice 1", "provider": "edge_tts"}
         mock_vm_instance.get_voice_by_name.return_value = mock_voice
         mock_vm_class = MagicMock(return_value=mock_vm_instance)
-        monkeypatch.setattr('tts.tts_engine.VoiceManager', mock_vm_class)
+        monkeypatch.setattr(tts_engine_module, 'VoiceManager', mock_vm_class)
         
         engine = TTSEngine(provider_manager=mock_pm_instance)
         output_path = temp_dir / "test_output.mp3"
@@ -361,13 +363,13 @@ class TestTTSEngineProviders:
         mock_pm_instance = MagicMock()
         mock_pm_instance.get_provider.return_value = mock_provider
         mock_pm_class = MagicMock(return_value=mock_pm_instance)
-        monkeypatch.setattr('tts.tts_engine.TTSProviderManager', mock_pm_class)
+        monkeypatch.setattr(tts_engine_module, 'TTSProviderManager', mock_pm_class)
 
         mock_vm_instance = MagicMock()
         mock_voice = {"id": "voice1", "name": "Voice 1"}
         mock_vm_instance.get_voice_by_name.return_value = mock_voice
         mock_vm_class = MagicMock(return_value=mock_vm_instance)
-        monkeypatch.setattr('tts.tts_engine.VoiceManager', mock_vm_class)
+        monkeypatch.setattr(tts_engine_module, 'VoiceManager', mock_vm_class)
         
         engine = TTSEngine(provider_manager=mock_pm_instance)
         input_file = Path("/tmp/test_input.txt")
@@ -402,13 +404,13 @@ class TestTTSEngineProviders:
         mock_pm_instance.get_provider.return_value = mock_provider
         mock_pm_instance.get_available_provider.return_value = mock_provider
         mock_pm_class = MagicMock(return_value=mock_pm_instance)
-        monkeypatch.setattr('tts.tts_engine.TTSProviderManager', mock_pm_class)
+        monkeypatch.setattr(tts_engine_module, 'TTSProviderManager', mock_pm_class)
 
         mock_vm_instance = MagicMock()
         mock_voice = {"id": "voice1", "name": "Voice 1", "provider": "edge_tts"}
         mock_vm_instance.get_voice_by_name.return_value = mock_voice
         mock_vm_class = MagicMock(return_value=mock_vm_instance)
-        monkeypatch.setattr('tts.tts_engine.VoiceManager', mock_vm_class)
+        monkeypatch.setattr(tts_engine_module, 'VoiceManager', mock_vm_class)
         
         engine = TTSEngine(provider_manager=mock_pm_instance)
 
@@ -446,13 +448,13 @@ class TestTTSEngineProviders:
         mock_pm_instance.get_provider.return_value = mock_provider
         mock_pm_instance.get_available_provider.return_value = mock_provider
         mock_pm_class = MagicMock(return_value=mock_pm_instance)
-        monkeypatch.setattr('tts.tts_engine.TTSProviderManager', mock_pm_class)
+        monkeypatch.setattr(tts_engine_module, 'TTSProviderManager', mock_pm_class)
 
         mock_vm_instance = MagicMock()
         mock_voice = {"id": "voice1", "name": "Voice 1", "provider": "edge_tts"}
         mock_vm_instance.get_voice_by_name.return_value = mock_voice
         mock_vm_class = MagicMock(return_value=mock_vm_instance)
-        monkeypatch.setattr('tts.tts_engine.VoiceManager', mock_vm_class)
+        monkeypatch.setattr(tts_engine_module, 'VoiceManager', mock_vm_class)
         
         engine = TTSEngine(provider_manager=mock_pm_instance)
         output_path = temp_dir / "test_output.mp3"
@@ -478,13 +480,13 @@ class TestTTSEngineProviders:
         mock_pm_instance.get_provider.return_value = mock_provider
         mock_pm_instance.get_available_provider.return_value = mock_provider
         mock_pm_class = MagicMock(return_value=mock_pm_instance)
-        monkeypatch.setattr('tts.tts_engine.TTSProviderManager', mock_pm_class)
+        monkeypatch.setattr(tts_engine_module, 'TTSProviderManager', mock_pm_class)
 
         mock_vm_instance = MagicMock()
         mock_voice = {"id": "voice1", "name": "Voice 1", "provider": "pyttsx3"}
         mock_vm_instance.get_voice_by_name.return_value = mock_voice
         mock_vm_class = MagicMock(return_value=mock_vm_instance)
-        monkeypatch.setattr('tts.tts_engine.VoiceManager', mock_vm_class)
+        monkeypatch.setattr(tts_engine_module, 'VoiceManager', mock_vm_class)
         
         engine = TTSEngine(provider_manager=mock_pm_instance)
 
