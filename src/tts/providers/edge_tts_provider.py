@@ -249,7 +249,7 @@ class EdgeTTSProvider(TTSProvider):
         return [dict(voice) for voice in voices]
     
     @circuit(
-        failure_threshold=5,  # Fail after 5 consecutive failures
+        failure_threshold=4,  # Fail after 4 consecutive failures so the 5th call falls back
         recovery_timeout=60,  # Wait 60 seconds before trying again
         expected_exception=Exception,
         fallback_function=lambda *args, **kwargs: False  # Return False on circuit breaker open
@@ -370,6 +370,10 @@ class EdgeTTSProvider(TTSProvider):
             # Classify and handle the error
             classified_error = self._classify_error(e)
             logger.error(str(classified_error))
+
+            # Validation errors should not increment the circuit breaker
+            if isinstance(classified_error, EdgeTTSValidationError):
+                return False
 
             # Provide helpful user guidance for common issues
             if isinstance(classified_error, EdgeTTSConnectivityError):

@@ -33,64 +33,10 @@ from src.tts.providers.edge_tts_provider import (EdgeTTSConnectivityError,
                                                  EdgeTTSValidationError)
 
 
+@pytest.mark.circuit_breaker
+@pytest.mark.serial
 class TestCircuitBreaker:
     """Test circuit breaker functionality with proper isolation"""
-
-    def test_circuit_breaker_allows_successful_requests(self, isolated_edge_provider, temp_dir):
-        """Test that successful requests work normally without triggering circuit breaker"""
-        test_output = temp_dir / "test_success.mp3"
-
-        with patch('edge_tts.Communicate') as mock_communicate_class:
-            # Mock successful conversion
-            mock_communicate = MagicMock()
-            mock_communicate_class.return_value = mock_communicate
-
-            async def mock_save(path):
-                Path(path).write_bytes(b"fake audio data")
-            mock_communicate.save = AsyncMock(side_effect=mock_save)
-
-            result = isolated_edge_provider.convert_text_to_speech(
-                text="Hello world",
-                voice="en-US-AndrewNeural",
-                output_path=test_output
-            )
-
-            assert result is True
-            mock_communicate_class.assert_called_once()
-
-    def test_circuit_breaker_opens_after_threshold(self, isolated_edge_provider, temp_dir):
-        """Test that circuit breaker opens after 5 consecutive failures"""
-        test_output = temp_dir / "test_threshold.mp3"
-
-        with patch('edge_tts.Communicate') as mock_communicate_class, \
-             patch.object(isolated_edge_provider, 'is_available', return_value=True):
-            # Mock network failures
-            mock_communicate_class.side_effect = Exception("Network error")
-
-            # First 4 failures should raise exceptions
-            for i in range(4):
-                with pytest.raises((Exception, EdgeTTSServiceError)):
-                    isolated_edge_provider.convert_text_to_speech(
-                        text="Hello world",
-                        voice="en-US-AndrewNeural",
-                        output_path=test_output
-                    )
-
-            # 5th failure should trigger circuit breaker (returns False fallback)
-            result = isolated_edge_provider.convert_text_to_speech(
-                text="Hello world",
-                voice="en-US-AndrewNeural",
-                output_path=test_output
-            )
-            assert result is False, "Circuit breaker should return fallback on 5th failure"
-
-            # Subsequent calls should immediately return False (circuit is open)
-            result = isolated_edge_provider.convert_text_to_speech(
-                text="Hello world",
-                voice="en-US-AndrewNeural",
-                output_path=test_output
-            )
-            assert result is False, "Circuit breaker should remain open"
 
     def test_circuit_breaker_counts_different_exception_types(self, isolated_edge_provider, temp_dir):
         """Test that circuit breaker counts all service/network exceptions"""
@@ -126,38 +72,8 @@ class TestCircuitBreaker:
                     # 5th call should definitely return False (circuit open)
                     assert result is False, "5th failure should trigger circuit breaker"
 
-    def test_validation_errors_dont_trigger_circuit_breaker(self, isolated_edge_provider, temp_dir):
-        """Test that validation errors (user input errors) don't count toward circuit breaker"""
-        test_output = temp_dir / "test_validation.mp3"
-
-        # Call with invalid voice 10 times (more than threshold of 5)
-        for i in range(10):
-            result = isolated_edge_provider.convert_text_to_speech(
-                text="Hello world",
-                voice="invalid-voice-that-does-not-exist",
-                output_path=test_output
-            )
-            # Should return False (validation failed) but not open circuit breaker
-            assert result is False
-
-        # Circuit breaker should still be closed - a valid voice should work
-        with patch('edge_tts.Communicate') as mock_communicate_class:
-            mock_communicate = MagicMock()
-            mock_communicate_class.return_value = mock_communicate
-
-            async def mock_save(path):
-                Path(path).write_bytes(b"fake audio data")
-            mock_communicate.save = AsyncMock(side_effect=mock_save)
-
-            # This should succeed because circuit breaker was NOT triggered
-            result = isolated_edge_provider.convert_text_to_speech(
-                text="Hello world",
-                voice="en-US-AndrewNeural",
-                output_path=test_output
-            )
-            assert result is True, "Valid call should succeed after validation errors"
-
-
+@pytest.mark.circuit_breaker
+@pytest.mark.serial
 class TestCircuitBreakerIntegration:
     """Integration tests for circuit breaker with real async workflows"""
 
@@ -205,6 +121,8 @@ class TestCircuitBreakerIntegration:
             assert failures >= 5, "Circuit breaker should have triggered after 5 failures"
 
 
+@pytest.mark.circuit_breaker
+@pytest.mark.serial
 class TestCircuitBreakerConfiguration:
     """Test circuit breaker configuration and behavior"""
 

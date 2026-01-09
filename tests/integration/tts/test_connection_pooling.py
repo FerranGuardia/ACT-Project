@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 import pytest
+from tests.conftest import reset_circuit_breaker
 
 project_root = Path(__file__).parent.parent.parent.parent
 src_path = project_root / "src"

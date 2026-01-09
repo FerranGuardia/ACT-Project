@@ -83,6 +83,19 @@ def _reset_circuit_breaker(method):
     return reset_successful
 
 
+def reset_circuit_breaker():
+    """
+    Convenience helper for tests that expect a global reset function.
+
+    Resets the circuit breaker state for EdgeTTSProvider.convert_text_to_speech.
+    """
+    try:
+        from src.tts.providers.edge_tts_provider import EdgeTTSProvider
+        return _reset_circuit_breaker(EdgeTTSProvider.convert_text_to_speech)
+    except Exception:
+        return False
+
+
 @pytest.fixture(scope="function", autouse=True)
 def reset_all_circuit_breakers():
     """
@@ -149,6 +162,8 @@ def isolated_edge_provider():
     _reset_circuit_breaker(EdgeTTSProvider.convert_text_to_speech)
     
     provider = EdgeTTSProvider()
+    # Mark available so tests can run offline with mocked edge_tts
+    provider._available = True
     
     return provider
 
