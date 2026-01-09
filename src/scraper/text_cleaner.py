@@ -255,19 +255,19 @@ def clean_text(text: Optional[str]) -> str:
     text = re.sub(r"\.\s+\.{2,}", "...", text)  # ". ..." or ". ...." → "..."
     text = re.sub(r"\.{2,}\s+\.", "...", text)  # ".. ." or "... ." → "..."
     text = re.sub(r"\.{4,}", "...", text)  # More than 3 dots becomes ...
-    text = re.sub(r"!{3,}", "!", text)  # Multiple ! becomes single
-    text = re.sub(r"\?{3,}", "?", text)  # Multiple ? becomes single
+    text = re.sub(r"!{3,}", "!", text)  # Multiple ! becomes single (3+ only)
+    text = re.sub(r"\?{3,}", "??", text)  # Multiple ? becomes ?? (3+ becomes 2)
     text = re.sub(r",{2,}", ",", text)  # Multiple commas to single
     text = re.sub(r";{2,}", ";", text)  # Multiple semicolons to single
     text = re.sub(r":{2,}", ":", text)  # Multiple colons to single (but keep time like 12:30)
     
     # Step 15: Clean up spacing around punctuation (improves TTS flow)
-    # But preserve ellipses (three dots) - don't add space after them
+    # But preserve ellipses and quotes - don't add space after them
     text = re.sub(r"\s+([,.!?;:])", r"\1", text)  # Remove space before punctuation
-    # Add space after punctuation if missing, but not after ellipses
-    text = re.sub(r"([,.!?;:])([^\s.])", r"\1 \2", text)  # Add space after punctuation if missing (but not if next char is dot)
+    # Add space after punctuation if missing, but not after ellipses, quotes, or between consecutive punctuation
+    text = re.sub(r"([,.!?;:])([^\s,.!?;:\"\'`])", r"\1 \2", text)  # Add space after punctuation if next char is not punctuation or quotes
     # Handle ellipses separately - ensure space after "..."
-    text = re.sub(r"\.{3}([^\s])", r"... \1", text)  # Add space after "..." if missing
+    text = re.sub(r"\.{3}([^\s,.!?;:\"\'`])", r"... \1", text)  # Add space after "..." if next char is not punctuation or quotes
     
     # Step 16: Handle special formatting that might confuse TTS
     # Remove standalone symbols on their own lines

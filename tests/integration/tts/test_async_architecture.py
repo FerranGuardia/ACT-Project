@@ -325,7 +325,9 @@ class TestAsyncErrorScenarios:
 
         # This tests the circuit breaker behavior more than async specifically
         # but ensures async errors are handled properly
-        with pytest.raises((ConnectionError, asyncio.TimeoutError)):
+        # The provider now properly classifies errors, so we expect the classified error types
+        from src.tts.providers.edge_tts_provider import EdgeTTSConnectivityError, EdgeTTSServiceError
+        with pytest.raises((EdgeTTSConnectivityError, EdgeTTSServiceError)):
             self.provider.convert_text_to_speech(
                 text="Test",
                 voice="en-US-AndrewNeural",

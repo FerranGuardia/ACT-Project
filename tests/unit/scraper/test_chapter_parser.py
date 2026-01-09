@@ -8,7 +8,8 @@ import pytest
 
 from src.scraper.chapter_parser import (
     extract_chapter_number,
-    sort_chapters_by_number
+    sort_chapters_by_number,
+    sort_chapter_dicts_by_number
 )
 
 
@@ -78,7 +79,7 @@ class TestChapterParser:
             {"url": "https://example.com/chapter-2", "title": "Chapter 2"},
         ]
 
-        sorted_chapters = sort_chapters_by_number(chapters)
+        sorted_chapters = sort_chapter_dicts_by_number(chapters)
 
         # Should be sorted by chapter number
         expected_order = [1, 2, 5, 10]
@@ -94,7 +95,7 @@ class TestChapterParser:
             {"url": "https://example.com/epilogue", "title": "Epilogue"},
         ]
 
-        sorted_chapters = sort_chapters_by_number(chapters)
+        sorted_chapters = sort_chapter_dicts_by_number(chapters)
 
         # Should preserve order for items without numbers, put numbered ones first
         assert len(sorted_chapters) == 3
@@ -122,7 +123,7 @@ class TestChapterParser:
             {"url": "https://example.com/chapter-1", "title": "Chapter 1", "extra": "more data"},
         ]
 
-        sorted_chapters = sort_chapters_by_number(chapters)
+        sorted_chapters = sort_chapter_dicts_by_number(chapters)
 
         # Should preserve all fields
         assert sorted_chapters[0]["title"] == "Chapter 1"
@@ -138,6 +139,6 @@ class TestChapterParser:
     def test_sort_chapters_single_item(self):
         """Test sorting single item list."""
         chapters = [{"url": "https://example.com/chapter-1", "title": "Chapter 1"}]
-        result = sort_chapters_by_number(chapters)
+        result = sort_chapter_dicts_by_number(chapters)
         assert len(result) == 1
         assert result[0]["title"] == "Chapter 1"

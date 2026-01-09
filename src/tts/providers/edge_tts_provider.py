@@ -176,6 +176,12 @@ class EdgeTTSProvider(TTSProvider):
         if not self._available:
             self._check_availability_sync()
         return self._available
+
+    async def is_available_async(self) -> bool:
+        """Check if provider is available asynchronously (safe for async contexts)"""
+        if not self._available:
+            self._available = await self._check_availability_async()
+        return self._available
     
     def get_voices(self, locale: Optional[str] = None) -> List[Dict]:
         """Get available Edge TTS voices, filtered by locale.
@@ -435,7 +441,7 @@ class EdgeTTSProvider(TTSProvider):
         Returns:
             True if conversion successful, False otherwise
         """
-        if not self.is_available():
+        if not await self.is_available_async():
             logger.error("Edge TTS provider is not available")
             return False
 

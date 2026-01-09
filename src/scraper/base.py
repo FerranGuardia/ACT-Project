@@ -46,8 +46,8 @@ class BaseScraper(ABC):
 
         # Get settings from config with fallback to defaults
         self.timeout = self.config.get("scraper.timeout", REQUEST_TIMEOUT)
-        self.delay = REQUEST_DELAY
-        self.max_retries = MAX_RETRIES
+        self.delay = self.config.get("scraper.delay", REQUEST_DELAY)
+        self.max_retries = self.config.get("scraper.max_retries", MAX_RETRIES)
 
     @abstractmethod
     def scrape_chapter(self, chapter_url: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:

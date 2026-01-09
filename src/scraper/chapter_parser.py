@@ -39,6 +39,11 @@ def extract_chapter_number(url: str) -> Optional[int]:
     if match:
         return int(match.group(1))
 
+    # Handle "ch-" prefix (shorter form of "chapter-")
+    ch_match = re.search(r"ch[_-]?(\d+)", url, re.I)
+    if ch_match:
+        return int(ch_match.group(1))
+
     # Handle weird formats like "chapter-1-3" or "chapter-1-4"
     # Extract just the first number after "chapter"
     weird_match = re.search(r"chapter[_-]?(\d+)[_-]?\d*", url, re.I)
@@ -135,6 +140,32 @@ def sort_chapters_by_number(chapter_urls: List[str]) -> List[str]:
         return num if num is not None else 999999
 
     return sorted(chapter_urls, key=get_chapter_num)
+
+
+def sort_chapter_dicts_by_number(chapter_dicts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Sort chapter dictionaries by the chapter number in their URL field.
+
+    Args:
+        chapter_dicts: List of chapter dictionaries with 'url' field
+
+    Returns:
+        Sorted list of chapter dictionaries
+
+    Example:
+        >>> chapters = [
+        ...     {"url": "chapter-3", "title": "Chapter 3"},
+        ...     {"url": "chapter-1", "title": "Chapter 1"}
+        ... ]
+        >>> sort_chapter_dicts_by_number(chapters)
+        [{"url": "chapter-1", "title": "Chapter 1"}, {"url": "chapter-3", "title": "Chapter 3"}]
+    """
+    def get_chapter_num(chapter_dict: Dict[str, Any]) -> int:
+        url = chapter_dict.get('url', '')
+        num = extract_chapter_number(url)
+        return num if num is not None else 999999
+
+    return sorted(chapter_dicts, key=get_chapter_num)
 
 
 def extract_novel_id(url: str) -> Optional[str]:
