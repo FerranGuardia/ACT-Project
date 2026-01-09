@@ -136,7 +136,8 @@ class TestPipelineComponentIntegration:
             mock_config.return_value.get.side_effect = lambda key, default=None: config_dict.get(key, default)
             mock_pm_config.return_value.get.side_effect = lambda key, default=None: config_dict.get(key, default)
             mock_fm_config.return_value.get.side_effect = lambda key, default=None: config_dict.get(key, default)
-            yield ProcessingPipeline("test_project")
+            # CRITICAL: Pass base_output_dir to prevent creating folders outside temp_dir
+            yield ProcessingPipeline("test_project", base_output_dir=temp_dir / "output")
     
     def test_pipeline_project_initialization(self, pipeline, temp_dir):
         """Test pipeline initializes project correctly."""
@@ -295,7 +296,8 @@ class TestErrorHandlingIntegration:
             mock_config.return_value.get.side_effect = lambda key, default=None: config_dict.get(key, default)
             mock_pm_config.return_value.get.side_effect = lambda key, default=None: config_dict.get(key, default)
             mock_fm_config.return_value.get.side_effect = lambda key, default=None: config_dict.get(key, default)
-            yield ProcessingPipeline("test_project")
+            # CRITICAL: Pass base_output_dir to prevent creating folders outside temp_dir
+            yield ProcessingPipeline("test_project", base_output_dir=temp_dir / "output")
     
     @patch('processor.pipeline.GenericScraper')
     def test_error_isolation_continues_processing(self, mock_scraper_class, pipeline, temp_dir):

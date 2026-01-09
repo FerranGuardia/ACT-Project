@@ -177,13 +177,25 @@ def qt_application():
 
 @pytest.fixture
 def temp_dir():
-    """Create a temporary directory for test files"""
+    """
+    Create a temporary directory for test files.
+    
+    Automatically cleaned up after test completes.
+    Use this fixture for any test that creates files/folders.
+    
+    Yields:
+        Path: Temporary directory path
+        
+    Cleanup:
+        Recursively deletes entire directory tree after test
+    """
     import shutil
     import tempfile
     from pathlib import Path
 
     temp_path = Path(tempfile.mkdtemp())
     yield temp_path
+    # Automatic cleanup: Remove entire temp directory tree
     shutil.rmtree(temp_path, ignore_errors=True)
 
 
@@ -330,3 +342,46 @@ def real_tts_engine():
     # Create real TTS engine instance
     engine = TTSEngine()
     return engine
+
+
+@pytest.fixture
+def sample_novel_url():
+    """
+    Real novel URL for integration testing.
+    
+    Uses a real webnovel site that's fast and reliable.
+    Limited to fetching 1-2 chapters to keep tests fast.
+    """
+    # Use a real, simple novel page for testing
+    # This is a public domain story on a fast, stable site
+    return "https://www.royalroad.com/fiction/21220/mother-of-learning"
+
+
+@pytest.fixture
+def real_scraper(sample_novel_url):
+    """
+    Real NovelScraper instance for integration tests.
+    
+    Uses actual Playwright + Network + Scraper integration.
+    Tests are limited to 1-2 chapters for speed.
+    
+    Automatically cleans up:
+    - Playwright browser instances
+    - Any temporary files created during scraping
+    
+    Returns:
+        NovelScraper: Configured scraper instance for the test URL
+    """
+    import shutil
+    from scraper.novel_scraper import NovelScraper
+    
+    # Create real scraper with actual Playwright backend
+    # Note: NovelScraper doesn't accept timeout/delay in __init__
+    # It reads them from config or sets them on extractors
+    scraper = NovelScraper(base_url=sample_novel_url)
+    
+    yield scraper
+    
+    # Cleanup: Playwright browsers are closed automatically in their context managers
+    # No persistent files or folders are created by the scraper itself
+    # (Playwright may create temp cache in system temp, but OS handles cleanup)
