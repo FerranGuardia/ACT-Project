@@ -9,12 +9,14 @@ Validates:
 - Pipeline ordering and fallback behavior
 """
 
-import pytest
-from unittest.mock import Mock, MagicMock, patch, call
-from typing import List, Any
+from typing import Any, List
+from unittest.mock import MagicMock, Mock, call, patch
 
-from src.scraper.extractors.url_extractor_extractors import ChapterUrlExtractors, retry_with_backoff
+import pytest
+
 from src.scraper.extractors.url_extractor import UrlExtractor
+from src.scraper.extractors.url_extractor_extractors import (
+    ChapterUrlExtractors, retry_with_backoff)
 
 
 class TestChapterUrlExtractorsHelpers:
@@ -376,7 +378,7 @@ class TestNoBeautifulSoupDependency:
     def test_extractors_no_beautifulsoup_imports(self):
         """Verify extractors module doesn't import BeautifulSoup."""
         import src.scraper.extractors.url_extractor_extractors as extractors_module
-        
+
         # BeautifulSoup should not be in the module
         source = extractors_module.__doc__ or ""
         # Check the actual module doesn't have BeautifulSoup references
