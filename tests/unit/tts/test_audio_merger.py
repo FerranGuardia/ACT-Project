@@ -425,16 +425,16 @@ class TestConfiguration(TestAudioMerger):
 
     def test_default_constants(self, merger):
         """Test that default constants are properly set."""
-        assert merger.DEFAULT_MAX_CHUNK_BYTES == 3000
-        assert merger.DEFAULT_CHUNK_RETRIES == 3
-        assert merger.DEFAULT_CHUNK_RETRY_DELAY == 1.0
-        assert merger.MAX_CHUNK_RETRY_DELAY == 10.0
-        assert merger.CONVERSION_TIMEOUT == 60.0
+        assert merger.config.DEFAULT_MAX_CHUNK_BYTES == 3000
+        assert merger.config.DEFAULT_CHUNK_RETRIES == 3
+        assert merger.config.DEFAULT_CHUNK_RETRY_DELAY == 1.0
+        assert merger.config.MAX_CHUNK_RETRY_DELAY == 10.0
+        assert merger.config.CONVERSION_TIMEOUT == 60.0
 
     def test_constants_affect_behavior(self, merger):
         """Test that constants affect actual behavior."""
         # Test that retry count affects retry attempts
-        assert merger.DEFAULT_CHUNK_RETRIES == 3
+        assert merger.config.DEFAULT_CHUNK_RETRIES == 3
 
         # Test that timeout is used
-        assert merger.CONVERSION_TIMEOUT == 60.0
+        assert merger.config.CONVERSION_TIMEOUT == 60.0

@@ -23,6 +23,52 @@ from .voice_validator import VoiceValidator
 logger = get_logger("tts.tts_engine")
 
 
+class AsyncBridge:
+    """Simple async/sync bridge for running coroutines in sync context."""
+
+    @staticmethod
+    def run_async(coro) -> Any:
+        """
+        Run an async coroutine in a synchronous context.
+
+        Handles both cases: when there's already a running event loop
+        and when we need to create a new one.
+        """
+        try:
+            # Check if we're already in an async context
+            loop = asyncio.get_running_loop()
+            # If we get here, we're in an async context but need sync result
+            # This is an unusual case - we'll create a new thread
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, coro)
+                return future.result()
+        except RuntimeError:
+            # No running loop, we can safely use asyncio.run
+            return asyncio.run(coro)
+
+
+class TTSConfig:
+    """Configuration constants for TTS operations."""
+
+    # Chunking settings
+    DEFAULT_MAX_CHUNK_BYTES = 3000
+    DEFAULT_CHUNK_RETRIES = 3
+    DEFAULT_CHUNK_RETRY_DELAY = 1.0
+    MAX_CHUNK_RETRY_DELAY = 10.0
+    CONVERSION_TIMEOUT = 60.0
+
+    # Voice settings
+    DEFAULT_VOICE = "en-US-AndrewNeural"
+    DEFAULT_RATE = "+0%"
+    DEFAULT_PITCH = "+0Hz"
+    DEFAULT_VOLUME = "+0%"
+
+    # File operations
+    FILE_CLEANUP_RETRIES = 3
+    FILE_CLEANUP_DELAY = 0.2
+
+
 def format_chapter_intro(chapter_title: str, content: str) -> str:
     """
     Format chapter text with introduction and pauses for TTS.
@@ -43,20 +89,10 @@ def format_chapter_intro(chapter_title: str, content: str) -> str:
 
 class TTSEngine:
     """Main TTS engine for converting text to speech."""
-    
-    # Configuration constants
-    DEFAULT_MAX_CHUNK_BYTES = 3000
-    DEFAULT_CHUNK_RETRIES = 5
-    DEFAULT_CHUNK_RETRY_DELAY = 5.0
-    DEFAULT_VOICE = "en-US-AndrewNeural"
-    DEFAULT_RATE = "+0%"
-    DEFAULT_PITCH = "+0Hz"
-    DEFAULT_VOLUME = "+0%"
-    FILE_CLEANUP_RETRIES = 3
-    FILE_CLEANUP_DELAY = 0.2
 
-    def __init__(self, base_text_cleaner: Optional[Callable[[str], str]] = None, 
-                 provider_manager: Optional[TTSProviderManager] = None):
+    def __init__(self, base_text_cleaner: Optional[Callable[[str], str]] = None,
+                 provider_manager: Optional[TTSProviderManager] = None,
+                 config: Optional[TTSConfig] = None):
         """
         Initialize TTS engine.
 
@@ -64,35 +100,20 @@ class TTSEngine:
             base_text_cleaner: Optional function to clean text before TTS cleaning
                                (e.g., scraper text cleaner)
             provider_manager: Optional TTSProviderManager instance. If None, creates a new one.
+            config: Optional TTSConfig instance. If None, uses default TTSConfig.
         """
-        self.config = ConfigManager()
+        self.config = config or TTSConfig()
         self.provider_manager = provider_manager or TTSProviderManager()
         self.base_text_cleaner = base_text_cleaner
         
         # Initialize sub-modules
         self.voice_manager = VoiceManager(provider_manager=self.provider_manager)
-        
+
         self.voice_validator = VoiceValidator(self.voice_manager, self.provider_manager)
         self.text_processor = TextProcessor(self.provider_manager, base_text_cleaner)
         self.tts_utils = TTSUtils(self.provider_manager)
-        self.audio_merger = AudioMerger(self.provider_manager, self._cleanup_files)
+        self.audio_merger = AudioMerger(self.provider_manager, config=self.config)
 
-    def _cleanup_files(self, file_paths: List[Path], max_retries: Optional[int] = None) -> None:
-        """Delegate to TTSUtils for file cleanup."""
-        self.tts_utils.cleanup_files(file_paths, max_retries)
-
-    def _get_provider_instance(self, provider: Optional[str]) -> Optional[TTSProvider]:
-        """Delegate to TTSUtils for provider instance retrieval."""
-        return self.tts_utils.get_provider_instance(provider)
-
-    def _get_speech_params(self, rate: Optional[float] = None, pitch: Optional[float] = None, 
-                           volume: Optional[float] = None) -> tuple[Optional[float], Optional[float], Optional[float]]:
-        """Delegate to TTSUtils for speech parameter resolution."""
-        return self.tts_utils.get_speech_params(rate, pitch, volume)
-
-    def _run_async_task(self, coro):
-        """Delegate to TTSUtils for async task execution."""
-        return self.tts_utils.run_async_task(coro)
 
     def get_available_voices(self, locale: Optional[str] = None, provider: Optional[str] = None) -> List[Dict[str, Any]]:
         """Delegate to VoiceValidator."""
@@ -112,15 +133,13 @@ class TTSEngine:
         """Delegate to TextProcessor."""
         return self.text_processor.build_text_for_conversion(text, provider_instance, rate, pitch, volume)
 
-    def _route_conversion(self, text: str, voice_id: str, output_path: Path, 
+    def _route_conversion(self, text: str, voice_id: str, output_path: Path,
                          provider: Optional[str], provider_instance: Optional[TTSProvider],
-                         rate: Optional[float] = None, pitch: Optional[float] = None, 
+                         rate: Optional[float] = None, pitch: Optional[float] = None,
                          volume: Optional[float] = None) -> bool:
         """
         Route text to appropriate conversion method (chunked vs direct).
-        
-        Determines if chunking is needed and delegates to the appropriate conversion method.
-        
+
         Args:
             text: Prepared text to convert
             voice_id: Voice identifier
@@ -130,57 +149,75 @@ class TTSEngine:
             rate: Speech rate adjustment
             pitch: Pitch adjustment
             volume: Volume adjustment
-        
+
         Returns:
             True if conversion successful, False otherwise
         """
+        self._log_conversion_start(text, output_path, voice_id, provider, rate, pitch, volume)
+
+        conversion_strategy = self._determine_conversion_strategy(text, provider_instance)
+
+        if conversion_strategy == "chunked":
+            return self._convert_with_chunking(text, voice_id, output_path, rate, pitch, volume, provider)
+        else:
+            return self._convert_direct(text, voice_id, output_path, provider, provider_instance, rate, pitch, volume)
+
+    def _log_conversion_start(self, text: str, output_path: Path, voice_id: str,
+                             provider: Optional[str], rate: Optional[float],
+                             pitch: Optional[float], volume: Optional[float]) -> None:
+        """Log the start of conversion with relevant parameters."""
         text_bytes_size = len(text.encode('utf-8'))
-        
+
         logger.info(f"Converting text to speech: {output_path.name}")
         logger.info(f"Voice: {voice_id}, Provider: {provider or 'auto'}, Rate: {rate}%, Pitch: {pitch}%, Volume: {volume}%")
         logger.info(f"Text size: {text_bytes_size} bytes")
-        
-        # Determine which provider will be used and check if chunking is needed
-        provider_for_chunking = provider_instance if provider_instance else self.provider_manager.get_available_provider()
-        
-        # Check if chunking is needed based on provider capabilities
-        needs_chunking = False
-        max_bytes = None
-        if provider_for_chunking:
-            if provider_for_chunking.supports_chunking():
-                max_bytes = provider_for_chunking.get_max_text_bytes()
-                if max_bytes and text_bytes_size > max_bytes:
-                    needs_chunking = True
-        
-        if needs_chunking and max_bytes:
-            # Use chunking for providers that support it
+
+    def _determine_conversion_strategy(self, text: str, provider_instance: Optional[TTSProvider]) -> str:
+        """
+        Determine whether to use chunked or direct conversion.
+
+        Returns:
+            "chunked" or "direct"
+        """
+        provider_for_check = provider_instance or self.provider_manager.get_available_provider()
+
+        if not provider_for_check or not provider_for_check.supports_chunking():
+            return "direct"
+
+        max_bytes = provider_for_check.get_max_text_bytes()
+        text_bytes_size = len(text.encode('utf-8'))
+
+        if max_bytes and text_bytes_size > max_bytes:
             logger.info(f"Text exceeds {max_bytes} bytes ({text_bytes_size} bytes), using chunking...")
-            return self._convert_with_chunking(text, voice_id, output_path, rate, pitch, volume, provider)
+            return "chunked"
+
+        return "direct"
+
+    def _convert_direct(self, text: str, voice_id: str, output_path: Path,
+                       provider: Optional[str], provider_instance: Optional[TTSProvider],
+                       rate: Optional[float], pitch: Optional[float], volume: Optional[float]) -> bool:
+        """Perform direct conversion without chunking."""
+        if provider_instance:
+            logger.info(f"Attempting conversion with provider '{provider}' (no fallback)")
+            return provider_instance.convert_text_to_speech(
+                text=text,
+                voice=voice_id,
+                output_path=output_path,
+                rate=rate,
+                pitch=pitch,
+                volume=volume
+            )
         else:
-            # Use direct conversion
-            if provider_instance:
-                # Provider was already validated
-                logger.info(f"Attempting conversion with provider '{provider}' (no fallback)")
-                return provider_instance.convert_text_to_speech(
-                    text=text,
-                    voice=voice_id,
-                    output_path=output_path,
-                    rate=rate,
-                    pitch=pitch,
-                    volume=volume
-                )
-            else:
-                # No provider specified - use fallback logic
-                logger.info(f"Attempting conversion with provider manager (auto fallback)")
-                return self.provider_manager.convert_with_fallback(
-                    text=text,
-                    voice=voice_id,
-                    output_path=output_path,
-                    preferred_provider=None,
-                    rate=rate,
-                    pitch=pitch,
-                    volume=volume
-                )
+            logger.info("Attempting conversion with provider manager (auto fallback)")
+            return self.provider_manager.convert_with_fallback(
+                text=text,
+                voice=voice_id,
+                output_path=output_path,
+                preferred_provider=None,
+                rate=rate,
+                pitch=pitch,
+                volume=volume
+            )
 
     def convert_text_to_speech(
         self,
@@ -217,10 +254,10 @@ class TTSEngine:
         voice_id, provider, _ = voice_validation_result  # voice_dict not needed in main method
         
         # Get provider instance for later use if not already resolved
-        provider_instance: Optional[TTSProvider] = self._get_provider_instance(provider) if provider else None
+        provider_instance: Optional[TTSProvider] = self.tts_utils.get_provider_instance(provider) if provider else None
 
         # Step 2: Get rate, pitch, volume from config if not provided
-        rate, pitch, volume = self._get_speech_params(rate, pitch, volume)
+        rate, pitch, volume = self.tts_utils.get_speech_params(rate, pitch, volume)
 
         # Step 3: Prepare text for conversion
         cleaned_text = self._prepare_text(text)
@@ -287,11 +324,11 @@ class TTSEngine:
             
             try:
                 # Chunk the text
-                chunks = self._chunk_text(text, self.DEFAULT_MAX_CHUNK_BYTES)
+                chunks = self._chunk_text(text, self.config.DEFAULT_MAX_CHUNK_BYTES)
                 logger.info(f"Split text into {len(chunks)} chunks")
                 
                 # Convert chunks in parallel
-                chunk_files = self._run_async_task(
+                chunk_files = AsyncBridge.run_async(
                     self._convert_chunks_parallel(
                         chunks, voice, temp_dir, output_path.stem,
                         provider=provider, rate=rate, pitch=pitch, volume=volume
@@ -301,11 +338,11 @@ class TTSEngine:
                 # Merge the chunks
                 if not self._merge_audio_chunks(chunk_files, output_path):
                     logger.error("Failed to merge audio chunks")
-                    self._cleanup_files(chunk_files)
+                    self.tts_utils.cleanup_files(chunk_files)
                     return False
-                
+
                 # Clean up chunk files
-                self._cleanup_files(chunk_files)
+                self.tts_utils.cleanup_files(chunk_files)
                 
                 # Verify output
                 if not output_path.exists():

@@ -326,15 +326,18 @@ class TestAsyncCancellationScenarios:
         mock_provider = MagicMock()
         mock_provider.convert_chunk_async = AsyncMock(side_effect=asyncio.CancelledError("Thread cancelled"))
 
-        # Should handle cancellation in parallel operations
-        with pytest.raises(asyncio.CancelledError):
-            asyncio.run(merger.convert_chunks_parallel(
-                chunks=["chunk1", "chunk2", "chunk3"],
-                voice="test-voice",
-                temp_dir=self.temp_dir,
-                output_stem="cancel_test",
-                provider=mock_provider
-            ))
+        # Should handle cancellation in parallel operations - returns exceptions in result list
+        result = asyncio.run(merger.convert_chunks_parallel(
+            chunks=["chunk1", "chunk2", "chunk3"],
+            voice="test-voice",
+            temp_dir=self.temp_dir,
+            output_stem="cancel_test",
+            provider=mock_provider
+        ))
+
+        # All chunks should fail due to cancellation, resulting in list of CancelledError exceptions
+        assert len(result) == 3
+        assert all(isinstance(r, asyncio.CancelledError) for r in result)
 
     def test_partial_cancellation_cleanup(self):
         """Test that partial results are cleaned up when operations are cancelled"""
@@ -714,21 +717,22 @@ class TestAsyncConcurrencyScenarios:
             # Create many small chunks to increase parallelism
             chunks = [f"chunk_{i}" for i in range(20)]
 
-            # Mock temp directory creation
+            # Mock temp directory creation and file verification
             with patch('pathlib.Path.mkdir'):
                 with patch('pathlib.Path.exists', return_value=True):
-                    # This should handle high concurrency without race conditions
-                    try:
-                        result_files = await merger.convert_chunks_parallel(
-                            chunks=chunks,
-                            voice="test-voice",
-                            temp_dir=self.temp_dir,
-                            output_stem="race_test",
-                            provider=mock_provider
-                        )
-                        return len(result_files)
-                    except Exception as e:
-                        return f"error: {e}"
+                    with patch.object(merger, '_verify_audio_file_async', return_value=True):
+                        # This should handle high concurrency without race conditions
+                        try:
+                            result_files = await merger.convert_chunks_parallel(
+                                chunks=chunks,
+                                voice="test-voice",
+                                temp_dir=self.temp_dir,
+                                output_stem="race_test",
+                                provider=mock_provider
+                            )
+                            return len(result_files)
+                        except Exception as e:
+                            return f"error: {e}"
 
         result = asyncio.run(race_condition_test())
 

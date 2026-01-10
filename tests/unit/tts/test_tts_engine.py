@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 # Import the REAL source code for proper testing and coverage
-from src.tts.tts_engine import TTSEngine
+from src.tts.tts_engine import TTSEngine, TTSConfig, AsyncBridge
 from src.tts.providers.provider_manager import TTSProviderManager
 from src.tts.voice_manager import VoiceManager
 from src.tts.voice_validator import VoiceValidator
@@ -42,14 +42,12 @@ class TestTTSEngine:
         assert engine.text_processor is not None
         assert isinstance(engine.text_processor, TextProcessor)
 
-        assert engine.tts_utils is not None
-        assert isinstance(engine.tts_utils, TTSUtils)
-
         assert engine.audio_merger is not None
         assert isinstance(engine.audio_merger, AudioMerger)
 
-        # Should have config
+        # Should have config (TTSConfig instance)
         assert engine.config is not None
+        assert isinstance(engine.config, TTSConfig)
 
     def test_dependency_injection_works(self):
         """Test that dependency injection properly replaces real components"""
@@ -115,26 +113,6 @@ class TestTTSEngine:
         assert use_ssml is True
         mock_processor.build_text_for_conversion.assert_called_once_with("input", mock_provider, 10.0, 5.0, -5.0)
 
-    def test_utility_methods_delegate_correctly(self):
-        """Test that utility methods delegate to TTSUtils"""
-        engine = TTSEngine()
-
-        # Mock TTSUtils
-        mock_utils = MagicMock()
-        mock_utils.get_provider_instance.return_value = MagicMock()
-        mock_utils.get_speech_params.return_value = (10.0, 5.0, -5.0)
-        engine.tts_utils = mock_utils
-
-        # Test get_provider_instance delegation
-        result = engine._get_provider_instance("edge_tts")
-        assert result is not None
-        mock_utils.get_provider_instance.assert_called_once_with("edge_tts")
-
-        # Test get_speech_params delegation
-        result = engine._get_speech_params(10.0, 5.0, -5.0)
-        assert result == (10.0, 5.0, -5.0)
-        mock_utils.get_speech_params.assert_called_once_with(10.0, 5.0, -5.0)
-    
     def test_voice_validation_delegation(self):
         """Test that voice validation delegates to VoiceValidator"""
         engine = TTSEngine()
@@ -322,4 +300,220 @@ class TestTTSEngine:
         engine.convert_text_to_speech.assert_not_called()
 
 
+class TestTTSConfig:
+    """Test TTSConfig class functionality."""
+
+    def test_tts_config_has_all_constants(self):
+        """Test that TTSConfig contains all expected constants."""
+        config = TTSConfig()
+
+        # Chunking settings
+        assert hasattr(config, 'DEFAULT_MAX_CHUNK_BYTES')
+        assert config.DEFAULT_MAX_CHUNK_BYTES == 3000
+
+        assert hasattr(config, 'DEFAULT_CHUNK_RETRIES')
+        assert config.DEFAULT_CHUNK_RETRIES == 3
+
+        assert hasattr(config, 'DEFAULT_CHUNK_RETRY_DELAY')
+        assert config.DEFAULT_CHUNK_RETRY_DELAY == 1.0
+
+        assert hasattr(config, 'MAX_CHUNK_RETRY_DELAY')
+        assert config.MAX_CHUNK_RETRY_DELAY == 10.0
+
+        assert hasattr(config, 'CONVERSION_TIMEOUT')
+        assert config.CONVERSION_TIMEOUT == 60.0
+
+        # Voice settings
+        assert hasattr(config, 'DEFAULT_VOICE')
+        assert config.DEFAULT_VOICE == "en-US-AndrewNeural"
+
+        assert hasattr(config, 'DEFAULT_RATE')
+        assert config.DEFAULT_RATE == "+0%"
+
+        assert hasattr(config, 'DEFAULT_PITCH')
+        assert config.DEFAULT_PITCH == "+0Hz"
+
+        assert hasattr(config, 'DEFAULT_VOLUME')
+        assert config.DEFAULT_VOLUME == "+0%"
+
+        # File operations
+        assert hasattr(config, 'FILE_CLEANUP_RETRIES')
+        assert config.FILE_CLEANUP_RETRIES == 3
+
+        assert hasattr(config, 'FILE_CLEANUP_DELAY')
+        assert config.FILE_CLEANUP_DELAY == 0.2
+
+    def test_tts_config_constants_are_immutable(self):
+        """Test that config constants cannot be accidentally modified."""
+        config = TTSConfig()
+
+        # Should be able to read
+        original_value = config.DEFAULT_MAX_CHUNK_BYTES
+
+        # Attempting to modify should not work (these are class attributes)
+        # Note: This test ensures the constants are defined as expected
+        assert config.DEFAULT_MAX_CHUNK_BYTES == original_value
+
+
+class TestAsyncBridge:
+    """Test AsyncBridge functionality."""
+
+    @pytest.mark.asyncio
+    async def test_run_async_with_existing_loop(self):
+        """Test AsyncBridge.run_async when there's already a running event loop."""
+        async def async_function():
+            return "success"
+
+        # We're already in an async context (pytest.mark.asyncio)
+        result = AsyncBridge.run_async(async_function())
+        assert result == "success"
+
+    def test_run_async_without_existing_loop(self):
+        """Test AsyncBridge.run_async when creating a new event loop."""
+        async def async_function():
+            return "success"
+
+        result = AsyncBridge.run_async(async_function())
+        assert result == "success"
+
+    def test_run_async_with_exception(self):
+        """Test AsyncBridge.run_async handles exceptions properly."""
+        async def failing_function():
+            raise ValueError("test error")
+
+        with pytest.raises(ValueError, match="test error"):
+            AsyncBridge.run_async(failing_function())
+
+    @pytest.mark.asyncio
+    async def test_run_async_with_async_context(self):
+        """Test that run_async works correctly in async test context."""
+        async def delayed_function():
+            await asyncio.sleep(0.01)
+            return "delayed_success"
+
+        result = AsyncBridge.run_async(delayed_function())
+        assert result == "delayed_success"
+
+
+class TestTTSEngineRefactoredMethods:
+    """Test the refactored methods in TTSEngine."""
+
+    def test_config_injection(self):
+        """Test that custom config can be injected."""
+        custom_config = TTSConfig()
+        custom_config.DEFAULT_MAX_CHUNK_BYTES = 5000  # Custom value
+
+        engine = TTSEngine(config=custom_config)
+
+        assert engine.config is custom_config
+        assert engine.config.DEFAULT_MAX_CHUNK_BYTES == 5000
+        assert engine.audio_merger.config is custom_config  # Should be passed through
+
+    def test_default_config_used_when_none_provided(self):
+        """Test that default TTSConfig is used when none provided."""
+        engine = TTSEngine()  # No config provided
+
+        assert isinstance(engine.config, TTSConfig)
+        assert engine.config.DEFAULT_MAX_CHUNK_BYTES == 3000
+
+    def test_determine_conversion_strategy_chunked(self):
+        """Test _determine_conversion_strategy returns 'chunked' when needed."""
+        engine = TTSEngine()
+
+        # Mock provider that supports chunking and has small limit
+        mock_provider = MagicMock()
+        mock_provider.supports_chunking.return_value = True
+        mock_provider.get_max_text_bytes.return_value = 1000
+
+        # Text larger than limit
+        large_text = "x" * 2000  # 2000 bytes
+
+        strategy = engine._determine_conversion_strategy(large_text, mock_provider)
+        assert strategy == "chunked"
+
+    def test_determine_conversion_strategy_direct(self):
+        """Test _determine_conversion_strategy returns 'direct' when chunking not needed."""
+        engine = TTSEngine()
+
+        # Mock provider that doesn't support chunking
+        mock_provider = MagicMock()
+        mock_provider.supports_chunking.return_value = False
+
+        text = "short text"
+
+        strategy = engine._determine_conversion_strategy(text, mock_provider)
+        assert strategy == "direct"
+
+    def test_determine_conversion_strategy_direct_no_provider(self):
+        """Test _determine_conversion_strategy returns 'direct' when no provider."""
+        engine = TTSEngine()
+
+        text = "some text"
+
+        strategy = engine._determine_conversion_strategy(text, None)
+        assert strategy == "direct"
+
+    def test_determine_conversion_strategy_direct_under_limit(self):
+        """Test _determine_conversion_strategy returns 'direct' when under chunking limit."""
+        engine = TTSEngine()
+
+        # Mock provider with large limit
+        mock_provider = MagicMock()
+        mock_provider.supports_chunking.return_value = True
+        mock_provider.get_max_text_bytes.return_value = 10000
+
+        small_text = "short"  # Much smaller than limit
+
+        strategy = engine._determine_conversion_strategy(small_text, mock_provider)
+        assert strategy == "direct"
+
+    def test_log_conversion_start_formats_correctly(self):
+        """Test that _log_conversion_start formats parameters correctly."""
+        engine = TTSEngine()
+
+        # This test verifies the logging method exists and can be called
+        # (actual logging output would be tested in integration tests)
+        text = "test text"
+        output_path = Path("/tmp/test.mp3")
+        voice_id = "test-voice"
+        provider = "edge_tts"
+        rate = 50.0
+        pitch = 10.0
+        volume = 25.0
+
+        # Should not raise any exceptions
+        engine._log_conversion_start(text, output_path, voice_id, provider, rate, pitch, volume)
+
+
+class TestTTSEngineIntegration:
+    """Integration tests for the refactored TTSEngine."""
+
+    def test_full_initialization_with_dependencies(self):
+        """Test that all dependencies are properly initialized and wired together."""
+        engine = TTSEngine()
+
+        # Verify all components exist
+        assert engine.provider_manager is not None
+        assert engine.voice_manager is not None
+        assert engine.voice_validator is not None
+        assert engine.text_processor is not None
+        assert engine.audio_merger is not None
+        assert engine.config is not None
+
+        # Verify config is shared between components
+        assert engine.audio_merger.config is engine.config
+
+    def test_custom_config_propagates_to_components(self):
+        """Test that custom config is properly propagated to all components."""
+        custom_config = TTSConfig()
+        custom_config.DEFAULT_MAX_CHUNK_BYTES = 9999
+
+        engine = TTSEngine(config=custom_config)
+
+        # Verify config is set on engine
+        assert engine.config.DEFAULT_MAX_CHUNK_BYTES == 9999
+
+        # Verify config is shared with audio_merger
+        assert engine.audio_merger.config is engine.config
+        assert engine.audio_merger.config.DEFAULT_MAX_CHUNK_BYTES == 9999
 

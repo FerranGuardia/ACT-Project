@@ -204,7 +204,7 @@ class TestFullPipelineE2E:
         logger.info("✅ E2E Error Handling Test PASSED")
     
     @pytest.mark.network
-    @pytest.mark.timeout(600)  # 10 minute timeout for network test
+    @pytest.mark.timeout(300)  # 5 minute timeout for network test (pyttsx3 is faster)
     def test_resume_functionality(self, temp_output_dir, test_novel_url):
         """Test project resume functionality."""
         logger.info("="*60)
@@ -225,7 +225,7 @@ class TestFullPipelineE2E:
             novel_url=test_novel_url,
             start_from=1,
             max_chapters=1,
-            voice="en-US-AndrewNeural"  # Use a valid English voice for testing
+            voice="pyttsx3"  # Use pyttsx3 for faster testing
         )
         
         # Handle network failures gracefully (403 errors, site blocking, etc.)
@@ -257,7 +257,7 @@ class TestFullPipelineE2E:
             novel_url=test_novel_url,
             start_from=1,
             max_chapters=1,  # Process 1 more chapter (should be chapter 2, skipping chapter 1)
-            voice="en-US-AndrewNeural"  # Use same voice as first run
+            voice="pyttsx3"  # Use same voice as first run for consistency
         )
         
         assert result2.get('success') == True, f"Second run failed: {result2.get('error')}"

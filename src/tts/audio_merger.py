@@ -25,25 +25,20 @@ logger = get_logger("tts.audio_merger")
 class AudioMerger:
     """Handles text chunking, parallel conversion, and audio merging."""
 
-    # Configuration constants
-    DEFAULT_MAX_CHUNK_BYTES = 3000
-    DEFAULT_CHUNK_RETRIES = 3  # Reduced from 5 for faster failure
-    DEFAULT_CHUNK_RETRY_DELAY = 1.0  # Reduced from 5.0
-    MAX_CHUNK_RETRY_DELAY = 10.0  # Cap exponential backoff
-    FILE_CLEANUP_RETRIES = 3
-    FILE_CLEANUP_DELAY = 0.2
-
     # Chunk conversion settings
     CONVERSION_TIMEOUT = 60.0  # 60 second timeout per chunk
     
-    def __init__(self, provider_manager: TTSProviderManager, cleanup_callback: Optional[Callable[[List[Path]], None]] = None):
+    def __init__(self, provider_manager: TTSProviderManager, cleanup_callback: Optional[Callable[[List[Path]], None]] = None, config: Optional['TTSConfig'] = None):
         """
         Initialize audio merger.
-        
+
         Args:
             provider_manager: TTSProviderManager for provider access
             cleanup_callback: Optional callback for cleaning up files (defaults to simple deletion)
+            config: Optional TTSConfig instance. If None, uses default TTSConfig.
         """
+        from .tts_engine import TTSConfig  # Avoid circular import
+        self.config = config or TTSConfig()
         self.provider_manager = provider_manager
         self.cleanup_callback = cleanup_callback
     
@@ -306,9 +301,9 @@ class AudioMerger:
             Exception: If conversion fails after all retries
         """
         chunk_path = temp_dir / f"{output_stem}_chunk_{index}.mp3"
-        retry_delay = self.DEFAULT_CHUNK_RETRY_DELAY
+        retry_delay = self.config.DEFAULT_CHUNK_RETRY_DELAY
 
-        for attempt in range(self.DEFAULT_CHUNK_RETRIES):
+        for attempt in range(self.config.DEFAULT_CHUNK_RETRIES):
             try:
                 # Add timeout to prevent hanging
                 success = await asyncio.wait_for(
@@ -320,7 +315,7 @@ class AudioMerger:
                         pitch=pitch,
                         volume=volume
                     ),
-                    timeout=self.CONVERSION_TIMEOUT
+                    timeout=self.config.CONVERSION_TIMEOUT
                 )
 
                 # Verify output file exists and has content
@@ -336,12 +331,12 @@ class AudioMerger:
                 logger.debug(f"Chunk {index+1} attempt {attempt+1} failed: {e}")
 
             # Don't retry on last attempt
-            if attempt < self.DEFAULT_CHUNK_RETRIES - 1:
+            if attempt < self.config.DEFAULT_CHUNK_RETRIES - 1:
                 # Cap exponential backoff
-                retry_delay = min(retry_delay * 1.5, self.MAX_CHUNK_RETRY_DELAY)
+                retry_delay = min(retry_delay * 1.5, self.config.MAX_CHUNK_RETRY_DELAY)
                 await asyncio.sleep(retry_delay)
 
-        raise Exception(f"Failed to convert chunk {index+1} after {self.DEFAULT_CHUNK_RETRIES} attempts")
+        raise Exception(f"Failed to convert chunk {index+1} after {self.config.DEFAULT_CHUNK_RETRIES} attempts")
 
     async def _verify_audio_file_async(self, file_path: Path) -> bool:
         """
