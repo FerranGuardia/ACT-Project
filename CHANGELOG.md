@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Test Execution
 - Added parallel test execution configuration (`-n auto`) in `pytest.ini`
 - Automatic CPU core detection for optimal parallelization
+- Fixed TTS constant access issues in AudioMerger and test suite
+- Improved E2E test reliability by switching to offline TTS (pyttsx3)
+- Reduced E2E test timeouts from 10 to 5 minutes for faster execution
 - Circuit breaker test isolation fixes for reliable parallel execution
 
 ### Testing Infrastructure
