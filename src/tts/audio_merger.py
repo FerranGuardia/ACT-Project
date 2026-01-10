@@ -24,12 +24,17 @@ logger = get_logger("tts.audio_merger")
 
 class AudioMerger:
     """Handles text chunking, parallel conversion, and audio merging."""
-    
+
+    # Configuration constants
     DEFAULT_MAX_CHUNK_BYTES = 3000
-    DEFAULT_CHUNK_RETRIES = 5
-    DEFAULT_CHUNK_RETRY_DELAY = 5.0
+    DEFAULT_CHUNK_RETRIES = 3  # Reduced from 5 for faster failure
+    DEFAULT_CHUNK_RETRY_DELAY = 1.0  # Reduced from 5.0
+    MAX_CHUNK_RETRY_DELAY = 10.0  # Cap exponential backoff
     FILE_CLEANUP_RETRIES = 3
     FILE_CLEANUP_DELAY = 0.2
+
+    # Chunk conversion settings
+    CONVERSION_TIMEOUT = 60.0  # 60 second timeout per chunk
     
     def __init__(self, provider_manager: TTSProviderManager, cleanup_callback: Optional[Callable[[List[Path]], None]] = None):
         """
@@ -45,91 +50,164 @@ class AudioMerger:
     def chunk_text(self, text: str, max_bytes: int) -> List[str]:
         """
         Split text into chunks that don't exceed max_bytes when UTF-8 encoded.
-        
+
+        Uses a hierarchical splitting approach: sentences -> words -> characters
+        to maintain natural text boundaries while respecting byte limits.
+
         Args:
             text: Text to chunk
             max_bytes: Maximum bytes per chunk
-            
+
         Returns:
-            List of text chunks
+            List of text chunks, guaranteed to not exceed max_bytes each
+
+        Raises:
+            ValueError: If max_bytes is <= 0 or text cannot be chunked
         """
-        chunks: List[str] = []
+        if max_bytes <= 0:
+            raise ValueError("max_bytes must be positive")
+        if not text:
+            return []
+
+        # Convert to bytes once for efficiency
+        text_bytes = text.encode('utf-8')
+        if len(text_bytes) <= max_bytes:
+            return [text]
+
+        chunks = []
+
+        # Strategy 1: Split by sentence boundaries (most natural)
+        sentences = self._split_by_sentences(text)
+        if len(sentences) > 1:
+            return self._chunk_sentences(sentences, max_bytes)
+
+        # Strategy 2: Split by words (if no sentence boundaries)
+        words = text.split()
+        if len(words) > 1:
+            return self._chunk_words(words, max_bytes)
+
+        # Strategy 3: Split by characters (fallback for very long words)
+        return self._chunk_characters(text, max_bytes)
+
+    def _split_by_sentences(self, text: str) -> List[str]:
+        """Split text by sentence boundaries, preserving punctuation."""
+        # Split on sentence endings followed by whitespace or end of string
+        pattern = r'(?<=[.!?])\s+|(?<=[.!?])$'
+        parts = re.split(pattern, text)
+
+        sentences = []
+        for part in parts:
+            part = part.strip()
+            if part:
+                sentences.append(part)
+
+        return sentences
+
+    def _chunk_sentences(self, sentences: List[str], max_bytes: int) -> List[str]:
+        """Chunk sentences while respecting byte limits."""
+        chunks = []
         current_chunk = ""
         current_bytes = 0
-        
-        # Split by sentences first (try to break at natural points)
-        # Use multiple sentence delimiters
-        sentences = re.split(r'([.!?]\s+)', text)
-        
-        # Recombine sentences with their punctuation
-        combined_sentences: List[str] = []
-        for i in range(0, len(sentences) - 1, 2):
-            if i + 1 < len(sentences):
-                combined_sentences.append(sentences[i] + sentences[i + 1])
-            else:
-                combined_sentences.append(sentences[i])
-        
-        if len(combined_sentences) == 1:
-            # No sentence breaks, split by spaces
-            combined_sentences = text.split(' ')
-        
-        for sentence in combined_sentences:
-            # Ensure sentence is a string (it should be from List[str])
-            if not isinstance(sentence, str):
-                continue
-            # Ensure sentence has trailing space if it's not the last one
-            if sentence != combined_sentences[-1] and not sentence.endswith((' ', '.', '!', '?')):
-                sentence += ' '
-            
-            sentence_bytes = len(sentence.encode('utf-8'))
-            
+
+        for sentence in sentences:
+            # Add space between sentences (except for first)
+            separator = " " if current_chunk else ""
+            sentence_with_sep = separator + sentence
+            sentence_bytes = len(sentence_with_sep.encode('utf-8'))
+
             if current_bytes + sentence_bytes <= max_bytes:
-                # Add to current chunk
-                current_chunk += sentence
+                current_chunk += sentence_with_sep
                 current_bytes += sentence_bytes
             else:
-                # Current chunk is full, start new one
+                # Finish current chunk
                 if current_chunk:
                     chunks.append(current_chunk.strip())
+
+                # Start new chunk
                 current_chunk = sentence
-                current_bytes = sentence_bytes
-                
-                # If single sentence is too long, split by words
-                if sentence_bytes > max_bytes:
-                    words = sentence.split(' ')
-                    for word in words:
-                        if not word:
-                            continue
-                        word_with_space = word + ' '
-                        word_bytes = len(word_with_space.encode('utf-8'))
-                        if current_bytes + word_bytes <= max_bytes:
-                            current_chunk += word_with_space
-                            current_bytes += word_bytes
-                        else:
-                            if current_chunk:
-                                chunks.append(current_chunk.strip())
-                            current_chunk = word_with_space
-                            current_bytes = word_bytes
-        
-        # Add remaining chunk
-        if current_chunk.strip():
+                current_bytes = len(sentence.encode('utf-8'))
+
+                # If sentence itself is too big, split it by words
+                if current_bytes > max_bytes:
+                    if current_chunk:
+                        chunks.append(current_chunk.strip())
+                    word_chunks = self._chunk_words(sentence.split(), max_bytes)
+                    chunks.extend(word_chunks)
+                    current_chunk = ""
+                    current_bytes = 0
+
+        # Add final chunk
+        if current_chunk:
             chunks.append(current_chunk.strip())
-        
-        # Verify all chunks are within limit
-        verified_chunks: List[str] = []
-        for chunk in chunks:
-            if not isinstance(chunk, str):
-                continue
-            chunk_bytes = len(chunk.encode('utf-8'))
-            if chunk_bytes > max_bytes:
-                logger.warning(f"Chunk exceeds limit ({chunk_bytes} > {max_bytes} bytes), splitting further...")
-                # Recursively split oversized chunks
-                sub_chunks = self.chunk_text(chunk, max_bytes // 2)
-                verified_chunks.extend(sub_chunks)
+
+        return chunks
+
+    def _chunk_words(self, words: List[str], max_bytes: int) -> List[str]:
+        """Chunk words while respecting byte limits."""
+        if not words:
+            return []
+
+        chunks = []
+        current_chunk = ""
+        current_bytes = 0
+
+        for word in words:
+            # Add space between words (except for first)
+            separator = " " if current_chunk else ""
+            word_with_sep = separator + word
+            word_bytes = len(word_with_sep.encode('utf-8'))
+
+            if current_bytes + word_bytes <= max_bytes:
+                current_chunk += word_with_sep
+                current_bytes += word_bytes
             else:
-                verified_chunks.append(chunk)
-        
-        return verified_chunks
+                # Finish current chunk
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+
+                # Start new chunk with this word
+                current_chunk = word
+                current_bytes = len(word.encode('utf-8'))
+
+                # If word itself is too big, split by characters
+                if current_bytes > max_bytes:
+                    if current_chunk:
+                        chunks.append(current_chunk.strip())
+                    char_chunks = self._chunk_characters(word, max_bytes)
+                    chunks.extend(char_chunks)
+                    current_chunk = ""
+                    current_bytes = 0
+
+        # Add final chunk
+        if current_chunk:
+            chunks.append(current_chunk.strip())
+
+        return chunks
+
+    def _chunk_characters(self, text: str, max_bytes: int) -> List[str]:
+        """Split text by characters as last resort."""
+        chunks = []
+        current_chunk = ""
+        current_bytes = 0
+
+        for char in text:
+            char_bytes = len(char.encode('utf-8'))
+
+            if current_bytes + char_bytes <= max_bytes:
+                current_chunk += char
+                current_bytes += char_bytes
+            else:
+                # Finish current chunk
+                if current_chunk:
+                    chunks.append(current_chunk)
+                current_chunk = char
+                current_bytes = char_bytes
+
+        # Add final chunk
+        if current_chunk:
+            chunks.append(current_chunk)
+
+        return chunks
     
     async def convert_chunks_parallel(
         self,
@@ -142,8 +220,9 @@ class AudioMerger:
         pitch: Optional[float] = None,
         volume: Optional[float] = None
     ) -> List[Path]:
-        """Convert chunks in parallel using provider abstraction.
-        
+        """
+        Convert chunks in parallel using provider abstraction.
+
         Args:
             chunks: List of text chunks to convert
             voice: Voice identifier
@@ -153,127 +232,253 @@ class AudioMerger:
             rate: Speech rate adjustment
             pitch: Pitch adjustment
             volume: Volume adjustment
-        
+
         Returns:
             List of Path objects for converted chunk files
-            
+
         Raises:
-            ValueError: If provider is None
+            ValueError: If provider is None or inputs are invalid
         """
         if not provider:
             raise ValueError("Provider is required for parallel chunk conversion")
-        
-        async def convert_chunk(chunk: str, index: int) -> Path:
-            """Convert a single chunk using the provider's async method"""
-            chunk_path = temp_dir / f"{output_stem}_chunk_{index}.mp3"
-            max_retries = self.DEFAULT_CHUNK_RETRIES
-            retry_delay = self.DEFAULT_CHUNK_RETRY_DELAY
-            
-            for retry in range(max_retries):
-                try:
-                    # Use provider's async chunk conversion method
-                    success = await provider.convert_chunk_async(  # type: ignore[attr-defined]
+        if not chunks:
+            return []
+        if not temp_dir.exists():
+            raise ValueError(f"Temporary directory does not exist: {temp_dir}")
+
+        # Convert all chunks concurrently with error handling
+        tasks = [
+            self._convert_single_chunk_async(chunk, index, voice, temp_dir, output_stem, provider, rate, pitch, volume)
+            for index, chunk in enumerate(chunks)
+        ]
+
+        try:
+            chunk_files = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Handle partial failures
+            successful_files = []
+            failures = []
+
+            for i, result in enumerate(chunk_files):
+                if isinstance(result, Exception):
+                    failures.append((i, result))
+                    logger.error(f"Chunk {i+1} conversion failed: {result}")
+                else:
+                    successful_files.append(result)
+
+            if failures:
+                logger.warning(f"{len(failures)}/{len(chunks)} chunks failed to convert")
+
+            return successful_files
+
+        except Exception as e:
+            logger.error(f"Parallel conversion failed: {e}")
+            raise
+
+    async def _convert_single_chunk_async(
+        self,
+        chunk: str,
+        index: int,
+        voice: str,
+        temp_dir: Path,
+        output_stem: str,
+        provider: TTSProvider,
+        rate: Optional[float],
+        pitch: Optional[float],
+        volume: Optional[float]
+    ) -> Path:
+        """
+        Convert a single chunk with retry logic and timeout.
+
+        Args:
+            chunk: Text chunk to convert
+            index: Chunk index for logging
+            voice: Voice identifier
+            temp_dir: Temporary directory
+            output_stem: Output filename stem
+            provider: TTS provider instance
+            rate, pitch, volume: Audio adjustments
+
+        Returns:
+            Path to converted audio file
+
+        Raises:
+            Exception: If conversion fails after all retries
+        """
+        chunk_path = temp_dir / f"{output_stem}_chunk_{index}.mp3"
+        retry_delay = self.DEFAULT_CHUNK_RETRY_DELAY
+
+        for attempt in range(self.DEFAULT_CHUNK_RETRIES):
+            try:
+                # Add timeout to prevent hanging
+                success = await asyncio.wait_for(
+                    provider.convert_chunk_async(  # type: ignore[attr-defined]
                         text=chunk,
                         voice=voice,
                         output_path=chunk_path,
                         rate=rate,
                         pitch=pitch,
                         volume=volume
-                    )
-                    
-                    if success and chunk_path.exists() and chunk_path.stat().st_size > 0:
-                        return chunk_path
-                    else:
-                        logger.warning(f"Chunk {index+1} attempt {retry+1} produced empty file, retrying...")
-                except Exception as retry_error:
-                    if retry < max_retries - 1:
-                        await asyncio.sleep(retry_delay)
-                        retry_delay *= 1.5
-                        logger.debug(f"Retrying chunk {index+1} after error: {retry_error}")
-                    else:
-                        logger.error(f"Failed to convert chunk {index+1} after {max_retries} retries: {retry_error}")
-                        raise retry_error
-            
-            raise Exception(f"Failed to convert chunk {index+1} after {max_retries} retries")
-        
-        # Convert all chunks concurrently
-        tasks = [convert_chunk(chunk, i) for i, chunk in enumerate(chunks)]
-        chunk_files = await asyncio.gather(*tasks)
-        return chunk_files
+                    ),
+                    timeout=self.CONVERSION_TIMEOUT
+                )
+
+                # Verify output file exists and has content
+                if success and await self._verify_audio_file_async(chunk_path):
+                    logger.debug(f"✓ Chunk {index+1} converted successfully")
+                    return chunk_path
+                else:
+                    logger.warning(f"Chunk {index+1} attempt {attempt+1} produced invalid file")
+
+            except asyncio.TimeoutError:
+                logger.warning(f"Chunk {index+1} attempt {attempt+1} timed out")
+            except Exception as e:
+                logger.debug(f"Chunk {index+1} attempt {attempt+1} failed: {e}")
+
+            # Don't retry on last attempt
+            if attempt < self.DEFAULT_CHUNK_RETRIES - 1:
+                # Cap exponential backoff
+                retry_delay = min(retry_delay * 1.5, self.MAX_CHUNK_RETRY_DELAY)
+                await asyncio.sleep(retry_delay)
+
+        raise Exception(f"Failed to convert chunk {index+1} after {self.DEFAULT_CHUNK_RETRIES} attempts")
+
+    async def _verify_audio_file_async(self, file_path: Path) -> bool:
+        """
+        Asynchronously verify that an audio file exists and has content.
+
+        Args:
+            file_path: Path to audio file
+
+        Returns:
+            True if file exists and has non-zero size
+        """
+        try:
+            # Use asyncio.to_thread for blocking file operations
+            exists = await asyncio.to_thread(file_path.exists)
+            if not exists:
+                return False
+
+            # Check file size
+            stat = await asyncio.to_thread(file_path.stat)
+            return stat.st_size > 0
+
+        except Exception:
+            return False
     
     def merge_audio_chunks(self, chunk_files: List[Path], output_path: Path) -> bool:
         """
         Merge multiple audio files into one.
-        
+
         Args:
-            chunk_files: List of paths to audio chunk files
+            chunk_files: List of paths to audio chunk files (must exist and be readable)
             output_path: Path for merged output file
-            
+
         Returns:
             True if successful, False otherwise
+
+        Raises:
+            ValueError: If chunk_files is empty or contains invalid paths
         """
-        try:
-            # Try using pydub if available
+        if not chunk_files:
+            raise ValueError("chunk_files cannot be empty")
+
+        # Validate input files exist
+        missing_files = [f for f in chunk_files if not f.exists()]
+        if missing_files:
+            raise ValueError(f"Chunk files do not exist: {missing_files}")
+
+        # Try different merging strategies in order of preference
+        strategies = [
+            self._merge_with_pydub,
+            self._merge_with_ffmpeg,
+            self._merge_fallback_copy
+        ]
+
+        for strategy in strategies:
             try:
-                from pydub import AudioSegment  # type: ignore[import-untyped]
-                
-                combined = AudioSegment.empty()  # type: ignore[attr-defined]
-                audio_segments = []
-                for chunk_file in chunk_files:
-                    audio = AudioSegment.from_mp3(str(chunk_file))  # type: ignore[attr-defined]
-                    audio_segments.append(audio)
-                    combined += audio  # type: ignore[assignment]
-                
-                combined.export(str(output_path), format="mp3")  # type: ignore[attr-defined]
-                
-                # Explicitly delete references to ensure file handles are released
-                del combined
-                del audio_segments
-                gc.collect()
-                
-                logger.info(f"✓ Merged {len(chunk_files)} audio chunks using pydub")
-                return True
-            except ImportError:
-                # pydub not available, try using ffmpeg directly or simple concatenation
-                logger.warning("pydub not available, trying alternative merge method...")
-                
-                # Try using ffmpeg if available
-                try:
-                    # Create file list for ffmpeg concat
-                    temp_dir = Path(tempfile.gettempdir())
-                    file_list = temp_dir / f"concat_list_{output_path.stem}.txt"
-                    
-                    with open(file_list, 'w', encoding='utf-8') as f:
-                        for chunk_file in chunk_files:
-                            f.write(f"file '{chunk_file.absolute()}'\n")
-                    
-                    # Use ffmpeg to concatenate
-                    result = subprocess.run(
-                        ['ffmpeg', '-f', 'concat', '-safe', '0', '-i', str(file_list), '-c', 'copy', str(output_path)],
-                        capture_output=True,
-                        text=True
-                    )
-                    
-                    # Clean up file list
-                    if file_list.exists():
-                        file_list.unlink()
-                    
-                    if result.returncode == 0 and output_path.exists():
-                        logger.info(f"✓ Merged {len(chunk_files)} audio chunks using ffmpeg")
-                        return True
-                    else:
-                        logger.error(f"ffmpeg merge failed: {result.stderr}")
-                except (FileNotFoundError, subprocess.SubprocessError) as e:
-                    logger.error(f"ffmpeg not available or failed: {e}")
-                
-                # Last resort: just copy the first chunk (not ideal, but better than nothing)
-                logger.warning("No audio merging library available. Using first chunk only (incomplete audio).")
-                logger.warning("Install pydub for proper audio merging: pip install pydub")
-                if chunk_files and chunk_files[0].exists():
-                    shutil.copy2(chunk_files[0], output_path)
+                if strategy(chunk_files, output_path):
                     return True
-                
-                return False
+            except Exception as e:
+                logger.debug(f"Merge strategy {strategy.__name__} failed: {e}")
+                continue
+
+        logger.error("All audio merging strategies failed")
+        return False
+
+    def _merge_with_pydub(self, chunk_files: List[Path], output_path: Path) -> bool:
+        """Merge using pydub library."""
+        try:
+            from pydub import AudioSegment  # type: ignore[import-untyped]
+        except ImportError:
+            logger.debug("pydub not available")
+            return False
+
+        try:
+            combined = AudioSegment.empty()  # type: ignore[attr-defined]
+
+            # Load and combine all audio segments
+            for chunk_file in chunk_files:
+                audio = AudioSegment.from_mp3(str(chunk_file))  # type: ignore[attr-defined]
+                combined += audio  # type: ignore[assignment]
+
+            # Export with context manager to ensure file handle cleanup
+            with open(output_path, 'wb') as f:
+                combined.export(f, format="mp3")  # type: ignore[attr-defined]
+
+            logger.info(f"✓ Merged {len(chunk_files)} audio chunks using pydub")
+            return True
+
         except Exception as e:
-            logger.error(f"Error merging audio chunks: {e}")
+            logger.debug(f"pydub merge failed: {e}")
+            return False
+
+    def _merge_with_ffmpeg(self, chunk_files: List[Path], output_path: Path) -> bool:
+        """Merge using ffmpeg command line tool."""
+        try:
+            # Create temporary file list for ffmpeg concat
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
+                temp_file_list = Path(f.name)
+                for chunk_file in chunk_files:
+                    f.write(f"file '{chunk_file.absolute()}'\n")
+
+            try:
+                # Run ffmpeg concatenation
+                result = subprocess.run(
+                    ['ffmpeg', '-f', 'concat', '-safe', '0', '-i', str(temp_file_list),
+                     '-c', 'copy', str(output_path)],
+                    capture_output=True,
+                    text=True,
+                    timeout=300  # 5 minute timeout
+                )
+
+                if result.returncode == 0 and output_path.exists():
+                    logger.info(f"✓ Merged {len(chunk_files)} audio chunks using ffmpeg")
+                    return True
+                else:
+                    logger.debug(f"ffmpeg merge failed: {result.stderr}")
+                    return False
+
+            finally:
+                # Always clean up temporary file
+                try:
+                    temp_file_list.unlink(missing_ok=True)
+                except Exception:
+                    pass  # Ignore cleanup errors
+
+        except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.SubprocessError) as e:
+            logger.debug(f"ffmpeg merge failed: {e}")
+            return False
+
+    def _merge_fallback_copy(self, chunk_files: List[Path], output_path: Path) -> bool:
+        """Fallback: copy first chunk (produces incomplete audio)."""
+        logger.warning("Using fallback merge method - only first chunk will be used")
+        logger.warning("Install pydub for proper audio merging: pip install pydub")
+
+        try:
+            shutil.copy2(chunk_files[0], output_path)
+            logger.info(f"✓ Copied first chunk to output (fallback mode)")
+            return True
+        except Exception as e:
+            logger.error(f"Fallback copy failed: {e}")
             return False

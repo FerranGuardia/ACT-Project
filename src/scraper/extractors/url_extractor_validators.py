@@ -35,11 +35,11 @@ def is_chapter_url(url: str, link_text: str = "") -> bool:
         return True
     
     # Standard chapter patterns in URL
-    if re.search(r"chapter|ch[_\-\s]?\d+", url_lower):
+    if re.search(r"chapter[/_\-\s]?\d+|ch[_\-\s]?\d+", url_lower):
         return True
-    
+
     # Standard chapter patterns in link text
-    if re.search(r"chapter|ch[_\-\s]?\d+|第\s*\d+\s*章", text_lower):
+    if re.search(r"(chapter|chap)\s*\d+|ch\.?\s*\d+|第\s*\d+\s*章|episode\s*\d+|ep\s*\d+|vol\.?\s*\d+|volume\s*\d+", text_lower):
         return True
     
     # FanMTL pattern: novel-name_123.html or novel-name/123.html
