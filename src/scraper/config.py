@@ -6,13 +6,13 @@ Contains default settings, selectors, and patterns for web scraping.
 
 # Request settings
 REQUEST_TIMEOUT = 30
-REQUEST_DELAY = 2.0
+REQUEST_DELAY = 5.0  # Increased from 2.0 to reduce website impact
 MAX_RETRIES = 3
-RETRY_BACKOFF_BASE = 2.0  # seconds
+RETRY_BACKOFF_BASE = 3.0  # Increased from 2.0 for more conservative backoff
 
 # Rate limiting
-RATE_LIMIT_DELAY = 1.0
-RATE_LIMIT_BUFFER = 0.5
+RATE_LIMIT_DELAY = 3.0  # Increased from 1.0 to reduce request frequency
+RATE_LIMIT_BUFFER = 1.0  # Increased from 0.5 for more conservative rate limiting
 
 # Playwright settings
 PLAYWRIGHT_TIMEOUT = 30000
@@ -31,6 +31,16 @@ TITLE_SELECTORS = [
 ]
 
 CONTENT_SELECTORS = [
+    # NovelFull specific selectors (most specific first)
+    "div.cha-words",  # NovelFull main content container
+    "div.cha-content",  # NovelFull content wrapper
+    "div.chapter-c",
+    "div#chapter-c",
+    "div.text-left",
+    "div#text-chapter",
+    "div.chapter-content-wrapper",
+
+    # General novel site selectors
     "div.chapter-content",
     "div#chapter-content",
     "div.chapter-body",
@@ -43,6 +53,19 @@ CONTENT_SELECTORS = [
     "div.chapter-text",
     "div#novel-content",
     "div.novel-content",
+
+    # Additional common selectors
+    "div.entry-content",
+    "div.post-content",
+    "div.story-content",
+    "div#story-content",
+    "div.chapter-inner",
+    "div.reading-content",
+    "div#reading-content",
+    "div.text",
+    "div#text",
+    "div.chap-content",
+    "div#chap-content",
 ]
 
 # Chapter URL patterns

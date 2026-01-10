@@ -10,8 +10,12 @@ from pathlib import Path
 from typing import Any, Dict, Optional, cast
 
 from .logger import get_logger
+from .constants import get_version
 
 logger = get_logger("core.config_manager")
+
+
+__all__ = ["ConfigManager", "get_config"]
 
 
 class ConfigManager:
@@ -49,15 +53,14 @@ class ConfigManager:
             Dictionary with default configuration
         """
         # Read version from VERSION file
-        version_file = Path(__file__).parent.parent / "VERSION"
-        version = version_file.read_text().strip() if version_file.exists() else "1.2.0"
+        version = get_version()
 
         # Detect if running in test environment
         import os
         import tempfile
         is_test_env = ("PYTEST_CURRENT_TEST" in os.environ or
                       "pytest" in str(Path.cwd()) or
-                      any("test" in str(Path.cwd()).lower().split(os.sep)))
+                      any("test" in part for part in str(Path.cwd()).lower().split(os.sep)))
 
         # Use temp directory for tests to avoid desktop pollution
         if is_test_env:
@@ -256,9 +259,3 @@ def get_config() -> ConfigManager:
         >>> voice = config.get('tts.voice')
     """
     return ConfigManager()
-
-
-
-
-
-

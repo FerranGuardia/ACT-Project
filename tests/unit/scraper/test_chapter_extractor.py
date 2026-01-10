@@ -20,7 +20,7 @@ class TestChapterExtractorInit:
         extractor = ChapterExtractor("https://example.com")
         assert extractor.base_url == "https://example.com"
         assert extractor.timeout == 30  # REQUEST_TIMEOUT
-        assert extractor.delay == 2.0  # REQUEST_DELAY
+        assert extractor.delay == 5.0  # REQUEST_DELAY
         assert extractor._session is None
 
     def test_init_custom_values(self):

@@ -70,6 +70,40 @@ class VoiceValidator:
             voice = voice.strip()
         else:
             voice = "en-US-AndrewNeural"  # Fallback if config returns None
+
+        # Handle Windows SAPI voice names that might be selected in UI
+        # Map common Windows TTS voice names to Edge TTS equivalents
+        windows_voice_mapping = {
+            # Ana voices
+            "microsoft ana online (natural)": "en-US-AnaNeural",
+            "microsoft ana online (natural) - english (united states) female": "en-US-AnaNeural",
+            "microsoft ana online (natural) - english (united states)": "en-US-AnaNeural",
+
+            # Zira voices
+            "microsoft zira desktop": "en-US-ZiraNeural",
+            "microsoft zira desktop - english (united states)": "en-US-ZiraNeural",
+
+            # David voices
+            "microsoft david desktop": "en-US-ZiraNeural",  # Map to female since David is male but we want consistency
+            "microsoft david desktop - english (united states)": "en-US-ZiraNeural",
+
+            # Aria voices (if available)
+            "microsoft aria online (natural)": "en-US-AriaNeural",
+            "microsoft aria online (natural) - english (united states)": "en-US-AriaNeural",
+
+            # Generic mappings for common patterns
+            "ana": "en-US-AnaNeural",
+            "zira": "en-US-ZiraNeural",
+            "aria": "en-US-AriaNeural",
+        }
+
+        # Check if the voice name matches any Windows voice patterns
+        voice_lower = voice.lower()
+        for windows_name, edge_voice in windows_voice_mapping.items():
+            if windows_name in voice_lower:
+                logger.info(f"Mapped Windows voice '{voice}' to Edge TTS voice '{edge_voice}'")
+                voice = edge_voice
+                break
         
         # Ensure voice is a string at this point
         if not isinstance(voice, str):
@@ -80,15 +114,17 @@ class VoiceValidator:
         provider_instance: Optional[TTSProvider] = self._get_provider_instance(provider)
         if provider and not provider_instance:
             # Provider was specified but not available
+            logger.error(f"Provider '{provider}' was specified but not available")
             return None
         
         # Look up voice in provider(s)
+        logger.debug(f"Looking up voice '{voice}' in provider '{provider or 'any'}'")
         # Suppress warnings about partially unknown return type from VoiceManager
         voice_dict: Optional[Dict[str, Any]] = self.voice_manager.get_voice_by_name(voice, provider=provider)  # type: ignore[assignment]
         if not voice_dict:
             if provider:
                 # If provider is specified and voice not found, fail (no fallback)
-                logger.error(f"Voice '{voice}' not found in provider '{provider}'")
+                logger.error(f"Voice '{voice}' not found in provider '{provider}' - available voices may not be loaded")
                 return None
             else:
                 # If no provider specified, try to find voice in any provider
@@ -96,18 +132,30 @@ class VoiceValidator:
                 # Suppress warnings about partially unknown return type from VoiceManager
                 voice_dict = self.voice_manager.get_voice_by_name(voice, provider=None)  # type: ignore[assignment]
                 if not voice_dict:
-                    logger.error(f"Voice '{voice}' not found in any provider")
+                    logger.error(f"Voice '{voice}' not found in any provider - voice manager may not be initialized properly")
+                    # Log available voices for debugging
+                    try:
+                        all_voices = self.voice_manager.get_voices()
+                        logger.error(f"Available voices ({len(all_voices)} total):")
+                        for i, v in enumerate(all_voices[:5]):  # Show first 5
+                            logger.error(f"  {i+1}. {v.get('name', 'unknown')} ({v.get('id', 'no-id')})")
+                        if len(all_voices) > 5:
+                            logger.error(f"  ... and {len(all_voices) - 5} more")
+                    except Exception as e:
+                        logger.error(f"Could not list available voices: {e}")
                     return None
         
+        # Determine provider from voice metadata if not already specified
+        resolved_provider = provider
+
         # Resolve voice ID (prefer id, then ShortName for backward compatibility)
         # Type ignore because voice_dict is Dict[str, Any] but Pylance sees Dict[Unknown, Unknown]
         voice_id_raw = voice_dict.get("id") or voice_dict.get("ShortName", voice)  # type: ignore[arg-type]
         voice_id: str = str(voice_id_raw) if voice_id_raw is not None else voice
         if voice_id != voice:
-            logger.info(f"Using voice ID '{voice_id}' instead of '{voice}'")
-        
-        # Determine provider from voice metadata if not already specified
-        resolved_provider = provider
+            logger.info(f"Resolved voice: '{voice}' -> '{voice_id}' (provider: {resolved_provider})")
+        else:
+            logger.info(f"Using voice: '{voice_id}' (provider: {resolved_provider})")
         if resolved_provider is None and "provider" in voice_dict:
             provider_value = voice_dict.get("provider")  # type: ignore[arg-type]
             if isinstance(provider_value, str):

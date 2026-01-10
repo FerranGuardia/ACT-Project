@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from core.config_manager import get_config
 from core.logger import ACTLogger, get_logger
+from core.constants import LOG_SEPARATOR_WIDTH, get_version
 
 # Initialize logger and config
 _ = ACTLogger()
@@ -27,10 +28,10 @@ def main() -> int:
     Returns:
         Exit code (0 for success, non-zero for error)
     """
-    logger.info("=" * 60)
+    logger.info("=" * LOG_SEPARATOR_WIDTH)
     logger.info("ACT - Audiobook Creator Tools")
-    logger.info(f"Version: {config.get('app.version', '1.2.0')}")
-    logger.info("=" * 60)
+    logger.info(f"Version: {config.get('app.version', get_version())}")
+    logger.info("=" * LOG_SEPARATOR_WIDTH)
 
     try:
         # Initialize configuration
@@ -75,13 +76,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-
-
-
-
-
-
-
-
-
-

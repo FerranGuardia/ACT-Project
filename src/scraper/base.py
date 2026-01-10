@@ -10,7 +10,7 @@ from pathlib import Path
 
 from core.logger import get_logger
 from core.config_manager import get_config
-from .text_cleaner import clean_text
+from text_utils import clean_text
 from .chapter_parser import extract_chapter_number as _extract_chapter_number, sort_chapters_by_number
 from .config import REQUEST_TIMEOUT, REQUEST_DELAY, MAX_RETRIES
 

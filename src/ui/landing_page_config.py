@@ -55,7 +55,7 @@ class LandingPageConfig:
     LOGO_PADDING = 20
     
     # Logo filenames
-    LOGO_FILENAMES = ["logo atc 1.png", "logo.png", "logo_atc_1.png"]
+    LOGO_FILENAMES = ["logo.png", "logo atc 1.png", "logo_atc_1.png"]
 
 
 class DesignTokens:

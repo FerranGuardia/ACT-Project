@@ -291,11 +291,15 @@ class AddQueueDialog(QDialog):
             from tts.providers.provider_manager import TTSProviderManager
             provider_manager = TTSProviderManager()
             provider_instance = provider_manager.get_provider(provider)
-            if not provider_instance or not provider_instance.is_available():
-                self.voice_combo.addItems(["Sorry, the provider you are trying to use is currently unavailable"])
+            if not provider_instance:
+                self.voice_combo.addItems(["Sorry, the provider you are trying to use is not found"])
                 self.voice_combo.setEnabled(False)
-                logger.warning(f"Provider '{provider}' is not available - voice selection disabled")
+                logger.warning(f"Provider '{provider}' not found - voice selection disabled")
                 return
+
+            # Note: We don't check is_available() here because the provider was selected
+            # from the ProviderSelectionDialog which already tested audio generation.
+            # If it passed that test, we should trust it can load voices.
 
             # Load voices for the selected provider (filtered to en-US only)
             voices = self.voice_manager.get_voice_list(locale="en-US", provider=provider)

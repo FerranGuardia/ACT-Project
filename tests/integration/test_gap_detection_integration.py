@@ -43,13 +43,14 @@ def temp_output_dir():
 
 @pytest.fixture
 def test_novel_url():
-    """Test novel URL - using NovelBin for faster testing."""
-    return "https://novelbin.me/novel-book/the-archmages-restaurant#tab-chapters-title"
+    """Test novel URL - using NovelFull for more conservative rate limiting."""
+    return "https://novelfull.net/the-second-coming-of-gluttony.html"
 
 
 class TestGapDetectionIntegration:
     """Integration tests for gap detection feature."""
     
+    @pytest.mark.serial
     @pytest.mark.network
     @pytest.mark.timeout(300)  # 5 minute timeout for network test
     def test_gap_detection_finds_missing_audio_files(self, temp_output_dir, test_novel_url):
@@ -181,6 +182,7 @@ class TestGapDetectionIntegration:
         
         logger.info("✅ Gap Detection Integration Test PASSED")
     
+    @pytest.mark.serial
     @pytest.mark.network
     @pytest.mark.timeout(300)  # 5 minute timeout for network test
     def test_gap_detection_no_gaps_scenario(self, temp_output_dir, test_novel_url):

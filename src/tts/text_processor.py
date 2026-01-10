@@ -12,7 +12,7 @@ from core.logger import get_logger
 from .providers.base_provider import TTSProvider
 from .providers.provider_manager import TTSProviderManager
 from .ssml_builder import build_ssml
-from .text_cleaner import clean_text_for_tts
+from text_utils import clean_text_for_tts
 from .audio_merger import AudioMerger
 
 logger = get_logger("tts.text_processor")

@@ -35,15 +35,16 @@ def temp_output_dir():
 
 @pytest.fixture
 def test_novel_url():
-    """Test novel URL - using NovelBin for faster testing (AJAX method, no Playwright)."""
-    # Using NovelBin URL - uses AJAX method, much faster than Playwright
-    # This URL uses AJAX endpoint discovery, no Playwright needed
-    return "https://novelbin.me/novel-book/the-archmages-restaurant#tab-chapters-title"
+    """Test novel URL - using NovelFull for more conservative rate limiting."""
+    # Using NovelFull URL - less aggressive rate limiting than NovelBin
+    # This URL uses AJAX method, much faster than Playwright
+    return "https://novelfull.net/the-second-coming-of-gluttony.html"
 
 
 class TestFullPipelineE2E:
     """End-to-end tests for complete pipeline workflow."""
     
+    @pytest.mark.serial
     @pytest.mark.network
     @pytest.mark.timeout(600)  # 10 minute timeout for network test
     def test_happy_path_scrape_and_tts(self, temp_output_dir, test_novel_url):
@@ -117,6 +118,7 @@ class TestFullPipelineE2E:
         
         logger.info("✅ E2E Happy Path Test PASSED")
     
+    @pytest.mark.serial
     @pytest.mark.network
     @pytest.mark.timeout(600)  # 10 minute timeout for network test
     def test_fallback_to_pyttsx3(self, temp_output_dir, test_novel_url):

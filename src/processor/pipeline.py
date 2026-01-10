@@ -22,6 +22,9 @@ from .progress_tracker import ProgressTracker, ProcessingStatus
 logger = get_logger("processor.pipeline")
 
 
+__all__ = ["ProcessingPipeline"]
+
+
 class ProcessingPipeline:
     """
     Main processing pipeline for audiobook creation.

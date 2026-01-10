@@ -1,23 +1,11 @@
 # Core dependencies
 # edge-tts: Edge TTS provider uses system edge-tts installation
-#   - Main provider (edge_tts): Standard API method
-# NOTE: Version 7.2.3 has a bug causing "NoAudioReceived" errors. Pin to 7.2.0 until fixed.
-edge-tts==7.2.0
+#   - Main provider (edge_tts): Standard API method 7.2.0
 pyttsx3>=2.90  # Offline TTS provider
 PySide6>=6.6.0
 requests>=2.31.0
-
-# Optional but recommended
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
 playwright>=1.40.0  # For advanced scraping with JavaScript
 pydub>=0.25.1  # For audio processing
-
-# Audio format support
 mutagen>=1.47.0  # For metadata handling in audio files
-
-# Circuit breaker pattern for fault tolerance
-circuitbreaker>=1.3.0
-
-
-
-
-

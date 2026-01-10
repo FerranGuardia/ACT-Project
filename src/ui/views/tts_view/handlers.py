@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 from PySide6.QtWidgets import QMessageBox, QFileDialog
 from PySide6.QtCore import QUrl, QTimer
 
+from core.constants import PREVIEW_TEXT_LENGTH, TEMP_FILE_CLEANUP_DELAY_MS
 from core.logger import get_logger
 from tts import TTSEngine, VoiceManager
 
@@ -118,18 +119,23 @@ class TTSViewHandlers:
             # Get selected provider
             current_index = provider_combo.currentIndex()
             if current_index < 0:
-                provider = None
+                # Default to Edge TTS if no provider selected
+                provider = "edge_tts"
+                logger.info("No provider selected, defaulting to Edge TTS")
             else:
                 provider = provider_combo.itemData(current_index)
             
             # Load voices for the selected provider (filtered to en-US only)
+            logger.info(f"Loading voices for provider: {provider}")
             voices = self.voice_manager.get_voice_list(locale="en-US", provider=provider)
-            
+
             if not voices:
                 logger.warning(f"No voices available for provider: {provider}")
                 voice_combo.addItems(["No voices available"])
                 voice_combo.setEnabled(False)
                 return
+
+            logger.info(f"Loaded {len(voices)} voices: {voices[:3]}...")
             
             voice_combo.setEnabled(True)
             voice_combo.addItems(voices)
@@ -223,8 +229,8 @@ class TTSViewHandlers:
         if current_tab == 1:  # Text Editor tab
             editor_text = text_editor.toPlainText().strip()
             if editor_text:
-                # Use first 200 characters of editor text for preview
-                sample_text = editor_text[:200] + ("..." if len(editor_text) > 200 else "")
+                # Use first N characters of editor text for preview
+                sample_text = editor_text[:PREVIEW_TEXT_LENGTH] + ("..." if len(editor_text) > PREVIEW_TEXT_LENGTH else "")
         
         try:
             status_label.setText("Generating preview...")
@@ -319,7 +325,7 @@ class TTSViewHandlers:
                             finally:
                                 self.preview_temp_file = None
                         
-                        QTimer.singleShot(500, cleanup_temp_file)  # 500ms delay
+                        QTimer.singleShot(TEMP_FILE_CLEANUP_DELAY_MS, cleanup_temp_file)
                     except Exception as e:
                         logger.warning(f"Error scheduling temp file cleanup: {e}")
     

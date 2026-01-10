@@ -16,7 +16,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFontDatabase, QCloseEvent, QFont, QShortcut, QKeySequence
-from PySide6.QtGui import QFontDatabase, QCloseEvent, QFont
 
 from core.logger import get_logger
 from ui.landing_page import LandingPage
@@ -24,6 +23,9 @@ from ui.views import ScraperView, TTSView, MergerView, FullAutoView
 from ui.styles import get_global_style
 
 logger = get_logger("ui.main_window")
+
+
+__all__ = ["MainWindow"]
 
 
 class MainWindow(QMainWindow):

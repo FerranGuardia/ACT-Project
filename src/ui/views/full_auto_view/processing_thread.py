@@ -22,8 +22,9 @@ class ProcessingThread(QThread):
     chapter_update = Signal(int, str, str)  # Chapter num, status, message
     finished = Signal(bool, str)  # Success, message
     
-    def __init__(self, url: str, project_name: str, voice: Optional[str] = None, 
-                 provider: Optional[str] = None, chapter_selection: Optional[Dict[str, Any]] = None, 
+    def __init__(self, url: str, project_name: str, voice: Optional[str] = None,
+                 provider: Optional[str] = None, chapter_selection: Optional[Dict[str, Any]] = None,
+                 output_format: Optional[Dict[str, Any]] = None,
                  output_folder: Optional[str] = None, novel_title: Optional[str] = None):
         super().__init__()
         self.url = url
@@ -31,6 +32,7 @@ class ProcessingThread(QThread):
         self.voice = voice
         self.provider = provider
         self.chapter_selection = chapter_selection or {'type': 'all'}
+        self.output_format = output_format or {'type': 'individual_mp3s'}
         self.output_folder = output_folder or str(Path.home() / "Desktop")
         self.novel_title = novel_title or project_name
         self.pipeline: Optional[ProcessingPipeline] = None
@@ -210,6 +212,18 @@ class ProcessingThread(QThread):
                 gaps_info = ""
                 if missing_chapters:
                     gaps_info = f" ({len(missing_chapters)} gaps detected and filled)"
+
+                # Handle output format - merge audio files if needed
+                if self.output_format.get('type') != 'individual_mp3s':
+                    self.status.emit("Merging audio files...")
+                    logger.info(f"Merging audio files with format: {self.output_format}")
+                    merge_success = self.pipeline.merge_audio_files(self.output_format)
+                    if merge_success:
+                        self.status.emit("Audio files merged successfully")
+                        logger.info("Audio files merged successfully")
+                    else:
+                        logger.warning("Audio file merging failed, but continuing with success")
+
                 self.finished.emit(True, f"Processing completed successfully{gaps_info}")
             elif self.should_stop:
                 self.finished.emit(False, "Processing stopped")

@@ -20,6 +20,7 @@ if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
 
+@pytest.mark.serial
 @pytest.mark.e2e
 @pytest.mark.slow
 @pytest.mark.timeout(300)  # 5 minute timeout for E2E test
@@ -31,8 +32,8 @@ def test_single_chapter_e2e_isolated(tmp_path):
     output_dir = tmp_path / "e2e_output"
     output_dir.mkdir()
 
-    # Use a reliable test URL that loads quickly
-    test_url = "https://novelbin.me/novel-book/the-archmages-restaurant#tab-chapters-title"
+    # Use a reliable test URL that loads quickly (NovelFull has less aggressive rate limiting)
+    test_url = "https://novelfull.net/the-second-coming-of-gluttony.html"
 
     # Create pipeline with isolated environment
     with patch('core.config_manager.get_config') as mock_config, \

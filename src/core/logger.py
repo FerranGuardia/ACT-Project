@@ -11,6 +11,11 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from .constants import MAX_LOG_FILE_SIZE_MB, ERROR_LOG_FILE_SIZE_MB, LOG_BACKUP_COUNT, ERROR_LOG_BACKUP_COUNT
+
+
+__all__ = ["ACTLogger", "get_logger"]
+
 
 class ACTLogger:
     """Centralized logger for ACT application."""
@@ -58,8 +63,8 @@ class ACTLogger:
         # File handler - DEBUG level and above (with rotation)
         file_handler = logging.handlers.RotatingFileHandler(
             self.log_file,
-            maxBytes=10 * 1024 * 1024,  # 10MB
-            backupCount=5,
+            maxBytes=MAX_LOG_FILE_SIZE_MB * 1024 * 1024,  # Use constant
+            backupCount=LOG_BACKUP_COUNT,
             encoding="utf-8",
         )
         file_handler.setLevel(logging.DEBUG)
@@ -73,8 +78,8 @@ class ACTLogger:
         # Error file handler - ERROR level and above
         error_handler = logging.handlers.RotatingFileHandler(
             self.error_log_file,
-            maxBytes=5 * 1024 * 1024,  # 5MB
-            backupCount=3,
+            maxBytes=ERROR_LOG_FILE_SIZE_MB * 1024 * 1024,  # Use constant
+            backupCount=ERROR_LOG_BACKUP_COUNT,
             encoding="utf-8",
         )
         error_handler.setLevel(logging.ERROR)
@@ -161,14 +166,3 @@ def get_logger(name: str) -> logging.Logger:
         >>> logger.info("Starting scraper")
     """
     return ACTLogger.get_logger(name)
-
-
-
-
-
-
-
-
-
-
-

@@ -62,8 +62,9 @@ class VoiceManager:
         if provider:
             voices = self.provider_manager.get_voices_by_provider(provider, locale=locale)  # type: ignore[assignment]
         else:
-            # Get voices from all providers
-            voices = self.provider_manager.get_all_voices(locale=locale)  # type: ignore[assignment]
+            # Default to Edge TTS voices when no provider specified (avoid Windows SAPI voices)
+            logger.debug("No provider specified, defaulting to Edge TTS voices")
+            voices = self.provider_manager.get_voices_by_provider("edge_tts", locale=locale)  # type: ignore[assignment]
         
         # Cast to proper type since ProviderManager returns List[Dict] without type args
         return voices  # type: ignore[return-value]

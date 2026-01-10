@@ -136,7 +136,7 @@ class PlaywrightExtractor:
         links: List[tuple[str, str]] = []
         try:
             dom_links = page.query_selector_all("a[href]")  # type: ignore[attr-defined]
-        except Exception:
+        except Exception as e:
             return links
 
         for link in dom_links:
@@ -148,7 +148,7 @@ class PlaywrightExtractor:
                 text_raw: Any = link.inner_text()  # type: ignore[attr-defined]
                 text: str = (str(text_raw) if text_raw else "").strip()
                 links.append((href, text))
-            except Exception:
+            except Exception as e:
                 continue
         return links
     
@@ -231,7 +231,7 @@ class PlaywrightExtractor:
             try:
                 page_title = page.title()  # type: ignore[attr-defined]
                 is_cloudflare = "just a moment" in page_title.lower() or "checking your browser" in page_title.lower()
-            except Exception:
+            except Exception as e:
                 is_cloudflare = False
         
         if not is_cloudflare:
@@ -266,7 +266,7 @@ class PlaywrightExtractor:
                             logger.debug(f"Cloudflare challenge completed after navigation ({waited}s)")
                             challenge_complete = True
                             break
-                    except Exception:
+                    except Exception as e:
                         pass
                 
                 if waited % 4 == 0 and not challenge_complete:
@@ -282,23 +282,23 @@ class PlaywrightExtractor:
                     if not ("just a moment" in current_title.lower() or "checking your browser" in current_title.lower()):
                         challenge_complete = True
                         break
-                except Exception:
+                except Exception as e:
                     pass
         
         if challenge_complete:
             try:
                 page.wait_for_load_state("networkidle", timeout=10000)  # type: ignore[attr-defined]
-            except Exception:
+            except Exception as e:
                 try:
                     page.wait_for_load_state("domcontentloaded", timeout=5000)  # type: ignore[attr-defined]
-                except Exception:
+                except Exception as e:
                     pass
             time.sleep(1)
         else:
             logger.warning("⚠ Cloudflare wait timed out, proceeding anyway...")
             try:
                 page.wait_for_load_state("domcontentloaded", timeout=5000)  # type: ignore[attr-defined]
-            except Exception:
+            except Exception as e:
                 pass
     
     def _check_captcha(self, page: Any) -> None:
@@ -308,7 +308,7 @@ class PlaywrightExtractor:
             if captcha_iframes:
                 logger.warning("⚠ CAPTCHA detected (separate from Cloudflare) - this may block scraping")
                 time.sleep(3)  # Brief wait in case it auto-resolves
-        except Exception:
+        except Exception as e:
             pass
     
     def _detect_pagination(self, page: Any, toc_url: str) -> List[str]:
@@ -333,7 +333,7 @@ class PlaywrightExtractor:
                 if found:
                     pagination_links.extend(found)
                     logger.debug(f"Found {len(found)} pagination links using: {selector}")
-            except Exception:
+            except Exception as e:
                 continue
         
         # Also try finding pagination by looking for links with numbers
@@ -545,10 +545,10 @@ class PlaywrightExtractor:
                 page.goto(page_url, wait_until="domcontentloaded", timeout=30000)  # type: ignore[attr-defined]
                 try:
                     page.wait_for_load_state("networkidle", timeout=10000)  # type: ignore[attr-defined]
-                except Exception:
+                except Exception as e:
                     try:
                         page.wait_for_load_state("domcontentloaded", timeout=5000)  # type: ignore[attr-defined]
-                    except Exception:
+                    except Exception as e:
                         pass
                 
                 page_title: str = page.title()  # type: ignore[attr-defined]
@@ -562,7 +562,7 @@ class PlaywrightExtractor:
                             current_title: str = page.title()  # type: ignore[attr-defined]
                             if not ("just a moment" in current_title.lower() or "checking your browser" in current_title.lower()):
                                 break
-                        except Exception:
+                        except Exception as e:
                             pass
                 return True
             
@@ -643,7 +643,7 @@ class PlaywrightExtractor:
                         working_pattern = pattern
                         page.goto(toc_url, wait_until="domcontentloaded", timeout=30000)  # type: ignore[attr-defined]
                         break
-            except Exception:
+            except Exception as e:
                 continue
         
         if working_pattern:
@@ -666,11 +666,11 @@ class PlaywrightExtractor:
         try:
             page.wait_for_load_state("networkidle", timeout=15000)  # type: ignore[attr-defined]
             logger.debug("Network idle - all content should be loaded")
-        except Exception:
+        except Exception as e:
             try:
                 page.wait_for_load_state("domcontentloaded", timeout=5000)  # type: ignore[attr-defined]
                 logger.debug("Network idle timeout, but DOM is loaded")
-            except Exception:
+            except Exception as e:
                 pass
         
         chapter_urls: List[str] = []

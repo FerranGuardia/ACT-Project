@@ -50,16 +50,17 @@ class FullAutoViewHandlers:
             parsed = urlparse(url)
             title = parsed.path.strip('/').split('/')[-1] or "Untitled Novel"
             return title
-        except:
+        except Exception as e:
+            logger.warning(f"Failed to parse URL for title generation: {e}")
             return "Untitled Novel"
     
-    def connect_queue_item_buttons(self, queue_widget, row: int, 
+    def connect_queue_item_buttons(self, queue_widget, row: int,
                                    move_up_callback, move_down_callback, remove_callback):
         """Connect action buttons for a queue item widget."""
         for button in queue_widget.findChildren(QPushButton):
-            if button.text() == "↑":
+            if "Move Up" in button.text():
                 button.clicked.connect(lambda checked, r=row: move_up_callback(r))
-            elif button.text() == "↓":
+            elif "Move Down" in button.text():
                 button.clicked.connect(lambda checked, r=row: move_down_callback(r))
             elif "Remove" in button.text():
                 button.clicked.connect(lambda checked, r=row: remove_callback(r))

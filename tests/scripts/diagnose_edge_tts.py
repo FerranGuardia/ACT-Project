@@ -89,10 +89,10 @@ async def test_edge_tts_connection():
             import os
             temp_dir = Path(tempfile.gettempdir())
             test_file = temp_dir / f"edge_tts_test_{voice_name.replace('-', '_')}.mp3"
-            
+
             try:
                 await communicate.save(str(test_file))
-                
+
                 # Check if file was created and has content
                 if test_file.exists() and test_file.stat().st_size > 0:
                     size = test_file.stat().st_size
@@ -101,21 +101,8 @@ async def test_edge_tts_connection():
                     success_count += 1
                 else:
                     print("[FAIL] No audio received")
-            except PermissionError:
-                # Try user's Desktop instead
-                desktop = Path.home() / "Desktop"
-                test_file = desktop / f"edge_tts_test_{voice_name.replace('-', '_')}.mp3"
-                try:
-                    await communicate.save(str(test_file))
-                    if test_file.exists() and test_file.stat().st_size > 0:
-                        size = test_file.stat().st_size
-                        test_file.unlink()
-                        print(f"[OK] Working ({size} bytes)")
-                        success_count += 1
-                    else:
-                        print("[FAIL] No audio received")
-                except Exception as e2:
-                    print(f"[FAIL] {e2}")
+            except Exception as e:
+                print(f"[FAIL] {e}")
         except Exception as e:
             print(f"[FAIL] {e}")
     

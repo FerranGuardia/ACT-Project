@@ -17,6 +17,9 @@ from utils.validation import validate_url
 logger = get_logger("scraper.novel_scraper")
 
 
+__all__ = ["NovelScraper"]
+
+
 class NovelScraper(BaseScraper):
     """
     Novel scraper with failsafe methods for webnovel sites.

@@ -160,7 +160,7 @@ class ChapterUrlExtractors:
     def _is_same_host(self, url: str) -> bool:
         try:
             netloc = urlparse(url).netloc.lower()
-        except Exception:
+        except Exception as e:
             return True
         if not self.base_host or not netloc:
             return True
@@ -233,7 +233,7 @@ class ChapterUrlExtractors:
                             return urls
                     except (json.JSONDecodeError, ValueError):
                         continue
-                except Exception:
+                except Exception as e:
                     continue
             
             return []

@@ -6,7 +6,7 @@ Tests the clean_text function and related utilities without network dependencies
 
 import pytest
 
-from src.scraper.text_cleaner import clean_text
+from src.text_utils import clean_text
 
 
 class TestTextCleaner:

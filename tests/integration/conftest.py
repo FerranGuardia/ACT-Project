@@ -6,8 +6,6 @@ Integration tests use real components, not mocks
 import sys
 from pathlib import Path
 
-from circuitbreaker import CircuitBreaker
-
 # Add ACT project src to path for integration tests
 project_root = Path(__file__).parent.parent.parent
 src_path = project_root / "src"
@@ -15,134 +13,17 @@ if src_path.exists():
     sys.path.insert(0, str(project_root))
     sys.path.insert(0, str(src_path))
 
-
 # Setup for UI integration tests
 import pytest
 
-
-def _reset_circuit_breaker(method):
-    """
-    Robustly reset circuit breaker state for a decorated method.
-    
-    This function resets the singleton circuit breaker state attached to a method
-    decorated with @circuit.
-    
-    Args:
-        method: The decorated method with a circuit breaker
-        
-    Returns:
-        bool: True if reset successful, False otherwise
-    """
-    reset_successful = False
-    
-    # Strategy 1: Direct _circuit_breaker attribute
-    if hasattr(method, '_circuit_breaker'):
-        breaker = method._circuit_breaker
-        if hasattr(breaker, '_failure_count'):
-            breaker._failure_count = 0
-            breaker._state = CircuitBreaker.CLOSED
-            breaker._opened_at = None
-            breaker._last_failure_at = None
-            reset_successful = True
-    
-    # Strategy 2: Search all attributes for circuit breaker instances
-    if not reset_successful:
-        for attr_name in dir(method):
-            if 'circuit' in attr_name.lower() or '_breaker' in attr_name.lower():
-                try:
-                    attr_value = getattr(method, attr_name)
-                    if hasattr(attr_value, '_failure_count') and hasattr(attr_value, '_state'):
-                        attr_value._failure_count = 0
-                        attr_value._state = CircuitBreaker.CLOSED  
-                        attr_value._opened_at = None
-                        attr_value._last_failure_at = None
-                        reset_successful = True
-                except:
-                    continue
-    
-    # Strategy 3: Force initialization by calling with invalid params
-    if not reset_successful:
-        try:
-            from src.tts.providers.edge_tts_provider import EdgeTTSProvider
-            dummy_provider = EdgeTTSProvider()
-            dummy_provider.convert_text_to_speech("test", "invalid-voice", Path("dummy.mp3"))
-        except:
-            pass
-        
-        # Try strategy 1 again after initialization
-        if hasattr(method, '_circuit_breaker'):
-            breaker = method._circuit_breaker
-            if hasattr(breaker, '_failure_count'):
-                breaker._failure_count = 0
-                breaker._state = CircuitBreaker.CLOSED
-                breaker._opened_at = None
-                breaker._last_failure_at = None
-                reset_successful = True
-    
-    return reset_successful
-
-
-@pytest.fixture(scope="function", autouse=True)
-def reset_all_circuit_breakers():
-    """
-    Auto-fixture that runs before and after EVERY test to ensure circuit breaker isolation.
-    
-    This prevents cross-test contamination by resetting all circuit breakers to clean state.
-    """
-    # Reset before test runs
-    try:
-        from src.tts.providers.edge_tts_provider import EdgeTTSProvider
-        _reset_circuit_breaker(EdgeTTSProvider.convert_text_to_speech)
-    except:
-        pass
-    
-    yield  # Run the test
-    
-    # Reset after test completes
-    try:
-        from src.tts.providers.edge_tts_provider import EdgeTTSProvider
-        _reset_circuit_breaker(EdgeTTSProvider.convert_text_to_speech)
-    except:
-        pass
-
-
-@pytest.fixture
-def fresh_circuit_breaker():
-    """
-    Fixture that explicitly resets circuit breaker and returns the reset function.
-    
-    Returns:
-        Callable: Function to reset the circuit breaker on demand
-    """
-    from src.tts.providers.edge_tts_provider import EdgeTTSProvider
-    
-    def reset():
-        return _reset_circuit_breaker(EdgeTTSProvider.convert_text_to_speech)
-    
-    # Reset before test
-    reset()
-    
-    return reset
-
-
-@pytest.fixture
-def isolated_edge_provider():
-    """
-    Create an EdgeTTSProvider instance with guaranteed clean circuit breaker state.
-    
-    Returns:
-        EdgeTTSProvider: Provider instance with clean circuit breaker state
-    """
-    from src.tts.providers.edge_tts_provider import EdgeTTSProvider
-
-    # Reset circuit breaker before creating provider
-    _reset_circuit_breaker(EdgeTTSProvider.convert_text_to_speech)
-    
-    provider = EdgeTTSProvider()
-    
-    return provider
-
+# Import shared circuit breaker fixtures
+from tests._circuit_breaker_fixtures import (
+    reset_all_circuit_breakers,
+    fresh_circuit_breaker,
+    isolated_edge_provider
+)
 @pytest.fixture(scope="session")
+def qt_application():
 def qt_application():
     """Create QApplication instance for UI tests (session-scoped)"""
     try:

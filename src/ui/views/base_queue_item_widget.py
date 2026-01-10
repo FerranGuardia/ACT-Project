@@ -78,11 +78,16 @@ class BaseQueueItemWidget(QWidget):
         
         # Action buttons
         actions_layout = QVBoxLayout()
-        self.up_button = QPushButton("↑")
+        self.up_button = QPushButton("↑ Move Up")
         self.up_button.setMaximumWidth(ViewConfig.QUEUE_ACTION_BUTTON_WIDTH)
-        self.down_button = QPushButton("↓")
+        self.down_button = QPushButton("↓ Move Down")
         self.down_button.setMaximumWidth(ViewConfig.QUEUE_ACTION_BUTTON_WIDTH)
         self.remove_button = QPushButton("✖️ Remove")
+        # Make sure buttons are visible and properly styled
+        for btn in [self.up_button, self.down_button, self.remove_button]:
+            btn.setMinimumWidth(70)
+            btn.setVisible(True)
+            btn.setEnabled(True)
         actions_layout.addWidget(self.up_button)
         actions_layout.addWidget(self.down_button)
         actions_layout.addWidget(self.remove_button)

@@ -37,7 +37,7 @@ except ImportError:
     HAS_PLAYWRIGHT: bool = False  # type: ignore[constant-redefinition]
 
 from ..chapter_parser import extract_chapter_number
-from ..text_cleaner import clean_text
+from text_utils import clean_text
 from core.logger import get_logger
 from ..config import (
     REQUEST_TIMEOUT,
@@ -275,17 +275,25 @@ class ChapterExtractor:
         for selector in CONTENT_SELECTORS:
             content_elem = soup.select_one(selector)  # type: ignore[attr-defined]
             if content_elem:
+                logger.debug(f"Found content element with selector: {selector}")
                 break
         
         if not content_elem:
             # Fallback: find by class/id patterns
             content_elem = soup.find("div", class_=re.compile("content|chapter|text", re.I))  # type: ignore[attr-defined]
+            if content_elem:
+                logger.debug("Found content element with regex fallback: div with content/chapter/text class")
         if not content_elem:
             content_elem = soup.find("article")  # type: ignore[attr-defined]
+            if content_elem:
+                logger.debug("Found content element with fallback: article tag")
         if not content_elem:
             content_elem = soup.find("body")  # type: ignore[attr-defined]
+            if content_elem:
+                logger.debug("Found content element with last fallback: body tag")
         
         if not content_elem:
+            logger.debug(f"No content element found for chapter {chapter_url}")
             return None
         
         # Extract paragraphs - prefer p tags, avoid nested duplication
@@ -313,12 +321,31 @@ class ChapterExtractor:
             text_raw = elem.get_text(strip=True)  # type: ignore[attr-defined]
             text: str = str(text_raw) if text_raw is not None else ""
             if text and len(text) > 20:
-                # Filter out navigation/UI elements
-                if not re.search(
-                    r"previous|next|chapter|table of contents|advertisement|comment",
-                    text,
-                    re.I,
-                ):
+                # Filter out navigation/UI elements - be more specific to avoid filtering chapter content
+                # Only filter if the text is primarily navigation (short text with navigation words)
+                is_navigation = False
+                text_lower = text.lower()
+
+                # Check for navigation patterns, but allow chapter content that happens to contain these words
+                nav_patterns = [
+                    r"^\s*(previous|next)\s+(chapter|page)",
+                    r"^\s*chapter\s+\d+\s*$",  # Just "Chapter 123" by itself
+                    r"^\s*table of contents",
+                    r"^\s*advertisement",
+                    r"^\s*comment",
+                    r"^\s*(read online|download|pdf)",
+                ]
+
+                for pattern in nav_patterns:
+                    if re.search(pattern, text_lower):
+                        is_navigation = True
+                        break
+
+                # Also filter very short text that contains navigation words (likely menu items)
+                if len(text.strip()) < 50 and any(word in text_lower for word in ['previous', 'next', 'table of contents', 'advertisement', 'comment']):
+                    is_navigation = True
+
+                if not is_navigation:
                     # Normalize text for comparison (remove extra whitespace)
                     normalized = re.sub(r"\s+", " ", text.strip())
                     # Only add if we haven't seen this exact text before
@@ -330,19 +357,47 @@ class ChapterExtractor:
             # Fallback: get all text
             text_raw = content_elem.get_text(separator="\n", strip=True)  # type: ignore[attr-defined]
             text = str(text_raw) if text_raw is not None else ""
+            logger.debug(f"Fallback text extraction: found {len(text)} characters of raw text")
             if text and len(text) > 50:
                 lines: list[str] = []
                 seen_lines: set[str] = set()
                 for line in text.split("\n"):
                     line = line.strip()
                     if line and len(line) > 20:
-                        normalized = re.sub(r"\s+", " ", line)
-                        if normalized not in seen_lines:
-                            seen_lines.add(normalized)
-                            lines.append(line)
+                        # Apply same navigation filtering as above
+                        line_lower = line.lower()
+                        is_navigation = False
+
+                        nav_patterns = [
+                            r"^\s*(previous|next)\s+(chapter|page)",
+                            r"^\s*chapter\s+\d+\s*$",  # Just "Chapter 123" by itself
+                            r"^\s*table of contents",
+                            r"^\s*advertisement",
+                            r"^\s*comment",
+                            r"^\s*(read online|download|pdf)",
+                        ]
+
+                        for pattern in nav_patterns:
+                            if re.search(pattern, line_lower):
+                                is_navigation = True
+                                break
+
+                        # Also filter very short text that contains navigation words (likely menu items)
+                        if len(line.strip()) < 50 and any(word in line_lower for word in ['previous', 'next', 'table of contents', 'advertisement', 'comment']):
+                            is_navigation = True
+
+                        if not is_navigation:
+                            normalized = re.sub(r"\s+", " ", line)
+                            if normalized not in seen_lines:
+                                seen_lines.add(normalized)
+                                lines.append(line)
                 text_parts = lines
-        
-        return "\n\n".join(text_parts) if text_parts else None
+                logger.debug(f"Fallback text processing: extracted {len(text_parts)} lines after filtering")
+
+        result = "\n\n".join(text_parts) if text_parts else None
+        if not result:
+            logger.warning(f"No content extracted from chapter - content_elem found but no usable text")
+        return result
     
     def _wait_for_cloudflare_optimized(self, page: Any, should_stop: Optional[Callable[[], bool]] = None) -> None:
         """
@@ -363,7 +418,7 @@ class ChapterExtractor:
         try:
             page_title = page.title().lower()  # type: ignore[attr-defined]
             is_cloudflare_title = "just a moment" in page_title or "checking your browser" in page_title
-        except Exception:
+        except Exception as e:
             is_cloudflare_title = False
         
         # Check for challenge elements
@@ -379,7 +434,7 @@ class ChapterExtractor:
                 checking_text > 0,
                 cf_verification > 0
             ])
-        except Exception:
+        except Exception as e:
             has_challenge_elements = False
         
         if not is_cloudflare_title and not has_challenge_elements:
@@ -406,7 +461,7 @@ class ChapterExtractor:
                 try:
                     current_title = page.title().lower()  # type: ignore[attr-defined]
                     challenge_gone_title = not ("just a moment" in current_title or "checking your browser" in current_title)
-                except Exception:
+                except Exception as e:
                     challenge_gone_title = False
                 
                 # Check if challenge elements are gone
@@ -414,7 +469,7 @@ class ChapterExtractor:
                     challenge_form_now = page.locator("form#challenge-form").count()  # type: ignore[attr-defined]
                     challenge_text_now = page.locator("text=Just a moment").count()  # type: ignore[attr-defined]
                     challenge_gone_elements = challenge_form_now == 0 and challenge_text_now == 0
-                except Exception:
+                except Exception as e:
                     challenge_gone_elements = False
                 
                 # If challenge appears to be gone, wait a bit more and verify
@@ -427,7 +482,7 @@ class ChapterExtractor:
                         if not ("just a moment" in final_title or "checking your browser" in final_title):
                             logger.debug(f"✓ Cloudflare challenge completed after {waited}s")
                             return
-                    except Exception:
+                    except Exception as e:
                         pass
                 
                 # Log progress every 5 seconds
@@ -528,7 +583,7 @@ class ChapterExtractor:
                 # Wait for content to load
                 try:
                     page.wait_for_load_state("networkidle", timeout=15000)
-                except Exception:
+                except Exception as e:
                     # Network idle timeout is okay, wait a bit more
                     page.wait_for_timeout(2000)
                 

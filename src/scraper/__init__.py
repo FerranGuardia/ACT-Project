@@ -7,8 +7,6 @@ from .base import BaseScraper
 
 # Backwards compatibility aliases
 GenericScraper = NovelScraper  # Deprecated: use NovelScraper
-ChapterUrlFetcher = None  # Moved to extractors.url_extractor.UrlExtractor
-ContentScraper = None  # Moved to extractors.chapter_extractor.ChapterExtractor
 
 __all__ = [
     "NovelScraper",
@@ -16,5 +14,3 @@ __all__ = [
     # Backwards compatibility
     "GenericScraper",
 ]
-
-

@@ -1,6 +1,7 @@
 """Test en-US-RogerNeural voice with Hugging Face demo method"""
 import sys
 import asyncio
+import tempfile
 from pathlib import Path
 
 # Add src to path
@@ -68,9 +69,10 @@ async def test_rogerneural():
     try:
         print("Creating Communicate object...")
         communicate = edge_tts.Communicate(test_text, voice_short_name, rate=rate_str, pitch=pitch_str)
-        
-        # Save to file
-        output_path = Path.home() / "Desktop" / "test_rogerneural.mp3"
+
+        # Save to file (use temp directory instead of desktop)
+        temp_dir = Path(tempfile.gettempdir())
+        output_path = temp_dir / "test_rogerneural.mp3"
         print(f"Saving to: {output_path}")
         
         await communicate.save(str(output_path))

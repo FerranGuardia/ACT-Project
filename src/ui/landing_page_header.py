@@ -89,7 +89,7 @@ class LandingPageHeader(QWidget):
                 logo_label.setMinimumHeight(pixmap.height() + LandingPageConfig.LOGO_PADDING * 2)
                 logo_label.setMinimumWidth(pixmap.width() + LandingPageConfig.LOGO_PADDING * 2)
                 layout.addWidget(logo_label)
-                logger.info(f"✓ Loaded logo from {logo_path.absolute()}")
+                logger.info(f"[OK] Loaded logo from {logo_path.absolute()}")
     
     def add_title_section(self, layout: QVBoxLayout):
         """Add title and subtitle to layout."""

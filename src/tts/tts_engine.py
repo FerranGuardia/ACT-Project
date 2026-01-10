@@ -23,6 +23,14 @@ from .voice_validator import VoiceValidator
 logger = get_logger("tts.tts_engine")
 
 
+__all__ = [
+    "AsyncBridge",
+    "TTSConfig",
+    "format_chapter_intro",
+    "TTSEngine",
+]
+
+
 class AsyncBridge:
     """Simple async/sync bridge for running coroutines in sync context."""
 
@@ -156,10 +164,13 @@ class TTSEngine:
         self._log_conversion_start(text, output_path, voice_id, provider, rate, pitch, volume)
 
         conversion_strategy = self._determine_conversion_strategy(text, provider_instance)
+        logger.info(f"Using conversion strategy: {conversion_strategy}")
 
         if conversion_strategy == "chunked":
+            logger.info("Starting chunked conversion...")
             return self._convert_with_chunking(text, voice_id, output_path, rate, pitch, volume, provider)
         else:
+            logger.info("Starting direct conversion...")
             return self._convert_direct(text, voice_id, output_path, provider, provider_instance, rate, pitch, volume)
 
     def _log_conversion_start(self, text: str, output_path: Path, voice_id: str,
@@ -171,6 +182,12 @@ class TTSEngine:
         logger.info(f"Converting text to speech: {output_path.name}")
         logger.info(f"Voice: {voice_id}, Provider: {provider or 'auto'}, Rate: {rate}%, Pitch: {pitch}%, Volume: {volume}%")
         logger.info(f"Text size: {text_bytes_size} bytes")
+
+        # Debug: Check text content
+        if len(text) < 200:
+            logger.info(f"Text preview: '{text}'")
+        else:
+            logger.info(f"Text preview: '{text[:200]}...'")
 
     def _determine_conversion_strategy(self, text: str, provider_instance: Optional[TTSProvider]) -> str:
         """
@@ -199,25 +216,41 @@ class TTSEngine:
         """Perform direct conversion without chunking."""
         if provider_instance:
             logger.info(f"Attempting conversion with provider '{provider}' (no fallback)")
-            return provider_instance.convert_text_to_speech(
-                text=text,
-                voice=voice_id,
-                output_path=output_path,
-                rate=rate,
-                pitch=pitch,
-                volume=volume
-            )
+            try:
+                success = provider_instance.convert_text_to_speech(
+                    text=text,
+                    voice=voice_id,
+                    output_path=output_path,
+                    rate=rate,
+                    pitch=pitch,
+                    volume=volume
+                )
+                logger.info(f"Provider instance conversion result: {success}")
+                if not success:
+                    logger.error(f"TTS conversion failed for voice '{voice_id}' using provider '{provider}'")
+                return success
+            except Exception as e:
+                logger.error(f"Exception during TTS conversion with provider '{provider}': {e}")
+                return False
         else:
             logger.info("Attempting conversion with provider manager (auto fallback)")
-            return self.provider_manager.convert_with_fallback(
-                text=text,
-                voice=voice_id,
-                output_path=output_path,
-                preferred_provider=None,
-                rate=rate,
-                pitch=pitch,
-                volume=volume
-            )
+            try:
+                success = self.provider_manager.convert_with_fallback(
+                    text=text,
+                    voice=voice_id,
+                    output_path=output_path,
+                    preferred_provider=None,
+                    rate=rate,
+                    pitch=pitch,
+                    volume=volume
+                )
+                logger.info(f"Provider manager fallback result: {success}")
+                if not success:
+                    logger.error(f"TTS conversion failed for voice '{voice_id}' using provider manager fallback")
+                return success
+            except Exception as e:
+                logger.error(f"Exception during TTS conversion with provider manager: {e}")
+                return False
 
     def convert_text_to_speech(
         self,
@@ -247,8 +280,10 @@ class TTSEngine:
             True if successful, False otherwise
         """
         # Step 1: Validate and resolve voice parameters
+        logger.info(f"Validating voice: {voice}, provider: {provider}")
         voice_validation_result = self._validate_and_resolve_voice(voice, provider)
         if voice_validation_result is None:
+            logger.error("Voice validation failed - this will cause TTS conversion to fail")
             return False
         
         voice_id, provider, _ = voice_validation_result  # voice_dict not needed in main method
@@ -295,7 +330,7 @@ class TTSEngine:
         provider_instance: Optional[TTSProvider] = None
         if provider:
             if isinstance(provider, str):
-                provider_instance = self._get_provider_instance(provider)
+                provider_instance = self.provider_manager.get_provider(provider)
             else:
                 # Assume it's already a TTSProvider object
                 provider_instance = provider

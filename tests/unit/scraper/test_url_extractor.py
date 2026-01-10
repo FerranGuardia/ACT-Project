@@ -19,8 +19,8 @@ from src.scraper.extractors.url_extractor import UrlExtractor
 
 class TestChapterUrlExtractorsHelpers:
     """Test shared helper methods."""
-
-    def setup_method(self, mock_logger):
+    
+    def setup_method(self):
         """Set up test fixtures."""
         self.session_manager = Mock()
         self.extractors = ChapterUrlExtractors(
@@ -107,8 +107,8 @@ class TestChapterUrlExtractorsHelpers:
 
 class TestJSExtraction:
     """Test JavaScript variable extraction."""
-
-    def setup_method(self, mock_logger):
+    
+    def setup_method(self):
         """Set up test fixtures."""
         self.session_manager = Mock()
         self.extractors = ChapterUrlExtractors(
@@ -118,20 +118,20 @@ class TestJSExtraction:
             delay=0.5
         )
     
-    def test_js_extraction_success(self, mock_logger):
+    def test_js_extraction_success(self):
         """Test successful JS extraction."""
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.text = '<script>var chapters = ["ch1", "ch2"];</script>'
-
+        
         mock_session = Mock()
         mock_session.get.return_value = mock_response
         self.session_manager.get_session.return_value = mock_session
-
+        
         with patch('src.scraper.extractors.url_extractor_extractors.extract_chapters_from_javascript') as mock_extract:
             mock_extract.return_value = ["https://example.com/ch1", "https://example.com/ch2"]
             result = self.extractors.try_js_extraction("https://example.com/toc")
-
+        
         assert len(result) == 2
         assert "https://example.com/ch1" in result
     
@@ -141,20 +141,20 @@ class TestJSExtraction:
         result = self.extractors.try_js_extraction("https://example.com/toc")
         assert result == []
     
-    def test_js_extraction_failure(self, mock_logger):
+    def test_js_extraction_failure(self):
         """Test JS extraction with parsing failure."""
         mock_session = Mock()
         mock_session.get.side_effect = Exception("Network error")
         self.session_manager.get_session.return_value = mock_session
-
+        
         result = self.extractors.try_js_extraction("https://example.com/toc")
         assert result == []
 
 
 class TestAJAXExtraction:
     """Test AJAX endpoint extraction."""
-
-    def setup_method(self, mock_logger):
+    
+    def setup_method(self):
         """Set up test fixtures."""
         self.session_manager = Mock()
         self.extractors = ChapterUrlExtractors(
@@ -164,13 +164,13 @@ class TestAJAXExtraction:
             delay=0.5
         )
     
-    def test_ajax_extraction_json_success(self, mock_logger):
+    def test_ajax_extraction_json_success(self):
         """Test AJAX extraction with JSON response."""
         mock_toc_response = Mock()
         mock_toc_response.status_code = 200
         mock_toc_response.text = '<html><div data-novel-id="123"></div></html>'
         mock_toc_response.content = b'<html></html>'
-
+        
         mock_ajax_response = Mock()
         mock_ajax_response.status_code = 200
         mock_ajax_response.json.return_value = {
@@ -179,11 +179,11 @@ class TestAJAXExtraction:
                 {"url": "https://example.com/ch2", "title": "Ch 2"},
             ]
         }
-
+        
         mock_session = Mock()
         mock_session.get.side_effect = [mock_toc_response, mock_ajax_response]
         self.session_manager.get_session.return_value = mock_session
-
+        
         with patch('src.scraper.extractors.url_extractor_extractors.extract_novel_id_from_html') as mock_id:
             with patch('src.scraper.extractors.url_extractor_extractors.discover_ajax_endpoints') as mock_disc:
                 with patch('src.scraper.extractors.url_extractor_extractors.normalize_url') as mock_norm:
@@ -192,27 +192,27 @@ class TestAJAXExtraction:
                         mock_disc.return_value = ["https://example.com/api/chapters"]
                         mock_norm.side_effect = lambda url, base: url
                         mock_is_ch.return_value = True
-
+                        
                         result = self.extractors.try_ajax_endpoints("https://example.com/toc")
-
+        
         assert len(result) == 2
     
-    def test_ajax_extraction_no_endpoints(self, mock_logger):
+    def test_ajax_extraction_no_endpoints(self):
         """Test AJAX extraction with no endpoints found."""
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.text = '<html></html>'
-
+        
         mock_session = Mock()
         mock_session.get.return_value = mock_response
         self.session_manager.get_session.return_value = mock_session
-
+        
         with patch('src.scraper.extractors.url_extractor_extractors.extract_novel_id_from_html') as mock_id:
             with patch('src.scraper.extractors.url_extractor_extractors.discover_ajax_endpoints') as mock_disc:
                 mock_id.return_value = "123"
                 mock_disc.return_value = []  # No endpoints
                 result = self.extractors.try_ajax_endpoints("https://example.com/toc")
-
+        
         assert result == []
 
 
@@ -252,14 +252,14 @@ class TestRetryWithBackoff:
         assert result == "success"
         assert mock_func.call_count == 1
     
-    def test_retry_success_after_failures(self, mock_logger):
+    def test_retry_success_after_failures(self):
         """Test successful execution after retries."""
         mock_func = Mock(side_effect=[Exception("fail"), Exception("fail"), "success"])
         result = retry_with_backoff(mock_func, max_retries=3, base_delay=0.01)
         assert result == "success"
         assert mock_func.call_count == 3
     
-    def test_retry_exhausted(self, mock_logger):
+    def test_retry_exhausted(self):
         """Test all retries exhausted."""
         mock_func = Mock(side_effect=Exception("always fails"))
         with pytest.raises(Exception):
@@ -277,8 +277,8 @@ class TestRetryWithBackoff:
 
 class TestUrlExtractorPipeline:
     """Test the overall URL extractor fetch pipeline."""
-
-    def setup_method(self, mock_logger):
+    
+    def setup_method(self):
         """Set up test fixtures."""
         self.extractor = UrlExtractor(base_url="https://example.com", timeout=30, delay=0.5)
     
@@ -307,13 +307,13 @@ class TestUrlExtractorPipeline:
         mock_js.assert_called_once()
         mock_ajax.assert_called_once()
     
-    def test_fetch_metadata_tracking(self, mock_logger):
+    def test_fetch_metadata_tracking(self):
         """Test fetch tracks methods attempted."""
         with patch.object(self.extractor._extractors, 'try_js_extraction') as mock_js:
             mock_js.return_value = []
-
+            
             urls, metadata = self.extractor.fetch("https://example.com/toc")
-
+        
         assert "methods_tried" in metadata
         assert "js" in metadata["methods_tried"]
         assert metadata["methods_tried"]["js"] == 0

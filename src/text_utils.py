@@ -1,19 +1,26 @@
 """
-Text cleaning utilities for scraped webnovel content.
+Unified text processing utilities.
 
-Provides functions to clean and normalize text extracted from webnovel sites,
-removing UI elements, HTML artifacts, and other unwanted content.
-Optimized for TTS (text-to-speech) readability.
+This module provides comprehensive text cleaning functions for both
+web scraping and text-to-speech processing. It consolidates the
+previously separate text_cleaner modules into a unified architecture.
 """
 
 import re
 import unicodedata
-from typing import Optional
+from typing import Callable, Optional
+
+from core.logger import get_logger
+
+logger = get_logger("text_utils")
 
 
 def clean_text(text: Optional[str]) -> str:
     """
     Clean scraped text from webnovel sites.
+
+    This is the comprehensive text cleaner optimized for web scraping,
+    removing HTML artifacts, UI elements, and unwanted content.
 
     Strategy:
     1. Remove HTML artifacts
@@ -40,7 +47,7 @@ def clean_text(text: Optional[str]) -> str:
     # Step 1: Remove HTML artifacts
     text = re.sub(r"<[^>]+>", "", text)  # HTML tags
     text = re.sub(r"&nbsp;|&amp;|&lt;|&gt;|&quot;|&#\d+;", " ", text)  # HTML entities
-    
+
     # Step 1.5: Handle tables and structured content
     # Convert table separators to readable text
     text = re.sub(r"\|{2,}", " | ", text)  # Table column separators
@@ -71,7 +78,7 @@ def clean_text(text: Optional[str]) -> str:
 
     # Step 3: Remove entire UI blocks
     ui_block_patterns = [
-        r"What\s+do\s+you\s+think\?.*?Total\s+Responses.*?Sort\s+by.*?",
+        r"What\s+do\s+you\s+think\?.*?Total\s+Responses.*?Sort\s+by.*?Add\s+a\s+(Comment|Post).*?",
         r"Total\s+Responses:?\s*\d+.*?Sort\s+by:?.*?(Latest|Most|Oldest|Liked).*?Add\s+a\s+(Comment|Post).*?",
         r"Add\s+a\s+Post.*?Loading.*?Load\s+More.*?",
         r"Reply\s+to.*?Submit\s+Reply.*?",
@@ -103,7 +110,7 @@ def clean_text(text: Optional[str]) -> str:
     ]
     for pattern in translator_patterns:
         text = re.sub(pattern, "", text, flags=re.IGNORECASE | re.MULTILINE)
-    
+
     # Step 5: Remove navigation elements
     navigation_patterns = [
         r"\bNext\s+Chapter\b",
@@ -142,7 +149,6 @@ def clean_text(text: Optional[str]) -> str:
     text = re.sub(r"[_]{3,}", "", text)  # ___
     text = re.sub(r"[*]{3,}", "", text)  # ***
     text = re.sub(r"[~]{2,}", "", text)  # ~~~
-    text = re.sub(r"×", "", text)  # UI multiplication symbol
 
     # Step 9: Context-aware removal of UI words
     context_aware_patterns = [
@@ -226,11 +232,11 @@ def clean_text(text: Optional[str]) -> str:
         '"': '"', '"': '"',  # Smart quotes to regular quotes
         ''': "'", ''': "'",  # Smart apostrophes to regular apostrophes
     }
-    
+
     # Replace known emojis and symbols
     for emoji, replacement in emoji_replacements.items():
         text = text.replace(emoji, replacement)
-    
+
     # Remove other emojis and special Unicode characters that TTS can't handle well
     # Keep basic punctuation and letters/numbers
     def is_tts_safe(char):
@@ -248,10 +254,10 @@ def clean_text(text: Optional[str]) -> str:
                 return False
             return True
         return False
-    
+
     # Filter out problematic Unicode characters
     text = ''.join(char if is_tts_safe(char) else ' ' for char in text)
-    
+
     # Step 13: Replace square brackets with parentheses for TTS compatibility
     # TTS engines may read [] as "bracket" or "square bracket", so use () instead
     text = text.replace('[', '(').replace(']', ')')
@@ -272,7 +278,7 @@ def clean_text(text: Optional[str]) -> str:
     text = re.sub(r",{2,}", ",", text)  # Multiple commas to single
     text = re.sub(r";{2,}", ";", text)  # Multiple semicolons to single
     text = re.sub(r":{2,}", ":", text)  # Multiple colons to single (but keep time like 12:30)
-    
+
     # Step 15: Clean up spacing around punctuation (improves TTS flow)
     # But preserve ellipses and quotes - don't add space after them
     text = re.sub(r"\s+([,.!?;:])", r"\1", text)  # Remove space before punctuation
@@ -280,26 +286,95 @@ def clean_text(text: Optional[str]) -> str:
     text = re.sub(r"([,.!?;:])([^\s,.!?;:\"\'`])", r"\1 \2", text)  # Add space after punctuation if next char is not punctuation or quotes
     # Handle ellipses separately - ensure space after "..."
     text = re.sub(r"\.{3}([^\s,.!?;:\"\'`])", r"... \1", text)  # Add space after "..." if next char is not punctuation or quotes
-    
+
     # Step 16: Handle special formatting that might confuse TTS
     # Remove standalone symbols on their own lines
     text = re.sub(r"^\s*[=*#~|_-]{2,}\s*$", "", text, flags=re.MULTILINE)
     # Remove lines with only symbols and numbers (likely UI elements)
     text = re.sub(r"^\s*[\d\s=*#~|_-]+\s*$", "", text, flags=re.MULTILINE)
-    
+
     # Step 17: Final whitespace cleanup
     text = re.sub(r"[ \t]+", " ", text)  # Multiple spaces to single space
     text = re.sub(r"\n\s*\n\s*\n+", "\n\n", text)  # Max 2 consecutive newlines
     text = re.sub(r"^\s+|\s+$", "", text, flags=re.MULTILINE)  # Trim each line
-    
+
     # Step 18: Remove empty parentheses and brackets (leftover from cleaning)
     text = re.sub(r"\(\s*\)", "", text)  # Empty parentheses
     text = re.sub(r"\[\s*\]", "", text)  # Empty brackets
     text = re.sub(r"\{\s*\}", "", text)  # Empty braces
-    
+
     # Final cleanup of any double spaces that might have been created
     text = re.sub(r"  +", " ", text)
 
     return text.strip()
 
 
+def clean_text_for_tts(text: str, base_cleaner: Optional[Callable[[str], str]] = None) -> str:
+    """
+    Clean text specifically for text-to-speech conversion.
+
+    First applies base cleaner (if provided) to remove UI elements,
+    then applies TTS-specific cleaning to remove symbols that TTS reads incorrectly.
+
+    Args:
+        text: Text to clean
+        base_cleaner: Optional function to apply first (e.g., scraper text cleaner)
+
+    Returns:
+        Cleaned text ready for TTS
+    """
+    if not text:
+        return ""
+
+    # Apply base cleaner first if provided
+    if base_cleaner:
+        try:
+            cleaned = base_cleaner(text)
+            text = cleaned if isinstance(cleaned, str) else str(cleaned or "")
+        except Exception as e:
+            logger.warning(f"Error applying base cleaner: {e}")
+
+    # Precompile regex patterns once for performance
+    RE_SEPARATORS = re.compile(r'(=+|-{3,}|_{3,}|\*{3,}|#{2,}|~{2,}|\|{2,})')
+    RE_STANDALONE = re.compile(r'\s+[=*#~|_-]+\s+')
+    RE_SYMBOL_LINES = re.compile(r'^\s*[=*#~|_-]+\s*$', flags=re.MULTILINE)
+    RE_PUNCT = re.compile(r'(\.{4,}|!{3,}|\?{3,})')
+    RE_BRACKETS = re.compile(r'[\[\]]')
+    RE_SPACES = re.compile(r'[ \t]+')
+    RE_NEWLINES = re.compile(r'\n\s*\n\s*\n+')
+
+    # Remove separators
+    text = RE_SEPARATORS.sub(' ', text)
+
+    # Remove standalone symbol groups
+    text = RE_STANDALONE.sub(' ', text)
+    text = RE_SYMBOL_LINES.sub('', text)
+
+    # Normalize punctuation
+    text = RE_PUNCT.sub(lambda m: m.group(0)[0] * 3 if m.group(0)[0] in '.!?' else m.group(0), text)
+
+    # Replace brackets with parentheses
+    text = RE_BRACKETS.sub(lambda m: '(' if m.group(0) == '[' else ')', text)
+
+    # Whitespace cleanup
+    text = RE_SPACES.sub(' ', text)
+    text = RE_NEWLINES.sub('\n\n', text)
+
+    return text.strip()
+
+
+# Backwards compatibility aliases
+# These will be deprecated in favor of direct imports from this module
+scraper_clean_text = clean_text
+tts_clean_text_for_tts = clean_text_for_tts
+
+
+__all__ = [
+    # Main functions
+    "clean_text",
+    "clean_text_for_tts",
+
+    # Backwards compatibility (deprecated)
+    "scraper_clean_text",
+    "tts_clean_text_for_tts",
+]

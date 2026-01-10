@@ -9,17 +9,55 @@ import gc
 import re
 import shutil
 import subprocess
+import shlex
 import tempfile
 import time
 from pathlib import Path
 from typing import Callable, List, Optional
 
 from core.logger import get_logger
+from core.constants import FFMPEG_TIMEOUT_SECONDS
 
 from .providers.base_provider import TTSProvider
 from .providers.provider_manager import TTSProviderManager
 
 logger = get_logger("tts.audio_merger")
+
+
+def _validate_subprocess_args(args: List[str]) -> List[str]:
+    """
+    Validate subprocess arguments for security.
+
+    Args:
+        args: Command arguments to validate
+
+    Returns:
+        Validated arguments
+
+    Raises:
+        ValueError: If arguments contain dangerous characters
+    """
+    validated_args = []
+    for arg in args:
+        # Check for shell metacharacters that could be used for injection
+        dangerous_chars = [';', '&', '|', '`', '$(', '${', '\n', '\r']
+        for char in dangerous_chars:
+            if char in str(arg):
+                raise ValueError(f"Potentially dangerous character '{char}' in subprocess argument: {arg}")
+
+        # Ensure paths are absolute and exist (for file paths)
+        if str(arg).endswith(('.mp3', '.wav', '.txt')) or '/' in str(arg) or '\\' in str(arg):
+            path = Path(arg)
+            if not path.is_absolute():
+                # Convert to absolute path
+                arg = str(path.resolve())
+            # Validate that the path doesn't contain dangerous elements
+            if '..' in arg or arg.startswith('~'):
+                raise ValueError(f"Potentially dangerous path pattern in argument: {arg}")
+
+        validated_args.append(str(arg))
+
+    return validated_args
 
 
 class AudioMerger:
@@ -438,13 +476,16 @@ class AudioMerger:
                     f.write(f"file '{chunk_file.absolute()}'\n")
 
             try:
-                # Run ffmpeg concatenation
+                # Run ffmpeg concatenation with validated arguments
+                cmd_args = _validate_subprocess_args([
+                    'ffmpeg', '-f', 'concat', '-safe', '0', '-i', str(temp_file_list),
+                    '-c', 'copy', str(output_path)
+                ])
                 result = subprocess.run(
-                    ['ffmpeg', '-f', 'concat', '-safe', '0', '-i', str(temp_file_list),
-                     '-c', 'copy', str(output_path)],
+                    cmd_args,
                     capture_output=True,
                     text=True,
-                    timeout=300  # 5 minute timeout
+                    timeout=FFMPEG_TIMEOUT_SECONDS  # Use constant
                 )
 
                 if result.returncode == 0 and output_path.exists():

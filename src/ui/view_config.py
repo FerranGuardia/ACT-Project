@@ -22,7 +22,7 @@ class ViewConfig:
     QUEUE_LIST_SPACING: Final[int] = 5
     QUEUE_ITEM_MARGINS: Final[tuple[int, int, int, int]] = (10, 10, 10, 10)
     QUEUE_ITEM_ICON_SIZE: Final[int] = 60
-    QUEUE_ACTION_BUTTON_WIDTH: Final[int] = 30
+    QUEUE_ACTION_BUTTON_WIDTH: Final[int] = 80
     
     # Merger view file item settings
     MERGER_FILE_ITEM_MARGINS: Final[tuple[int, int, int, int]] = (5, 5, 5, 5)
