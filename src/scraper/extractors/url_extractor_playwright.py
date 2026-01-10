@@ -5,31 +5,23 @@ Handles the most reliable but slowest method for extracting chapter URLs
 using Playwright with scrolling and pagination support.
 """
 
-import time
 import re
+import time
 from pathlib import Path
-from typing import Optional, List, Callable, Any
+from typing import Any, Callable, List, Optional
 
 try:
-    from bs4 import BeautifulSoup  # type: ignore[import-untyped]
-    HAS_BS4: bool = True
-except ImportError:
-    BeautifulSoup = None  # type: ignore[assignment, misc]
-    HAS_BS4: bool = False  # type: ignore[constant-redefinition]
-
-try:
-    from playwright.sync_api import sync_playwright  # type: ignore[import-untyped]
+    from playwright.sync_api import \
+        sync_playwright  # type: ignore[import-untyped]
     HAS_PLAYWRIGHT: bool = True
 except ImportError:
     sync_playwright = None  # type: ignore[assignment, misc]
     HAS_PLAYWRIGHT: bool = False  # type: ignore[constant-redefinition]
 
-from ..chapter_parser import (
-    extract_chapter_number,
-    normalize_url,
-)
-from .url_extractor_validators import is_chapter_url
 from core.logger import get_logger
+
+from ..chapter_parser import extract_chapter_number, normalize_url
+from .url_extractor_validators import is_chapter_url
 
 logger = get_logger("scraper.extractors.url_extractor_playwright")
 
@@ -124,15 +116,7 @@ def _load_playwright_scroll_script() -> str:
 
 
 class PlaywrightExtractor:
-    """
-    Playwright-based chapter URL extraction.
-    
-    Handles extraction using browser automation, supporting:
-    - Cloudflare challenge handling
-    - Pagination detection and traversal
-    - Lazy loading via scrolling
-    - Multiple site patterns
-    """
+   
     
     def __init__(
         self,
@@ -140,20 +124,33 @@ class PlaywrightExtractor:
         session_manager: Any,  # SessionManager from url_extractor_session
         timeout: int,
         delay: float,
-    ):
-        """
-        Initialize the Playwright extractor.
-        
-        Args:
-            base_url: Base URL of the webnovel site
-            session_manager: SessionManager instance for rate limiting
-            timeout: Request timeout in seconds
-            delay: Delay between requests in seconds
-        """
+):
+      
         self.base_url = base_url
         self.session_manager = session_manager
         self.timeout = timeout
         self.delay = delay
+
+    def _collect_links(self, page: Any) -> List[tuple[str, str]]:
+        """Collect (href, text) pairs from the current DOM."""
+        links: List[tuple[str, str]] = []
+        try:
+            dom_links = page.query_selector_all("a[href]")  # type: ignore[attr-defined]
+        except Exception:
+            return links
+
+        for link in dom_links:
+            try:
+                href_raw: Any = link.get_attribute("href")  # type: ignore[attr-defined]
+                href: str = str(href_raw) if href_raw else ""
+                if not href:
+                    continue
+                text_raw: Any = link.inner_text()  # type: ignore[attr-defined]
+                text: str = (str(text_raw) if text_raw else "").strip()
+                links.append((href, text))
+            except Exception:
+                continue
+        return links
     
     def extract(
         self,
@@ -487,34 +484,6 @@ class PlaywrightExtractor:
                     if 1 <= page_num <= 200:
                         extracted_page_nums.add(page_num)
         
-        # Extract from HTML directly
-        try:
-            html = page.content()  # type: ignore[attr-defined]
-            if HAS_BS4 and BeautifulSoup is not None:
-                soup = BeautifulSoup(html, "html.parser")  # type: ignore[arg-type, assignment]
-                pagination_elements = soup.find_all(['a', 'button'], class_=re.compile(r'page|pagination|pager', re.I))  # type: ignore[attr-defined]
-                pagination_elements.extend(soup.find_all('a', href=re.compile(r'[?&]page=|/page/', re.I)))  # type: ignore[attr-defined]
-                
-                for elem in pagination_elements:  # type: ignore[assignment]
-                    elem_any: Any = elem  # type: ignore[assignment]
-                    text_raw: Any = elem_any.get_text(strip=True)  # type: ignore[attr-defined]
-                    text: str = str(text_raw) if text_raw else ""  # type: ignore[arg-type]
-                    text_clean: str = re.sub(r'[^\d]', '', text)
-                    if text_clean.isdigit() and 1 <= int(text_clean) <= 200:
-                        extracted_page_nums.add(int(text_clean))
-                    
-                    href_raw: Any = elem_any.get('href', '')  # type: ignore[attr-defined, arg-type]
-                    href: str = str(href_raw) if href_raw else ""  # type: ignore[arg-type]
-                    if href:
-                        normalized_href: str = normalize_url(href, toc_url).lower()
-                        page_match = re.search(r'[?&]page[=_](\d+)|/page[/-](\d+)|/p[/-](\d+)', normalized_href)
-                        if page_match:
-                            page_num: int = int(page_match.group(1) or page_match.group(2) or page_match.group(3))
-                            if 1 <= page_num <= 200:
-                                extracted_page_nums.add(page_num)
-        except Exception as e:
-            logger.debug(f"Error extracting page numbers from HTML: {e}")
-        
         # Construct URLs
         constructed_urls: List[str] = []
         for page_num in sorted(extracted_page_nums):
@@ -552,20 +521,10 @@ class PlaywrightExtractor:
         
         # Extract from page 1 (already loaded)
         logger.debug("Collecting chapters from page 1...")
-        html = page.content()  # type: ignore[attr-defined]
-        if HAS_BS4 and BeautifulSoup is not None:
-            soup = BeautifulSoup(html, "html.parser")  # type: ignore[arg-type, assignment]
-            links = soup.find_all("a", href=True)  # type: ignore[attr-defined]
-            for link in links:  # type: ignore[assignment]
-                link_elem: Any = link  # type: ignore[assignment]
-                href_raw: Any = link_elem.get("href", "")  # type: ignore[attr-defined, arg-type]
-                href: str = str(href_raw) if href_raw else ""  # type: ignore[arg-type]
-                if href:
-                    full_url: str = normalize_url(href, self.base_url)
-                    link_text_raw: Any = link_elem.get_text(strip=True)  # type: ignore[attr-defined]
-                    link_text: str = str(link_text_raw) if link_text_raw else ""  # type: ignore[arg-type]
-                    if is_chapter_url(full_url, link_text):
-                        all_chapter_urls.append(full_url)
+        for href, text in self._collect_links(page):
+            full_url: str = normalize_url(href, self.base_url)
+            if is_chapter_url(full_url, text):
+                all_chapter_urls.append(full_url)
         
         # Visit additional pages
         max_pages_to_visit = min(len(page_urls), 200)
@@ -610,24 +569,14 @@ class PlaywrightExtractor:
             try:
                 retry_with_backoff(load_page, max_retries=3, base_delay=1.0, should_stop=should_stop)
                 
-                html = page.content()  # type: ignore[attr-defined]
-                if HAS_BS4 and BeautifulSoup is not None:
-                    soup = BeautifulSoup(html, "html.parser")  # type: ignore[arg-type, assignment]
-                    links = soup.find_all("a", href=True)  # type: ignore[attr-defined]
-                    page_chapters: List[str] = []
-                    for link in links:  # type: ignore[assignment]
-                        link_elem: Any = link  # type: ignore[assignment]
-                        href_raw: Any = link_elem.get("href", "")  # type: ignore[attr-defined, arg-type]
-                        href: str = str(href_raw) if href_raw else ""  # type: ignore[arg-type]
-                        if href:
-                            full_url: str = normalize_url(href, self.base_url)
-                            link_text_raw: Any = link_elem.get_text(strip=True)  # type: ignore[attr-defined]
-                            link_text: str = str(link_text_raw) if link_text_raw else ""  # type: ignore[arg-type]
-                            if is_chapter_url(full_url, link_text):
-                                page_chapters.append(full_url)
-                    
-                    all_chapter_urls.extend(page_chapters)
-                    logger.info(f"Page {idx}/{total_pages}: Found {len(page_chapters)} chapters (total so far: {len(all_chapter_urls)})")
+                page_chapters: List[str] = []
+                for href, text in self._collect_links(page):
+                    full_url: str = normalize_url(href, self.base_url)
+                    if is_chapter_url(full_url, text):
+                        page_chapters.append(full_url)
+                
+                all_chapter_urls.extend(page_chapters)
+                logger.info(f"Page {idx}/{total_pages}: Found {len(page_chapters)} chapters (total so far: {len(all_chapter_urls)})")
             except Exception as e:
                 logger.warning(f"Error loading page {idx} ({page_url}) after retries: {e}")
                 continue
@@ -654,24 +603,11 @@ class PlaywrightExtractor:
         if not min_chapter_number or min_chapter_number <= 100:
             return []
         
-        html = page.content()  # type: ignore[attr-defined]
-        if not HAS_BS4 or BeautifulSoup is None:
-            return []
-        
-        soup = BeautifulSoup(html, "html.parser")  # type: ignore[arg-type, assignment]
-        current_page_links = soup.find_all("a", href=True)  # type: ignore[attr-defined]
         current_chapters: List[str] = []
-        
-        for link in current_page_links:  # type: ignore[assignment]
-            link_elem: Any = link  # type: ignore[assignment]
-            href_raw: Any = link_elem.get("href", "")  # type: ignore[attr-defined, arg-type]
-            href: str = str(href_raw) if href_raw else ""  # type: ignore[arg-type]
-            if href:
-                full_url: str = normalize_url(href, self.base_url)
-                link_text_raw: Any = link_elem.get_text(strip=True)  # type: ignore[attr-defined]
-                link_text: str = str(link_text_raw) if link_text_raw else ""  # type: ignore[arg-type]
-                if is_chapter_url(full_url, link_text):
-                    current_chapters.append(full_url)
+        for href, text in self._collect_links(page):
+            full_url: str = normalize_url(href, self.base_url)
+            if is_chapter_url(full_url, text):
+                current_chapters.append(full_url)
         
         current_chapter_count: int = len(current_chapters)
         if not (30 <= current_chapter_count <= 60):
@@ -697,20 +633,11 @@ class PlaywrightExtractor:
                 test_url: str = pattern.format(2)
                 test_response = page.goto(test_url, wait_until="domcontentloaded", timeout=10000)  # type: ignore[attr-defined]
                 if test_response and test_response.status == 200:  # type: ignore[attr-defined]
-                    test_html = page.content()  # type: ignore[attr-defined]
-                    test_soup = BeautifulSoup(test_html, "html.parser")  # type: ignore[arg-type, assignment]
-                    test_links = test_soup.find_all("a", href=True)  # type: ignore[attr-defined]
                     test_chapters: List[str] = []
-                    for link in test_links:  # type: ignore[assignment]
-                        link_elem: Any = link  # type: ignore[assignment]
-                        href_raw: Any = link_elem.get("href", "")  # type: ignore[attr-defined, arg-type]
-                        href: str = str(href_raw) if href_raw else ""  # type: ignore[arg-type]
-                        if href:
-                            full_url: str = normalize_url(href, self.base_url)
-                            link_text_raw: Any = link_elem.get_text(strip=True)  # type: ignore[attr-defined]
-                            link_text: str = str(link_text_raw) if link_text_raw else ""  # type: ignore[arg-type]
-                            if is_chapter_url(full_url, link_text):
-                                test_chapters.append(full_url)
+                    for href, text in self._collect_links(page):
+                        full_url: str = normalize_url(href, self.base_url)
+                        if is_chapter_url(full_url, text):
+                            test_chapters.append(full_url)
                     
                     if len(test_chapters) > 0 and set(test_chapters) != set(current_chapters):
                         working_pattern = pattern
@@ -746,58 +673,13 @@ class PlaywrightExtractor:
             except Exception:
                 pass
         
-        html = page.content()  # type: ignore[attr-defined]
-        page.close()  # type: ignore[attr-defined]
-        
-        if not HAS_BS4 or BeautifulSoup is None:
-            logger.warning("BeautifulSoup4 not available, cannot parse HTML")
-            return []
-        
-        soup = BeautifulSoup(html, "html.parser")  # type: ignore[arg-type, assignment]
-        
-        selectors = [
-            '.list-chapter a', '#list-chapter a', 'ul.list-chapter a',
-            '.chapter-list a', '#chapters a', 'ul.chapter-list a', 'div.chapter-list a',
-            '[class*="chapter"] a', '[id*="chapter"] a',
-            '.chapter-item a', '.chapter-name a', 'a[href*="/book/"]',
-            'li a[href*="/book/"]', 'ul li a[href]', 'ol li a[href]',
-            'a[href*="chapter"]', 'main a[href]', '.content a[href]',
-            '#content a[href]', 'article a[href]',
-        ]
-        
-        links: List[Any] = []
-        for selector in selectors:
-            try:
-                found = soup.select(selector)  # type: ignore[attr-defined]
-                if found:
-                    links.extend(found)
-            except Exception:
-                continue
-        
-        seen_hrefs: set[str] = set()
-        unique_links: List[Any] = []
-        for link in links:
-            link_elem: Any = link  # type: ignore[assignment]
-            href_raw: Any = link_elem.get("href", "")  # type: ignore[attr-defined, arg-type]
-            href: str = str(href_raw) if href_raw else ""
-            if href:
-                normalized: str = normalize_url(href, self.base_url)
-                if normalized not in seen_hrefs:
-                    seen_hrefs.add(normalized)
-                    unique_links.append(link)  # type: ignore[arg-type]
-        
         chapter_urls: List[str] = []
-        for link in unique_links:
-            link_elem: Any = link
-            href_raw: Any = link_elem.get("href", "")  # type: ignore[attr-defined]
-            href: str = str(href_raw) if href_raw else ""
-            if href:
-                full_url: str = normalize_url(href, self.base_url)
-                link_text_raw: Any = link_elem.get_text(strip=True)  # type: ignore[attr-defined]
-                link_text: str = str(link_text_raw) if link_text_raw else ""
-                if is_chapter_url(full_url, link_text):
-                    chapter_urls.append(full_url)
-        
+        for href, text in self._collect_links(page):
+            full_url: str = normalize_url(href, self.base_url)
+            if is_chapter_url(full_url, text):
+                chapter_urls.append(full_url)
+        page.close()  # type: ignore[attr-defined]
+
         seen: set[str] = set()
         unique_urls: List[str] = []
         for url in chapter_urls:

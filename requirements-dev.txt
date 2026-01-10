@@ -27,7 +27,6 @@ bleach>=6.1.0  # HTML sanitization and text cleaning
 
 # Type stubs
 types-requests>=2.31.0
-types-beautifulsoup4>=4.12.0
 
 
 

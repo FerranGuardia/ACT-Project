@@ -1,24 +1,20 @@
 """
 URL extractor module.
 
-Handles extracting chapter URLs from table of contents pages using multiple methods:
-1. JavaScript variable extraction (fastest)
-2. AJAX endpoint discovery (fast)
-3. HTML parsing (medium)
-4. Playwright with scrolling (slow but gets all - reference method)
-5. Follow "next" links (slow but reliable)
+Handles extracting chapter URLs from table of contents pages using methods optimized for speed and reliability:
+1. JavaScript variable extraction (fastest) - direct variable parsing
+2. AJAX endpoint discovery (fast) - handles lazy-loaded & paginated content
+3. Playwright with scrolling (comprehensive) - reference method for difficult sites
 """
 
-from typing import Optional, List, Callable, Dict, Tuple, Set, Any
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-from ..chapter_parser import (
-    extract_chapter_number,
-    sort_chapters_by_number,
-)
-from .url_extractor_session import SessionManager
-from .url_extractor_extractors import ChapterUrlExtractors
 from core.logger import get_logger
-from ..config import REQUEST_TIMEOUT, REQUEST_DELAY
+
+from ..chapter_parser import extract_chapter_number, sort_chapters_by_number
+from ..config import REQUEST_DELAY, REQUEST_TIMEOUT
+from .url_extractor_extractors import ChapterUrlExtractors
+from .url_extractor_session import SessionManager
 
 logger = get_logger("scraper.extractors.url_extractor")
 
@@ -27,12 +23,10 @@ class UrlExtractor:
     """
     Fetches chapter URLs from table of contents pages.
     
-    Uses failsafe methods in order of speed:
-    1. JavaScript variable extraction
-    2. AJAX endpoint discovery
-    3. HTML parsing
-    4. Playwright with scrolling (reference method - gets all chapters)
-    5. Follow "next" links
+    Uses methods in order of speed/reliability:
+    1. JavaScript variable extraction (fastest, direct parsing)
+    2. AJAX endpoint discovery (fast, handles lazy-loading)
+    3. Playwright with scrolling (comprehensive, reference method)
     """
 
     def __init__(self, base_url: str, timeout: int = REQUEST_TIMEOUT, delay: float = REQUEST_DELAY):
@@ -84,9 +78,7 @@ class UrlExtractor:
         Uses our existing fetch() method which tries all methods in order:
         1. JavaScript extraction (fastest)
         2. AJAX endpoints (fast)
-        3. HTML parsing (medium)
-        4. Playwright with scrolling (slow but gets all)
-        5. Follow next links (slow but reliable)
+        3. Playwright with scrolling (slow but gets all)
         
         Args:
             toc_url: URL of the table of contents page
@@ -235,14 +227,12 @@ class UrlExtractor:
 
     def fetch(self, toc_url: str, should_stop: Optional[Callable[[], bool]] = None, use_reference: bool = False, min_chapter_number: Optional[int] = None, max_chapter_number: Optional[int] = None) -> Tuple[List[str], Dict[str, Any]]:
         """
-        Fetch chapter URLs using failsafe methods.
+        Fetch chapter URLs using methods optimized for speed and reliability.
         
-        Tries methods in order of speed:
-        1. JavaScript variable extraction
-        2. AJAX endpoint discovery
-        3. HTML parsing
-        4. Playwright with scrolling (if enabled)
-        5. Follow "next" links
+        Tries methods in order:
+        1. JavaScript variable extraction (fastest)
+        2. AJAX endpoint discovery (fast + lazy-loading)
+        3. Playwright with scrolling (comprehensive fallback)
         
         Args:
             toc_url: URL of the table of contents page
@@ -396,36 +386,7 @@ class UrlExtractor:
         else:
             logger.info(f"Method 2 (AJAX endpoint): Found {len(urls) if urls else 0} chapters - trying next method")
         
-        # Method 3: Try HTML parsing (medium)
-        logger.info("Trying method 3: HTML parsing")
-        urls = self._extractors.try_html_parsing(toc_url)
-        metadata["methods_tried"]["html"] = len(urls) if urls else 0
-        if urls and len(urls) >= 10:
-            # CRITICAL CHECK: If exactly 55 URLs, always try Playwright (pagination)
-            if len(urls) == 55:
-                logger.info(f"⚠ Method 3 (HTML parsing) found exactly 55 URLs - detected pagination limit, trying Playwright for complete list")
-                # Don't return, continue to Playwright
-            else:
-                # Check if it covers the needed range or seems complete
-                is_complete = not seems_incomplete(urls)
-                covers_needed = covers_range(urls)
-                logger.debug(f"HTML parsing: found {len(urls)} URLs, covers_range={covers_needed}, seems_incomplete={not is_complete}")
-                
-                if covers_needed and is_complete:
-                    logger.info(f"✓ Found {len(urls)} chapters via HTML parsing")
-                    metadata["method_used"] = "html"
-                    metadata["urls_found"] = len(urls)
-                    return sort_chapters_by_number(urls), metadata
-                else:
-                    if not is_complete:
-                        logger.info(f"⚠ Method 3 (HTML parsing) found {len(urls)} chapters but seems incomplete (pagination detected), trying Playwright")
-                    elif not covers_needed:
-                        logger.info(f"⚠ Method 3 (HTML parsing) found {len(urls)} chapters but doesn't cover needed range, trying Playwright")
-                    # Continue to next method
-        else:
-            logger.info(f"Method 3 (HTML parsing): Found {len(urls) if urls else 0} chapters - trying next method")
-        
-        # Method 4: Try Playwright with scrolling (slow but gets all)
+        # Method 3: Try Playwright with scrolling (slow but gets all)
         try:
             from .url_extractor_playwright import PlaywrightExtractor
             
@@ -453,18 +414,6 @@ class UrlExtractor:
                 logger.warning("⚠ Playwright did not find any chapter URLs")
         except ImportError:
             logger.warning("⚠ Playwright not available - install with: pip install playwright && playwright install chromium")
-        
-        # Method 5: Try following "next" links (slow but reliable)
-        logger.info("Trying method 5: Follow 'next' links")
-        urls = self._extractors.try_follow_next_links(toc_url, should_stop=should_stop)
-        metadata["methods_tried"]["next"] = len(urls) if urls else 0
-        if urls:
-            logger.info(f"✓ Found {len(urls)} chapters via 'next' links")
-            metadata["method_used"] = "next"
-            metadata["urls_found"] = len(urls)
-            return sort_chapters_by_number(urls), metadata
-        else:
-            logger.info(f"Method 5 (Follow 'next' links): Found {len(urls) if urls else 0} chapters")
         
         # Log summary of all methods tried
         methods_summary = ", ".join([f"{method}: {count}" for method, count in metadata["methods_tried"].items() if count > 0])

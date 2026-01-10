@@ -9,29 +9,36 @@ Contains all extraction methods for fetching chapter URLs from table of contents
 - Follow "next" links
 """
 
+"""
+Chapter URL extraction methods.
+
+Methods: JavaScript variables and AJAX endpoints (fast), fallback to Playwright (comprehensive).
+- JavaScript extraction: Direct variable parsing from page source (fastest)
+- AJAX endpoints: Discovers and queries API endpoints for chapter lists (fast + handles lazy-loading)
+- Playwright: Handles complex rendering, pagination, and lazy-loading via scrolling (fallback)
+
+Note: HTML parsing with selectors was removed due to high false positive rate across diverse sites.
+"""
+
 import time
-import re
 import json
-from typing import Optional, List, Callable, Any
+from typing import Any, Callable, Iterable, List, Optional, Tuple
+from urllib.parse import urlparse
 
-try:
-    from bs4 import BeautifulSoup  # type: ignore[import-untyped]
-    HAS_BS4: bool = True
-except ImportError:
-    BeautifulSoup = None  # type: ignore[assignment, misc]
-    HAS_BS4: bool = False  # type: ignore[constant-redefinition]
-
-from ..chapter_parser import (
-    extract_chapter_number,
-    normalize_url,
-    extract_chapters_from_javascript,
-    extract_novel_id_from_html,
-    discover_ajax_endpoints,
-)
-from .url_extractor_validators import is_chapter_url
 from core.logger import get_logger
 
-logger = get_logger("scraper.extractors.url_extractor_extractors")
+logger = get_logger(__name__)
+
+from ..chapter_parser import (discover_ajax_endpoints, extract_chapter_number,
+                              extract_chapters_from_javascript, normalize_url,
+                              extract_novel_id_from_html)
+from .url_extractor_validators import is_chapter_url
+class ExtractionResult:
+    urls: List[str]
+    source: str
+    confidence: float
+    error: Optional[str] = None
+    elapsed_ms: Optional[int] = None
 
 
 def retry_with_backoff(func: Callable[..., Any], max_retries: int = 3, base_delay: float = 1.0, should_stop: Optional[Callable[[], bool]] = None):
@@ -103,38 +110,80 @@ class ChapterUrlExtractors:
         self.session_manager = session_manager
         self.timeout = timeout
         self.delay = delay
+        parsed_base = urlparse(base_url)
+        self.base_host = parsed_base.netloc.lower()
+
+    def _fetch_response(self, url: str, *, allow_retry: bool = True) -> Optional[Any]:
+        """Fetch a URL with rate limiting and optional retries."""
+        def _do_request():
+            session = self.session_manager.get_session()
+            if not session:
+                return None
+            self.session_manager.rate_limit()
+            response = session.get(url, timeout=self.timeout)  # type: ignore[attr-defined]
+            status = getattr(response, "status_code", None)
+            if status != 200:
+                raise Exception(f"status {status}")
+            return response
+
+        try:
+            start = time.time()
+            response = retry_with_backoff(
+                _do_request,
+                max_retries=3,
+                base_delay=self.delay if self.delay > 0 else 0.5,
+            ) if allow_retry else _do_request()
+            if response is not None:
+                elapsed_ms = int((time.time() - start) * 1000)
+                logger.debug(f"Fetched {url} in {elapsed_ms}ms")
+            return response
+        except Exception as e:
+            logger.debug(f"Request to {url} failed: {e}")
+            return None
+
+    def _normalize_and_filter(self, candidates: Iterable[Tuple[str, str]]) -> List[str]:
+        """Normalize URLs, keep same-host chapters, and drop duplicates."""
+        seen: set[str] = set()
+        results: List[str] = []
+        for href, text in candidates:
+            if not href:
+                continue
+            full_url = normalize_url(href, self.base_url)
+            if not self._is_same_host(full_url):
+                continue
+            if is_chapter_url(full_url, text):
+                if full_url not in seen:
+                    seen.add(full_url)
+                    results.append(full_url)
+        return results
+
+    def _is_same_host(self, url: str) -> bool:
+        try:
+            netloc = urlparse(url).netloc.lower()
+        except Exception:
+            return True
+        if not self.base_host or not netloc:
+            return True
+        return netloc == self.base_host
     
     def try_js_extraction(self, toc_url: str) -> List[str]:
         """Try to extract chapter URLs from JavaScript variables."""
-        session = self.session_manager.get_session()
-        if not session:
+        response = self._fetch_response(toc_url)
+        if not response:
             return []
-        
+
         try:
-            self.session_manager.rate_limit()
-            response = session.get(toc_url, timeout=self.timeout)  # type: ignore[attr-defined]
-            if response.status_code != 200:  # type: ignore[attr-defined]
-                return []
-            
-            urls = extract_chapters_from_javascript(response.text, self.base_url)  # type: ignore[attr-defined]
-            return urls
+            return extract_chapters_from_javascript(response.text, self.base_url)  # type: ignore[attr-defined]
         except Exception as e:
             logger.debug(f"JS extraction failed: {e}")
             return []
     
     def try_ajax_endpoints(self, toc_url: str) -> List[str]:
         """Try to get chapter URLs via AJAX endpoints."""
-        session = self.session_manager.get_session()
-        if not session or not HAS_BS4 or BeautifulSoup is None:
-            return []
-        
         try:
-            self.session_manager.rate_limit()
-            response = session.get(toc_url, timeout=self.timeout)  # type: ignore[attr-defined]
-            if response.status_code != 200:  # type: ignore[attr-defined]
+            response = self._fetch_response(toc_url)
+            if not response:
                 return []
-            
-            soup = BeautifulSoup(response.content, "html.parser")  # type: ignore[arg-type, assignment]
             
             # Extract novel ID
             novel_id = extract_novel_id_from_html(response.text)  # type: ignore[attr-defined]
@@ -153,57 +202,37 @@ class ChapterUrlExtractors:
             # Try each endpoint
             for endpoint in endpoints:
                 try:
-                    self.session_manager.rate_limit()
-                    ajax_response = session.get(endpoint, timeout=self.timeout)  # type: ignore[attr-defined]
-                    if ajax_response.status_code == 200:  # type: ignore[attr-defined]
-                        # Try JSON
-                        try:
-                            data: Any = ajax_response.json()  # type: ignore[attr-defined]
-                            chapters: List[Any] = []
-                            if isinstance(data, dict):
-                                # Type: ignore for nested dict.get() calls - Pylance can't infer the type
-                                data_list: Any = data.get("data", [])  # type: ignore[arg-type]
-                                data_list_fallback: Any = data.get("list", [])  # type: ignore[arg-type]
-                                chapters_raw: Any = data.get("chapters", data_list)  # type: ignore[arg-type]
-                                if chapters_raw is None:
-                                    chapters_raw = data_list_fallback  # type: ignore[assignment]
-                                if isinstance(chapters_raw, list):
-                                    chapters: List[Any] = chapters_raw  # type: ignore[assignment]
-                                else:
-                                    chapters: List[Any] = []
-                            elif isinstance(data, list):
-                                chapters: List[Any] = data  # type: ignore[assignment]
-                            
-                            urls: List[str] = []
-                            for ch in chapters:
-                                if isinstance(ch, dict):
-                                    # Type: ignore for dict.get() - Pylance can't infer the type
-                                    url_raw: Any = ch.get("url") or ch.get("href") or ch.get("link")  # type: ignore[arg-type]
-                                    url: Optional[str] = str(url_raw) if url_raw is not None else None  # type: ignore[arg-type]
-                                    if url:
-                                        if not url.startswith("http"):
-                                            url = normalize_url(url, self.base_url)
-                                        urls.append(url)
-                            
-                            if urls:
-                                return urls
-                        except (json.JSONDecodeError, ValueError):
-                            # Not JSON, try HTML parsing
-                            ajax_soup = BeautifulSoup(ajax_response.content, "html.parser")  # type: ignore[arg-type, assignment]
-                            links = ajax_soup.find_all("a", href=re.compile(r"chapter", re.I))  # type: ignore[attr-defined]
-                            urls: List[str] = []
-                            for link in links:  # type: ignore[assignment]
-                                link_elem: Any = link  # type: ignore[assignment]
-                                href_raw: Any = link_elem.get("href", "")  # type: ignore[attr-defined, arg-type]
-                                href: str = str(href_raw) if href_raw else ""  # type: ignore[arg-type]
-                                if href:
-                                    full_url: str = normalize_url(href, self.base_url)
-                                    link_text_raw: Any = link_elem.get_text(strip=True)  # type: ignore[attr-defined]
-                                    link_text: str = str(link_text_raw) if link_text_raw else ""  # type: ignore[arg-type]
-                                    if is_chapter_url(full_url, link_text):
-                                        urls.append(full_url)
-                            if urls:
-                                return urls
+                    ajax_response = self._fetch_response(endpoint)
+                    if not ajax_response:
+                        continue
+
+                    try:
+                        data: Any = ajax_response.json()  # type: ignore[attr-defined]
+                        chapters: List[Any] = []
+                        if isinstance(data, dict):
+                            data_list: Any = data.get("data", [])  # type: ignore[arg-type]
+                            data_list_fallback: Any = data.get("list", [])  # type: ignore[arg-type]
+                            chapters_raw: Any = data.get("chapters", data_list)  # type: ignore[arg-type]
+                            if chapters_raw is None:
+                                chapters_raw = data_list_fallback  # type: ignore[assignment]
+                            if isinstance(chapters_raw, list):
+                                chapters = chapters_raw  # type: ignore[assignment]
+                        elif isinstance(data, list):
+                            chapters = data  # type: ignore[assignment]
+
+                        candidates: List[Tuple[str, str]] = []
+                        for ch in chapters:
+                            if isinstance(ch, dict):
+                                url_raw: Any = ch.get("url") or ch.get("href") or ch.get("link")  # type: ignore[arg-type]
+                                url: Optional[str] = str(url_raw) if url_raw is not None else None  # type: ignore[arg-type]
+                                if url:
+                                    candidates.append((url, ""))
+
+                        urls = self._normalize_and_filter(candidates)
+                        if urls:
+                            return urls
+                    except (json.JSONDecodeError, ValueError):
+                        continue
                 except Exception:
                     continue
             
@@ -211,163 +240,6 @@ class ChapterUrlExtractors:
         except Exception as e:
             logger.debug(f"AJAX endpoint extraction failed: {e}")
             return []
-    
-    def try_html_parsing(self, toc_url: str) -> List[str]:
-        """
-        Try to get chapter URLs by parsing HTML.
-        
-        Uses multiple selector patterns to find chapter links,
-        including FanMTL-specific selectors.
-        """
-        session = self.session_manager.get_session()
-        if not session or not HAS_BS4 or BeautifulSoup is None:
-            return []
-        
-        try:
-            self.session_manager.rate_limit()
-            response = session.get(toc_url, timeout=self.timeout)  # type: ignore[attr-defined]
-            if response.status_code != 200:  # type: ignore[attr-defined]
-                return []
-            
-            soup = BeautifulSoup(response.content, "html.parser")  # type: ignore[arg-type, assignment]
-            
-            # Try multiple selector patterns (including FanMTL, LightNovelPub, etc.)
-            selectors_to_try = [
-                # Site-specific selectors
-                '.list-chapter a',           # NovelFull
-                '#list-chapter a',            # NovelFull
-                'ul.list-chapter a',          # NovelFull
-                '.chapter-list a',            # Generic, FanMTL
-                '#chapters a',                # Generic, FanMTL
-                'ul.chapter-list a',          # Generic, FanMTL
-                # LightNovelPub specific
-                '.chapter-item a',            # LightNovelPub
-                '.chapter-name a',            # LightNovelPub
-                'a[href*="/book/"]',          # LightNovelPub pattern
-                # Other common patterns
-                '.chapters a',
-                'div.chapter-list a',
-                '[class*="chapter"] a',
-                '[id*="chapter"] a',
-                # Generic fallback
-                'a[href*="chapter"]',
-            ]
-            
-            chapter_urls: List[str] = []
-            found_selectors: set[str] = set()
-            
-            for selector in selectors_to_try:
-                try:
-                    links = soup.select(selector)  # type: ignore[attr-defined]
-                    if links:
-                        found_selectors.add(selector)
-                        for link in links:  # type: ignore[assignment]
-                            link_elem: Any = link  # type: ignore[assignment]
-                            href_raw: Any = link_elem.get("href", "")  # type: ignore[attr-defined, arg-type]
-                            href: str = str(href_raw) if href_raw else ""  # type: ignore[arg-type]
-                            if href:
-                                # Normalize URL
-                                full_url: str = normalize_url(href, self.base_url)
-                                link_text_raw: Any = link_elem.get_text(strip=True)  # type: ignore[attr-defined]
-                                link_text: str = str(link_text_raw) if link_text_raw else ""  # type: ignore[arg-type]
-                                
-                                # Use our flexible chapter detection method
-                                if is_chapter_url(full_url, link_text):
-                                    chapter_urls.append(full_url)
-                except Exception:
-                    continue
-            
-            if found_selectors:
-                logger.debug(f"Found chapter links using selectors: {', '.join(found_selectors)}")
-            
-            # Remove duplicates while preserving order
-            seen: set[str] = set()
-            unique_urls: List[str] = []
-            for url in chapter_urls:
-                if url not in seen:
-                    seen.add(url)
-                    unique_urls.append(url)
-            
-            return unique_urls
-        except Exception as e:
-            logger.debug(f"HTML parsing failed: {e}")
-            return []
-    
-    def try_follow_next_links(self, toc_url: str, max_chapters: int = 100, should_stop: Optional[Callable[[], bool]] = None) -> List[str]:
-        """Try to get chapter URLs by following 'next' links."""
-        session = self.session_manager.get_session()
-        if not session or not HAS_BS4 or BeautifulSoup is None:
-            return []
-        
-        chapter_urls: List[str] = []
-        current_url: str = toc_url
-        visited: set[str] = set()
-        
-        try:
-            for _ in range(max_chapters):
-                if should_stop and should_stop():
-                    break
-                    
-                if current_url in visited:
-                    break
-                visited.add(current_url)
-                
-                self.session_manager.rate_limit()
-                response = session.get(current_url, timeout=self.timeout)  # type: ignore[attr-defined]
-                if response.status_code != 200:  # type: ignore[attr-defined]
-                    break
-                
-                soup = BeautifulSoup(response.content, "html.parser")  # type: ignore[arg-type, assignment]
-                
-                # Add current URL if it's a chapter
-                if "chapter" in current_url.lower():
-                    chapter_urls.append(current_url)
-                
-                # Find "next" link
-                next_link: Optional[str] = None
-                next_selectors: List[str] = [
-                    "a.btn-next",
-                    "a.next",
-                    "a[rel='next']",
-                ]
-                
-                for selector in next_selectors:
-                    try:
-                        link = soup.select_one(selector)  # type: ignore[attr-defined]
-                        if link:
-                            link_elem: Any = link
-                            href_raw: Any = link_elem.get("href")  # type: ignore[attr-defined]
-                            next_link = str(href_raw) if href_raw else None
-                            break
-                    except Exception:
-                        continue
-                
-                # Also try text-based search
-                if not next_link:
-                    links = soup.find_all("a")  # type: ignore[attr-defined]
-                    for link in links:  # type: ignore[assignment]
-                        link_elem: Any = link  # type: ignore[assignment]
-                        text_raw: Any = link_elem.get_text(strip=True)  # type: ignore[attr-defined]
-                        text: str = str(text_raw).lower() if text_raw else ""  # type: ignore[arg-type]
-                        if "next" in text and "chapter" in text:
-                            href_raw: Any = link_elem.get("href")  # type: ignore[attr-defined, arg-type]
-                            next_link = str(href_raw) if href_raw else None  # type: ignore[arg-type]
-                            break
-                
-                if not next_link:
-                    break
-                
-                # Normalize next URL
-                current_url = normalize_url(next_link, self.base_url)
-                
-                # Add delay
-                if self.delay > 0:
-                    time.sleep(self.delay)
-            
-            return chapter_urls
-        except Exception as e:
-            logger.debug(f"Follow next links failed: {e}")
-            return chapter_urls
     
     def try_playwright_with_scrolling(
         self,

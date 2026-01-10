@@ -368,6 +368,74 @@ class TestProcessingPipeline:
         assert failure_callback_called[0][0] == 1
         assert isinstance(failure_callback_called[0][1], Exception)
     
+    def test_set_pause_check_callback(self, pipeline):
+        """Test setting pause check callback."""
+        def pause_callback():
+            return True
+
+        pipeline.set_pause_check_callback(pause_callback)
+        assert pipeline._check_paused_callback == pause_callback
+
+    def test_check_should_pause_no_callback(self, pipeline):
+        """Test pause check when no callback is set."""
+        assert pipeline._check_should_pause() == False
+
+    def test_check_should_pause_with_callback(self, pipeline):
+        """Test pause check with callback set."""
+        def pause_callback():
+            return True
+
+        pipeline.set_pause_check_callback(pause_callback)
+        assert pipeline._check_should_pause() == True
+
+        def no_pause_callback():
+            return False
+
+        pipeline.set_pause_check_callback(no_pause_callback)
+        assert pipeline._check_should_pause() == False
+
+    @patch('time.sleep')
+    def test_wait_if_paused(self, mock_sleep, pipeline):
+        """Test waiting while paused."""
+        call_count = 0
+        def pause_callback():
+            nonlocal call_count
+            call_count += 1
+            return call_count < 3  # Pause for first 2 calls, then resume
+
+        pipeline.set_pause_check_callback(pause_callback)
+
+        pipeline._wait_if_paused()
+
+        # Should have slept twice (while paused)
+        assert mock_sleep.call_count == 2
+
+    @patch('time.sleep')
+    def test_wait_if_paused_stop_during_pause(self, mock_sleep, pipeline):
+        """Test stopping while paused."""
+        def pause_callback():
+            return True  # Always paused
+
+        pipeline.set_pause_check_callback(pause_callback)
+        pipeline.should_stop = True  # Stop immediately
+
+        pipeline._wait_if_paused()
+
+        # Should not have slept since we stopped immediately
+        assert mock_sleep.call_count == 0
+
+    def test_extract_base_url(self, pipeline):
+        """Test base URL extraction from full URLs."""
+        # HTTP URL
+        assert pipeline._extract_base_url("https://example.com/path/to/page") == "https://example.com"
+        assert pipeline._extract_base_url("http://example.com/path") == "http://example.com"
+
+        # URL with port
+        assert pipeline._extract_base_url("https://example.com:8080/path") == "https://example.com:8080"
+
+        # URL with query parameters
+        assert pipeline._extract_base_url("https://example.com/path?param=value") == "https://example.com"
+
     def test_process_chapter_failure_callback_cleanup(self, pipeline, temp_dir):
         """Test failure callback cleans up temp files (Phase 1 - RQ pattern)."""
         import tempfile

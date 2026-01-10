@@ -13,12 +13,10 @@
 
 ## Strategies
 
-URL fetching (fallback order):
-1. JavaScript variable extraction
-2. AJAX endpoint discovery  
-3. HTML parsing
-4. Playwright with scrolling
-5. Link following
+URL fetching (optimized order):
+1. JavaScript variable extraction (fastest)
+2. AJAX endpoint discovery (fast + lazy-loading)
+3. Playwright with scrolling (comprehensive)
 
 ## Features
 
