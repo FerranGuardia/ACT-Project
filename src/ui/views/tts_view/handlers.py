@@ -18,6 +18,7 @@ from PySide6.QtCore import QUrl, QTimer
 from core.constants import PREVIEW_TEXT_LENGTH, TEMP_FILE_CLEANUP_DELAY_MS
 from core.logger import get_logger
 from tts import TTSEngine, VoiceManager
+from utils.validation import validate_file_path
 
 # Try to import QtMultimedia for audio playback
 logger = get_logger("ui.tts_view.handlers")
@@ -271,14 +272,31 @@ class TTSViewHandlers:
                     # Fallback to external player
                     import subprocess
                     import platform
-                    if platform.system() == 'Windows':
-                        os.startfile(temp_path)
-                    elif platform.system() == 'Darwin':  # macOS
-                        subprocess.run(['afplay', temp_path])
-                    else:  # Linux
-                        subprocess.run(['xdg-open', temp_path])
-                    status_label.setText("Preview playing in external player...")
-                    logger.info(f"Preview opened in external player for voice: {voice}")
+
+                    # Validate temp file path for security
+                    is_valid, path_or_error = validate_file_path(temp_path, allow_create=False)
+                    if not is_valid:
+                        logger.error(f"Invalid temp file path for external player: {path_or_error}")
+                        QMessageBox.warning(self.view, "Security Error", f"Cannot play audio: {path_or_error}")
+                        status_label.setText("Ready")
+                        return
+
+                    safe_temp_path = path_or_error
+                    logger.info(f"Validated temp file path for external player: {safe_temp_path}")
+
+                    try:
+                        if platform.system() == 'Windows':
+                            os.startfile(safe_temp_path)
+                        elif platform.system() == 'Darwin':  # macOS
+                            subprocess.run(['afplay', safe_temp_path], check=True)
+                        else:  # Linux
+                            subprocess.run(['xdg-open', safe_temp_path], check=True)
+                        status_label.setText("Preview playing in external player...")
+                        logger.info(f"Preview opened in external player for voice: {voice}")
+                    except (subprocess.SubprocessError, OSError) as e:
+                        logger.error(f"Failed to open external player: {e}")
+                        QMessageBox.warning(self.view, "Player Error", f"Failed to open external player: {e}")
+                        status_label.setText("Ready")
             else:
                 QMessageBox.warning(self.view, "Preview Error", "Failed to generate preview")
                 status_label.setText("Ready")

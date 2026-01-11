@@ -50,7 +50,6 @@ TEST_AUDIO_SIZE_THRESHOLD: Final[int] = 1000  # Minimum audio file size in bytes
 TEST_NETWORK_TIMEOUT: Final[int] = 300  # 5 minutes for network tests
 
 # UI constants
-PREVIEW_TEXT_LENGTH: Final[int] = 200  # Characters for voice preview
 TEMP_FILE_CLEANUP_DELAY_MS: Final[int] = 500  # Delay before cleaning up temp files
 
 

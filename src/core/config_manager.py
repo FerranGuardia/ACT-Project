@@ -22,19 +22,17 @@ class ConfigManager:
     """Manages application configuration and user preferences."""
 
     _instance: Optional["ConfigManager"] = None
-    _initialized: bool = False
 
     def __new__(cls) -> "ConfigManager":
         """Singleton pattern to ensure only one config manager instance."""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
+            # Initialize only once in __new__ to avoid __init__ being called multiple times
+            cls._instance._initialize()
         return cls._instance
 
-    def __init__(self) -> None:
-        """Initialize the configuration manager."""
-        if self._initialized:
-            return
-
+    def _initialize(self) -> None:
+        """Initialize the configuration manager (called only once)."""
         self.config_dir = Path.home() / ".act"
         self.config_dir.mkdir(parents=True, exist_ok=True)
 
@@ -43,7 +41,10 @@ class ConfigManager:
         self._default_config = self._get_default_config()
 
         self.load_config()
-        self._initialized = True
+
+    def __init__(self) -> None:
+        """Prevent multiple initialization - all work done in __new__."""
+        pass
 
     def _get_default_config(self) -> Dict[str, Any]:
         """

@@ -21,19 +21,17 @@ class ACTLogger:
     """Centralized logger for ACT application."""
 
     _instance: Optional["ACTLogger"] = None
-    _initialized: bool = False
 
     def __new__(cls) -> "ACTLogger":
         """Singleton pattern to ensure only one logger instance."""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
+            # Initialize only once in __new__ to avoid __init__ being called multiple times
+            cls._instance._initialize()
         return cls._instance
 
-    def __init__(self) -> None:
-        """Initialize the logger if not already initialized."""
-        if self._initialized:
-            return
-
+    def _initialize(self) -> None:
+        """Initialize the logger (called only once)."""
         self.log_dir = Path.home() / ".act" / "logs"
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -41,7 +39,10 @@ class ACTLogger:
         self.error_log_file = self.log_dir / "act_errors.log"
 
         self._setup_loggers()
-        self._initialized = True
+
+    def __init__(self) -> None:
+        """Prevent multiple initialization - all work done in __new__."""
+        pass
 
     def _setup_loggers(self) -> None:
         """Configure all loggers with appropriate handlers."""
@@ -147,8 +148,7 @@ class ACTLogger:
         return instance.error_log_file
 
 
-# Initialize logger when module is imported
-_ = ACTLogger()
+# Logger is initialized lazily when first requested
 
 
 def get_logger(name: str) -> logging.Logger:

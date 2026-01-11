@@ -1,11 +1,14 @@
 """
 Voice manager for TTS module.
 
+DEPRECATED: This module is deprecated. Use VoiceResolver instead.
+
 Handles loading, caching, and managing TTS voices from multiple providers.
 """
 
 import json
 import time
+import warnings
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
@@ -14,6 +17,13 @@ from core.logger import get_logger
 from tts.providers.provider_manager import TTSProviderManager
 
 logger = get_logger("tts.voice_manager")
+
+# Deprecation warning
+warnings.warn(
+    "VoiceManager is deprecated. Use VoiceResolver instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 
 class VoiceManager:

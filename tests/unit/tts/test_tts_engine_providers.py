@@ -59,6 +59,14 @@ if "core.config_manager" not in sys.modules:
     setattr(config_module, "ConfigManager", MagicMock)  # type: ignore[attr-defined]
     sys.modules["core.config_manager"] = config_module
 
+# Mock core.constants
+if "core.constants" not in sys.modules:
+    constants_module = types.ModuleType("core.constants")
+    setattr(constants_module, "FFMPEG_TIMEOUT_SECONDS", 300)  # type: ignore[attr-defined]
+    setattr(constants_module, "DEFAULT_REQUEST_TIMEOUT", 30)  # type: ignore[attr-defined]
+    setattr(constants_module, "MAX_RETRIES", 3)  # type: ignore[attr-defined]
+    sys.modules["core.constants"] = constants_module
+
 # Set up package structure
 if "tts" not in sys.modules:
     sys.modules["tts"] = types.ModuleType("tts")
@@ -128,6 +136,12 @@ if "tts.ssml_builder" not in sys.modules:
     setattr(ssml_builder_module, "parse_volume", lambda s: 0.0)  # type: ignore[attr-defined]
     sys.modules["tts.ssml_builder"] = ssml_builder_module
 
+# Mock text_utils
+if "text_utils" not in sys.modules:
+    text_utils_module = types.ModuleType("text_utils")
+    setattr(text_utils_module, "clean_text_for_tts", lambda text, base_cleaner=None: text)  # type: ignore[attr-defined]
+    sys.modules["text_utils"] = text_utils_module
+
 # Load audio_merger module (needed by text_processor)
 audio_merger_path = act_src / "tts" / "audio_merger.py"
 spec_am = importlib.util.spec_from_file_location("tts.audio_merger", audio_merger_path)
@@ -164,6 +178,51 @@ tts_utils_module = importlib.util.module_from_spec(spec_tu)
 sys.modules["tts.tts_utils"] = tts_utils_module
 spec_tu.loader.exec_module(tts_utils_module)
 
+# Load resource_manager module
+resource_manager_path = act_src / "tts" / "resource_manager.py"
+spec_rm = importlib.util.spec_from_file_location("tts.resource_manager", resource_manager_path)
+if spec_rm is None or spec_rm.loader is None:
+    raise ImportError(f"Could not load spec for resource_manager from {resource_manager_path}")
+resource_manager_module = importlib.util.module_from_spec(spec_rm)
+sys.modules["tts.resource_manager"] = resource_manager_module
+spec_rm.loader.exec_module(resource_manager_module)
+
+# Load text_processing_pipeline module
+text_pipeline_path = act_src / "tts" / "text_processing_pipeline.py"
+spec_tp_new = importlib.util.spec_from_file_location("tts.text_processing_pipeline", text_pipeline_path)
+if spec_tp_new is None or spec_tp_new.loader is None:
+    raise ImportError(f"Could not load spec for text_processing_pipeline from {text_pipeline_path}")
+text_pipeline_module = importlib.util.module_from_spec(spec_tp_new)
+sys.modules["tts.text_processing_pipeline"] = text_pipeline_module
+spec_tp_new.loader.exec_module(text_pipeline_module)
+
+# Load voice_resolver module
+voice_resolver_path = act_src / "tts" / "voice_resolver.py"
+spec_vr = importlib.util.spec_from_file_location("tts.voice_resolver", voice_resolver_path)
+if spec_vr is None or spec_vr.loader is None:
+    raise ImportError(f"Could not load spec for voice_resolver from {voice_resolver_path}")
+voice_resolver_module = importlib.util.module_from_spec(spec_vr)
+sys.modules["tts.voice_resolver"] = voice_resolver_module
+spec_vr.loader.exec_module(voice_resolver_module)
+
+# Load conversion_strategies module
+conversion_strategies_path = act_src / "tts" / "conversion_strategies.py"
+spec_cs = importlib.util.spec_from_file_location("tts.conversion_strategies", conversion_strategies_path)
+if spec_cs is None or spec_cs.loader is None:
+    raise ImportError(f"Could not load spec for conversion_strategies from {conversion_strategies_path}")
+conversion_strategies_module = importlib.util.module_from_spec(spec_cs)
+sys.modules["tts.conversion_strategies"] = conversion_strategies_module
+spec_cs.loader.exec_module(conversion_strategies_module)
+
+# Load conversion_coordinator module
+conversion_coordinator_path = act_src / "tts" / "conversion_coordinator.py"
+spec_cc = importlib.util.spec_from_file_location("tts.conversion_coordinator", conversion_coordinator_path)
+if spec_cc is None or spec_cc.loader is None:
+    raise ImportError(f"Could not load spec for conversion_coordinator from {conversion_coordinator_path}")
+conversion_coordinator_module = importlib.util.module_from_spec(spec_cc)
+sys.modules["tts.conversion_coordinator"] = conversion_coordinator_module
+spec_cc.loader.exec_module(conversion_coordinator_module)
+
 # Load tts_engine
 tts_engine_path = act_src / "tts" / "tts_engine.py"
 spec_engine = importlib.util.spec_from_file_location("tts.tts_engine", tts_engine_path)
@@ -183,30 +242,36 @@ class TestTTSEngineProviders:
     def test_initialization_with_provider_manager(self, monkeypatch):
         """Test TTSEngine initialization with ProviderManager"""
         mock_pm_instance = MagicMock()
-        mock_pm_class = MagicMock(return_value=mock_pm_instance)
+        mock_pm_class = MagicMock(return_value=mock_pm_class)
         monkeypatch.setattr(tts_engine_module, 'TTSProviderManager', mock_pm_class)
-        mock_vm_instance = MagicMock()
-        mock_vm_class = MagicMock(return_value=mock_vm_instance)
-        monkeypatch.setattr(tts_engine_module, 'VoiceManager', mock_vm_class)
-        
+
+        # Mock VoiceResolver since that's what TTSEngine now uses internally
+        mock_vr_instance = MagicMock()
+        mock_vr_class = MagicMock(return_value=mock_vr_instance)
+        monkeypatch.setattr(tts_engine_module, 'VoiceResolver', mock_vr_class)
+
         engine = TTSEngine(provider_manager=mock_pm_instance)
 
         assert engine.provider_manager == mock_pm_instance
-        mock_vm_class.assert_called_once_with(provider_manager=mock_pm_instance)
-    
+        # VoiceResolver should be created with the provider manager
+        mock_vr_class.assert_called_once_with(mock_pm_instance)
+
     def test_initialization_without_provider_manager(self, monkeypatch):
         """Test TTSEngine initialization creates ProviderManager"""
         mock_pm_instance = MagicMock()
         mock_pm_class = MagicMock(return_value=mock_pm_instance)
         monkeypatch.setattr(tts_engine_module, 'TTSProviderManager', mock_pm_class)
-        mock_vm_instance = MagicMock()
-        mock_vm_class = MagicMock(return_value=mock_vm_instance)
-        monkeypatch.setattr(tts_engine_module, 'VoiceManager', mock_vm_class)
-        
+
+        # Mock VoiceResolver
+        mock_vr_instance = MagicMock()
+        mock_vr_class = MagicMock(return_value=mock_vr_instance)
+        monkeypatch.setattr(tts_engine_module, 'VoiceResolver', mock_vr_class)
+
         engine = TTSEngine()
-        
+
         assert engine.provider_manager is not None
         mock_pm_class.assert_called_once()
+        mock_vr_class.assert_called_once_with(mock_pm_instance)
     
     def test_get_available_voices_with_provider(self, monkeypatch):
         """Test get_available_voices with provider parameter"""

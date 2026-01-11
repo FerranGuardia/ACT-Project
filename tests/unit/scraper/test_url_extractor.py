@@ -10,13 +10,14 @@ Validates:
 """
 
 from typing import Any, List
-from unittest.mock import MagicMock, Mock, call, patch
+from unittest.mock import MagicMock, Mock, call, patch, AsyncMock
 
 import pytest
 
-from src.scraper.extractors.url_extractor import UrlExtractor
-from src.scraper.extractors.url_extractor_extractors import (
+from scraper.extractors.url_extractor import UrlExtractor
+from scraper.extractors.url_extractor_extractors import (
     ChapterUrlExtractors, retry_with_backoff)
+from scraper.universal_url_detector import UniversalUrlDetector, DetectionResult
 
 
 class TestChapterUrlExtractorsHelpers:
@@ -59,10 +60,10 @@ class TestChapterUrlExtractorsHelpers:
             ("https://example.com/page", "Page"),  # Not a chapter
         ]
         
-        with patch('src.scraper.extractors.url_extractor_extractors.is_chapter_url') as mock_is_ch:
+        with patch('scraper.extractors.url_extractor_extractors.is_chapter_url') as mock_is_ch:
             # Return True for first two, False for third
             mock_is_ch.side_effect = [True, True, False]
-            with patch('src.scraper.extractors.url_extractor_extractors.normalize_url') as mock_norm:
+            with patch('scraper.extractors.url_extractor_extractors.normalize_url') as mock_norm:
                 mock_norm.side_effect = lambda url, base: url
                 result = self.extractors._normalize_and_filter(candidates)
         
@@ -77,9 +78,9 @@ class TestChapterUrlExtractorsHelpers:
             ("https://example.com/chapter/1", "Chapter 1"),  # Duplicate
         ]
         
-        with patch('src.scraper.extractors.url_extractor_extractors.is_chapter_url') as mock_is_ch:
+        with patch('scraper.extractors.url_extractor_extractors.is_chapter_url') as mock_is_ch:
             mock_is_ch.return_value = True
-            with patch('src.scraper.extractors.url_extractor_extractors.normalize_url') as mock_norm:
+            with patch('scraper.extractors.url_extractor_extractors.normalize_url') as mock_norm:
                 mock_norm.side_effect = lambda url, base: url
                 result = self.extractors._normalize_and_filter(candidates)
         
@@ -93,9 +94,9 @@ class TestChapterUrlExtractorsHelpers:
             ("https://other.com/chapter/2", "Chapter 2"),  # Different host
         ]
         
-        with patch('src.scraper.extractors.url_extractor_extractors.is_chapter_url') as mock_is_ch:
+        with patch('scraper.extractors.url_extractor_extractors.is_chapter_url') as mock_is_ch:
             mock_is_ch.return_value = True
-            with patch('src.scraper.extractors.url_extractor_extractors.normalize_url') as mock_norm:
+            with patch('scraper.extractors.url_extractor_extractors.normalize_url') as mock_norm:
                 # Normalize keeps same host, other.com stays as-is
                 def norm_side_effect(url, base):
                     return url  # Return as-is
@@ -130,7 +131,7 @@ class TestJSExtraction:
         mock_session.get.return_value = mock_response
         self.session_manager.get_session.return_value = mock_session
         
-        with patch('src.scraper.extractors.url_extractor_extractors.extract_chapters_from_javascript') as mock_extract:
+        with patch('scraper.extractors.url_extractor_extractors.extract_chapters_from_javascript') as mock_extract:
             mock_extract.return_value = ["https://example.com/ch1", "https://example.com/ch2"]
             result = self.extractors.try_js_extraction("https://example.com/toc")
         
@@ -186,10 +187,10 @@ class TestAJAXExtraction:
         mock_session.get.side_effect = [mock_toc_response, mock_ajax_response]
         self.session_manager.get_session.return_value = mock_session
         
-        with patch('src.scraper.extractors.url_extractor_extractors.extract_novel_id_from_html') as mock_id:
-            with patch('src.scraper.extractors.url_extractor_extractors.discover_ajax_endpoints') as mock_disc:
-                with patch('src.scraper.extractors.url_extractor_extractors.normalize_url') as mock_norm:
-                    with patch('src.scraper.extractors.url_extractor_extractors.is_chapter_url') as mock_is_ch:
+        with patch('scraper.extractors.url_extractor_extractors.extract_novel_id_from_html') as mock_id:
+            with patch('scraper.extractors.url_extractor_extractors.discover_ajax_endpoints') as mock_disc:
+                with patch('scraper.extractors.url_extractor_extractors.normalize_url') as mock_norm:
+                    with patch('scraper.extractors.url_extractor_extractors.is_chapter_url') as mock_is_ch:
                         mock_id.return_value = "123"
                         mock_disc.return_value = ["https://example.com/api/chapters"]
                         mock_norm.side_effect = lambda url, base: url
@@ -209,8 +210,8 @@ class TestAJAXExtraction:
         mock_session.get.return_value = mock_response
         self.session_manager.get_session.return_value = mock_session
         
-        with patch('src.scraper.extractors.url_extractor_extractors.extract_novel_id_from_html') as mock_id:
-            with patch('src.scraper.extractors.url_extractor_extractors.discover_ajax_endpoints') as mock_disc:
+        with patch('scraper.extractors.url_extractor_extractors.extract_novel_id_from_html') as mock_id:
+            with patch('scraper.extractors.url_extractor_extractors.discover_ajax_endpoints') as mock_disc:
                 mock_id.return_value = "123"
                 mock_disc.return_value = []  # No endpoints
                 result = self.extractors.try_ajax_endpoints("https://example.com/toc")
@@ -279,10 +280,11 @@ class TestRetryWithBackoff:
 
 class TestUrlExtractorPipeline:
     """Test the overall URL extractor fetch pipeline."""
-    
+
     def setup_method(self):
         """Set up test fixtures."""
-        self.extractor = UrlExtractor(base_url="https://example.com", timeout=30, delay=0.5)
+        # Use legacy mode for existing tests
+        self.extractor = UrlExtractor(base_url="https://example.com", timeout=30, delay=0.5, use_universal_detector=False)
     
     def test_fetch_tries_js_first(self):
         """Test fetch tries JavaScript extraction first."""
@@ -340,8 +342,8 @@ class TestValidation:
             delay=0.5
         )
         
-        with patch('src.scraper.extractors.url_extractor_extractors.is_chapter_url') as mock_is_ch:
-            with patch('src.scraper.extractors.url_extractor_extractors.normalize_url') as mock_norm:
+        with patch('scraper.extractors.url_extractor_extractors.is_chapter_url') as mock_is_ch:
+            with patch('scraper.extractors.url_extractor_extractors.normalize_url') as mock_norm:
                 mock_is_ch.return_value = False
                 mock_norm.side_effect = lambda url, base: url
                 result = extractors._normalize_and_filter([
@@ -360,8 +362,8 @@ class TestValidation:
             delay=0.5
         )
         
-        with patch('src.scraper.extractors.url_extractor_extractors.is_chapter_url') as mock_is_ch:
-            with patch('src.scraper.extractors.url_extractor_extractors.normalize_url') as mock_norm:
+        with patch('scraper.extractors.url_extractor_extractors.is_chapter_url') as mock_is_ch:
+            with patch('scraper.extractors.url_extractor_extractors.normalize_url') as mock_norm:
                 mock_is_ch.return_value = True
                 mock_norm.side_effect = lambda url, base: url
                 result = extractors._normalize_and_filter([
@@ -377,7 +379,7 @@ class TestNoBeautifulSoupDependency:
     
     def test_extractors_no_beautifulsoup_imports(self):
         """Verify extractors module doesn't import BeautifulSoup."""
-        import src.scraper.extractors.url_extractor_extractors as extractors_module
+        import scraper.extractors.url_extractor_extractors as extractors_module
 
         # BeautifulSoup should not be in the module
         source = extractors_module.__doc__ or ""
@@ -413,3 +415,91 @@ class TestMethodOrdering:
         # Playwright: handles everything but slowest
         # Implicitly tested by fetch pipeline
         pass
+
+
+class TestUniversalUrlDetector:
+    """Test the new universal URL detector."""
+
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.detector = UniversalUrlDetector("https://example.com")
+
+    @pytest.mark.asyncio
+    async def test_detect_urls_basic(self):
+        """Test basic URL detection with universal detector."""
+        # Mock the adaptive config to avoid strategy ordering issues
+        with patch('scraper.universal_url_detector.UniversalUrlDetector._detect_parallel') as mock_detect:
+            with patch.object(self.detector, '_get_optimal_strategy_order', return_value=['javascript']):
+                mock_result = DetectionResult(
+                    urls=["https://example.com/ch1", "https://example.com/ch2"],
+                    confidence=0.8,
+                    method="javascript",
+                    response_time=1.5,
+                    pagination_detected=False
+                )
+                mock_detect.return_value = mock_result
+
+                result = await self.detector.detect_urls("https://example.com/toc")
+
+                assert len(result.urls) == 2
+                assert result.confidence == 0.8
+                assert result.method == "javascript"
+                mock_detect.assert_called_once()
+
+    def test_strategy_initialization(self):
+        """Test that strategies are properly initialized."""
+        assert len(self.detector.strategies) == 5
+        strategy_names = [s.name for s in self.detector.strategies]
+        assert "javascript" in strategy_names
+        assert "ajax" in strategy_names
+        assert "html_parsing" in strategy_names
+        assert "browser_automation" in strategy_names
+        assert "api_reverse" in strategy_names
+
+    def test_adaptive_config_integration(self):
+        """Test that adaptive config is integrated."""
+        assert hasattr(self.detector, 'adaptive_config')
+        assert self.detector.adaptive_config is not None
+
+    def test_domain_extraction(self):
+        """Test domain extraction from URLs."""
+        assert self.detector.domain == "example.com"
+
+    def test_optimal_strategy_order(self):
+        """Test getting optimal strategy order."""
+        order = self.detector._get_optimal_strategy_order()
+        assert isinstance(order, list)
+        assert len(order) > 0
+
+
+class TestUrlExtractorUniversalMode:
+    """Test URL extractor with universal detector enabled."""
+
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.extractor = UrlExtractor(base_url="https://example.com", timeout=30, delay=0.5, use_universal_detector=True)
+
+    @pytest.mark.asyncio
+    async def test_universal_mode_delegates_to_detector(self):
+        """Test that universal mode delegates to UniversalUrlDetector."""
+        with patch('scraper.extractors.url_extractor.UniversalUrlDetector') as mock_detector_class:
+            mock_detector = Mock()
+            mock_detector_class.return_value = mock_detector
+
+            mock_result = DetectionResult(
+                urls=["https://example.com/ch1"],
+                confidence=0.9,
+                method="javascript",
+                response_time=1.0
+            )
+            mock_detector.detect_urls = AsyncMock(return_value=mock_result)
+
+            # Reinitialize to use the mock
+            self.extractor = UrlExtractor(base_url="https://example.com", use_universal_detector=True)
+
+            urls, metadata = self.extractor.fetch("https://example.com/toc")
+
+            mock_detector.detect_urls.assert_called_once()
+            assert urls == ["https://example.com/ch1"]
+            assert metadata["method_used"] == "javascript"
+            assert metadata["confidence"] == 0.9

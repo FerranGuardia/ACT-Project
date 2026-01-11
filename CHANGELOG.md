@@ -5,7 +5,7 @@ All notable changes to ACT (Audiobook Creator Tools) will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.3.0] - 2026-01-11
+## [1.1.0] - 2026-01-11
 
 ### Architecture Refactoring
 
@@ -20,6 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Zero Breaking Changes**: All existing APIs preserved through backward compatibility
 - **Enhanced Testability**: Individual coordinators can be tested in isolation
 
+#### Performance Improvements
+
+##### Text Processing Optimization
+- **472x performance improvement** for text cleaning operations
+- Precompiled regex patterns in `text_cleaner.py` eliminate compilation overhead
+- Processing speed increased from ~380 to ~180,000 characters/second
+- Memory allocation reduced through pattern reuse
+
 #### Testing Infrastructure Expansion
 - **100+ New Tests**: Comprehensive test suite covering all new coordinators
 - **Unit Tests**: `tests/unit/processor/test_coordinators.py` - Isolated coordinator testing
@@ -27,28 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Backward Compatibility Tests**: Ensuring legacy APIs still work
 - **Improved Coverage**: Better isolation and mocking capabilities
 
-#### Documentation Updates
-- Updated `docs/modules/BLOCK_5_PROCESSOR.md` to reflect new architecture
-- Enhanced README.md with architecture overview and recent improvements
-- Added comprehensive documentation for new modular components
+##### Test Suite Reorganization
+- **Separated E2E tests** from integration tests for proper categorization
+- Created `tests/e2e/` directory for end-to-end tests with external dependencies
+- Moved network-dependent tests: `test_scraper_real.py`, `test_full_pipeline_e2e.py`, `test_tts_multi_provider.py`
+- Integration tests now focus on internal component interactions only
 
-#### Code Cleanup
-- Removed dead files: `test_circuit_breaker.py.old`
-- Cleaned up empty directories: `docs/tests/`
-- Updated import paths throughout codebase
-- Fixed missing exports in TTS module
-
-## [1.2.0] - 2026-01-08
-
-### Performance Improvements
-
-#### Text Processing Optimization
-- **472x performance improvement** for text cleaning operations
-- Precompiled regex patterns in `text_cleaner.py` eliminate compilation overhead
-- Processing speed increased from ~380 to ~180,000 characters/second
-- Memory allocation reduced through pattern reuse
-
-#### Test Execution
+##### Test Execution Improvements
 - Added parallel test execution configuration (`-n auto`) in `pytest.ini`
 - Automatic CPU core detection for optimal parallelization
 - Fixed TTS constant access issues in AudioMerger and test suite
@@ -56,30 +49,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reduced E2E test timeouts from 10 to 5 minutes for faster execution
 - Circuit breaker test isolation fixes for reliable parallel execution
 
-### Testing Infrastructure
+#### Technical Enhancements
 
-#### Test Suite Reorganization
-- **Separated E2E tests** from integration tests for proper categorization
-- Created `tests/e2e/` directory for end-to-end tests with external dependencies
-- Moved network-dependent tests: `test_scraper_real.py`, `test_full_pipeline_e2e.py`, `test_tts_multi_provider.py`
-- Integration tests now focus on internal component interactions only
-
-#### Test Markers and Configuration
-- Added `@pytest.mark.e2e` marker for end-to-end tests
-- Enhanced test categorization for selective execution
-- Comprehensive E2E test documentation with execution guidelines
-
-### Technical Enhancements
-
-#### TextProcessor Improvements
+##### TextProcessor Improvements
 - Added `chunk_text()` method for text segmentation
 - Enhanced provider manager integration
 - Improved text processing pipeline
 
-#### Circuit Breaker Reliability
+##### Circuit Breaker Reliability
 - Implemented circuit breaker reset mechanisms for test isolation
 - Fixed parallel execution state contamination issues
 - Enhanced fault tolerance testing reliability
+
+#### Documentation Updates
+- Updated `docs/modules/BLOCK_5_PROCESSOR.md` to reflect new architecture
+- Enhanced README.md with architecture overview and recent improvements
+- Added comprehensive documentation for new modular components
+
+#### Code Quality Improvements
+- **Singleton Pattern Fixes**: Improved singleton implementations in ConfigManager and ACTLogger
+- **Import Standardization**: Updated error_handling.py to use consistent logger imports
+- **Constant Cleanup**: Removed unused PREVIEW_TEXT_LENGTH constant
+- **Module Interface Fixes**: Added missing VoiceManager export to TTS module
+
+#### Code Cleanup
+- Removed dead files: `test_circuit_breaker.py.old`, `TEST_ACTION_PLAN.md`, `test_analysis_queue_manager.md`
+- Cleaned up empty directories: `docs/tests/`
+- Updated import paths throughout codebase for new modular architecture
+- Maintained backward compatibility while modernizing internal structure
 
 ### CI/CD Configuration
 
@@ -102,7 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Parallel execution enabled by default (`-n auto`)
 - Use `pytest -m "not e2e"` to skip network-dependent E2E tests in CI/CD
 
-## [1.1.0] - 2025-12-15
+## [1.0.0] - 2025-12-15
 
 ### Added
 - Initial public release

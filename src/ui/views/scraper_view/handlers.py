@@ -14,6 +14,7 @@ from PySide6.QtWidgets import QFileDialog
 
 from core.logger import get_logger
 from ui.ui_constants import QueueItemText
+from utils.validation import validate_directory_path
 from ui.utils.error_handling import (
     show_no_directory_error,
     show_directory_not_found_error,
@@ -111,12 +112,27 @@ class ScraperViewHandlers:
             return
         
         try:
+            # Validate directory path for security
+            is_valid, dir_path_or_error = validate_directory_path(output_dir, allow_create=False)
+            if not is_valid:
+                logger.error(f"Invalid directory path for opening: {dir_path_or_error}")
+                show_error_opening_folder(self.view, f"Security error: {dir_path_or_error}")
+                return
+
+            safe_dir_path = dir_path_or_error
+            logger.info(f"Validated directory path for opening: {safe_dir_path}")
+
             # Open folder in default file manager
+            import platform
             if os.name == 'nt':  # Windows
-                os.startfile(output_dir)
+                os.startfile(safe_dir_path)
             elif os.name == 'posix':  # macOS and Linux
-                subprocess.run(['open' if os.uname().sysname == 'Darwin' else 'xdg-open', output_dir])
-            logger.info(f"Opened folder: {output_dir}")
+                command = 'open' if platform.system() == 'Darwin' else 'xdg-open'
+                subprocess.run([command, safe_dir_path], check=True)
+            logger.info(f"Opened folder: {safe_dir_path}")
+        except subprocess.SubprocessError as e:
+            show_error_opening_folder(self.view, f"Failed to open file manager: {e}")
+            logger.error(f"Error opening folder with subprocess: {e}")
         except Exception as e:
             show_error_opening_folder(self.view, str(e))
             logger.error(f"Error opening folder: {e}")

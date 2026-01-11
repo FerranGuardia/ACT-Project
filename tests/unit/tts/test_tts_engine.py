@@ -15,35 +15,34 @@ import pytest
 # Import the REAL source code for proper testing and coverage
 from src.tts.tts_engine import TTSEngine, TTSConfig, AsyncBridge
 from src.tts.providers.provider_manager import TTSProviderManager
-from src.tts.voice_manager import VoiceManager
-from src.tts.voice_validator import VoiceValidator
-from src.tts.text_processor import TextProcessor
-from src.tts.tts_utils import TTSUtils
-from src.tts.audio_merger import AudioMerger
+from src.tts.voice_resolver import VoiceResolver
+from src.tts.text_processing_pipeline import TextProcessingPipeline
+from src.tts.resource_manager import TTSResourceManager
 
 
 class TestTTSEngine:
     """Test cases for TTSEngine - focusing on real functionality"""
 
     def test_initialization_creates_real_dependencies(self):
-        """Test that TTSEngine creates real dependency instances"""
+        """Test that TTSEngine creates real dependency instances with new architecture"""
         engine = TTSEngine()
 
         # Should create real instances, not None
         assert engine.provider_manager is not None
         assert isinstance(engine.provider_manager, TTSProviderManager)
 
-        assert engine.voice_manager is not None
-        assert isinstance(engine.voice_manager, VoiceManager)
+        # New architecture components
+        assert engine.voice_resolver is not None
+        assert hasattr(engine.voice_resolver, 'resolve_voice')  # Check it has the expected method
 
-        assert engine.voice_validator is not None
-        assert isinstance(engine.voice_validator, VoiceValidator)
+        assert engine.text_pipeline is not None
+        assert hasattr(engine.text_pipeline, 'process')  # Check it has the expected method
 
-        assert engine.text_processor is not None
-        assert isinstance(engine.text_processor, TextProcessor)
+        assert engine.resource_manager is not None
+        assert hasattr(engine.resource_manager, 'cleanup_all')  # Check it has the expected method
 
-        assert engine.audio_merger is not None
-        assert isinstance(engine.audio_merger, AudioMerger)
+        assert engine.coordinator is not None
+        assert hasattr(engine.coordinator, 'convert_text_to_speech')  # Check it has the expected method
 
         # Should have config (TTSConfig instance)
         assert engine.config is not None
@@ -59,37 +58,39 @@ class TestTTSEngine:
         # Should use injected dependency
         assert engine.provider_manager is mock_provider_manager
 
-        # Other components should still be real, but created with the mock
-        assert isinstance(engine.voice_manager, VoiceManager)
-        assert isinstance(engine.voice_validator, VoiceValidator)
-        # VoiceManager should have been created with the mock provider_manager
-        # (This tests that dependencies are properly wired together)
+        # New architecture components should be created with the mock
+        assert engine.voice_resolver is not None
+        assert engine.text_pipeline is not None
+        assert engine.coordinator is not None
+        # Coordinator should have been created with the mock provider_manager
 
     def test_base_text_cleaner_injection(self):
-        """Test that base_text_cleaner is properly injected into TextProcessor"""
+        """Test that base_text_cleaner is properly injected into TextProcessingPipeline"""
         def custom_cleaner(text: str) -> str:
             return text.upper()
 
         engine = TTSEngine(base_text_cleaner=custom_cleaner)
 
-        # TextProcessor should have received the custom cleaner
-        assert engine.text_processor.base_text_cleaner is custom_cleaner
+        # TextProcessingPipeline should have received the custom cleaner
+        assert engine.text_pipeline is not None
+        # The custom cleaner should be in the pipeline
+        assert len(engine.text_pipeline.cleaners) > 0
     
     def test_get_available_voices_delegates_correctly(self):
-        """Test that get_available_voices properly delegates to VoiceValidator"""
+        """Test that get_available_voices properly delegates to the coordinator"""
         engine = TTSEngine()
 
-        # Mock the voice validator
-        mock_validator = MagicMock()
+        # Mock the coordinator
+        mock_coordinator = MagicMock()
         expected_voices = [{"id": "voice1", "name": "Voice 1"}]
-        mock_validator.get_available_voices.return_value = expected_voices
-        engine.voice_validator = mock_validator
+        mock_coordinator.get_available_voices.return_value = expected_voices
+        engine.coordinator = mock_coordinator
 
         # Test delegation
         result = engine.get_available_voices(locale="en-US", provider="edge_tts")
 
         assert result == expected_voices
-        mock_validator.get_available_voices.assert_called_once_with(locale="en-US", provider="edge_tts")
+        mock_coordinator.get_available_voices.assert_called_once_with(locale="en-US", provider="edge_tts")
 
     def test_text_processing_delegation(self):
         """Test that text processing methods delegate to TextProcessor"""

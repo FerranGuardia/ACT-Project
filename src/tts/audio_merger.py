@@ -17,6 +17,7 @@ from typing import Callable, List, Optional
 
 from core.logger import get_logger
 from core.constants import FFMPEG_TIMEOUT_SECONDS
+from utils.validation import validate_file_path
 
 from .providers.base_provider import TTSProvider
 from .providers.provider_manager import TTSProviderManager
@@ -477,9 +478,21 @@ class AudioMerger:
 
             try:
                 # Run ffmpeg concatenation with validated arguments
+                # Validate output path for security
+                is_valid, safe_output_path = validate_file_path(output_path, allow_create=True)
+                if not is_valid:
+                    logger.error(f"Invalid output path for ffmpeg: {safe_output_path}")
+                    return False
+
+                # Validate temp file list path
+                is_valid, safe_temp_file = validate_file_path(temp_file_list, allow_create=False)
+                if not is_valid:
+                    logger.error(f"Invalid temp file path for ffmpeg: {safe_temp_file}")
+                    return False
+
                 cmd_args = _validate_subprocess_args([
-                    'ffmpeg', '-f', 'concat', '-safe', '0', '-i', str(temp_file_list),
-                    '-c', 'copy', str(output_path)
+                    'ffmpeg', '-f', 'concat', '-safe', '0', '-i', str(safe_temp_file),
+                    '-c', 'copy', str(safe_output_path)
                 ])
                 result = subprocess.run(
                     cmd_args,

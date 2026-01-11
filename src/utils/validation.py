@@ -6,7 +6,9 @@ to prevent security vulnerabilities and improve reliability.
 """
 
 import re
-from typing import Dict, Any, Optional, Tuple
+import os
+from pathlib import Path
+from typing import Dict, Any, Optional, Tuple, Union
 from urllib.parse import urlparse
 from cerberus import Validator
 import bleach
@@ -315,6 +317,140 @@ class InputValidator:
 
         return False
 
+    def validate_file_path(self, file_path: Union[str, Path], allow_create: bool = True) -> Tuple[bool, str]:
+        """
+        Validate file path for security and safety.
+
+        Args:
+            file_path: Path to validate
+            allow_create: Whether to allow paths that don't exist yet (for output files)
+
+        Returns:
+            Tuple of (is_valid, error_message_or_clean_path)
+        """
+        try:
+            # Convert to Path object
+            if isinstance(file_path, str):
+                path = Path(file_path)
+            else:
+                path = file_path
+
+            # Resolve to absolute path to prevent relative path attacks
+            resolved_path = path.resolve()
+
+            # Check for dangerous path patterns
+            path_str = str(resolved_path)
+
+            # Prevent directory traversal attacks
+            if '..' in path_str or path_str.startswith('~'):
+                return False, "Path contains directory traversal patterns"
+
+            # Prevent absolute path manipulation
+            if os.path.isabs(path_str):
+                # For Windows, prevent UNC paths and other dangerous patterns
+                if os.name == 'nt':
+                    if path_str.startswith('\\\\') or ':\\' not in path_str:
+                        return False, "Invalid Windows path format"
+                else:
+                    # For Unix-like systems, ensure path is under allowed directories
+                    if not (path_str.startswith('/tmp/') or path_str.startswith('/home/') or
+                           path_str.startswith('/var/tmp/') or path_str.startswith(str(Path.home()))):
+                        return False, "Path must be under user home or temporary directory"
+
+            # Check file extension for safety
+            if resolved_path.suffix.lower() not in ['.txt', '.mp3', '.wav', '.json', '.log']:
+                return False, f"Unsafe file extension: {resolved_path.suffix}"
+
+            # Check path length
+            if len(path_str) > 4096:  # Common filesystem path limit
+                return False, "Path too long"
+
+            # Check if parent directory exists (for safety)
+            if not allow_create and not resolved_path.parent.exists():
+                return False, f"Parent directory does not exist: {resolved_path.parent}"
+
+            # Additional Windows-specific checks
+            if os.name == 'nt':
+                # Prevent paths with reserved names
+                reserved_names = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4',
+                                'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2',
+                                'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9']
+                parts = resolved_path.parts
+                for part in parts:
+                    if part.upper() in reserved_names or part.upper().endswith(('.TXT', '.MP3', '.WAV')):
+                        return False, f"Reserved filename detected: {part}"
+
+            return True, str(resolved_path)
+
+        except Exception as e:
+            logger.error(f"Error validating file path {file_path}: {e}")
+            return False, f"Path validation error: {str(e)}"
+
+    def validate_directory_path(self, dir_path: Union[str, Path], allow_create: bool = True) -> Tuple[bool, str]:
+        """
+        Validate directory path for security and safety.
+
+        Args:
+            dir_path: Directory path to validate
+            allow_create: Whether to allow directories that don't exist yet
+
+        Returns:
+            Tuple of (is_valid, error_message_or_clean_path)
+        """
+        try:
+            # Convert to Path object
+            if isinstance(dir_path, str):
+                path = Path(dir_path)
+            else:
+                path = dir_path
+
+            # Resolve to absolute path
+            resolved_path = path.resolve()
+            path_str = str(resolved_path)
+
+            # Check for dangerous patterns
+            if '..' in path_str or path_str.startswith('~'):
+                return False, "Path contains directory traversal patterns"
+
+            # Prevent absolute path manipulation
+            if os.path.isabs(path_str):
+                if os.name == 'nt':
+                    if path_str.startswith('\\\\') or ':\\' not in path_str:
+                        return False, "Invalid Windows path format"
+                else:
+                    # Allow common user directories
+                    allowed_prefixes = ['/tmp/', '/home/', '/var/tmp/', str(Path.home())]
+                    if not any(path_str.startswith(prefix) for prefix in allowed_prefixes):
+                        return False, "Path must be under user home or temporary directory"
+
+            # Check path length
+            if len(path_str) > 4096:
+                return False, "Path too long"
+
+            # Check if directory exists or can be created
+            if not allow_create and not resolved_path.exists():
+                return False, f"Directory does not exist: {resolved_path}"
+
+            if resolved_path.exists() and not resolved_path.is_dir():
+                return False, f"Path exists but is not a directory: {resolved_path}"
+
+            # Additional Windows-specific checks
+            if os.name == 'nt':
+                # Prevent paths with reserved names
+                reserved_names = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4',
+                                'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2',
+                                'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9']
+                parts = resolved_path.parts
+                for part in parts:
+                    if part.upper() in reserved_names:
+                        return False, f"Reserved directory name detected: {part}"
+
+            return True, str(resolved_path)
+
+        except Exception as e:
+            logger.error(f"Error validating directory path {dir_path}: {e}")
+            return False, f"Directory path validation error: {str(e)}"
+
 
 # Global validator instance
 _validator_instance: Optional[InputValidator] = None
@@ -352,3 +488,31 @@ def validate_tts_request(request_data: Dict[str, Any]) -> Tuple[bool, str]:
         Tuple of (is_valid, error_message)
     """
     return get_validator().validate_tts_request(request_data)
+
+
+def validate_file_path(file_path: Union[str, Path], allow_create: bool = True) -> Tuple[bool, str]:
+    """
+    Convenience function to validate file path
+
+    Args:
+        file_path: Path to validate
+        allow_create: Whether to allow paths that don't exist yet
+
+    Returns:
+        Tuple of (is_valid, error_message_or_clean_path)
+    """
+    return get_validator().validate_file_path(file_path, allow_create)
+
+
+def validate_directory_path(dir_path: Union[str, Path], allow_create: bool = True) -> Tuple[bool, str]:
+    """
+    Convenience function to validate directory path
+
+    Args:
+        dir_path: Directory path to validate
+        allow_create: Whether to allow directories that don't exist yet
+
+    Returns:
+        Tuple of (is_valid, error_message_or_clean_path)
+    """
+    return get_validator().validate_directory_path(dir_path, allow_create)

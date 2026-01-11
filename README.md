@@ -2,7 +2,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-v1.3.0-success)](https://github.com/FerranGuardia/ACT-Project)
+[![Status](https://img.shields.io/badge/Status-v1.1.0-success)](https://github.com/FerranGuardia/ACT-Project)
 [![Performance](https://img.shields.io/badge/Performance-472x%20faster-orange)](src/tts/text_cleaner.py)
 
 Modular Python application for converting webnovels to audiobooks using automated scraping and multi-provider TTS synthesis.

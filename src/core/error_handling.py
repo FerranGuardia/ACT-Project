@@ -9,7 +9,9 @@ import logging
 from typing import Any, Callable, TypeVar, Optional
 from functools import wraps
 
-logger = logging.getLogger(__name__)
+from .logger import get_logger
+
+logger = get_logger("core.error_handling")
 
 T = TypeVar('T')
 

@@ -344,7 +344,7 @@ class TestChapterParser:
         assert result == []
 
     # Tests for extract_novel_id_from_html
-    @patch('src.scraper.chapter_parser.BeautifulSoup')
+    @patch('bs4.BeautifulSoup')
     def test_extract_novel_id_from_html_with_data_attribute(self, mock_bs):
         """Test extracting novel ID from HTML data attributes."""
         # Mock BeautifulSoup and its methods
@@ -360,7 +360,7 @@ class TestChapterParser:
 
         assert result == "12345"
 
-    @patch('src.scraper.chapter_parser.BeautifulSoup')
+    @patch('bs4.BeautifulSoup')
     def test_extract_novel_id_from_html_no_data_attribute(self, mock_bs):
         """Test when no novel ID data attribute is found."""
         # Mock BeautifulSoup to return None for select_one
@@ -386,7 +386,7 @@ class TestChapterParser:
         assert result is None
 
     # Tests for discover_ajax_endpoints
-    @patch('src.scraper.chapter_parser.BeautifulSoup')
+    @patch('bs4.BeautifulSoup')
     def test_discover_ajax_endpoints_with_javascript(self, mock_bs):
         """Test discovering AJAX endpoints from JavaScript variables."""
         # Mock BeautifulSoup and script

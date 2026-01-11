@@ -78,3 +78,8 @@ NOVEL_ID_PATTERNS = [
     r'data-novel-id="(\d+)"',
 ]
 
+# Pagination detection settings
+PAGINATION_SUSPICIOUS_COUNTS = [20, 25, 30, 40, 50, 55, 100, 200]  # Common pagination limits
+PAGINATION_CRITICAL_COUNT = 55  # Always suspect pagination at this count
+PAGINATION_SMALL_COUNT_THRESHOLD = 100  # Below this is considered "small"
+PAGINATION_RANGE_COVERAGE_THRESHOLD = 0.8  # Minimum coverage required for range validation

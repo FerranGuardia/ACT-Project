@@ -1,9 +1,12 @@
 """
 Text processing module for TTS engine.
 
+DEPRECATED: This module is deprecated. Use TextProcessingPipeline instead.
+
 Handles text cleaning, validation, and SSML building.
 """
 
+import warnings
 from typing import Callable, Optional
 
 from core.config_manager import get_config
@@ -16,6 +19,13 @@ from text_utils import clean_text_for_tts
 from .audio_merger import AudioMerger
 
 logger = get_logger("tts.text_processor")
+
+# Deprecation warning
+warnings.warn(
+    "TextProcessor is deprecated. Use TextProcessingPipeline instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 
 class TextProcessor:

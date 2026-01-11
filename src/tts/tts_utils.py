@@ -1,11 +1,14 @@
 """
 Utility functions for TTS engine.
 
+DEPRECATED: This module is deprecated. Use the new architecture components instead.
+
 Handles provider management, speech parameters, async tasks, and file cleanup.
 """
 
 import asyncio
 import time
+import warnings
 from pathlib import Path
 from typing import List, Optional
 
@@ -17,6 +20,13 @@ from .providers.provider_manager import TTSProviderManager
 from .ssml_builder import parse_pitch, parse_rate, parse_volume
 
 logger = get_logger("tts.tts_utils")
+
+# Deprecation warning
+warnings.warn(
+    "TTSUtils is deprecated. Use the new architecture components instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 
 class TTSUtils:

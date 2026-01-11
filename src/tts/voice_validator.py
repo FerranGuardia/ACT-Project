@@ -1,9 +1,12 @@
 """
 Voice validation and management module for TTS engine.
 
+DEPRECATED: This module is deprecated. Use VoiceResolver instead.
+
 Handles voice lookup, validation, ID resolution, and provider management.
 """
 
+import warnings
 from typing import Any, Dict, Optional
 
 from core.config_manager import get_config
@@ -14,6 +17,13 @@ from .providers.provider_manager import TTSProviderManager
 from .voice_manager import VoiceManager
 
 logger = get_logger("tts.voice_validator")
+
+# Deprecation warning
+warnings.warn(
+    "VoiceValidator is deprecated. Use VoiceResolver instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 
 class VoiceValidator:

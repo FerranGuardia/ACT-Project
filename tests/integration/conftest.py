@@ -24,7 +24,6 @@ from tests._circuit_breaker_fixtures import (
 )
 @pytest.fixture(scope="session")
 def qt_application():
-def qt_application():
     """Create QApplication instance for UI tests (session-scoped)"""
     try:
         import sys
