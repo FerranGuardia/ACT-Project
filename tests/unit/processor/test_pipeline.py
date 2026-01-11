@@ -32,7 +32,6 @@ class TestProcessingPipeline:
         # Reset ConfigManager singleton to ensure clean state
         from core.config_manager import ConfigManager
         ConfigManager._instance = None
-        ConfigManager._initialized = False
         
         with patch('core.config_manager.get_config') as mock_get_config:
             config_dict = {
@@ -49,7 +48,6 @@ class TestProcessingPipeline:
             
             # Clean up: reset singleton after test
             ConfigManager._instance = None
-            ConfigManager._initialized = False
     
     def test_initialization(self, pipeline):
         """Test pipeline initialization."""
@@ -123,7 +121,6 @@ class TestProcessingPipeline:
         # Reset ConfigManager singleton to ensure clean state
         from core.config_manager import ConfigManager
         ConfigManager._instance = None
-        ConfigManager._initialized = False
         
         # Create and save a project first
         with patch('core.config_manager.get_config') as mock_get_config:
@@ -142,13 +139,13 @@ class TestProcessingPipeline:
                 novel_title="Test Novel"
             )
             chapter_manager = pipeline.project_manager.get_chapter_manager()
+            assert chapter_manager is not None, "Chapter manager should not be None after project initialization"
             chapter_manager.add_chapter(1, "https://example.com/1")
             chapter_manager.add_chapter(2, "https://example.com/2")
             pipeline.project_manager.save_project()
         
         # Reset singleton again before creating new pipeline
         ConfigManager._instance = None
-        ConfigManager._initialized = False
         
         # Create new pipeline and load
         with patch('core.config_manager.get_config') as mock_get_config:
@@ -183,9 +180,9 @@ class TestProcessingPipeline:
         
         pipeline.initialize_project(toc_url="https://example.com/toc")
         
-        success = pipeline.fetch_chapter_urls("https://example.com/toc")
-        
-        assert success is True
+        urls = pipeline.fetch_chapter_urls("https://example.com/toc")
+
+        assert len(urls) == 3
         assert pipeline.scraper is not None
         chapter_manager = pipeline.project_manager.get_chapter_manager()
         assert chapter_manager.get_total_count() == 3
@@ -200,9 +197,9 @@ class TestProcessingPipeline:
         
         pipeline.initialize_project(toc_url="https://example.com/toc")
         
-        success = pipeline.fetch_chapter_urls("https://example.com/toc")
-        
-        assert success is False
+        urls = pipeline.fetch_chapter_urls("https://example.com/toc")
+
+        assert len(urls) == 0
     
     def test_process_chapter_skip_if_exists(self, pipeline, temp_dir):
         """Test processing chapter when audio file already exists."""
@@ -363,8 +360,8 @@ class TestProcessingPipeline:
 
         # Process chapter with mocked TTS that raises exception during conversion
         # The failure callback should be called from within convert_chapter_to_audio's try-catch
-        pipeline.tts_engine = Mock()
-        pipeline.tts_engine.convert_text_to_speech.side_effect = Exception("TTS conversion failed")
+        pipeline.conversion_coordinator.tts_engine = Mock()
+        pipeline.conversion_coordinator.tts_engine.convert_text_to_speech.side_effect = Exception("TTS conversion failed")
 
         success = pipeline.process_chapter(chapter, on_failure=failure_callback, skip_if_exists=False)
 
@@ -430,8 +427,8 @@ class TestProcessingPipeline:
         # Should not have slept since we stopped immediately
         assert mock_sleep.call_count == 0
 
-    def test_extract_base_url(self, pipeline):
-        """Test base URL extraction from full URLs."""
+    def test_extract_base_url_variations(self, pipeline):
+        """Test base URL extraction from full URLs with various formats."""
         # HTTP URL
         assert pipeline._extract_base_url("https://example.com/path/to/page") == "https://example.com"
         assert pipeline._extract_base_url("http://example.com/path") == "http://example.com"
