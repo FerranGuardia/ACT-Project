@@ -1,35 +1,31 @@
 # Scraper Module
 
-**Status**: Complete
+**Status**: ✅ Complete
 **Location**: `src/scraper/`
+
+## Overview
+
+Handles web scraping and content extraction from novel websites.
 
 ## Components
 
-- **`GenericScraper`**: Main scraper for webnovel sites
-- **`ChapterUrlFetcher`**: Multi-strategy URL extraction with fallback
-- **`ContentScraper`**: Chapter content extraction with selector patterns
-- **`BaseScraper`**: Abstract base class
-- **`NovelBinScraper`**: Site-specific implementation
-
-## Strategies
-
-URL fetching (optimized order):
-1. JavaScript variable extraction (fastest)
-2. AJAX endpoint discovery (fast + lazy-loading)
-3. Playwright with scrolling (comprehensive)
+- **GenericScraper**: Main scraper for web novel sites
+- **URL extractors**: Multi-strategy URL discovery with fallback
+- **Content extractors**: Chapter content extraction
+- **Base classes**: Abstract scraper implementations
 
 ## Features
 
-- Retry logic with exponential backoff
-- Rate limiting (0.5s minimum delay)
-- Network idle waiting
+- Retry logic with backoff
+- Rate limiting and delays
 - Progress tracking
-- Cloudflare handling
+- Error handling
 
 ## Usage
 
 ```python
 from scraper import GenericScraper
+
 scraper = GenericScraper()
 chapters = scraper.fetch_chapter_urls(url)
 content = scraper.scrape_chapter(url)
@@ -37,5 +33,5 @@ content = scraper.scrape_chapter(url)
 
 ## Testing
 
-- `tests/unit/test_text_cleaner.py`
-- `tests/unit/test_chapter_parser.py`
+- Unit tests for scraper components
+- Integration tests for scraping workflows

@@ -14,6 +14,8 @@ from PySide6.QtWidgets import (
     QListWidget, QProgressBar, QGroupBox, QSpinBox, QLineEdit, QMessageBox,
     QListWidgetItem
 )
+
+from ui.views.base_view import BaseView
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QFont
 
@@ -219,25 +221,22 @@ class AudioFileItem(QWidget):
         self.setLayout(layout)
 
 
-class MergerView(QWidget):
+class MergerView(BaseView):
     """Audio merger view for combining audio files."""
     
     def __init__(self, parent=None):
         super().__init__(parent)
         self.file_paths: List[str] = []
         self.merger_thread: Optional[AudioMergerThread] = None
-        self.setup_ui()
         self._connect_handlers()
         logger.info("Merger view initialized")
     
     def setup_ui(self):
         """Set up the merger view UI."""
         from ui.view_config import ViewConfig
-        
-        main_layout = QVBoxLayout()
-        main_layout.setSpacing(ViewConfig.SPACING)
-        main_layout.setContentsMargins(*ViewConfig.MARGINS)
-        
+
+        main_layout = self.get_main_layout()
+
         # Background handled by global stylesheet - no need to set here
         
         # Audio files
@@ -330,9 +329,6 @@ class MergerView(QWidget):
         control_layout.addWidget(self.stop_button)
         control_layout.addStretch()
         main_layout.addLayout(control_layout)
-        
-        main_layout.addStretch()
-        self.setLayout(main_layout)
     
     def _connect_handlers(self):
         """Connect all button handlers."""

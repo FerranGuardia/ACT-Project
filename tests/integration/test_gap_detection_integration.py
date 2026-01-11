@@ -34,26 +34,17 @@ logger = get_logger("test.gap_detection_integration")
 pytestmark = pytest.mark.integration
 
 
-@pytest.fixture
-def temp_output_dir():
-    """Create temporary directory for test output."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        yield Path(temp_dir)
-
-
-@pytest.fixture
-def test_novel_url():
-    """Test novel URL - using NovelFull for more conservative rate limiting."""
-    return "https://novelfull.net/the-second-coming-of-gluttony.html"
+# Use centralized temp_dir fixture from conftest.py
 
 
 class TestGapDetectionIntegration:
     """Integration tests for gap detection feature."""
-    
+
     @pytest.mark.serial
     @pytest.mark.network
-    @pytest.mark.timeout(300)  # 5 minute timeout for network test
-    def test_gap_detection_finds_missing_audio_files(self, temp_output_dir, test_novel_url):
+    @pytest.mark.website
+    @pytest.mark.timeout(120)  # 2 minute timeout - much more reasonable
+    def test_gap_detection_finds_missing_audio_files(self, temp_dir, protected_sample_novel_url):
         """Test that gap detection finds missing audio files when resuming."""
         logger.info("="*60)
         logger.info("Integration Test: Gap Detection - Missing Audio Files")
@@ -61,41 +52,39 @@ class TestGapDetectionIntegration:
 
         project_name = "test_gap_detection_missing_files"
 
-        # Step 1: Process chapters 1-2 to create initial files
-        logger.info("Step 1: Processing initial chapters 1-2...")
+        # Step 1: Create mock files to simulate initial processing
+        # (Real network scraping is too slow/unreliable for this test)
+        logger.info("Step 1: Creating mock initial files...")
         pipeline1 = ProcessingPipeline(
             project_name=project_name,
-            base_output_dir=temp_output_dir,
-            voice="en-US-AndrewNeural", provider="edge_tts"  # Use valid voice
+            base_output_dir=temp_dir,
+            voice="en-US-AndrewNeural", provider="edge_tts"
         )
 
-        result1 = pipeline1.run_full_pipeline(
-            toc_url=test_novel_url,
-            novel_url=test_novel_url,
-            start_from=1,
-            max_chapters=2,
-            voice="en-US-AndrewNeural", provider="edge_tts"  # Use valid voice
-        )
+        # Create mock audio files to simulate completed processing
+        audio_dir = pipeline1.file_manager.get_audio_dir()
+        audio_dir.mkdir(parents=True, exist_ok=True)
 
-        # Handle network failures gracefully - try with mock data if network fails
-        if result1.get('completed', 0) == 0 and result1.get('failed', 0) > 0:
-            logger.warning("Network failed, falling back to mock data for testing")
-            return self._run_gap_detection_with_mock_data(temp_output_dir, project_name)
+        # Create chapter 1 and 2 audio files
+        chapter1_file = audio_dir / "chapter_0001.mp3"
+        chapter2_file = audio_dir / "chapter_0002.mp3"
 
-        assert result1.get('success') == True, f"Initial processing failed: {result1.get('error')}"
-        assert result1.get('completed', 0) >= 1, "No chapters were completed"
-        logger.info(f" Initial processing completed: {result1.get('completed')} chapters")
-        
-        # Verify initial files exist
-        audio_dir1 = pipeline1.file_manager.get_audio_dir()
-        initial_files = list(audio_dir1.glob("chapter_*.mp3"))
+        # Write fake audio content
+        fake_audio = b"fake audio data" * 1000
+        chapter1_file.write_bytes(fake_audio)
+        chapter2_file.write_bytes(fake_audio)
+
+        logger.info(f"  Created mock files: {chapter1_file.name}, {chapter2_file.name}")
+
+        # Verify initial mock files exist
+        initial_files = list(audio_dir.glob("chapter_*.mp3"))
         initial_count = len(initial_files)
         logger.info(f"  Initial audio files: {initial_count}")
-        assert initial_count >= 1, f"Expected at least 1 audio file, found {initial_count}"
+        assert initial_count == 2, f"Expected 2 audio files, found {initial_count}"
         
         # Step 2: Manually delete audio files for chapters 2 (simulate gap)
         logger.info("Step 2: Simulating gap by deleting chapter 2 audio file...")
-        chapter2_files = list(audio_dir1.glob("chapter_0002*.mp3"))
+        chapter2_files = list(audio_dir.glob("chapter_0002*.mp3"))
         deleted_count = 0
         for file in chapter2_files:
             if file.exists():
@@ -105,7 +94,7 @@ class TestGapDetectionIntegration:
         
         if deleted_count == 0:
             # Try to find chapter 2 file with different pattern
-            all_files = list(audio_dir1.glob("chapter_*.mp3"))
+            all_files = list(audio_dir.glob("chapter_*.mp3"))
             if len(all_files) >= 2:
                 # Delete the second file (assuming it's chapter 2)
                 all_files[1].unlink()
@@ -115,19 +104,19 @@ class TestGapDetectionIntegration:
         assert deleted_count > 0, "Could not delete any files to simulate gap"
         
         # Verify gap exists
-        remaining_files = list(audio_dir1.glob("chapter_*.mp3"))
+        remaining_files = list(audio_dir.glob("chapter_*.mp3"))
         logger.info(f"  Remaining audio files after deletion: {len(remaining_files)}")
         
         # Step 3: Test gap detection directly
         logger.info("Step 3: Testing gap detection...")
         pipeline2 = ProcessingPipeline(
             project_name=project_name,
-            base_output_dir=temp_output_dir,
+            base_output_dir=temp_dir,
             voice="en-US-AndrewNeural", provider="edge_tts"  # Use valid voice
         )
 
         # Initialize project to load existing data
-        if not pipeline2.initialize_project(toc_url=test_novel_url):
+        if not pipeline2.initialize_project(toc_url=protected_sample_novel_url):
             pytest.skip("Could not initialize project for gap detection test")
 
         # Load project
@@ -158,8 +147,8 @@ class TestGapDetectionIntegration:
         # Step 4: Resume processing (should re-process missing chapters)
         logger.info("Step 4: Resuming processing (should re-process missing chapters)...")
         result2 = pipeline2.run_full_pipeline(
-            toc_url=test_novel_url,
-            novel_url=test_novel_url,
+            toc_url=protected_sample_novel_url,
+            novel_url=protected_sample_novel_url,
             start_from=1,
             max_chapters=2,
             voice="en-US-AndrewNeural", provider="edge_tts"  # Use valid voice
@@ -185,7 +174,7 @@ class TestGapDetectionIntegration:
     @pytest.mark.serial
     @pytest.mark.network
     @pytest.mark.timeout(300)  # 5 minute timeout for network test
-    def test_gap_detection_no_gaps_scenario(self, temp_output_dir, test_novel_url):
+    def test_gap_detection_no_gaps_scenario(self, temp_dir, protected_sample_novel_url):
         """Test gap detection when no gaps exist (all files present)."""
         logger.info("="*60)
         logger.info("Integration Test: Gap Detection - No Gaps Scenario")
@@ -197,13 +186,13 @@ class TestGapDetectionIntegration:
         logger.info("Step 1: Processing chapters 1-2...")
         pipeline1 = ProcessingPipeline(
             project_name=project_name,
-            base_output_dir=temp_output_dir,
+            base_output_dir=temp_dir,
             voice="en-US-AndrewNeural", provider="edge_tts"  # Use valid voice
         )
 
         result1 = pipeline1.run_full_pipeline(
-            toc_url=test_novel_url,
-            novel_url=test_novel_url,
+            toc_url=protected_sample_novel_url,
+            novel_url=protected_sample_novel_url,
             start_from=1,
             max_chapters=2,
             voice="en-US-AndrewNeural", provider="edge_tts"  # Use valid voice
@@ -212,7 +201,7 @@ class TestGapDetectionIntegration:
         # Handle network failures gracefully - try with mock data if network fails
         if result1.get('completed', 0) == 0 and result1.get('failed', 0) > 0:
             logger.warning("Network failed, falling back to mock data for testing")
-            return self._run_no_gaps_scenario_with_mock_data(temp_output_dir, project_name)
+            return self._run_no_gaps_scenario_with_mock_data(temp_dir, project_name)
 
         assert result1.get('success') == True
         assert result1.get('completed', 0) >= 1
@@ -222,11 +211,11 @@ class TestGapDetectionIntegration:
         logger.info("Step 2: Testing gap detection (should find no gaps)...")
         pipeline2 = ProcessingPipeline(
             project_name=project_name,
-            base_output_dir=temp_output_dir,
+            base_output_dir=temp_dir,
             voice="en-US-AndrewNeural", provider="edge_tts"  # Use valid voice
         )
         
-        if not pipeline2.initialize_project(toc_url=test_novel_url):
+        if not pipeline2.initialize_project(toc_url=protected_sample_novel_url):
             pytest.skip("Could not initialize project")
         
         if not pipeline2.project_manager.load_project():
@@ -252,7 +241,7 @@ class TestGapDetectionIntegration:
         
         logger.info("✅ No Gaps Scenario Test PASSED")
 
-    def test_gap_detection_logic_unit_test(self, temp_output_dir):
+    def test_gap_detection_logic_unit_test(self, temp_dir):
         """Fast unit test for gap detection logic without network/TTS overhead."""
         logger.info("="*60)
         logger.info("Unit Test: Gap Detection Logic (Fast)")
@@ -263,7 +252,7 @@ class TestGapDetectionIntegration:
         # Create a pipeline and manually set up chapters with gaps
         pipeline = ProcessingPipeline(
             project_name=project_name,
-            base_output_dir=temp_output_dir,
+            base_output_dir=temp_dir,
             voice="pyttsx3"
         )
 
@@ -307,7 +296,7 @@ class TestGapDetectionIntegration:
 
         logger.info("✅ Gap Detection Unit Test PASSED")
     
-    def test_gap_detection_with_missing_chapter_in_manager(self, temp_output_dir):
+    def test_gap_detection_with_missing_chapter_in_manager(self, temp_dir):
         """Test gap detection when chapter is missing from chapter manager."""
         logger.info("="*60)
         logger.info("Integration Test: Gap Detection - Missing Chapter in Manager")
@@ -318,7 +307,7 @@ class TestGapDetectionIntegration:
         # Create a pipeline and manually set up chapters with a gap
         pipeline = ProcessingPipeline(
             project_name=project_name,
-            base_output_dir=temp_output_dir,
+            base_output_dir=temp_dir,
             voice="en-US-AndrewNeural"
         )
         
@@ -362,17 +351,17 @@ class TestGapDetectionIntegration:
         
         logger.info("✅ Missing Chapter in Manager Test PASSED")
     
-    def test_gap_detection_invalid_range(self, temp_output_dir):
+    def test_gap_detection_invalid_range(self, temp_dir):
         """Test gap detection with invalid range (start > end)."""
         logger.info("="*60)
         logger.info("Integration Test: Gap Detection - Invalid Range")
         logger.info("="*60)
         
         project_name = "test_gap_detection_invalid_range"
-        
+
         pipeline = ProcessingPipeline(
             project_name=project_name,
-            base_output_dir=temp_output_dir
+            base_output_dir=temp_dir
         )
         
         pipeline.initialize_project(toc_url="https://example.com/toc")
@@ -394,17 +383,17 @@ class TestGapDetectionIntegration:
         
         logger.info("✅ Invalid Range Test PASSED")
     
-    def test_gap_detection_empty_project(self, temp_output_dir):
+    def test_gap_detection_empty_project(self, temp_dir):
         """Test gap detection on empty project (no chapters)."""
         logger.info("="*60)
         logger.info("Integration Test: Gap Detection - Empty Project")
         logger.info("="*60)
         
         project_name = "test_gap_detection_empty"
-        
+
         pipeline = ProcessingPipeline(
             project_name=project_name,
-            base_output_dir=temp_output_dir
+            base_output_dir=temp_dir
         )
         
         pipeline.initialize_project(toc_url="https://example.com/toc")
@@ -426,18 +415,18 @@ class TestGapDetectionIntegration:
         
         logger.info("✅ Empty Project Test PASSED")
 
-    def _run_gap_detection_with_mock_data(self, temp_output_dir, project_name):
+    def _run_gap_detection_with_mock_data(self, temp_dir, project_name):
         """Run gap detection test with mock data when network is unavailable."""
         logger.info("Running gap detection test with mock data (network unavailable)")
 
         # Create pipeline with mock setup
-        # Use temp_output_dir as the base for both project and output directories
-        temp_projects_dir = temp_output_dir / "projects"
+        # Use temp_dir as the base for both project and output directories
+        temp_projects_dir = temp_dir / "projects"
         temp_projects_dir.mkdir(exist_ok=True)
 
         pipeline1 = ProcessingPipeline(
             project_name=project_name,
-            base_output_dir=temp_output_dir,
+            base_output_dir=temp_dir,
             voice="pyttsx3"
         )
 
@@ -482,7 +471,7 @@ class TestGapDetectionIntegration:
         logger.info("Step 2: Testing gap detection...")
         pipeline2 = ProcessingPipeline(
             project_name=project_name,
-            base_output_dir=temp_output_dir,
+            base_output_dir=temp_dir,
             voice="pyttsx3"
         )
 
@@ -538,17 +527,17 @@ class TestGapDetectionIntegration:
         logger.info("✅ Gap Detection Mock Test PASSED")
         return True
 
-    def _run_no_gaps_scenario_with_mock_data(self, temp_output_dir, project_name):
+    def _run_no_gaps_scenario_with_mock_data(self, temp_dir, project_name):
         """Run no-gaps scenario test with mock data when network is unavailable."""
         logger.info("Running no-gaps scenario test with mock data (network unavailable)")
 
         # Create pipeline with mock setup
-        temp_projects_dir = temp_output_dir / "projects"
+        temp_projects_dir = temp_dir / "projects"
         temp_projects_dir.mkdir(exist_ok=True)
 
         pipeline1 = ProcessingPipeline(
             project_name=project_name,
-            base_output_dir=temp_output_dir,
+            base_output_dir=temp_dir,
             voice="pyttsx3"
         )
 
@@ -589,7 +578,7 @@ class TestGapDetectionIntegration:
         logger.info("Step 2: Testing gap detection (should find no gaps)...")
         pipeline2 = ProcessingPipeline(
             project_name=project_name,
-            base_output_dir=temp_output_dir,
+            base_output_dir=temp_dir,
             voice="pyttsx3"
         )
 

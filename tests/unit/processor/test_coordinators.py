@@ -270,7 +270,11 @@ class TestConversionCoordinator:
         """Test successful chapter to audio conversion."""
         # Mock TTS engine
         mock_tts = MagicMock()
-        mock_tts.convert_text_to_speech.return_value = True
+        # Mock convert_text_to_speech to create a dummy file
+        def mock_convert(text, output_path, **kwargs):
+            output_path.write_bytes(b"dummy audio content")
+            return True
+        mock_tts.convert_text_to_speech.side_effect = mock_convert
         mock_tts_class.return_value = mock_tts
 
         # Reinitialize coordinator to use mocked TTS

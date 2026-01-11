@@ -35,6 +35,7 @@ from src.tts.providers.edge_tts_provider import (EdgeTTSConnectivityError,
 
 @pytest.mark.circuit_breaker
 @pytest.mark.serial
+@pytest.mark.timeout(60)
 class TestCircuitBreaker:
     """Test circuit breaker functionality with proper isolation"""
 
@@ -71,6 +72,7 @@ class TestCircuitBreaker:
 
 @pytest.mark.circuit_breaker
 @pytest.mark.serial
+@pytest.mark.timeout(60)
 class TestCircuitBreakerIntegration:
     """Integration tests for circuit breaker with real async workflows"""
 

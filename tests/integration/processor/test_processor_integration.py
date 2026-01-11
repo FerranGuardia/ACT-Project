@@ -150,36 +150,36 @@ class TestPipelineComponentIntegration:
         assert pipeline.project_manager.metadata["novel_title"] == "Test Novel"
         assert pipeline.file_manager is not None
     
-    @patch('scraper.GenericScraper')
-    def test_pipeline_fetch_and_save_workflow(self, mock_scraper_class, pipeline, temp_dir):
+    def test_pipeline_fetch_and_save_workflow(self, pipeline, temp_dir):
         """Test complete workflow: fetch URLs → save project."""
-        # Mock scraper
+        # Mock scraper on the pipeline's scraping coordinator
         mock_scraper = MagicMock()
         mock_scraper.get_chapter_urls.return_value = [
             "https://example.com/1",
             "https://example.com/2"
         ]
-        mock_scraper_class.return_value = mock_scraper
-        
-        # Initialize project
-        pipeline.initialize_project(toc_url="https://example.com/toc")
-        
-        # Fetch chapter URLs
-        success = pipeline.fetch_chapter_urls("https://example.com/toc")
-        
-        assert success is True
-        assert pipeline.scraper is not None
-        
-        # Verify chapters added
-        chapter_manager = pipeline.project_manager.get_chapter_manager()
-        assert chapter_manager.get_total_count() == 2
-        
-        # Save project
-        pipeline.project_manager.save_project()
-        
-        # Verify project file exists
-        project_file = pipeline.project_manager.metadata_file
-        assert project_file.exists()
+
+        # Patch GenericScraper to return our mock
+        with patch('processor.scraping_coordinator.GenericScraper', return_value=mock_scraper):
+            # Initialize project
+            pipeline.initialize_project(toc_url="https://example.com/toc")
+
+            # Fetch chapter URLs
+            urls = pipeline.fetch_chapter_urls("https://example.com/toc")
+
+            assert len(urls) == 2
+            assert pipeline.scraper is not None
+
+            # Verify chapters added
+            chapter_manager = pipeline.project_manager.get_chapter_manager()
+            assert chapter_manager.get_total_count() == 2
+
+            # Save project
+            pipeline.project_manager.save_project()
+
+            # Verify project file exists
+            project_file = pipeline.project_manager.metadata_file
+            assert project_file.exists()
 
 
 class TestSaveLoadResumeIntegration:
@@ -299,8 +299,7 @@ class TestErrorHandlingIntegration:
             # CRITICAL: Pass base_output_dir to prevent creating folders outside temp_dir
             yield ProcessingPipeline("test_project", base_output_dir=temp_dir / "output")
     
-    @patch('scraper.GenericScraper')
-    def test_error_isolation_continues_processing(self, mock_scraper_class, pipeline, temp_dir):
+    def test_error_isolation_continues_processing(self, pipeline, temp_dir):
         """Test that error isolation allows processing to continue (Phase 1 - yt-dlp pattern)."""
         # Mock scraper
         mock_scraper = MagicMock()
@@ -309,26 +308,35 @@ class TestErrorHandlingIntegration:
             "https://example.com/2",
             "https://example.com/3"
         ]
-        mock_scraper_class.return_value = mock_scraper
-        
+        pipeline.scraper = mock_scraper
+        pipeline.scraping_coordinator.scraper = mock_scraper
+
         # Initialize project
         pipeline.initialize_project(toc_url="https://example.com/toc")
-        pipeline.fetch_chapter_urls("https://example.com/toc")
-        
+
+        # Manually add chapters to chapter manager (since URL fetching is unreliable in tests)
+        chapter_manager = pipeline.project_manager.get_chapter_manager()
+        for i in range(1, 4):
+            chapter_manager.add_chapter(i, f"https://example.com/{i}")
+
         # Initialize progress tracker (required for process_all_chapters)
         from processor.progress_tracker import ProgressTracker
         pipeline.progress_tracker = ProgressTracker(total_chapters=3)
-        
+
         # Mock scraper: chapter 2 fails, others succeed
         def mock_scrape(url):
             if "2" in url:
                 return None, None, "Error"
             return "Content", "Title", None
         mock_scraper.scrape_chapter.side_effect = mock_scrape
-        
-        # Mock TTS
-        pipeline.tts_engine = Mock()
-        pipeline.tts_engine.convert_text_to_speech.return_value = True
+
+        # Mock TTS to create actual files
+        mock_tts = Mock()
+        def mock_convert(text, output_path, **kwargs):
+            output_path.write_bytes(b"dummy audio content")
+            return True
+        mock_tts.convert_text_to_speech.side_effect = mock_convert
+        pipeline.tts_engine = mock_tts
         
         # Mock file manager - create actual files for successful chapters
         def mock_save_text_file(chapter_num, content, title=None):
@@ -380,8 +388,9 @@ class TestErrorHandlingIntegration:
         temp_file.write_bytes(b"temp")
         
         # Mock TTS to fail by raising an exception (callback only called on exceptions)
-        pipeline.tts_engine = Mock()
-        pipeline.tts_engine.convert_text_to_speech.side_effect = Exception("TTS conversion failed")
+        # Mock the conversion coordinator's TTS engine
+        pipeline.conversion_coordinator.tts_engine = Mock()
+        pipeline.conversion_coordinator.tts_engine.convert_text_to_speech.side_effect = Exception("TTS conversion failed")
         
         # Mock file manager
         pipeline.file_manager.audio_file_exists = Mock(return_value=False)

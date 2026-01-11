@@ -1,5 +1,6 @@
 """
-Integration tests for parallel chunk processing feature.
+Unit tests for parallel chunk processing feature.
+
 Tests the parallel chunk conversion functionality using mocks.
 """
 
@@ -8,7 +9,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch, AsyncMock
 
 
-@pytest.mark.integration
+@pytest.mark.unit
 class TestParallelChunkProcessing:
     """Integration tests for parallel chunk processing using mocks"""
 

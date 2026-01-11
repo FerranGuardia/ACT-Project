@@ -8,10 +8,20 @@ Tests chapter management functionality including:
 - Serialization
 """
 
-# Path setup is handled by conftest.py
+"""
+Unit tests for ChapterManager component.
+
+Tests chapter management functionality including:
+- Chapter creation and organization
+- Status tracking
+- Chapter lookup
+- Serialization
+"""
+
 from typing import Any, Dict, List
 
-from processor.chapter_manager import Chapter, ChapterManager, ChapterStatus
+from src.processor.chapter_manager import (Chapter, ChapterManager,
+                                           ChapterStatus)
 
 
 class TestChapter:

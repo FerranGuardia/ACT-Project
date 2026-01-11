@@ -1,8 +1,8 @@
 """
-Comprehensive integration tests for the full TTS conversion pipeline.
+Integration tests for TTS conversion pipeline components.
 
-Tests end-to-end conversion from text to audio using the new architecture.
-Validates the complete workflow: VoiceResolver → TextProcessingPipeline → ConversionStrategy → Audio output.
+Tests component interactions in the TTS conversion pipeline.
+Uses mocks for external dependencies while testing real component integration.
 """
 
 import pytest
@@ -40,7 +40,14 @@ class TestFullConversionPipeline:
         mock_provider = MagicMock()
         mock_provider.is_available.return_value = True
         mock_provider.supports_ssml.return_value = False
-        mock_provider.convert_text_to_speech.return_value = True
+
+        # Mock provider to create a dummy file when convert_text_to_speech is called
+        def mock_convert_text_to_speech(text, voice, output_path, **kwargs):
+            # Create a dummy file to simulate successful conversion
+            output_path.write_bytes(b"dummy audio content")
+            return True
+
+        mock_provider.convert_text_to_speech.side_effect = mock_convert_text_to_speech
         mock_provider.get_provider_name.return_value = "mock_provider"
         mock_provider.supports_chunking.return_value = False
         mock_provider.get_max_text_bytes.return_value = None
@@ -97,7 +104,14 @@ class TestFullConversionPipeline:
         mock_provider = MagicMock()
         mock_provider.is_available.return_value = True
         mock_provider.supports_ssml.return_value = True  # SSML supported
-        mock_provider.convert_text_to_speech.return_value = True
+
+        # Mock provider to create actual file when convert_text_to_speech is called
+        def mock_convert_text_to_speech(text, voice, output_path, **kwargs):
+            # Create a dummy file to simulate successful conversion
+            output_path.write_bytes(b"dummy audio content")
+            return True
+
+        mock_provider.convert_text_to_speech.side_effect = mock_convert_text_to_speech
         mock_provider.get_provider_name.return_value = "edge_tts"
         mock_provider.supports_chunking.return_value = False
         mock_provider.get_max_text_bytes.return_value = None
@@ -138,9 +152,9 @@ class TestFullConversionPipeline:
 
             # Should contain SSML tags
             assert "<speak>" in ssml_text
-            assert 'rate="1.0%"' in ssml_text
-            assert 'pitch="2.0%"' in ssml_text
-            assert 'volume="3.0%"' in ssml_text
+            assert 'rate="+1%"' in ssml_text
+            assert 'pitch="+2%"' in ssml_text
+            assert 'volume="+3%"' in ssml_text
             assert "Hello world" in ssml_text
 
     @patch('src.tts.providers.provider_manager.TTSProviderManager')
@@ -187,7 +201,13 @@ class TestFullConversionPipeline:
         mock_provider_manager = MagicMock()
         mock_provider = MagicMock()
         mock_provider.is_available.return_value = True
-        mock_provider.convert_text_to_speech.return_value = True
+        # Mock provider to create a dummy file when convert_text_to_speech is called
+        def mock_convert_text_to_speech(text, voice, output_path, **kwargs):
+            # Create a dummy file to simulate successful conversion
+            output_path.write_bytes(b"dummy audio content")
+            return True
+
+        mock_provider.convert_text_to_speech.side_effect = mock_convert_text_to_speech
         mock_provider.supports_chunking.return_value = False
         mock_provider.get_max_text_bytes.return_value = None
 
@@ -294,7 +314,14 @@ class TestFullConversionPipeline:
         processed_text.build_text_for_conversion.return_value = ("processed text", False)
 
         mock_provider = MagicMock()
-        mock_provider.convert_text_to_speech.return_value = True
+
+        # Mock provider to create a dummy file when convert_text_to_speech is called
+        def mock_convert_text_to_speech(text, voice, output_path, **kwargs):
+            # Create a dummy file to simulate successful conversion
+            output_path.write_bytes(b"dummy audio content")
+            return True
+
+        mock_provider.convert_text_to_speech.side_effect = mock_convert_text_to_speech
 
         voice_resolution = VoiceResolutionResult(
             voice_id="test-voice",
@@ -376,7 +403,11 @@ class TestFullConversionPipeline:
                 mock_process.return_value = mock_processed_text
 
                 mock_strategy = MagicMock()
-                mock_strategy.convert.return_value = True
+                # Mock strategy to create a file when convert is called
+                def mock_convert(processed_text, voice_resolution, output_path, rate=None, pitch=None, volume=None):
+                    output_path.write_bytes(b"dummy audio content")
+                    return True
+                mock_strategy.convert.side_effect = mock_convert
                 mock_select.return_value = mock_strategy
             else:
                 # Setup failure case

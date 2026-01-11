@@ -101,13 +101,30 @@ class TestCoordinatorIntegration:
             assert title == "Chapter 1"
             assert error is None
 
-            # Mock TTS conversion
-            conversion.tts_engine = Mock()
-            conversion.tts_engine.convert_text_to_speech.return_value = True
+            # Mock TTS conversion to create actual file
+            mock_tts = Mock()
+            def mock_convert(text, output_path, **kwargs):
+                output_path.write_bytes(b"dummy audio content")
+                return True
+            mock_tts.convert_text_to_speech.side_effect = mock_convert
+            conversion.tts_engine = mock_tts
 
             # Mock file operations
-            conversion.file_manager.save_text_file = Mock(return_value=Path(temp_dir / "text.txt"))
-            conversion.file_manager.save_audio_file = Mock(return_value=Path(temp_dir / "audio.mp3"))
+            text_file_path = temp_dir / "text.txt"
+            audio_file_path = temp_dir / "audio.mp3"
+
+            def mock_save_text_file(chapter_num, content, title=None):
+                text_file_path.write_text(content, encoding="utf-8")
+                return text_file_path
+
+            def mock_save_audio_file(chapter_num, audio_path, title=None):
+                # Copy the temp audio file to the final location
+                import shutil
+                shutil.copy2(audio_path, audio_file_path)
+                return audio_file_path
+
+            conversion.file_manager.save_text_file = Mock(side_effect=mock_save_text_file)
+            conversion.file_manager.save_audio_file = Mock(side_effect=mock_save_audio_file)
             conversion.file_manager.audio_file_exists = Mock(return_value=False)
 
             # Mock project manager operations

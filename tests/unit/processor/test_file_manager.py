@@ -15,8 +15,18 @@ import shutil
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-# Path setup is handled by conftest.py
-from processor.file_manager import FileManager
+"""
+Unit tests for FileManager component.
+
+Tests file management functionality including:
+- Directory creation
+- File saving (text and audio)
+- File existence checking
+- File listing
+- Cleanup operations
+"""
+
+from src.processor.file_manager import FileManager
 
 
 class TestFileManager:

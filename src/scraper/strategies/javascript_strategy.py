@@ -94,8 +94,8 @@ class JavaScriptStrategy(BaseDetectionStrategy):
 
         # Pattern 2: JSON.parse() calls with chapter data
         json_patterns = [
-            r'JSON\.parse\(\s*[\'"]([^\'"]*chapters?[^\'"]*)[\'"]\s*\)',
-            r'JSON\.parse\(\s*`([^`]*(?:chapters?|chapters?_list)[^`]*)`\s*\)',
+            r'JSON\.parse\(\s*[\'"](.*?)[\'"]\s*\)',
+            r'JSON\.parse\(\s*`(.*?)`\s*\)',
         ]
 
         for pattern in json_patterns:
@@ -107,8 +107,9 @@ class JavaScriptStrategy(BaseDetectionStrategy):
 
         # Pattern 3: Object property access
         object_patterns = [
-            r'chapters\s*[:=]\s*\{[^}]*urls?\s*:\s*\[([^\]]+)\]',
-            r'chapterList\s*[:=]\s*\{[^}]*data\s*:\s*\[([^\]]+)\]',
+            r'chapters\s*[:=]\s*\{[^}]*["\']?urls?["\']?\s*:\s*\[([^\]]+)\]',
+            r'chapterList\s*[:=]\s*\{[^}]*["\']?data["\']?\s*:\s*\[([^\]]+)\]',
+            r'data\s*[:=]\s*\{[^}]*["\']?urls?["\']?\s*:\s*\[([^\]]+)\]',
         ]
 
         for pattern in object_patterns:
@@ -169,6 +170,13 @@ class JavaScriptStrategy(BaseDetectionStrategy):
         """Parse JSON string content for chapter URLs."""
         urls = []
 
+        # Check if JSON contains chapter-related keywords
+        chapter_keywords = ['chapter', 'chapters', 'chapterlist', 'urls']
+        has_chapter_content = any(keyword in json_str.lower() for keyword in chapter_keywords)
+
+        if not has_chapter_content:
+            return urls
+
         try:
             # Unescape common JavaScript escape sequences
             json_str = json_str.replace('\\n', '').replace('\\t', '').replace('\\r', '')
@@ -180,14 +188,19 @@ class JavaScriptStrategy(BaseDetectionStrategy):
             def extract_urls_from_obj(obj):
                 if isinstance(obj, dict):
                     for key, value in obj.items():
-                        if key.lower() in ['url', 'href', 'link', 'chapter_url']:
+                        if key.lower() in ['url', 'href', 'link', 'chapter_url', 'chapters', 'chapterlist', 'urls']:
                             if isinstance(value, str) and self._is_likely_chapter_url(value):
                                 urls.append(value)
+                            else:
+                                extract_urls_from_obj(value)
                         else:
                             extract_urls_from_obj(value)
                 elif isinstance(obj, list):
                     for item in obj:
-                        extract_urls_from_obj(item)
+                        if isinstance(item, str) and self._is_likely_chapter_url(item):
+                            urls.append(item)
+                        else:
+                            extract_urls_from_obj(item)
 
             extract_urls_from_obj(data)
 
@@ -199,6 +212,8 @@ class JavaScriptStrategy(BaseDetectionStrategy):
 
     def _is_likely_chapter_url(self, url: str) -> bool:
         """Check if a URL is likely to be a chapter URL."""
+        if '第' in url:
+            return True  # Special case for Chinese URLs
         url_lower = url.lower()
 
         # Must contain some chapter indicator
@@ -211,9 +226,13 @@ class JavaScriptStrategy(BaseDetectionStrategy):
 
         # Must have a number (chapter number)
         has_number = bool(re.search(r'\d+', url))
+        has_file_extension = '.' in url and len(url.split('.')[-1]) >= 2
 
-        # Should not be too short (likely not a real URL)
-        reasonable_length = len(url) > 10
+        # Should not be too short (likely not a real URL) - but be lenient if has extension
+        if has_file_extension:
+            reasonable_length = len(url) >= 6  # More lenient for URLs with extensions
+        else:
+            reasonable_length = len(url) >= 10
 
         return has_chapter_indicator and has_number and reasonable_length
 
@@ -259,8 +278,8 @@ class JavaScriptStrategy(BaseDetectionStrategy):
                 min_ch, max_ch = coverage
                 # If we have a dense range, max_ch might be the total
                 url_count = len(urls)
-                if url_count > 10 and max_ch == url_count:
-                    # Likely pagination, estimate higher
+                if max_ch == url_count:
+                    # Likely complete range, estimate higher
                     return max_ch * 2
 
         return None

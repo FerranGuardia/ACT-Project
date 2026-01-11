@@ -4,37 +4,26 @@ Unit tests for base TTS provider interface.
 Tests the abstract base class and provider type enum.
 """
 
-import sys
-import importlib.util
-from pathlib import Path
-
-# Path setup is handled by conftest.py
-# Direct import using importlib for module loading
-act_src = Path(__file__).parent.parent.parent.parent / "src"
-base_provider_path = act_src / "tts" / "providers" / "base_provider.py"
-spec = importlib.util.spec_from_file_location("base_provider", base_provider_path)
-if spec is None or spec.loader is None:
-    raise ImportError(f"Could not load spec for base_provider from {base_provider_path}")
-base_provider_module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(base_provider_module)
-
-TTSProvider = base_provider_module.TTSProvider
-ProviderType = base_provider_module.ProviderType
-
 import pytest
 from unittest.mock import Mock, patch
 
+from src.tts.providers.base_provider import TTSProvider, ProviderType
 
-class TestProviderType:
-    """Test ProviderType enum"""
-    
-    def test_provider_type_cloud(self):
-        """Test CLOUD provider type"""
+
+class TestProviderTypeEnum:
+    """Test ProviderType enum values and behavior."""
+
+    def test_provider_type_cloud_value(self):
+        """Test CLOUD provider type has correct value."""
         assert ProviderType.CLOUD.value == "cloud"
-    
-    def test_provider_type_offline(self):
-        """Test OFFLINE provider type"""
+
+    def test_provider_type_offline_value(self):
+        """Test OFFLINE provider type has correct value."""
         assert ProviderType.OFFLINE.value == "offline"
+
+
+class TestTTSProviderInterface:
+    """Test abstract TTSProvider interface and concrete implementations."""
 
 
 class ConcreteProvider(TTSProvider):

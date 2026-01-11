@@ -1,7 +1,7 @@
 """
-Integration tests for Provider Status Checking.
+Unit tests for Provider Status Checking.
 
-Tests the actual behavior of provider status checking with real file operations.
+Tests the logic of provider status checking with file operations.
 """
 
 import sys

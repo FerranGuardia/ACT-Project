@@ -1,52 +1,32 @@
 # Changelog
 
-All notable changes to ACT (Audiobook Creator Tools) will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+All notable changes to ACT will be documented in this file.
 
 ## [1.1.0] - 2026-01-11
 
-### Architecture Refactoring
+### Architecture Changes
 
-#### Processing Pipeline Modularization
-- **God Object Elimination**: Refactored monolithic `ProcessingPipeline` (846 lines) into 5 focused coordinators
-- **Single Responsibility Principle**: Each coordinator has one clear purpose:
-  - `ProcessingContext`: Shared state and configuration management
-  - `ScrapingCoordinator`: URL discovery and content extraction
-  - `ConversionCoordinator`: TTS conversion and file management
-  - `AudioPostProcessor`: Audio merging and post-processing
-  - `PipelineOrchestrator`: High-level workflow coordination
-- **Zero Breaking Changes**: All existing APIs preserved through backward compatibility
-- **Enhanced Testability**: Individual coordinators can be tested in isolation
+#### Processing Pipeline Refactoring
+- Split monolithic `ProcessingPipeline` class into 5 focused coordinators
+- Added `ProcessingContext`, `ScrapingCoordinator`, `ConversionCoordinator`, `AudioPostProcessor`, `PipelineOrchestrator`
+- Maintained backward compatibility with existing APIs
 
-#### Performance Improvements
+#### Text Processing Improvements
+- Optimized text cleaning with precompiled regex patterns
+- Improved processing performance for large documents
 
-##### Text Processing Optimization
-- **472x performance improvement** for text cleaning operations
-- Precompiled regex patterns in `text_cleaner.py` eliminate compilation overhead
-- Processing speed increased from ~380 to ~180,000 characters/second
-- Memory allocation reduced through pattern reuse
+### Testing Improvements
 
-#### Testing Infrastructure Expansion
-- **100+ New Tests**: Comprehensive test suite covering all new coordinators
-- **Unit Tests**: `tests/unit/processor/test_coordinators.py` - Isolated coordinator testing
-- **Integration Tests**: `tests/integration/processor/test_coordinator_integration.py` - Coordinator interactions
-- **Backward Compatibility Tests**: Ensuring legacy APIs still work
-- **Improved Coverage**: Better isolation and mocking capabilities
+#### Test Suite Expansion
+- Added 100+ new unit and integration tests
+- Created `tests/unit/processor/test_coordinators.py` for coordinator testing
+- Added integration tests for coordinator interactions
 
-##### Test Suite Reorganization
-- **Separated E2E tests** from integration tests for proper categorization
-- Created `tests/e2e/` directory for end-to-end tests with external dependencies
-- Moved network-dependent tests: `test_scraper_real.py`, `test_full_pipeline_e2e.py`, `test_tts_multi_provider.py`
-- Integration tests now focus on internal component interactions only
-
-##### UI Test Suite Unification
-- **Unified UI Testing**: Consolidated unit (`tests/unit/ui/`) and integration (`tests/integration/ui/`) tests into single `tests/ui/` directory
-- **Component-Based Organization**: Tests organized by component (components/, views/, dialogs/, utils/)
-- **Combined Coverage**: Each UI component now has both unit tests (with mocked Qt) and integration tests (with real Qt widgets)
-- **Improved Maintainability**: 63 comprehensive tests with better organization and easier maintenance
-- **Dead Code Removal**: Eliminated duplicate test files and consolidated redundant test logic
+#### Test Organization
+- Separated end-to-end tests from integration tests
+- Created `tests/e2e/` directory for external dependency tests
+- Unified UI tests under `tests/ui/` with component-based organization
+- Improved test coverage and maintainability
 
 ##### Test Execution Improvements
 - Added parallel test execution configuration (`-n auto`) in `pytest.ini`
