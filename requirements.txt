@@ -1,7 +1,6 @@
 # Core dependencies
-# edge-tts: Edge TTS provider uses system edge-tts installation
-#   - Main provider (edge_tts): Standard API method 7.2.0
 pyttsx3>=2.90  # Offline TTS provider
+edge-tts==7.2.0  # Edge TTS provider for online voices
 PySide6>=6.6.0
 requests>=2.31.0
 beautifulsoup4>=4.12.0
