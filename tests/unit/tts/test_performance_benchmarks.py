@@ -24,13 +24,13 @@ class TestTTSPerformanceBenchmarks:
 
     def test_text_cleaner_performance_short(self, benchmark, sample_text):
         """Benchmark text cleaning performance for short text."""
-        from src.tts.text_cleaner import clean_text_for_tts
+        from src.text_utils import clean_text_for_tts
 
         benchmark(clean_text_for_tts, sample_text)
 
     def test_text_cleaner_performance_long(self, benchmark, sample_long_text):
         """Benchmark text cleaning performance for long text."""
-        from src.tts.text_cleaner import clean_text_for_tts
+        from src.text_utils import clean_text_for_tts
 
         benchmark(clean_text_for_tts, sample_long_text)
 

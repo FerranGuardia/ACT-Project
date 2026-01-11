@@ -64,7 +64,7 @@ class TestTTSPropertyBased:
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
     def test_text_cleaner_handles_any_text(self, text):
         """Test that text cleaner function handles any input and produces valid output."""
-        from src.tts.text_cleaner import clean_text_for_tts
+        from src.text_utils import clean_text_for_tts
 
         try:
             original_text = text
@@ -374,7 +374,7 @@ class TestTTSPropertyBased:
     @settings(deadline=None)
     def test_idempotent_text_cleaning(self, text):
         """Test that cleaning already clean text doesn't break it (idempotent operation)."""
-        from src.tts.text_cleaner import clean_text_for_tts
+        from src.text_utils import clean_text_for_tts
 
         try:
             # Clean once

@@ -12,7 +12,7 @@ class TestTextCleaner:
     def test_clean_text_for_tts_basic(self):
         """Test basic text cleaning"""
         try:
-            from src.tts.text_cleaner import clean_text_for_tts  # type: ignore[import-untyped]
+            from src.text_utils import clean_text_for_tts  # type: ignore[import-untyped]
             
             text = "Hello world"
             cleaned = clean_text_for_tts(text)
@@ -27,8 +27,8 @@ class TestTextCleaner:
     def test_clean_text_for_tts_removes_html(self):
         """Test that HTML tags are removed when using base_cleaner"""
         try:
-            from src.tts.text_cleaner import clean_text_for_tts  # type: ignore[import-untyped]
-            from src.scraper.text_cleaner import clean_text  # type: ignore[import-untyped]
+            from src.text_utils import clean_text_for_tts  # type: ignore[import-untyped]
+            from src.text_utils import clean_text  # type: ignore[import-untyped]
             
             # Use text that survives scraper filtering (>15 chars or has punctuation)
             text = "<p>Hello <b>world</b>, this is a test sentence.</p>"
@@ -47,7 +47,7 @@ class TestTextCleaner:
     def test_clean_text_for_tts_normalizes_whitespace(self):
         """Test that whitespace is normalized"""
         try:
-            from src.tts.text_cleaner import clean_text_for_tts  # type: ignore[import-untyped]
+            from src.text_utils import clean_text_for_tts  # type: ignore[import-untyped]
             
             text = "Hello    world\n\n\nTest"
             cleaned = clean_text_for_tts(text)
@@ -62,7 +62,7 @@ class TestTextCleaner:
     def test_clean_text_for_tts_with_base_cleaner(self):
         """Test text cleaning with base cleaner function"""
         try:
-            from src.tts.text_cleaner import clean_text_for_tts  # type: ignore[import-untyped]
+            from src.text_utils import clean_text_for_tts  # type: ignore[import-untyped]
             
             def base_cleaner(text):
                 return text.upper()
@@ -79,7 +79,7 @@ class TestTextCleaner:
     def test_clean_text_for_tts_empty_string(self):
         """Test cleaning empty string"""
         try:
-            from src.tts.text_cleaner import clean_text_for_tts  # type: ignore[import-untyped]
+            from src.text_utils import clean_text_for_tts  # type: ignore[import-untyped]
             
             text = ""
             cleaned = clean_text_for_tts(text)
@@ -92,7 +92,7 @@ class TestTextCleaner:
     def test_clean_text_for_tts_special_characters(self):
         """Test that special characters are handled"""
         try:
-            from src.tts.text_cleaner import clean_text_for_tts  # type: ignore[import-untyped]
+            from src.text_utils import clean_text_for_tts  # type: ignore[import-untyped]
             
             text = "Hello & world <test> \"quotes\""
             cleaned = clean_text_for_tts(text)

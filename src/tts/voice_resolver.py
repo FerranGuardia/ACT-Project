@@ -7,13 +7,18 @@ Simplifies the complex voice management that was spread across VoiceManager and 
 
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
+import warnings
 
 from core.config_manager import get_config
 from core.logger import get_logger
 
 from .providers.base_provider import TTSProvider
 from .providers.provider_manager import TTSProviderManager
-from .voice_manager import VoiceManager
+
+# Suppress deprecation warning for VoiceManager - VoiceResolver uses it internally
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", DeprecationWarning)
+    from .voice_manager import VoiceManager
 
 logger = get_logger("tts.voice_resolver")
 

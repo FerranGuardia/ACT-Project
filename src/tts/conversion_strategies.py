@@ -17,7 +17,6 @@ from core.logger import get_logger
 from .providers.base_provider import TTSProvider
 from .providers.provider_manager import TTSProviderManager
 from .audio_merger import AudioMerger
-from .tts_utils import TTSUtils
 from .resource_manager import TTSResourceManager
 
 if TYPE_CHECKING:
@@ -33,7 +32,6 @@ class ConversionStrategy(ABC):
     def __init__(self, provider_manager: TTSProviderManager, resource_manager: TTSResourceManager):
         self.provider_manager = provider_manager
         self.resource_manager = resource_manager
-        self.tts_utils = TTSUtils(provider_manager)
 
     @abstractmethod
     def convert(
@@ -189,11 +187,11 @@ class ChunkedConversionStrategy(ConversionStrategy):
             # Merge the chunks
             if not self._merge_audio_chunks(chunk_files, output_path):
                 logger.error("Failed to merge audio chunks")
-                self.tts_utils.cleanup_files(chunk_files)
+                self.resource_manager.cleanup_temp_files(chunk_files)
                 return False
 
             # Clean up chunk files
-            self.tts_utils.cleanup_files(chunk_files)
+            self.resource_manager.cleanup_temp_files(chunk_files)
 
             # Verify output
             if not output_path.exists():
