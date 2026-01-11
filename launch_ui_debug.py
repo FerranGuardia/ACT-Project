@@ -16,10 +16,15 @@ Usage:
     python launch_ui_debug.py --filter ui  # Only show UI-related logs
 """
 
+import os
 import sys
 import logging
 import argparse
 from pathlib import Path
+
+# Suppress Qt multimedia warnings before any Qt imports
+os.environ['QT_LOGGING_RULES'] = 'qt.multimedia.*=false'
+os.environ['QT_QPA_PLATFORM'] = os.environ.get('QT_QPA_PLATFORM', 'windows:fontengine=freetype')
 
 # Add src to path
 src_path = Path(__file__).parent / "src"
@@ -49,25 +54,25 @@ def setup_debug_logging(quiet: bool = False, filter_category: str = ""):
     
     # Print header
     main_logger.info("=" * 70)
-    main_logger.info("🚀 ACT - Debug UI Launcher with Event Logging")
+    main_logger.info(">>> ACT - Debug UI Launcher with Event Logging")
     main_logger.info("=" * 70)
     main_logger.info("")
-    main_logger.info("📋 Verbose logging is ENABLED - All events will be shown in console")
+    main_logger.info("[OK] Verbose logging is ENABLED - All events will be shown in console")
     main_logger.info("")
-    
+
     if quiet:
-        main_logger.info("🔇 Quiet mode: Some verbose logs suppressed")
-    
+        main_logger.info("[QUIET] Quiet mode: Some verbose logs suppressed")
+
     if filter_category:
-        main_logger.info(f"🔍 Filtering: Only showing '{filter_category}' related logs")
-    
+        main_logger.info(f"[FILTER] Filtering: Only showing '{filter_category}' related logs")
+
     main_logger.info("")
     main_logger.info("Available events to watch for:")
-    main_logger.info("  🖱️  [CLICK]      - Button and UI element clicks")
-    main_logger.info("  ⌨️  [INPUT]      - Text field and input changes")
-    main_logger.info("  🔀 [NAVIGATION] - View and page transitions")
-    main_logger.info("  ⚙️  [PROCESS]    - Background operations")
-    main_logger.info("  ❌ [ERROR]      - Errors and exceptions")
+    main_logger.info("  [CLICK]      - Button and UI element clicks")
+    main_logger.info("  [INPUT]      - Text field and input changes")
+    main_logger.info("  [NAVIGATION] - View and page transitions")
+    main_logger.info("  [PROCESS]    - Background operations")
+    main_logger.info("  [ERROR]      - Errors and exceptions")
     main_logger.info("")
     main_logger.info("=" * 70)
     main_logger.info("")
@@ -159,8 +164,8 @@ Examples:
         
         logger.info("")
         logger.info("=" * 70)
-        logger.info("✅ Application launched successfully!")
-        logger.info("📝 Watch console for all UI interactions and events")
+        logger.info("[SUCCESS] Application launched successfully!")
+        logger.info("[INFO] Watch console for all UI interactions and events")
         logger.info("=" * 70)
         logger.info("")
         

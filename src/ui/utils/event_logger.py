@@ -101,8 +101,8 @@ class UIEventLogger:
         
         console = cls._get_console_logger()
         
-        # Build message
-        emoji_map = {
+        # Build message (using text instead of emojis to avoid Unicode encoding issues)
+        prefix_map = {
             cls.CLICK: "[CLICK]",
             cls.INPUT: "[INPUT]",
             cls.NAVIGATION: "[NAV]",
@@ -111,10 +111,10 @@ class UIEventLogger:
             cls.DEBUG: "[DEBUG]",
         }
 
-        emoji = emoji_map.get(category, "[EVENT]")
+        prefix = prefix_map.get(category, "[EVENT]")
         
         # Format main message
-        full_msg = f"{emoji} [{category}] {message}"
+        full_msg = f"{prefix} [{category}] {message}"
         
         if widget_name:
             full_msg += f" | Widget: {widget_name}"

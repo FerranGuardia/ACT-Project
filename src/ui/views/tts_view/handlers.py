@@ -20,18 +20,6 @@ from core.logger import get_logger
 from tts import TTSEngine, VoiceManager
 from utils.validation import validate_file_path
 
-# Try to import QtMultimedia for audio playback
-logger = get_logger("ui.tts_view.handlers")
-try:
-    from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
-    QT_MULTIMEDIA_AVAILABLE = True
-except ImportError:
-    QT_MULTIMEDIA_AVAILABLE = False
-    QMediaPlayer = None  # type: ignore[assignment, misc]
-    QAudioOutput = None  # type: ignore[assignment, misc]
-    logger.warning("QtMultimedia not available, preview will use external player")
-
-
 @contextmanager
 def suppress_stderr():
     """Temporarily suppress stderr output."""
@@ -42,6 +30,30 @@ def suppress_stderr():
             yield
         finally:
             sys.stderr = old_stderr
+
+
+# Try to import QtMultimedia for audio playback
+logger = get_logger("ui.tts_view.handlers")
+
+# Set Qt logging rules to suppress multimedia warnings at module level
+os.environ.setdefault('QT_LOGGING_RULES', 'qt.multimedia.*=false')
+
+QT_MULTIMEDIA_AVAILABLE = False
+QMediaPlayer = None  # type: ignore[assignment, misc]
+QAudioOutput = None  # type: ignore[assignment, misc]
+
+try:
+    # Suppress any import warnings/errors for QtMultimedia
+    with suppress_stderr():
+        from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
+    QT_MULTIMEDIA_AVAILABLE = True
+    logger.debug("QtMultimedia import successful")
+except ImportError:
+    # Silent fallback - QtMultimedia not available on this system
+    logger.debug("QtMultimedia not available, using external audio player fallback")
+except Exception as e:
+    # Any other import error, also silent fallback
+    logger.debug(f"QtMultimedia import failed: {e}, using external audio player fallback")
 
 
 class TTSViewHandlers:
@@ -59,23 +71,34 @@ class TTSViewHandlers:
         self.stop_preview_button = None
         self.multimedia_available = False  # Track if multimedia actually works
         
-        # Initialize audio playback if available
-        if QT_MULTIMEDIA_AVAILABLE and QMediaPlayer is not None and QAudioOutput is not None:
-            try:
-                # Suppress Qt's stderr warnings during initialization
-                with suppress_stderr():
-                    self.preview_player = QMediaPlayer()
-                    self.preview_audio_output = QAudioOutput()
-                    self.preview_player.setAudioOutput(self.preview_audio_output)  # type: ignore[attr-defined]
-                    self.preview_player.playbackStateChanged.connect(self._on_preview_state_changed)  # type: ignore[attr-defined]
-                self.multimedia_available = True
-                logger.info("QMediaPlayer initialized successfully")
-            except Exception as e:
-                # QMediaPlayer initialization failed (likely missing backend plugins)
-                logger.warning(f"Failed to initialize QMediaPlayer: {e}. Preview will use external player.")
-                self.preview_player = None
-                self.preview_audio_output = None
-                self.multimedia_available = False
+        # Initialize audio playback if available (lazy initialization - only when needed)
+        self.multimedia_available = False
+        # Don't initialize QMediaPlayer here - wait until preview is actually requested
+        # This prevents startup warnings and errors
+
+    def _ensure_multimedia_initialized(self):
+        """Lazily initialize QMediaPlayer when first needed."""
+        if self.multimedia_available or not QT_MULTIMEDIA_AVAILABLE:
+            return  # Already initialized or not available
+
+        if QMediaPlayer is None or QAudioOutput is None:
+            return  # Not available on this system
+
+        try:
+            # Suppress Qt's stderr warnings during initialization
+            with suppress_stderr():
+                self.preview_player = QMediaPlayer()
+                self.preview_audio_output = QAudioOutput()
+                self.preview_player.setAudioOutput(self.preview_audio_output)  # type: ignore[attr-defined]
+                self.preview_player.playbackStateChanged.connect(self._on_preview_state_changed)  # type: ignore[attr-defined]
+            self.multimedia_available = True
+            logger.debug("QMediaPlayer initialized successfully (lazy)")
+        except Exception as e:
+            # QMediaPlayer initialization failed (likely missing backend plugins)
+            logger.debug(f"QMediaPlayer initialization failed: {e}. Using external player fallback.")
+            self.preview_player = None
+            self.preview_audio_output = None
+            self.multimedia_available = False
     
     def set_preview_ui_elements(self, status_label, preview_button, stop_preview_button):
         """Set UI elements for preview state updates."""
@@ -215,6 +238,9 @@ class TTSViewHandlers:
             QMessageBox.warning(self.view, "No Voice", "Please select a voice")
             return
         
+        # Ensure multimedia is initialized
+        self._ensure_multimedia_initialized()
+
         # Stop any currently playing preview
         if self.multimedia_available and self.preview_player and QMediaPlayer is not None:
             if self.preview_player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:  # type: ignore[attr-defined, comparison-overlap]
@@ -309,6 +335,9 @@ class TTSViewHandlers:
     
     def stop_preview(self, status_label, preview_button, stop_preview_button):
         """Stop the currently playing preview."""
+        # Ensure multimedia is initialized (in case it wasn't before)
+        self._ensure_multimedia_initialized()
+
         if self.multimedia_available and self.preview_player:
             self.preview_player.stop()  # type: ignore[attr-defined]
             status_label.setText("Preview stopped")

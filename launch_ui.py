@@ -4,8 +4,13 @@ UI Launcher for ACT - Quick launch script for UI development.
 This script launches the UI application for testing and development.
 """
 
+import os
 import sys
 from pathlib import Path
+
+# Suppress Qt multimedia warnings before any Qt imports
+os.environ['QT_LOGGING_RULES'] = 'qt.multimedia.*=false'
+os.environ['QT_QPA_PLATFORM'] = os.environ.get('QT_QPA_PLATFORM', 'windows:fontengine=freetype')
 
 # Add src to path
 src_path = Path(__file__).parent / "src"
