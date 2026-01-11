@@ -5,6 +5,39 @@ All notable changes to ACT (Audiobook Creator Tools) will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-01-11
+
+### Architecture Refactoring
+
+#### Processing Pipeline Modularization
+- **God Object Elimination**: Refactored monolithic `ProcessingPipeline` (846 lines) into 5 focused coordinators
+- **Single Responsibility Principle**: Each coordinator has one clear purpose:
+  - `ProcessingContext`: Shared state and configuration management
+  - `ScrapingCoordinator`: URL discovery and content extraction
+  - `ConversionCoordinator`: TTS conversion and file management
+  - `AudioPostProcessor`: Audio merging and post-processing
+  - `PipelineOrchestrator`: High-level workflow coordination
+- **Zero Breaking Changes**: All existing APIs preserved through backward compatibility
+- **Enhanced Testability**: Individual coordinators can be tested in isolation
+
+#### Testing Infrastructure Expansion
+- **100+ New Tests**: Comprehensive test suite covering all new coordinators
+- **Unit Tests**: `tests/unit/processor/test_coordinators.py` - Isolated coordinator testing
+- **Integration Tests**: `tests/integration/processor/test_coordinator_integration.py` - Coordinator interactions
+- **Backward Compatibility Tests**: Ensuring legacy APIs still work
+- **Improved Coverage**: Better isolation and mocking capabilities
+
+#### Documentation Updates
+- Updated `docs/modules/BLOCK_5_PROCESSOR.md` to reflect new architecture
+- Enhanced README.md with architecture overview and recent improvements
+- Added comprehensive documentation for new modular components
+
+#### Code Cleanup
+- Removed dead files: `test_circuit_breaker.py.old`
+- Cleaned up empty directories: `docs/tests/`
+- Updated import paths throughout codebase
+- Fixed missing exports in TTS module
+
 ## [1.2.0] - 2026-01-08
 
 ### Performance Improvements

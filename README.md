@@ -2,7 +2,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-v1.2.0-success)](https://github.com/FerranGuardia/ACT-Project)
+[![Status](https://img.shields.io/badge/Status-v1.3.0-success)](https://github.com/FerranGuardia/ACT-Project)
 [![Performance](https://img.shields.io/badge/Performance-472x%20faster-orange)](src/tts/text_cleaner.py)
 
 Modular Python application for converting webnovels to audiobooks using automated scraping and multi-provider TTS synthesis.
@@ -21,7 +21,10 @@ Modular Python application for converting webnovels to audiobooks using automate
 - **GUI Interface**: PySide6-based application with 4 operational modes
 - **Project Management**: State persistence with resume capability
 - **Queue Processing**: Batch processing with progress tracking
-- **Testing Suite**: 150+ automated tests with parallel execution support (unit, integration, E2E)
+- **Testing Suite**: 200+ automated tests with comprehensive coverage (unit, integration, E2E)
+  - Modular architecture enables isolated testing of components
+  - Circuit breaker pattern testing for fault tolerance
+  - Property-based testing for edge cases
 
 ## Requirements
 
@@ -72,15 +75,29 @@ output/
 
 ## Architecture
 
+The codebase follows a clean, modular architecture with clear separation of concerns:
+
 ```
 src/
-├── core/               # Configuration, logging
-├── scraper/            # Web content extraction
-├── tts/                # Text-to-speech providers
-├── processor/          # Pipeline orchestration
-├── ui/                 # PySide6 interface
-└── utils/              # Shared utilities
+├── core/               # Configuration, logging, error handling
+├── scraper/            # Web content extraction and URL processing
+├── tts/                # Text-to-speech providers and audio processing
+├── processor/          # Modular processing pipeline (recently refactored)
+│   ├── context.py              # Shared state management
+│   ├── scraping_coordinator.py # URL discovery & content extraction
+│   ├── conversion_coordinator.py# TTS conversion & file management
+│   ├── audio_post_processor.py # Audio merging operations
+│   └── pipeline_orchestrator.py# High-level workflow coordination
+├── ui/                 # PySide6-based graphical interface
+└── utils/              # Shared utilities and validation
 ```
+
+### Recent Improvements
+
+- **Modular Architecture**: Refactored monolithic `ProcessingPipeline` (846 lines) into 5 focused coordinators
+- **Enhanced Testing**: 100+ new unit and integration tests covering all coordinators
+- **Better Maintainability**: Single responsibility principle applied throughout
+- **Backward Compatibility**: All existing APIs preserved during refactoring
 
 ## Configuration
 
