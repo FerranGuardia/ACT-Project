@@ -10,29 +10,27 @@ from pathlib import Path
 from typing import Any, Dict, Optional, cast
 
 from .logger import get_logger
-from .constants import get_version
 
 logger = get_logger("core.config_manager")
-
-
-__all__ = ["ConfigManager", "get_config"]
 
 
 class ConfigManager:
     """Manages application configuration and user preferences."""
 
     _instance: Optional["ConfigManager"] = None
+    _initialized: bool = False
 
     def __new__(cls) -> "ConfigManager":
         """Singleton pattern to ensure only one config manager instance."""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            # Initialize only once in __new__ to avoid __init__ being called multiple times
-            cls._instance._initialize()
         return cls._instance
 
-    def _initialize(self) -> None:
-        """Initialize the configuration manager (called only once)."""
+    def __init__(self) -> None:
+        """Initialize the configuration manager."""
+        if self._initialized:
+            return
+
         self.config_dir = Path.home() / ".act"
         self.config_dir.mkdir(parents=True, exist_ok=True)
 
@@ -41,10 +39,7 @@ class ConfigManager:
         self._default_config = self._get_default_config()
 
         self.load_config()
-
-    def __init__(self) -> None:
-        """Prevent multiple initialization - all work done in __new__."""
-        pass
+        self._initialized = True
 
     def _get_default_config(self) -> Dict[str, Any]:
         """
@@ -53,31 +48,16 @@ class ConfigManager:
         Returns:
             Dictionary with default configuration
         """
-        # Read version from VERSION file
-        version = get_version()
-
-        # Detect if running in test environment
-        import os
-        import tempfile
-        is_test_env = ("PYTEST_CURRENT_TEST" in os.environ or
-                      "pytest" in str(Path.cwd()) or
-                      any("test" in part for part in str(Path.cwd()).lower().split(os.sep)))
-
-        # Use temp directory for tests to avoid desktop pollution
-        if is_test_env:
-            temp_base = Path(tempfile.gettempdir()) / "act_test"
-            temp_base.mkdir(exist_ok=True)
-
         return {
             "app": {
-                "version": version,
+                "version": "1.1.0",
                 "theme": "light",
                 "language": "es",
             },
             "paths": {
-                "output_dir": str(temp_base / "output") if is_test_env else str(Path.home() / "Desktop"),
-                "scraped_dir": str(temp_base / "scraped") if is_test_env else str(Path.home() / "Documents" / "ACT" / "scraped"),
-                "projects_dir": str(temp_base / "projects") if is_test_env else str(Path.home() / "Documents" / "ACT" / "projects"),
+                "output_dir": str(Path.home() / "Desktop"),
+                "scraped_dir": str(Path.home() / "Documents" / "ACT" / "scraped"),
+                "projects_dir": str(Path.home() / "Documents" / "ACT" / "projects"),
             },
             "tts": {
                 "voice": "es-ES-ElviraNeural",
@@ -260,3 +240,9 @@ def get_config() -> ConfigManager:
         >>> voice = config.get('tts.voice')
     """
     return ConfigManager()
+
+
+
+
+
+

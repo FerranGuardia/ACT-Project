@@ -1,306 +1,150 @@
 """
 Centralized UI styles for ACT application.
 
-Simple, clean styling system with a single theme loaded from themes directory.
+Based on the Simple_PySide_Base style reference.
 """
 
-from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Final
+from typing import Dict
 
-if TYPE_CHECKING:
-    from PySide6.QtWidgets import QPushButton  # type: ignore[unused-import]
+# Color palette from reference
+COLORS: Dict[str, str] = {
+    'bg_dark': 'rgb(27, 29, 35)',
+    'bg_medium': 'rgb(39, 44, 54)',
+    'bg_light': 'rgb(44, 49, 60)',
+    'bg_lighter': 'rgb(52, 59, 72)',
+    'bg_hover': 'rgb(33, 37, 43)',
+    'bg_content': 'rgb(40, 44, 52)',
+    'text_primary': 'rgb(210, 210, 210)',
+    'text_secondary': 'rgb(98, 103, 111)',
+    'accent': 'rgb(85, 170, 255)',
+    'accent_hover': 'rgb(105, 180, 255)',
+    'accent_pressed': 'rgb(65, 130, 195)',
+    'border': 'rgb(64, 71, 88)',
+    'border_focus': 'rgb(91, 101, 124)',
+}
 
-# Global font family mapping: maps expected names to actual Qt font family names
-_font_family_map: dict[str, str] = {}
-
-
-def register_font_family_mapping(mapping: dict[str, str]) -> None:
-    """Register font family mapping from MainWindow."""
-    global _font_family_map
-    _font_family_map.update(mapping)
-
-
-def _load_theme(theme_name: str = "dark_default") -> Dict[str, str]:
-    """
-    Load theme from themes directory.
-    
-    Args:
-        theme_name: Name of the theme file (without .py extension)
-        
-    Returns:
-        Theme dictionary with all color and font settings
-    """
-    try:
-        # Get the themes directory path
-        themes_dir = Path(__file__).parent / "themes"
-        theme_path = themes_dir / f"{theme_name}.py"
-        
-        if not theme_path.exists():
-            raise FileNotFoundError(f"Theme file not found: {theme_path}")
-        
-        # Load the theme module dynamically
-        import importlib.util
-        spec = importlib.util.spec_from_file_location("theme_module", theme_path)
-        if spec is None or spec.loader is None:
-            raise ImportError(f"Could not load theme spec from {theme_path}")
-        
-        theme_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(theme_module)
-        
-        # Get THEME dict from the module
-        if not hasattr(theme_module, 'THEME'):
-            raise AttributeError(f"Theme file {theme_path} does not contain THEME dictionary")
-        
-        return theme_module.THEME
-    except Exception as e:
-        # Fallback to default theme values if loading fails
-        from core.logger import get_logger
-        logger = get_logger("ui.styles")
-        logger.warning(f"Failed to load theme '{theme_name}': {e}. Using fallback theme.")
-        
-        # Fallback theme (same as dark_default)
-        return {
-            'font_family': 'Segoe UI',
-            'font_size_base': '10pt',
-            'font_size_large': '12pt',
-            'font_size_small': '9pt',
-            'bg_dark': 'rgb(30, 30, 30)',
-            'bg_medium': 'rgb(39, 44, 54)',
-            'bg_light': 'rgb(44, 49, 60)',
-            'bg_lighter': 'rgb(52, 59, 72)',
-            'bg_hover': 'rgb(33, 37, 43)',
-            'bg_content': 'rgb(40, 44, 52)',
-            'text_primary': 'rgb(210, 210, 210)',
-            'text_secondary': 'rgb(98, 103, 111)',
-            'accent': 'rgb(85, 170, 255)',
-            'accent_hover': 'rgb(105, 180, 255)',
-            'accent_pressed': 'rgb(65, 130, 195)',
-            'border': 'rgb(64, 71, 88)',
-            'border_focus': 'rgb(91, 101, 124)',
-        }
+# Font family
+FONT_FAMILY: str = 'Segoe UI'
 
 
-# Load theme from themes directory (default: dark_default)
-_THEME = _load_theme("dark_default")
-
-
-def _get_colors() -> Dict[str, str]:
-    """Get theme colors."""
-    return {
-        'bg_dark': _THEME['bg_dark'],
-        'bg_medium': _THEME['bg_medium'],
-        'bg_light': _THEME['bg_light'],
-        'bg_lighter': _THEME['bg_lighter'],
-        'bg_hover': _THEME['bg_hover'],
-        'bg_content': _THEME['bg_content'],
-        'text_primary': _THEME['text_primary'],
-        'text_secondary': _THEME['text_secondary'],
-        'accent': _THEME['accent'],
-        'accent_hover': _THEME['accent_hover'],
-        'accent_pressed': _THEME['accent_pressed'],
-        'border': _THEME['border'],
-        'border_focus': _THEME['border_focus'],
-    }
-
-
-class _ColorsDict(dict):
-    """Dict-like object that always returns theme colors."""
-    
-    def __getitem__(self, key: str) -> str:
-        colors = _get_colors()
-        if key not in colors:
-            raise KeyError(f"Color '{key}' not found")
-        return colors[key]
-    
-    def get(self, key: str, default=None):
-        colors = _get_colors()
-        return colors.get(key, default)
-    
-    def copy(self):
-        return _get_colors().copy()
-    
-    def keys(self):
-        return _get_colors().keys()
-    
-    def values(self):
-        return _get_colors().values()
-    
-    def items(self):
-        return _get_colors().items()
-
-
-# Global COLORS object - explicitly typed as Final for static analysis
-COLORS: Final[_ColorsDict] = _ColorsDict()
-
-__all__ = [
-    'COLORS',
-    'get_font_family',
-    'get_font_size_base',
-    'get_font_size_large',
-    'get_font_size_small',
-    'get_global_style',
-    'register_font_family_mapping',
-    # Style getters (deprecated - kept for backward compatibility)
-    'get_button_primary_style',
-    'get_button_standard_style',
-    'set_button_primary',
-    'get_line_edit_style',
-    'get_group_box_style',
-    'get_list_widget_style',
-    'get_progress_bar_style',
-    'get_spin_box_style',
-    'get_status_label_style',
-    'get_combo_box_style',
-    'get_plain_text_edit_style',
-    'get_tab_widget_style',
-    'get_radio_button_style',
-    'get_slider_style',
-    'get_card_style',
-    'get_card_title_style',
-    'get_card_description_style',
-    'get_card_icon_style',
-    'get_card_arrow_style',
-]
-
-
-def get_font_family() -> str:
-    """Get font family."""
-    font_family_str = _THEME.get('font_family', 'Segoe UI')
-    
-    # Take the first font name (primary font)
-    font_names = [name.strip() for name in font_family_str.split(",")]
-    primary_font = font_names[0] if font_names else "Segoe UI"
-    
-    # Check if we have a mapping for this font
-    font_key = primary_font.lower()
-    if font_key in _font_family_map:
-        return _font_family_map[font_key]
-    
-    return primary_font
-
-
-def get_font_size_base() -> str:
-    """Get base font size."""
-    return _THEME.get('font_size_base', '10pt')
-
-
-def get_font_size_large() -> str:
-    """Get large font size."""
-    return _THEME.get('font_size_large', '12pt')
-
-
-def get_font_size_small() -> str:
-    """Get small font size."""
-    return _THEME.get('font_size_small', '9pt')
-
-
-def get_global_style() -> str:
-    """
-    Get comprehensive global application stylesheet.
-    
-    This single stylesheet applies to all widgets globally.
-    Specific areas can be overridden later if needed.
-    """
-    colors = _get_colors()
-    
-    # Extract RGB values for rgba conversion
-    import re
-    
-    # Tooltip background
-    bg_dark_rgba = 'rgba(30, 30, 30, 200)'
-    rgb_match = re.search(r'rgb\((\d+),\s*(\d+),\s*(\d+)\)', colors.get('bg_dark', ''))
-    if rgb_match:
-        r, g, b = rgb_match.groups()
-        bg_dark_rgba = f'rgba({r}, {g}, {b}, 200)'
-    
+def get_main_window_style() -> str:
+    """Get the main window stylesheet."""
     return f"""
-    /* Global Stylesheet */
-    
-    /* Main Window */
     QMainWindow {{
-        background-color: {colors['bg_dark']};
+        background: transparent;
     }}
-    
-    /* Central Widget */
+    QToolTip {{
+        color: #ffffff;
+        background-color: rgba(27, 29, 35, 160);
+        border: 1px solid rgb(40, 40, 40);
+        border-radius: 2px;
+    }}
+    """
+
+
+def get_central_widget_style() -> str:
+    """Get the central widget stylesheet."""
+    return f"""
     QWidget {{
-        background-color: {colors['bg_dark']};
-        color: {colors['text_primary']};
+        background: transparent;
+        color: {COLORS['text_primary']};
     }}
-    
-    /* Toolbar */
-    QToolBar {{
-        background-color: {colors['bg_medium']};
-        border: none;
-        border-bottom: 1px solid {colors['border']};
-        padding: 6px 8px;
-        spacing: 6px;
-    }}
-    
-    /* Buttons */
+    """
+
+
+def get_button_standard_style() -> str:
+    """Get standard button style."""
+    return f"""
     QPushButton {{
-        border: 2px solid {colors['bg_lighter']};
+        border: 2px solid {COLORS['bg_lighter']};
         border-radius: 5px;
-        background-color: {colors['bg_lighter']};
-        color: {colors['text_primary']};
-        padding: 8px 14px;
+        background-color: {COLORS['bg_lighter']};
+        color: {COLORS['text_primary']};
+        padding: 5px 10px;
+        font-family: '{FONT_FAMILY}';
+        font-size: 10pt;
     }}
     QPushButton:hover {{
-        background-color: {colors['bg_light']};
-        border: 2px solid {colors['border']};
+        background-color: rgb(57, 65, 80);
+        border: 2px solid rgb(61, 70, 86);
     }}
     QPushButton:pressed {{
-        background-color: {colors['bg_dark']};
-        border: 2px solid {colors['border_focus']};
+        background-color: rgb(35, 40, 49);
+        border: 2px solid rgb(43, 50, 61);
     }}
     QPushButton:disabled {{
-        background-color: {colors['bg_dark']};
-        color: {colors['text_secondary']};
-        border: 2px solid {colors['bg_dark']};
+        background-color: {COLORS['bg_dark']};
+        color: {COLORS['text_secondary']};
+        border: 2px solid {COLORS['bg_dark']};
     }}
-    
-    /* Primary/Accent Buttons */
-    QPushButton[class="primary"] {{
+    """
+
+
+def get_button_primary_style() -> str:
+    """Get primary/accent button style."""
+    return f"""
+    QPushButton {{
         border: none;
-        background-color: {colors['accent']};
+        border-radius: 5px;
+        background-color: {COLORS['accent']};
         color: white;
+        padding: 6px 12px;
+        font-family: '{FONT_FAMILY}';
+        font-size: 10pt;
         font-weight: bold;
     }}
-    QPushButton[class="primary"]:hover {{
-        background-color: {colors['accent_hover']};
+    QPushButton:hover {{
+        background-color: {COLORS['accent_hover']};
     }}
-    QPushButton[class="primary"]:pressed {{
-        background-color: {colors['accent_pressed']};
+    QPushButton:pressed {{
+        background-color: {COLORS['accent_pressed']};
     }}
-    QPushButton[class="primary"]:disabled {{
-        background-color: {colors['bg_lighter']};
-        color: {colors['text_secondary']};
+    QPushButton:disabled {{
+        background-color: {COLORS['bg_lighter']};
+        color: {COLORS['text_secondary']};
     }}
-    
-    /* Line Edit */
+    """
+
+
+def get_line_edit_style() -> str:
+    """Get line edit style."""
+    return f"""
     QLineEdit {{
-        background-color: {colors['bg_dark']};
+        background-color: {COLORS['bg_dark']};
         border-radius: 5px;
-        border: 2px solid {colors['bg_dark']};
-        padding: 5px 10px;
-        color: {colors['text_primary']};
+        border: 2px solid {COLORS['bg_dark']};
+        padding-left: 10px;
+        padding-right: 10px;
+        padding-top: 5px;
+        padding-bottom: 5px;
+        color: {COLORS['text_primary']};
+        font-family: '{FONT_FAMILY}';
+        font-size: 10pt;
     }}
     QLineEdit:hover {{
-        border: 2px solid {colors['border']};
+        border: 2px solid {COLORS['border']};
     }}
     QLineEdit:focus {{
-        border: 2px solid {colors['border_focus']};
+        border: 2px solid {COLORS['border_focus']};
     }}
-    
-    /* Combo Box */
+    """
+
+
+def get_combo_box_style() -> str:
+    """Get combo box style."""
+    return f"""
     QComboBox {{
-        background-color: {colors['bg_dark']};
+        background-color: {COLORS['bg_dark']};
         border-radius: 5px;
-        border: 2px solid {colors['bg_dark']};
-        padding: 5px 10px;
-        color: {colors['text_primary']};
+        border: 2px solid {COLORS['bg_dark']};
+        padding: 5px;
+        padding-left: 10px;
+        color: {COLORS['text_primary']};
+        font-family: '{FONT_FAMILY}';
+        font-size: 10pt;
     }}
     QComboBox:hover {{
-        border: 2px solid {colors['border']};
+        border: 2px solid {COLORS['border']};
     }}
     QComboBox::drop-down {{
         subcontrol-origin: padding;
@@ -313,104 +157,158 @@ def get_global_style() -> str:
         border-bottom-right-radius: 3px;
     }}
     QComboBox QAbstractItemView {{
-        color: {colors['accent']};
-        background-color: {colors['bg_dark']};
+        color: {COLORS['accent']};
+        background-color: {COLORS['bg_dark']};
         padding: 10px;
-        selection-background-color: {colors['bg_medium']};
-        border: 1px solid {colors['bg_light']};
+        selection-background-color: {COLORS['bg_medium']};
+        border: 1px solid {COLORS['bg_light']};
     }}
-    
-    /* Labels */
-    QLabel {{
-        color: {colors['text_primary']};
-    }}
-    
-    /* Scrollbars */
+    """
+
+
+def get_scrollbar_style() -> str:
+    """Get scrollbar style."""
+    return f"""
     QScrollBar:horizontal {{
         border: none;
-        background: {colors['bg_lighter']};
+        background: {COLORS['bg_lighter']};
         height: 14px;
         margin: 0px 21px 0 21px;
         border-radius: 0px;
     }}
     QScrollBar::handle:horizontal {{
-        background: {colors['accent']};
+        background: {COLORS['accent']};
         min-width: 25px;
         border-radius: 7px;
     }}
-    QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
+    QScrollBar::add-line:horizontal {{
         border: none;
-        background: {colors['bg_medium']};
+        background: rgb(55, 63, 77);
         width: 20px;
+        border-top-right-radius: 7px;
+        border-bottom-right-radius: 7px;
+        subcontrol-position: right;
+        subcontrol-origin: margin;
+    }}
+    QScrollBar::sub-line:horizontal {{
+        border: none;
+        background: rgb(55, 63, 77);
+        width: 20px;
+        border-top-left-radius: 7px;
+        border-bottom-left-radius: 7px;
+        subcontrol-position: left;
+        subcontrol-origin: margin;
+    }}
+    QScrollBar::up-arrow:horizontal, QScrollBar::down-arrow:horizontal {{
+        background: none;
+    }}
+    QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
+        background: none;
     }}
     QScrollBar:vertical {{
         border: none;
-        background: {colors['bg_lighter']};
+        background: {COLORS['bg_lighter']};
         width: 14px;
         margin: 21px 0 21px 0;
         border-radius: 0px;
     }}
     QScrollBar::handle:vertical {{
-        background: {colors['accent']};
+        background: {COLORS['accent']};
         min-height: 25px;
         border-radius: 7px;
     }}
-    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+    QScrollBar::add-line:vertical {{
         border: none;
-        background: {colors['bg_medium']};
+        background: rgb(55, 63, 77);
         height: 20px;
+        border-bottom-left-radius: 7px;
+        border-bottom-right-radius: 7px;
+        subcontrol-position: bottom;
+        subcontrol-origin: margin;
     }}
-    
-    /* Checkbox */
+    QScrollBar::sub-line:vertical {{
+        border: none;
+        background: rgb(55, 63, 77);
+        height: 20px;
+        border-top-left-radius: 7px;
+        border-top-right-radius: 7px;
+        subcontrol-position: top;
+        subcontrol-origin: margin;
+    }}
+    QScrollBar::up-arrow:vertical, QScrollBar::down-arrow:vertical {{
+        background: none;
+    }}
+    QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+        background: none;
+    }}
+    """
+
+
+def get_checkbox_style() -> str:
+    """Get checkbox style."""
+    return f"""
     QCheckBox::indicator {{
-        border: 3px solid {colors['bg_lighter']};
+        border: 3px solid {COLORS['bg_lighter']};
         width: 15px;
         height: 15px;
         border-radius: 10px;
-        background: {colors['bg_light']};
+        background: {COLORS['bg_light']};
     }}
     QCheckBox::indicator:hover {{
-        border: 3px solid {colors['border']};
+        border: 3px solid rgb(58, 66, 81);
     }}
     QCheckBox::indicator:checked {{
-        border: 3px solid {colors['bg_lighter']};
-        background-color: {colors['accent']};
+        background: 3px solid {COLORS['bg_lighter']};
+        border: 3px solid {COLORS['bg_lighter']};
+        background-color: {COLORS['accent']};
     }}
     QCheckBox {{
-        color: {colors['text_primary']};
+        color: {COLORS['text_primary']};
+        font-family: '{FONT_FAMILY}';
+        font-size: 10pt;
     }}
-    
-    /* Radio Button */
+    """
+
+
+def get_radio_button_style() -> str:
+    """Get radio button style."""
+    return f"""
     QRadioButton::indicator {{
-        border: 3px solid {colors['bg_lighter']};
+        border: 3px solid {COLORS['bg_lighter']};
         width: 15px;
         height: 15px;
         border-radius: 10px;
-        background: {colors['bg_light']};
+        background: {COLORS['bg_light']};
     }}
     QRadioButton::indicator:hover {{
-        border: 3px solid {colors['border']};
+        border: 3px solid rgb(58, 66, 81);
     }}
     QRadioButton::indicator:checked {{
-        background: {colors['accent']};
-        border: 3px solid {colors['bg_lighter']};
+        background: 3px solid rgb(94, 106, 130);
+        border: 3px solid {COLORS['bg_lighter']};
     }}
     QRadioButton {{
-        color: {colors['text_primary']};
+        color: {COLORS['text_primary']};
+        font-family: '{FONT_FAMILY}';
+        font-size: 10pt;
     }}
-    
-    /* Slider */
+    """
+
+
+def get_slider_style() -> str:
+    """Get slider style."""
+    return f"""
     QSlider::groove:horizontal {{
         border-radius: 9px;
         height: 18px;
         margin: 0px;
-        background-color: {colors['bg_lighter']};
+        background-color: {COLORS['bg_lighter']};
     }}
     QSlider::groove:horizontal:hover {{
-        background-color: {colors['bg_light']};
+        background-color: rgb(55, 62, 76);
     }}
     QSlider::handle:horizontal {{
-        background-color: {colors['accent']};
+        background-color: {COLORS['accent']};
         border: none;
         height: 18px;
         width: 18px;
@@ -418,22 +316,22 @@ def get_global_style() -> str:
         border-radius: 9px;
     }}
     QSlider::handle:horizontal:hover {{
-        background-color: {colors['accent_hover']};
+        background-color: {COLORS['accent_hover']};
     }}
     QSlider::handle:horizontal:pressed {{
-        background-color: {colors['accent_pressed']};
+        background-color: {COLORS['accent_pressed']};
     }}
     QSlider::groove:vertical {{
         border-radius: 9px;
         width: 18px;
         margin: 0px;
-        background-color: {colors['bg_lighter']};
+        background-color: {COLORS['bg_lighter']};
     }}
     QSlider::groove:vertical:hover {{
-        background-color: {colors['bg_light']};
+        background-color: rgb(55, 62, 76);
     }}
     QSlider::handle:vertical {{
-        background-color: {colors['accent']};
+        background-color: {COLORS['accent']};
         border: none;
         height: 18px;
         width: 18px;
@@ -441,290 +339,211 @@ def get_global_style() -> str:
         border-radius: 9px;
     }}
     QSlider::handle:vertical:hover {{
-        background-color: {colors['accent_hover']};
+        background-color: {COLORS['accent_hover']};
     }}
     QSlider::handle:vertical:pressed {{
-        background-color: {colors['accent_pressed']};
+        background-color: {COLORS['accent_pressed']};
     }}
-    
-    /* Group Box */
+    """
+
+
+def get_group_box_style() -> str:
+    """Get group box style."""
+    return f"""
     QGroupBox {{
-        border: 2px solid {colors['bg_medium']};
+        border: 2px solid {COLORS['bg_medium']};
         border-radius: 5px;
         margin-top: 10px;
         padding-top: 10px;
-        color: {colors['text_primary']};
+        color: {COLORS['text_primary']};
+        font-family: '{FONT_FAMILY}';
+        font-size: 11pt;
         font-weight: bold;
     }}
     QGroupBox::title {{
         subcontrol-origin: margin;
         subcontrol-position: top left;
         padding: 0 5px;
-        background-color: {colors['bg_medium']};
+        background-color: {COLORS['bg_medium']};
     }}
-    
-    /* List Widget */
+    """
+
+
+def get_list_widget_style() -> str:
+    """Get list widget style."""
+    return f"""
     QListWidget {{
-        background-color: {colors['bg_dark']};
+        background-color: {COLORS['bg_dark']};
         border-radius: 5px;
-        border: 2px solid {colors['bg_dark']};
+        border: 2px solid {COLORS['bg_dark']};
         padding: 5px;
-        color: {colors['text_primary']};
+        color: {COLORS['text_primary']};
+        font-family: '{FONT_FAMILY}';
+        font-size: 10pt;
     }}
     QListWidget::item {{
         padding: 5px;
         border-radius: 3px;
     }}
     QListWidget::item:hover {{
-        background-color: {colors['bg_medium']};
+        background-color: {COLORS['bg_medium']};
     }}
     QListWidget::item:selected {{
-        background-color: {colors['accent']};
+        background-color: {COLORS['accent']};
         color: white;
     }}
-    
-    /* Progress Bar */
+    {get_scrollbar_style()}
+    """
+
+
+def get_progress_bar_style() -> str:
+    """Get progress bar style."""
+    return f"""
     QProgressBar {{
-        border: 2px solid {colors['bg_lighter']};
+        border: 2px solid {COLORS['bg_lighter']};
         border-radius: 5px;
         text-align: center;
-        background-color: {colors['bg_dark']};
-        color: {colors['text_primary']};
+        background-color: {COLORS['bg_dark']};
+        color: {COLORS['text_primary']};
+        font-family: '{FONT_FAMILY}';
+        font-size: 10pt;
     }}
     QProgressBar::chunk {{
-        background-color: {colors['accent']};
+        background-color: {COLORS['accent']};
         border-radius: 3px;
     }}
-    
-    /* Plain Text Edit */
+    """
+
+
+def get_label_style() -> str:
+    """Get label style."""
+    return f"""
+    QLabel {{
+        color: {COLORS['text_primary']};
+        font-family: '{FONT_FAMILY}';
+        font-size: 10pt;
+    }}
+    """
+
+
+def get_plain_text_edit_style() -> str:
+    """Get plain text edit style."""
+    return f"""
     QPlainTextEdit {{
-        background-color: {colors['bg_dark']};
+        background-color: {COLORS['bg_dark']};
         border-radius: 5px;
         padding: 10px;
-        border: 2px solid {colors['bg_dark']};
-        color: {colors['text_primary']};
+        border: 2px solid {COLORS['bg_dark']};
+        color: {COLORS['text_primary']};
+        font-family: '{FONT_FAMILY}';
+        font-size: 10pt;
     }}
     QPlainTextEdit:hover {{
-        border: 2px solid {colors['border']};
+        border: 2px solid {COLORS['border']};
     }}
     QPlainTextEdit:focus {{
-        border: 2px solid {colors['border_focus']};
+        border: 2px solid {COLORS['border_focus']};
     }}
-    
-    /* Spin Box */
+    {get_scrollbar_style()}
+    """
+
+
+def get_spin_box_style() -> str:
+    """Get spin box style."""
+    return f"""
     QSpinBox {{
-        background-color: {colors['bg_dark']};
+        background-color: {COLORS['bg_dark']};
         border-radius: 5px;
-        border: 2px solid {colors['bg_dark']};
-        padding: 5px 10px;
-        color: {colors['text_primary']};
+        border: 2px solid {COLORS['bg_dark']};
+        padding: 5px;
+        padding-left: 10px;
+        color: {COLORS['text_primary']};
+        font-family: '{FONT_FAMILY}';
+        font-size: 10pt;
     }}
     QSpinBox:hover {{
-        border: 2px solid {colors['border']};
+        border: 2px solid {COLORS['border']};
     }}
     QSpinBox:focus {{
-        border: 2px solid {colors['border_focus']};
+        border: 2px solid {COLORS['border_focus']};
     }}
     QSpinBox::up-button, QSpinBox::down-button {{
-        background-color: {colors['bg_lighter']};
+        background-color: {COLORS['bg_lighter']};
         border: none;
         width: 20px;
     }}
     QSpinBox::up-button:hover, QSpinBox::down-button:hover {{
-        background-color: {colors['bg_medium']};
+        background-color: {COLORS['bg_medium']};
     }}
-    
-    /* Tab Widget */
+    """
+
+
+def get_tab_widget_style() -> str:
+    """Get tab widget style."""
+    return f"""
     QTabWidget::pane {{
-        border: 1px solid {colors['border']};
+        border: 1px solid {COLORS['border']};
         border-radius: 5px;
-        background-color: {colors['bg_dark']};
+        background-color: {COLORS['bg_dark']};
         top: -1px;
     }}
     QTabWidget::tab-bar {{
         alignment: left;
     }}
     QTabBar::tab {{
-        background-color: {colors['bg_medium']};
-        color: {colors['text_primary']};
-        border: 1px solid {colors['border']};
+        background-color: {COLORS['bg_medium']};
+        color: {COLORS['text_primary']};
+        border: 1px solid {COLORS['border']};
         border-bottom: none;
         border-top-left-radius: 5px;
         border-top-right-radius: 5px;
         padding: 8px 20px;
         margin-right: 2px;
+        font-family: '{FONT_FAMILY}';
+        font-size: 10pt;
     }}
     QTabBar::tab:selected {{
-        background-color: {colors['bg_dark']};
-        color: {colors['accent']};
-        border-bottom: 1px solid {colors['bg_dark']};
+        background-color: {COLORS['bg_dark']};
+        color: {COLORS['accent']};
+        border-bottom: 1px solid {COLORS['bg_dark']};
     }}
     QTabBar::tab:hover:!selected {{
-        background-color: {colors['bg_light']};
-    }}
-    
-    /* Tooltip */
-    QToolTip {{
-        color: {colors['text_primary']};
-        background-color: {bg_dark_rgba};
-        border: 1px solid {colors['border']};
-        border-radius: 2px;
+        background-color: {COLORS['bg_light']};
     }}
     """
 
 
-# Backward compatibility - keep these for existing code that uses them
-def set_button_primary(button: "QPushButton") -> None:
-    """Set a button as primary style using setProperty.
-    
-    Args:
-        button: The QPushButton to style as primary.
-    """
-    button.setProperty("class", "primary")
-    button.style().unpolish(button)
-    button.style().polish(button)
-
-
-def get_button_primary_style() -> str:
-    """Get primary button style (DEPRECATED - use set_button_primary instead)."""
-    return "/* Use set_button_primary() or button.setProperty('class', 'primary') */"
-
-
-def get_button_standard_style() -> str:
-    """Get standard button style (DEPRECATED - buttons use default style)."""
-    return "/* Buttons use default QPushButton style from global stylesheet */"
-
-
-def get_toolbar_style() -> str:
-    """Get toolbar style (for backward compatibility)."""
-    return "/* Use QToolBar in global stylesheet */"
-
-
-def get_combo_box_style() -> str:
-    """Get combo box style (for backward compatibility)."""
-    return "/* Use QComboBox in global stylesheet */"
-
-
-def get_label_style() -> str:
-    """Get label style (for backward compatibility)."""
-    return "/* Use QLabel in global stylesheet */"
-
-
-def get_status_label_style() -> str:
-    """Get status label style."""
-    colors = _get_colors()
-    return f"color: {colors['text_primary']};"
-
-
-def get_secondary_text_style() -> str:
-    """Get secondary text style."""
-    colors = _get_colors()
-    return f"color: {colors['text_secondary']};"
-
-
-def get_line_edit_style() -> str:
-    """Get line edit style (for backward compatibility)."""
-    return "/* Use QLineEdit in global stylesheet */"
-
-
-def get_group_box_style() -> str:
-    """Get group box style (for backward compatibility)."""
-    return "/* Use QGroupBox in global stylesheet */"
-
-
-def get_list_widget_style() -> str:
-    """Get list widget style (for backward compatibility)."""
-    return "/* Use QListWidget in global stylesheet */"
-
-
-def get_progress_bar_style() -> str:
-    """Get progress bar style (for backward compatibility)."""
-    return "/* Use QProgressBar in global stylesheet */"
-
-
-def get_spin_box_style() -> str:
-    """Get spin box style (for backward compatibility)."""
-    return "/* Use QSpinBox in global stylesheet */"
-
-
-def get_plain_text_edit_style() -> str:
-    """Get plain text edit style (for backward compatibility)."""
-    return "/* Use QPlainTextEdit in global stylesheet */"
-
-
-def get_tab_widget_style() -> str:
-    """Get tab widget style (for backward compatibility)."""
-    return "/* Use QTabWidget in global stylesheet */"
-
-
-def get_checkbox_style() -> str:
-    """Get checkbox style (for backward compatibility)."""
-    return "/* Use QCheckBox in global stylesheet */"
-
-
-def get_radio_button_style() -> str:
-    """Get radio button style (for backward compatibility)."""
-    return "/* Use QRadioButton in global stylesheet */"
-
-
-def get_slider_style() -> str:
-    """Get slider style (for backward compatibility)."""
-    return "/* Use QSlider in global stylesheet */"
-
-
-def get_queue_item_style() -> str:
-    """Get queue item widget container style."""
-    colors = _get_colors()
+def get_global_style() -> str:
+    """Get global application stylesheet."""
     return f"""
-        background-color: {colors['bg_medium']};
-        border-radius: 5px;
-        border: 1px solid {colors['border']};
+    {get_main_window_style()}
+    {get_central_widget_style()}
+    {get_scrollbar_style()}
+    {get_checkbox_style()}
+    {get_radio_button_style()}
+    {get_slider_style()}
+    {get_group_box_style()}
+    {get_list_widget_style()}
+    {get_progress_bar_style()}
+    {get_label_style()}
+    {get_plain_text_edit_style()}
+    {get_spin_box_style()}
+    {get_tab_widget_style()}
     """
 
 
-def get_icon_container_style() -> str:
-    """Get icon container style for queue items."""
-    colors = _get_colors()
-    return f"""
-        background-color: {colors['bg_light']};
-        border-radius: 5px;
-        border: 1px solid {colors['border']};
-    """
-
-
-# Landing page component styles
 def get_card_style() -> str:
-    """Get card container style."""
-    colors = _get_colors()
-    bg_color = colors.get('bg_content', colors['bg_medium'])
+    """Get card widget style for landing page."""
     return f"""
-        QFrame {{
-            background-color: {bg_color};
-            border: 1px solid {colors['border']};
-            border-radius: 12px;
-        }}
+    QWidget {{
+        background-color: {COLORS['bg_medium']};
+        border: 2px solid {COLORS['bg_light']};
+        border-radius: 8px;
+        padding: 15px;
+    }}
+    QWidget:hover {{
+        background-color: {COLORS['bg_light']};
+        border: 2px solid {COLORS['accent']};
+    }}
     """
 
-
-def get_card_title_style() -> str:
-    """Get card title style."""
-    colors = _get_colors()
-    return f"color: {colors['accent']}; background: transparent;"
-
-
-def get_card_description_style() -> str:
-    """Get card description style."""
-    colors = _get_colors()
-    return f"color: {colors['text_secondary']}; background: transparent;"
-
-
-def get_card_icon_style() -> str:
-    """Get card icon style."""
-    colors = _get_colors()
-    return f"color: {colors['accent']}; background: transparent;"
-
-
-def get_card_arrow_style() -> str:
-    """Get card arrow indicator style."""
-    colors = _get_colors()
-    return f"color: {colors['accent']}; background: transparent;"
