@@ -11,10 +11,9 @@ from ui.utils.error_handling import (
 )
 
 __all__ = [
-    'show_validation_error',
-    'show_already_running_error',
-    'show_success',
-    'show_error',
-    'show_confirmation',
+    "show_validation_error",
+    "show_already_running_error",
+    "show_success",
+    "show_error",
+    "show_confirmation",
 ]
-

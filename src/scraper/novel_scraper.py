@@ -23,7 +23,7 @@ __all__ = ["NovelScraper"]
 class NovelScraper(BaseScraper):
     """
     Novel scraper with failsafe methods for webnovel sites.
-    
+
     Combines URL extraction and content extraction modules to provide
     a unified interface. Uses failsafe methods that try multiple
     approaches in order of speed.
@@ -32,26 +32,20 @@ class NovelScraper(BaseScraper):
     def __init__(self, base_url: str, **kwargs: Any):
         """
         Initialize novel scraper.
-        
+
         Args:
             base_url: Base URL of the webnovel site
             **kwargs: Additional arguments passed to BaseScraper
         """
         super().__init__(base_url, **kwargs)
-        
-        # Initialize URL extractor and chapter extractor
-        self.url_extractor = UrlExtractor(
-            base_url=base_url,
-            timeout=self.timeout,
-            delay=self.delay
-        )
-        self.chapter_extractor = ChapterExtractor(
-            base_url=base_url,
-            timeout=self.timeout,
-            delay=self.delay
-        )
 
-    def get_chapter_urls(self, toc_url: str, min_chapter_number: Optional[int] = None, max_chapter_number: Optional[int] = None) -> List[str]:
+        # Initialize URL extractor and chapter extractor
+        self.url_extractor = UrlExtractor(base_url=base_url, timeout=self.timeout, delay=self.delay)
+        self.chapter_extractor = ChapterExtractor(base_url=base_url, timeout=self.timeout, delay=self.delay)
+
+    def get_chapter_urls(
+        self, toc_url: str, min_chapter_number: Optional[int] = None, max_chapter_number: Optional[int] = None
+    ) -> List[str]:
         """
         Get list of chapter URLs using failsafe methods.
 
@@ -84,12 +78,11 @@ class NovelScraper(BaseScraper):
             toc_url,
             should_stop=self.check_should_stop,  # type: ignore[arg-type]
             min_chapter_number=min_chapter_number,
-            max_chapter_number=max_chapter_number
+            max_chapter_number=max_chapter_number,
         )
         urls: List[str] = result[0]
         _: Any = result[1]  # Metadata dict, unused
         return urls
-
 
     def scrape_chapter(self, chapter_url: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         """
@@ -118,4 +111,3 @@ class NovelScraper(BaseScraper):
         chapter_url = validation_result  # Use sanitized URL
 
         return self.chapter_extractor.scrape(chapter_url, should_stop=self.check_should_stop)  # type: ignore[arg-type]
-

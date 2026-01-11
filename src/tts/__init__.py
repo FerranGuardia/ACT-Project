@@ -28,24 +28,20 @@ __all__ = [
     "TTSEngine",
     "TTSConversionCoordinator",
     "format_chapter_intro",
-
     # Supporting classes
     "VoiceResolver",
     "VoiceManager",
     "TextProcessingPipeline",
     "ResourceManager",
     "ConversionStrategySelector",
-
     # Provider management
     "TTSProviderManager",
-
     # Utilities
     "clean_text_for_tts",
     "build_ssml",
     "parse_rate",
     "parse_pitch",
     "parse_volume",
-
     # Legacy
     "AudioMerger",
 ]

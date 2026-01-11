@@ -11,7 +11,7 @@ GENRE_PRESETS: Dict[str, Dict] = {
     "default": {
         "name": "Default",
         "description": "Standard theme colors - no genre overlay",
-        "overlay": {}  # No overlay, use base theme as-is
+        "overlay": {},  # No overlay, use base theme as-is
     },
     "wuxia": {
         "name": "Wuxia",
@@ -29,7 +29,7 @@ GENRE_PRESETS: Dict[str, Dict] = {
             "text_secondary": "rgb(180, 160, 140)",
             "border": "rgb(90, 75, 60)",
             "border_focus": "rgb(255, 200, 100)",
-        }
+        },
     },
     "fantasy": {
         "name": "Fantasy",
@@ -47,7 +47,7 @@ GENRE_PRESETS: Dict[str, Dict] = {
             "text_secondary": "rgb(150, 160, 180)",
             "border": "rgb(70, 85, 110)",
             "border_focus": "rgb(150, 180, 255)",
-        }
+        },
     },
     "modern": {
         "name": "Modern",
@@ -65,7 +65,7 @@ GENRE_PRESETS: Dict[str, Dict] = {
             "text_secondary": "rgb(100, 110, 120)",
             "border": "rgb(200, 205, 210)",
             "border_focus": "rgb(70, 130, 230)",
-        }
+        },
     },
     "dark_fantasy": {
         "name": "Dark Fantasy",
@@ -83,7 +83,7 @@ GENRE_PRESETS: Dict[str, Dict] = {
             "text_secondary": "rgb(160, 150, 170)",
             "border": "rgb(80, 65, 95)",
             "border_focus": "rgb(180, 120, 255)",
-        }
+        },
     },
     "cyberpunk": {
         "name": "Cyberpunk",
@@ -101,18 +101,18 @@ GENRE_PRESETS: Dict[str, Dict] = {
             "text_secondary": "rgb(150, 180, 175)",
             "border": "rgb(40, 50, 65)",
             "border_focus": "rgb(0, 255, 200)",
-        }
-    }
+        },
+    },
 }
 
 
 def get_genre_preset(genre_id: str) -> Dict:
     """
     Get a genre preset by ID.
-    
+
     Args:
         genre_id: Genre identifier (e.g., 'wuxia', 'fantasy')
-        
+
     Returns:
         Genre preset dictionary or default if not found
     """
@@ -127,24 +127,23 @@ def get_available_genres() -> Dict[str, Dict]:
 def apply_genre_overlay(base_theme: Dict, genre_id: str) -> Dict:
     """
     Apply genre overlay to a base theme.
-    
+
     Args:
         base_theme: Base theme dictionary
         genre_id: Genre identifier
-        
+
     Returns:
         New theme dictionary with genre overlay applied
     """
     genre = get_genre_preset(genre_id)
     overlay = genre.get("overlay", {})
-    
+
     # Create new theme by copying base and applying overlay
     new_theme = base_theme.copy()
     new_theme.update(overlay)
-    
+
     # Preserve metadata
     new_theme["_genre"] = genre_id
     new_theme["_genre_name"] = genre.get("name", "Default")
-    
-    return new_theme
 
+    return new_theme

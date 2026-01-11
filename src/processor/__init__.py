@@ -25,7 +25,6 @@ __all__ = [
     "ScrapingCoordinator",
     "ConversionCoordinator",
     "AudioPostProcessor",
-
     # Legacy components
     "ProjectManager",
     "ChapterManager",

@@ -29,10 +29,16 @@ from core.logger import get_logger
 
 logger = get_logger(__name__)
 
-from ..chapter_parser import (discover_ajax_endpoints, extract_chapter_number,
-                              extract_chapters_from_javascript, normalize_url,
-                              extract_novel_id_from_html)
+from ..chapter_parser import (
+    discover_ajax_endpoints,
+    extract_chapter_number,
+    extract_chapters_from_javascript,
+    normalize_url,
+    extract_novel_id_from_html,
+)
 from .url_extractor_validators import is_chapter_url
+
+
 class ExtractionResult:
     urls: List[str]
     source: str
@@ -41,42 +47,47 @@ class ExtractionResult:
     elapsed_ms: Optional[int] = None
 
 
-def retry_with_backoff(func: Callable[..., Any], max_retries: int = 3, base_delay: float = 1.0, should_stop: Optional[Callable[[], bool]] = None):
+def retry_with_backoff(
+    func: Callable[..., Any],
+    max_retries: int = 3,
+    base_delay: float = 1.0,
+    should_stop: Optional[Callable[[], bool]] = None,
+):
     """
     Retry a function with exponential backoff.
-    
+
     Args:
         func: Function to retry (should be a callable that takes no arguments)
         max_retries: Maximum number of retry attempts
         base_delay: Base delay in seconds (will be multiplied by 2^attempt)
         should_stop: Optional callable to check if we should stop retrying
-    
+
     Returns:
         Result of the function call
-    
+
     Raises:
         Exception: The last exception if all retries fail
     """
     last_exception = None
-    
+
     for attempt in range(max_retries):
         if should_stop and should_stop():
             raise Exception("Operation cancelled by user")
-        
+
         try:
             return func()
         except Exception as e:
             last_exception = e
-            
+
             if attempt < max_retries - 1:
-                wait_time = base_delay * (2 ** attempt)  # Exponential backoff
+                wait_time = base_delay * (2**attempt)  # Exponential backoff
                 logger.debug(f"Retry {attempt + 1}/{max_retries} after {wait_time:.1f}s: {str(e)[:100]}")
                 time.sleep(wait_time)
                 continue
             else:
                 # Last attempt failed, raise the exception
                 raise
-    
+
     # Should never reach here, but just in case
     if last_exception:
         raise last_exception
@@ -85,11 +96,11 @@ def retry_with_backoff(func: Callable[..., Any], max_retries: int = 3, base_dela
 class ChapterUrlExtractors:
     """
     Collection of extraction methods for chapter URLs.
-    
+
     Provides various methods to extract chapter URLs from table of contents pages,
     ordered by speed: JS extraction, AJAX endpoints, HTML parsing, Playwright, next links.
     """
-    
+
     def __init__(
         self,
         base_url: str,
@@ -99,7 +110,7 @@ class ChapterUrlExtractors:
     ):
         """
         Initialize the extractors.
-        
+
         Args:
             base_url: Base URL of the webnovel site
             session_manager: SessionManager instance for HTTP requests
@@ -115,6 +126,7 @@ class ChapterUrlExtractors:
 
     def _fetch_response(self, url: str, *, allow_retry: bool = True) -> Optional[Any]:
         """Fetch a URL with rate limiting and optional retries."""
+
         def _do_request():
             session = self.session_manager.get_session()
             if not session:
@@ -128,11 +140,15 @@ class ChapterUrlExtractors:
 
         try:
             start = time.time()
-            response = retry_with_backoff(
-                _do_request,
-                max_retries=3,
-                base_delay=self.delay if self.delay > 0 else 0.5,
-            ) if allow_retry else _do_request()
+            response = (
+                retry_with_backoff(
+                    _do_request,
+                    max_retries=3,
+                    base_delay=self.delay if self.delay > 0 else 0.5,
+                )
+                if allow_retry
+                else _do_request()
+            )
             if response is not None:
                 elapsed_ms = int((time.time() - start) * 1000)
                 logger.debug(f"Fetched {url} in {elapsed_ms}ms")
@@ -165,7 +181,7 @@ class ChapterUrlExtractors:
         if not self.base_host or not netloc:
             return True
         return netloc == self.base_host
-    
+
     def try_js_extraction(self, toc_url: str) -> List[str]:
         """Try to extract chapter URLs from JavaScript variables."""
         response = self._fetch_response(toc_url)
@@ -177,14 +193,14 @@ class ChapterUrlExtractors:
         except Exception as e:
             logger.debug(f"JS extraction failed: {e}")
             return []
-    
+
     def try_ajax_endpoints(self, toc_url: str) -> List[str]:
         """Try to get chapter URLs via AJAX endpoints."""
         try:
             response = self._fetch_response(toc_url)
             if not response:
                 return []
-            
+
             # Extract novel ID
             novel_id = extract_novel_id_from_html(response.text)  # type: ignore[attr-defined]
             if not novel_id:
@@ -192,13 +208,13 @@ class ChapterUrlExtractors:
                 novel_id = extract_chapter_number(toc_url)
                 if novel_id:
                     novel_id = str(novel_id)
-            
+
             if not novel_id:
                 return []
-            
+
             # Discover AJAX endpoints
             endpoints = discover_ajax_endpoints(response.text, self.base_url, novel_id)  # type: ignore[attr-defined]
-            
+
             # Try each endpoint
             for endpoint in endpoints:
                 try:
@@ -235,38 +251,34 @@ class ChapterUrlExtractors:
                         continue
                 except Exception as e:
                     continue
-            
+
             return []
         except Exception as e:
             logger.debug(f"AJAX endpoint extraction failed: {e}")
             return []
-    
+
     def try_playwright_with_scrolling(
         self,
         toc_url: str,
         should_stop: Optional[Callable[[], bool]] = None,
         min_chapter_number: Optional[int] = None,
-        max_chapter_number: Optional[int] = None
+        max_chapter_number: Optional[int] = None,
     ) -> List[str]:
         """
         Try to get chapter URLs using Playwright with scrolling for lazy loading.
-        
+
         This is the most reliable method and serves as the "reference" method
         for getting the true chapter count.
         """
         from .url_extractor_playwright import PlaywrightExtractor
-        
+
         playwright_extractor = PlaywrightExtractor(
-            base_url=self.base_url,
-            session_manager=self.session_manager,
-            timeout=self.timeout,
-            delay=self.delay
+            base_url=self.base_url, session_manager=self.session_manager, timeout=self.timeout, delay=self.delay
         )
-        
+
         return playwright_extractor.extract(
             toc_url=toc_url,
             should_stop=should_stop,
             min_chapter_number=min_chapter_number,
-            max_chapter_number=max_chapter_number
+            max_chapter_number=max_chapter_number,
         )
-

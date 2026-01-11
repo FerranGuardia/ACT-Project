@@ -20,6 +20,7 @@ logger = get_logger("scraper.adaptive_config")
 @dataclass
 class SiteProfile:
     """Profile for a specific website containing learned patterns."""
+
     domain: str
     strategy_success_rates: Dict[str, float] = field(default_factory=dict)
     optimal_strategy_order: List[str] = field(default_factory=list)
@@ -66,6 +67,7 @@ class SiteProfile:
         for strategy, success_rate in self.strategy_success_rates.items():
             avg_time = self.average_response_times.get(strategy, 1.0)
             import math
+
             # Avoid division by zero - ensure avg_time is at least 0.001
             avg_time = max(avg_time, 0.001)
             # Avoid division by zero for success_rate
@@ -78,8 +80,7 @@ class SiteProfile:
         # Sort by score (descending) then by speed (ascending time)
         if strategy_scores:
             sorted_strategies = sorted(
-                strategy_scores.keys(),
-                key=lambda s: (-strategy_scores[s], self.average_response_times.get(s, 999))
+                strategy_scores.keys(), key=lambda s: (-strategy_scores[s], self.average_response_times.get(s, 999))
             )
         else:
             # No strategy data yet, use defaults
@@ -90,36 +91,38 @@ class SiteProfile:
     def _get_default_strategy_order(self) -> List[str]:
         """Get default strategy order when no learning data exists."""
         return [
-            "javascript",      # Fastest
-            "ajax",           # Fast with lazy-loading
-            "html_parsing",   # Traditional but reliable
+            "javascript",  # Fastest
+            "ajax",  # Fast with lazy-loading
+            "html_parsing",  # Traditional but reliable
             "browser_automation",  # Comprehensive but slow
-            "api_reverse"     # Advanced but complex
+            "api_reverse",  # Advanced but complex
         ]
 
     def add_custom_selector(self, selector: str, success_rate: float = 0.5):
         """Add a custom CSS selector that worked well."""
         # Check if selector already exists
-        existing = next((s for s in self.custom_selectors if s['selector'] == selector), None)
+        existing = next((s for s in self.custom_selectors if s["selector"] == selector), None)
         if existing:
             # Update success rate
-            existing['success_rate'] = existing['success_rate'] * 0.9 + success_rate * 0.1
-            existing['last_used'] = time.time()
+            existing["success_rate"] = existing["success_rate"] * 0.9 + success_rate * 0.1
+            existing["last_used"] = time.time()
         else:
-            self.custom_selectors.append({
-                'selector': selector,
-                'success_rate': success_rate,
-                'first_seen': time.time(),
-                'last_used': time.time()
-            })
+            self.custom_selectors.append(
+                {
+                    "selector": selector,
+                    "success_rate": success_rate,
+                    "first_seen": time.time(),
+                    "last_used": time.time(),
+                }
+            )
 
         # Keep only top selectors
-        self.custom_selectors.sort(key=lambda x: x['success_rate'], reverse=True)
+        self.custom_selectors.sort(key=lambda x: x["success_rate"], reverse=True)
         self.custom_selectors = self.custom_selectors[:20]  # Keep top 20
 
     def get_custom_selectors(self) -> List[str]:
         """Get custom selectors ordered by success rate."""
-        return [s['selector'] for s in self.custom_selectors]
+        return [s["selector"] for s in self.custom_selectors]
 
     def add_pagination_pattern(self, pattern: str):
         """Add a discovered pagination pattern."""
@@ -140,7 +143,7 @@ class AdaptiveConfigManager:
     """Manages adaptive configurations for all sites."""
 
     def __init__(self, config_dir: str = None):
-        self.config_dir = config_dir or os.path.join(os.path.dirname(__file__), 'adaptive_configs')
+        self.config_dir = config_dir or os.path.join(os.path.dirname(__file__), "adaptive_configs")
         self.site_profiles: Dict[str, SiteProfile] = {}
         self._ensure_config_dir()
         self._load_all_profiles()
@@ -153,7 +156,7 @@ class AdaptiveConfigManager:
     def _get_profile_path(self, domain: str) -> str:
         """Get the file path for a domain's profile."""
         # Sanitize domain for filename
-        safe_domain = domain.replace('.', '_').replace('/', '_')
+        safe_domain = domain.replace(".", "_").replace("/", "_")
         return os.path.join(self.config_dir, f"{safe_domain}.json")
 
     def _load_all_profiles(self):
@@ -162,8 +165,8 @@ class AdaptiveConfigManager:
             return
 
         for filename in os.listdir(self.config_dir):
-            if filename.endswith('.json'):
-                domain = filename[:-5].replace('_', '.')  # Remove .json and restore dots
+            if filename.endswith(".json"):
+                domain = filename[:-5].replace("_", ".")  # Remove .json and restore dots
                 self._load_profile(domain)
 
     def _load_profile(self, domain: str) -> Optional[SiteProfile]:
@@ -173,7 +176,7 @@ class AdaptiveConfigManager:
             return None
 
         try:
-            with open(profile_path, 'r', encoding='utf-8') as f:
+            with open(profile_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
             # Convert dict back to SiteProfile
@@ -196,21 +199,21 @@ class AdaptiveConfigManager:
 
             # Convert to dict for JSON serialization
             data = {
-                'domain': profile.domain,
-                'strategy_success_rates': profile.strategy_success_rates,
-                'optimal_strategy_order': profile.optimal_strategy_order,
-                'known_patterns': profile.known_patterns,
-                'last_successful_strategy': profile.last_successful_strategy,
-                'average_response_times': profile.average_response_times,
-                'total_attempts': profile.total_attempts,
-                'successful_attempts': profile.successful_attempts,
-                'last_updated': profile.last_updated,
-                'custom_selectors': profile.custom_selectors,
-                'pagination_patterns': profile.pagination_patterns,
-                'api_endpoints': profile.api_endpoints,
+                "domain": profile.domain,
+                "strategy_success_rates": profile.strategy_success_rates,
+                "optimal_strategy_order": profile.optimal_strategy_order,
+                "known_patterns": profile.known_patterns,
+                "last_successful_strategy": profile.last_successful_strategy,
+                "average_response_times": profile.average_response_times,
+                "total_attempts": profile.total_attempts,
+                "successful_attempts": profile.successful_attempts,
+                "last_updated": profile.last_updated,
+                "custom_selectors": profile.custom_selectors,
+                "pagination_patterns": profile.pagination_patterns,
+                "api_endpoints": profile.api_endpoints,
             }
 
-            with open(profile_path, 'w', encoding='utf-8') as f:
+            with open(profile_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
 
         except IOError as e:
@@ -264,15 +267,15 @@ class AdaptiveConfigManager:
         profile = self.get_site_profile(url)
 
         return {
-            'domain': profile.domain,
-            'total_attempts': profile.total_attempts,
-            'successful_attempts': profile.successful_attempts,
-            'success_rate': profile.successful_attempts / max(profile.total_attempts, 1),
-            'last_successful_strategy': profile.last_successful_strategy,
-            'strategy_count': len(profile.strategy_success_rates),
-            'custom_selectors_count': len(profile.custom_selectors),
-            'api_endpoints_count': len(profile.api_endpoints),
-            'last_updated': profile.last_updated,
+            "domain": profile.domain,
+            "total_attempts": profile.total_attempts,
+            "successful_attempts": profile.successful_attempts,
+            "success_rate": profile.successful_attempts / max(profile.total_attempts, 1),
+            "last_successful_strategy": profile.last_successful_strategy,
+            "strategy_count": len(profile.strategy_success_rates),
+            "custom_selectors_count": len(profile.custom_selectors),
+            "api_endpoints_count": len(profile.api_endpoints),
+            "last_updated": profile.last_updated,
         }
 
     def _extract_domain(self, url: str) -> str:
@@ -282,12 +285,12 @@ class AdaptiveConfigManager:
             domain = parsed.netloc.lower()
 
             # Remove www. prefix
-            if domain.startswith('www.'):
+            if domain.startswith("www."):
                 domain = domain[4:]
 
             return domain
         except Exception:
-            return 'unknown'
+            return "unknown"
 
     def cleanup_old_profiles(self, max_age_days: int = 90):
         """Remove profiles that haven't been updated recently."""
@@ -312,6 +315,7 @@ class AdaptiveConfigManager:
 
 # Global instance
 _adaptive_config_manager = None
+
 
 def get_adaptive_config_manager() -> AdaptiveConfigManager:
     """Get the global adaptive config manager instance."""

@@ -39,59 +39,59 @@ class QueueManager:
         validated_item = {}
 
         # Validate required fields
-        if 'url' not in item:
+        if "url" not in item:
             raise ValidationError("Queue item missing required field: 'url'")
-        if 'title' not in item:
+        if "title" not in item:
             raise ValidationError("Queue item missing required field: 'title'")
 
         # Validate and sanitize URL
-        url = item['url']
+        url = item["url"]
         if not isinstance(url, str):
             raise ValidationError(f"URL must be a string, got {type(url).__name__}")
         is_valid_url, url_result = self.validator.validate_url(url)
         if not is_valid_url:
             raise ValidationError(f"Invalid URL: {url_result}")
-        validated_item['url'] = url_result
+        validated_item["url"] = url_result
 
         # Validate and sanitize title
-        title = item['title']
+        title = item["title"]
         if not isinstance(title, str):
             raise ValidationError(f"Title must be a string, got {type(title).__name__}")
         # Basic title validation - should not be empty after stripping
         if not title.strip():
             raise ValidationError("Title cannot be empty")
-        validated_item['title'] = title.strip()
+        validated_item["title"] = title.strip()
 
         # Validate optional fields with defaults
-        validated_item['voice'] = self._validate_voice(item.get('voice'))
-        validated_item['provider'] = self._validate_provider(item.get('provider'))
-        validated_item['chapter_selection'] = self._validate_chapter_selection(item.get('chapter_selection'))
-        validated_item['output_format'] = self._validate_output_format(item.get('output_format'))
-        validated_item['output_folder'] = self._validate_output_folder(item.get('output_folder'))
-        validated_item['status'] = self._validate_status(item.get('status'))
-        validated_item['progress'] = self._validate_progress(item.get('progress'))
+        validated_item["voice"] = self._validate_voice(item.get("voice"))
+        validated_item["provider"] = self._validate_provider(item.get("provider"))
+        validated_item["chapter_selection"] = self._validate_chapter_selection(item.get("chapter_selection"))
+        validated_item["output_format"] = self._validate_output_format(item.get("output_format"))
+        validated_item["output_folder"] = self._validate_output_folder(item.get("output_folder"))
+        validated_item["status"] = self._validate_status(item.get("status"))
+        validated_item["progress"] = self._validate_progress(item.get("progress"))
 
         # Handle interruption tracking
-        if 'interrupted_at' in item:
-            validated_item['interrupted_at'] = self._validate_progress(item['interrupted_at'])
-        if 'was_interrupted_at' in item:
-            validated_item['was_interrupted_at'] = self._validate_progress(item['was_interrupted_at'])
+        if "interrupted_at" in item:
+            validated_item["interrupted_at"] = self._validate_progress(item["interrupted_at"])
+        if "was_interrupted_at" in item:
+            validated_item["was_interrupted_at"] = self._validate_progress(item["was_interrupted_at"])
 
         return validated_item
 
     def _validate_voice(self, voice: Any) -> str:
         """Validate voice field."""
         if voice is None:
-            return 'en-US-AndrewNeural'  # Default voice
+            return "en-US-AndrewNeural"  # Default voice
 
         if not isinstance(voice, str):
             logger.warning(f"Voice must be a string, got {type(voice).__name__}, using default")
-            return 'en-US-AndrewNeural'
+            return "en-US-AndrewNeural"
 
         # Basic voice validation - should contain language code pattern
         if not voice or len(voice) > 100:
             logger.warning(f"Invalid voice '{voice}', using default")
-            return 'en-US-AndrewNeural'
+            return "en-US-AndrewNeural"
 
         return voice
 
@@ -103,7 +103,7 @@ class QueueManager:
         if not isinstance(provider, str):
             raise ValidationError(f"Provider must be a string, got {type(provider).__name__}")
 
-        valid_providers = ['edge_tts', 'pyttsx3']
+        valid_providers = ["edge_tts", "pyttsx3"]
         if provider not in valid_providers:
             raise ValidationError(f"Unknown provider '{provider}', must be one of: {valid_providers}")
 
@@ -112,54 +112,54 @@ class QueueManager:
     def _validate_chapter_selection(self, chapter_selection: Any) -> Dict[str, Any]:
         """Validate chapter selection structure."""
         if chapter_selection is None:
-            return {'type': 'all'}
+            return {"type": "all"}
 
         if not isinstance(chapter_selection, dict):
             logger.warning(f"Chapter selection must be a dict, got {type(chapter_selection).__name__}, using default")
-            return {'type': 'all'}
+            return {"type": "all"}
 
-        selection_type = chapter_selection.get('type')
-        if selection_type not in ['all', 'range', 'list']:
+        selection_type = chapter_selection.get("type")
+        if selection_type not in ["all", "range", "list"]:
             logger.warning(f"Unknown chapter selection type '{selection_type}', using 'all'")
-            return {'type': 'all'}
+            return {"type": "all"}
 
-        if selection_type == 'range':
-            start = chapter_selection.get('start')
-            end = chapter_selection.get('end')
+        if selection_type == "range":
+            start = chapter_selection.get("start")
+            end = chapter_selection.get("end")
             if not isinstance(start, int) or not isinstance(end, int) or start < 1 or end < start:
                 logger.warning(f"Invalid chapter range {start}-{end}, using 'all'")
-                return {'type': 'all'}
-            return {'type': 'range', 'start': start, 'end': end}
+                return {"type": "all"}
+            return {"type": "range", "start": start, "end": end}
 
-        if selection_type == 'list':
-            chapters = chapter_selection.get('chapters', [])
+        if selection_type == "list":
+            chapters = chapter_selection.get("chapters", [])
             if not isinstance(chapters, list) or not all(isinstance(c, int) and c > 0 for c in chapters):
                 logger.warning(f"Invalid chapter list {chapters}, using 'all'")
-                return {'type': 'all'}
-            return {'type': 'list', 'chapters': sorted(set(chapters))}  # Remove duplicates and sort
+                return {"type": "all"}
+            return {"type": "list", "chapters": sorted(set(chapters))}  # Remove duplicates and sort
 
         return chapter_selection
 
     def _validate_output_format(self, output_format: Any) -> Dict[str, Any]:
         """Validate output format structure."""
         if output_format is None:
-            return {'type': 'individual_mp3s', 'batch_size': 50}
+            return {"type": "individual_mp3s", "batch_size": 50}
 
         if not isinstance(output_format, dict):
             logger.warning(f"Output format must be a dict, got {type(output_format).__name__}, using default")
-            return {'type': 'individual_mp3s', 'batch_size': 50}
+            return {"type": "individual_mp3s", "batch_size": 50}
 
-        format_type = output_format.get('type')
-        if format_type not in ['individual_mp3s', 'single_audiobook']:
+        format_type = output_format.get("type")
+        if format_type not in ["individual_mp3s", "single_audiobook"]:
             logger.warning(f"Unknown output format type '{format_type}', using default")
-            return {'type': 'individual_mp3s', 'batch_size': 50}
+            return {"type": "individual_mp3s", "batch_size": 50}
 
-        batch_size = output_format.get('batch_size', 50)
+        batch_size = output_format.get("batch_size", 50)
         if not isinstance(batch_size, int) or batch_size < 1:
             logger.warning(f"Invalid batch size {batch_size}, using 50")
             batch_size = 50
 
-        return {'type': format_type, 'batch_size': batch_size}
+        return {"type": format_type, "batch_size": batch_size}
 
     def _validate_output_folder(self, output_folder: Any) -> Optional[str]:
         """Validate output folder path."""
@@ -171,7 +171,7 @@ class QueueManager:
             return None
 
         # Basic path validation - should not contain dangerous characters
-        if any(char in output_folder for char in ['<', '>', '|', '*', '?']):
+        if any(char in output_folder for char in ["<", ">", "|", "*", "?"]):
             logger.warning(f"Output folder contains invalid characters: {output_folder}")
             return None
 
@@ -212,7 +212,7 @@ class QueueManager:
         except (ValueError, TypeError):
             logger.warning(f"Invalid progress value: {progress}, setting to 0")
             return 0
-    
+
     def save_queue(self, queue_items: List[Dict]):
         """
         Save queue state to disk with resume capability.
@@ -237,32 +237,32 @@ class QueueManager:
                 item_copy = validated_item.copy()
 
                 # Handle different statuses appropriately
-                if item_copy['status'] == StatusMessages.PROCESSING:
+                if item_copy["status"] == StatusMessages.PROCESSING:
                     # Processing items become interrupted (preserves progress for resume)
-                    item_copy['status'] = StatusMessages.INTERRUPTED
-                    item_copy['interrupted_at'] = item_copy.get('progress', 0)  # Save interruption point
+                    item_copy["status"] = StatusMessages.INTERRUPTED
+                    item_copy["interrupted_at"] = item_copy.get("progress", 0)  # Save interruption point
                     logger.debug(f"Saving processing item as interrupted: {item_copy['title']}")
-                elif item_copy['status'] == StatusMessages.PENDING:
+                elif item_copy["status"] == StatusMessages.PENDING:
                     # Pending items stay pending
-                    item_copy['status'] = StatusMessages.PENDING
+                    item_copy["status"] = StatusMessages.PENDING
                 else:
                     # Other statuses saved as-is
-                    item_copy['status'] = item_copy['status']
+                    item_copy["status"] = item_copy["status"]
 
                 queue_to_save.append(item_copy)
 
             # Save to JSON file
-            with open(self.queue_file, 'w', encoding='utf-8') as f:
+            with open(self.queue_file, "w", encoding="utf-8") as f:
                 json.dump(queue_to_save, f, indent=2, ensure_ascii=False)
 
             saved_count = len(queue_to_save)
-            interrupted_count = sum(1 for item in queue_to_save if item['status'] == StatusMessages.INTERRUPTED)
+            interrupted_count = sum(1 for item in queue_to_save if item["status"] == StatusMessages.INTERRUPTED)
             logger.info(f"Queue state saved: {saved_count} items ({interrupted_count} interrupted)")
 
         except Exception as e:
             logger.error(f"Error saving queue state: {e}")
             raise  # Re-raise to let caller handle the error
-    
+
     def validate_queue_items(self, queue_items: List[Dict]) -> List[Dict]:
         """
         Validate a list of queue items.
@@ -299,7 +299,7 @@ class QueueManager:
                 return []
 
             # Load from JSON file
-            with open(self.queue_file, 'r', encoding='utf-8') as f:
+            with open(self.queue_file, "r", encoding="utf-8") as f:
                 saved_queue = json.load(f)
 
             if not isinstance(saved_queue, list):
@@ -328,16 +328,16 @@ class QueueManager:
             for item in validated_queue:
                 item_copy = item.copy()
 
-                if item.get('status') == StatusMessages.INTERRUPTED:
+                if item.get("status") == StatusMessages.INTERRUPTED:
                     # Convert interrupted items back to pending for restart
-                    item_copy['status'] = StatusMessages.PENDING
+                    item_copy["status"] = StatusMessages.PENDING
                     # Preserve the interruption point as a note
-                    item_copy['was_interrupted_at'] = item.get('interrupted_at', 0)
+                    item_copy["was_interrupted_at"] = item.get("interrupted_at", 0)
                     interrupted_count += 1
                     logger.debug(f"Restored interrupted item to pending: {item['title']}")
-                elif item.get('status') == StatusMessages.PROCESSING:
+                elif item.get("status") == StatusMessages.PROCESSING:
                     # Safety: any items still marked as processing should be reset
-                    item_copy['status'] = StatusMessages.PENDING
+                    item_copy["status"] = StatusMessages.PENDING
                     logger.warning(f"Found processing item in saved queue, resetting to pending: {item['title']}")
 
                 processed_queue.append(item_copy)
@@ -353,4 +353,3 @@ class QueueManager:
             logger.error(f"Error loading queue state: {e}")
             # Return empty queue on any other error
             return []
-

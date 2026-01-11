@@ -37,7 +37,7 @@ class PipelineOrchestrator:
         voice: Optional[str] = None,
         provider: Optional[str] = None,
         base_output_dir: Optional[Path] = None,
-        novel_title: Optional[str] = None
+        novel_title: Optional[str] = None,
     ):
         # Create shared context
         self.context = ProcessingContext(
@@ -48,7 +48,7 @@ class PipelineOrchestrator:
             on_chapter_update=on_chapter_update,
             voice=voice,
             provider=provider,
-            base_output_dir=base_output_dir
+            base_output_dir=base_output_dir,
         )
 
         # Initialize coordinators
@@ -85,7 +85,7 @@ class PipelineOrchestrator:
         start_from: int = 1,
         max_chapters: Optional[int] = None,
         voice: Optional[str] = None,
-        provider: Optional[str] = None
+        provider: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Run the complete pipeline from TOC URL to finished audiobook."""
         logger.info("Starting full pipeline...")
@@ -98,10 +98,7 @@ class PipelineOrchestrator:
 
         # Step 1: Initialize project
         if not self.scraping_coordinator.initialize_project(
-            novel_url=novel_url,
-            toc_url=toc_url,
-            novel_title=novel_title,
-            novel_author=novel_author
+            novel_url=novel_url, toc_url=toc_url, novel_title=novel_title, novel_author=novel_author
         ):
             return {"success": False, "error": "Failed to initialize project"}
 
@@ -117,7 +114,7 @@ class PipelineOrchestrator:
         result = self.process_all_chapters(
             ignore_errors=True,  # Continue processing other chapters on failure
             start_from=start_from,
-            max_chapters=max_chapters
+            max_chapters=max_chapters,
         )
 
         return result
@@ -127,7 +124,7 @@ class PipelineOrchestrator:
         start_from: int = 1,
         max_chapters: Optional[int] = None,
         skip_if_exists: bool = True,
-        ignore_errors: bool = False
+        ignore_errors: bool = False,
     ) -> Dict[str, Any]:
         """Process all chapters in the project."""
         if not self.scraping_coordinator.progress_tracker:
@@ -146,10 +143,7 @@ class PipelineOrchestrator:
 
             if first_missing is not None:
                 # Filter to only process from first missing chapter onwards
-                chapters_to_process = [
-                    ch for ch in chapters_to_process
-                    if ch.number >= first_missing
-                ]
+                chapters_to_process = [ch for ch in chapters_to_process if ch.number >= first_missing]
                 logger.info(f"Resuming from chapter {first_missing} (first missing chapter)")
             else:
                 # All chapters already exist
@@ -168,6 +162,7 @@ class PipelineOrchestrator:
         def default_failure_callback(chapter_num: int, exception: Exception):
             """Default cleanup callback - removes temp files on failure."""
             import tempfile
+
             temp_dir = Path(tempfile.gettempdir())
             temp_audio_path = temp_dir / f"chapter_{chapter_num}_temp.mp3"
             if temp_audio_path.exists():
@@ -188,11 +183,7 @@ class PipelineOrchestrator:
                 logger.info("Processing stopped by user")
                 break
 
-            success = self.process_chapter(
-                chapter,
-                skip_if_exists=skip_if_exists,
-                on_failure=default_failure_callback
-            )
+            success = self.process_chapter(chapter, skip_if_exists=skip_if_exists, on_failure=default_failure_callback)
             if success:
                 completed += 1
             else:
@@ -216,18 +207,13 @@ class PipelineOrchestrator:
             "total": len(chapters_to_process),
             "completed": completed,
             "failed": failed,
-            "progress": progress_percentage
+            "progress": progress_percentage,
         }
 
         logger.info(f"Processing complete: {completed} completed, {failed} failed")
         return result
 
-    def process_chapter(
-        self,
-        chapter,
-        skip_if_exists: bool = True,
-        on_failure: Optional[callable] = None
-    ) -> bool:
+    def process_chapter(self, chapter, skip_if_exists: bool = True, on_failure: Optional[callable] = None) -> bool:
         """Process a single chapter: scrape → convert → save."""
         # Step 1: Scrape chapter content
         content, title, error = self.scraping_coordinator.scrape_chapter_content(chapter)
@@ -236,16 +222,12 @@ class PipelineOrchestrator:
             # Update progress tracker with failure
             if self.scraping_coordinator.progress_tracker:
                 self.scraping_coordinator.progress_tracker.update_chapter(
-                    chapter.number,
-                    ProcessingStatus.FAILED,
-                    error
+                    chapter.number, ProcessingStatus.FAILED, error
                 )
             return False
 
         # Step 2: Convert to audio
-        return self.conversion_coordinator.convert_chapter_to_audio(
-            chapter, content, title, skip_if_exists, on_failure
-        )
+        return self.conversion_coordinator.convert_chapter_to_audio(chapter, content, title, skip_if_exists, on_failure)
 
     def merge_audio_files(self, output_format: Optional[Dict[str, Any]] = None) -> bool:
         """Merge processed audio files."""
@@ -267,7 +249,9 @@ class PipelineOrchestrator:
             suspicious_counts = [55, 398, 50, 100, 200]
 
             if total_chapters in suspicious_counts:
-                logger.warning(f"Detected known incomplete chapter count ({total_chapters}) - likely from pagination issue")
+                logger.warning(
+                    f"Detected known incomplete chapter count ({total_chapters}) - likely from pagination issue"
+                )
                 logger.info("Re-fetching chapter URLs to get complete list...")
                 should_fetch = True
             else:
@@ -276,7 +260,9 @@ class PipelineOrchestrator:
                 if all_chapters:
                     max_chapter_num = max(ch.number for ch in all_chapters)
                     if max_chapter_num == total_chapters and total_chapters in suspicious_counts:
-                        logger.warning(f"Chapter numbers suggest incomplete data (max: {max_chapter_num}, total: {total_chapters})")
+                        logger.warning(
+                            f"Chapter numbers suggest incomplete data (max: {max_chapter_num}, total: {total_chapters})"
+                        )
                         logger.info("Re-fetching chapter URLs to get complete list...")
                         should_fetch = True
 
@@ -285,6 +271,7 @@ class PipelineOrchestrator:
             if chapter_manager:
                 logger.info("Clearing existing incomplete chapter data...")
                 from .chapter_manager import ChapterManager
+
                 self.scraping_coordinator.project_manager.chapter_manager = ChapterManager()
 
             if not self.scraping_coordinator.fetch_chapter_urls(toc_url):

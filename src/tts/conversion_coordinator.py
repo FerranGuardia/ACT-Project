@@ -24,6 +24,7 @@ logger = get_logger("tts.conversion_coordinator")
 @dataclass
 class ConversionRequest:
     """Represents a TTS conversion request."""
+
     text: str
     output_path: Path
     voice: Optional[str] = None
@@ -36,6 +37,7 @@ class ConversionRequest:
 @dataclass
 class ConversionResult:
     """Result of a TTS conversion operation."""
+
     success: bool
     output_path: Optional[Path] = None
     error_message: Optional[str] = None
@@ -59,7 +61,7 @@ class TTSConversionCoordinator:
         voice_resolver: Optional[VoiceResolver] = None,
         text_pipeline: Optional[TextProcessingPipeline] = None,
         strategy_selector: Optional[ConversionStrategySelector] = None,
-        resource_manager: Optional[TTSResourceManager] = None
+        resource_manager: Optional[TTSResourceManager] = None,
     ):
         """
         Initialize the TTS conversion coordinator.
@@ -77,9 +79,7 @@ class TTSConversionCoordinator:
         self.provider_manager = provider_manager or TTSProviderManager()
         self.voice_resolver = voice_resolver or VoiceResolver(self.provider_manager)
         self.text_pipeline = text_pipeline or TextProcessingPipeline()
-        self.strategy_selector = strategy_selector or ConversionStrategySelector(
-            self.provider_manager
-        )
+        self.strategy_selector = strategy_selector or ConversionStrategySelector(self.provider_manager)
         self.resource_manager = resource_manager or TTSResourceManager()
 
         logger.info("TTS Conversion Coordinator initialized")
@@ -92,7 +92,7 @@ class TTSConversionCoordinator:
         rate: Optional[float] = None,
         pitch: Optional[float] = None,
         volume: Optional[float] = None,
-        provider: Optional[str] = None
+        provider: Optional[str] = None,
     ) -> bool:
         """
         Convert text to speech using the coordinated workflow.
@@ -110,13 +110,7 @@ class TTSConversionCoordinator:
             True if conversion successful, False otherwise
         """
         request = ConversionRequest(
-            text=text,
-            output_path=output_path,
-            voice=voice,
-            rate=rate,
-            pitch=pitch,
-            volume=volume,
-            provider=provider
+            text=text, output_path=output_path, voice=voice, rate=rate, pitch=pitch, volume=volume, provider=provider
         )
 
         result = self.convert(request)
@@ -137,17 +131,13 @@ class TTSConversionCoordinator:
 
         try:
             # Step 1: Resolve and validate voice
-            voice_resolution = self.voice_resolver.resolve_voice(
-                request.voice, request.provider
-            )
+            voice_resolution = self.voice_resolver.resolve_voice(request.voice, request.provider)
 
             # Step 2: Process text
             processed_text = self.text_pipeline.process(request.text)
 
             # Step 3: Select conversion strategy
-            strategy = self.strategy_selector.select_strategy(
-                processed_text, voice_resolution
-            )
+            strategy = self.strategy_selector.select_strategy(processed_text, voice_resolution)
 
             # Step 4: Execute conversion
             success = strategy.convert(
@@ -156,7 +146,7 @@ class TTSConversionCoordinator:
                 output_path=request.output_path,
                 rate=request.rate,
                 pitch=request.pitch,
-                volume=request.volume
+                volume=request.volume,
             )
 
             if success:
@@ -171,31 +161,24 @@ class TTSConversionCoordinator:
                             "voice": voice_resolution.voice_id,
                             "provider": voice_resolution.provider.get_provider_name(),
                             "strategy": strategy.__class__.__name__,
-                            "file_size": file_size
-                        }
+                            "file_size": file_size,
+                        },
                     )
                 else:
-                    error_msg = f"Conversion reported success but output file is missing or empty: {request.output_path}"
-                    logger.error(error_msg)
-                    return ConversionResult(
-                        success=False,
-                        error_message=error_msg
+                    error_msg = (
+                        f"Conversion reported success but output file is missing or empty: {request.output_path}"
                     )
+                    logger.error(error_msg)
+                    return ConversionResult(success=False, error_message=error_msg)
             else:
                 error_msg = "Conversion strategy reported failure"
                 logger.error(error_msg)
-                return ConversionResult(
-                    success=False,
-                    error_message=error_msg
-                )
+                return ConversionResult(success=False, error_message=error_msg)
 
         except Exception as e:
             error_msg = f"Conversion failed: {str(e)}"
             logger.error(error_msg, exc_info=True)
-            return ConversionResult(
-                success=False,
-                error_message=error_msg
-            )
+            return ConversionResult(success=False, error_message=error_msg)
 
     def convert_file_to_speech(
         self,
@@ -205,7 +188,7 @@ class TTSConversionCoordinator:
         rate: Optional[float] = None,
         pitch: Optional[float] = None,
         volume: Optional[float] = None,
-        provider: Optional[str] = None
+        provider: Optional[str] = None,
     ) -> bool:
         """
         Convert text file to speech.
@@ -239,14 +222,16 @@ class TTSConversionCoordinator:
                 rate=rate,
                 pitch=pitch,
                 volume=volume,
-                provider=provider
+                provider=provider,
             )
 
         except Exception as e:
             logger.error(f"Error converting file {input_file}: {e}")
             return False
 
-    def get_available_voices(self, locale: Optional[str] = None, provider: Optional[str] = None) -> list[Dict[str, Any]]:
+    def get_available_voices(
+        self, locale: Optional[str] = None, provider: Optional[str] = None
+    ) -> list[Dict[str, Any]]:
         """
         Get available voices.
 

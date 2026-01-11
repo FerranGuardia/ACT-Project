@@ -151,7 +151,7 @@ class TTSProviderManager:
     def __init__(
         self,
         selection_strategy: Optional[ProviderSelectionStrategy] = None,
-        health_checker: Optional[ProviderHealthChecker] = None
+        health_checker: Optional[ProviderHealthChecker] = None,
     ):
         """
         Initialize provider manager with available providers.
@@ -164,7 +164,7 @@ class TTSProviderManager:
         self.selection_strategy = selection_strategy or FallbackProviderStrategy()
         self.health_checker = health_checker or ProviderHealthChecker()
         self._initialize_providers()
-    
+
     def _initialize_providers(self) -> None:
         """Initialize all available TTS providers"""
         # Initialize Edge TTS (cloud, high quality - primary provider)
@@ -177,7 +177,7 @@ class TTSProviderManager:
                 logger.warning("Edge TTS provider not available")
         except Exception as e:
             logger.warning(f"Failed to initialize Edge TTS provider: {e}")
-        
+
         # Initialize pyttsx3 (offline, fallback when Edge TTS is unavailable)
         try:
             pyttsx3_provider = Pyttsx3Provider()
@@ -188,10 +188,10 @@ class TTSProviderManager:
                 logger.warning("pyttsx3 provider not available")
         except Exception as e:
             logger.warning(f"Failed to initialize pyttsx3 provider: {e}")
-        
+
         if not self._providers:
             logger.error("No TTS providers available!")
-    
+
     def get_available_provider(self, preferred: Optional[str] = None) -> Optional[TTSProvider]:
         """
         Get an available provider, with optional preference.
@@ -210,10 +210,7 @@ class TTSProviderManager:
                 return provider
 
         # Use selection strategy for general provider selection
-        available_providers = [
-            p for p in self._providers.values()
-            if self.health_checker.is_provider_healthy(p)
-        ]
+        available_providers = [p for p in self._providers.values() if self.health_checker.is_provider_healthy(p)]
 
         if available_providers:
             selected = self.selection_strategy.select_provider(available_providers)
@@ -223,7 +220,7 @@ class TTSProviderManager:
         # No healthy provider available
         logger.warning("No healthy TTS providers available")
         return None
-    
+
     def convert_with_fallback(
         self,
         text: str,
@@ -232,7 +229,7 @@ class TTSProviderManager:
         preferred_provider: Optional[str] = None,
         rate: Optional[float] = None,
         pitch: Optional[float] = None,
-        volume: Optional[float] = None
+        volume: Optional[float] = None,
     ) -> bool:
         """
         Convert text to speech with automatic fallback.
@@ -255,13 +252,7 @@ class TTSProviderManager:
             ValueError: If input validation fails
         """
         # Validate input parameters
-        request_data = {
-            'text': text,
-            'voice': voice,
-            'rate': rate,
-            'pitch': pitch,
-            'volume': volume
-        }
+        request_data = {"text": text, "voice": voice, "rate": rate, "pitch": pitch, "volume": volume}
         is_valid, validation_error = validate_tts_request(request_data)
         if not is_valid:
             raise ValueError(f"TTS request validation failed: {validation_error}")
@@ -277,7 +268,8 @@ class TTSProviderManager:
 
         # Add other healthy providers using selection strategy
         available_providers = [
-            p for p in self._providers.values()
+            p
+            for p in self._providers.values()
             if self.health_checker.is_provider_healthy(p) and p not in providers_to_try
         ]
 
@@ -292,12 +284,7 @@ class TTSProviderManager:
             try:
                 logger.info(f"Attempting TTS conversion with {provider_name}")
                 success = provider.convert_text_to_speech(
-                    text=text,
-                    voice=voice,
-                    output_path=output_path,
-                    rate=rate,
-                    pitch=pitch,
-                    volume=volume
+                    text=text, voice=voice, output_path=output_path, rate=rate, pitch=pitch, volume=volume
                 )
 
                 if success:
@@ -315,18 +302,18 @@ class TTSProviderManager:
         # All providers failed
         logger.error("All TTS providers failed to convert text to speech")
         return False
-    
+
     def get_all_voices(self, locale: Optional[str] = None) -> List[Dict]:
         """Get all voices from all available providers.
-        
+
         Args:
             locale: Optional locale filter (e.g., "en-US"). Defaults to "en-US" only.
-        
+
         Returns:
             List of voice dictionaries from all providers
         """
         all_voices: List[Dict] = []
-        
+
         for provider_name, provider in self._providers.items():
             if provider.is_available():
                 try:
@@ -338,30 +325,30 @@ class TTSProviderManager:
                     all_voices.extend(voices)
                 except Exception as e:
                     logger.warning(f"Error getting voices from {provider_name}: {e}")
-        
+
         # Sort by name
         all_voices.sort(key=lambda x: x.get("name", ""))
         return all_voices
-    
+
     def get_voices_by_provider(self, provider: str, locale: Optional[str] = None) -> List[Dict]:
         """Get voices from a specific provider.
-        
+
         Args:
             provider: Provider name ("edge_tts" or "pyttsx3")
             locale: Optional locale filter (e.g., "en-US"). Defaults to "en-US" only.
-        
+
         Returns:
             List of voice dictionaries from the specified provider
         """
         if provider not in self._providers:
             logger.warning(f"Provider {provider} not found")
             return []
-        
+
         provider_instance = self._providers[provider]
         if not provider_instance.is_available():
             logger.warning(f"Provider {provider} is not available")
             return []
-        
+
         try:
             voices = provider_instance.get_voices(locale)
             # Ensure provider field is set
@@ -372,19 +359,19 @@ class TTSProviderManager:
         except Exception as e:
             logger.error(f"Error getting voices from {provider}: {e}")
             return []
-    
+
     def get_voices_by_type(self, provider_type: ProviderType, locale: Optional[str] = None) -> List[Dict]:
         """Get voices from providers of a specific type.
-        
+
         Args:
             provider_type: ProviderType.CLOUD or ProviderType.OFFLINE
             locale: Optional locale filter (e.g., "en-US"). Defaults to "en-US" only.
-        
+
         Returns:
             List of voice dictionaries from providers of the specified type
         """
         voices: List[Dict] = []
-        
+
         for provider_name, provider in self._providers.items():
             if provider.is_available() and provider.get_provider_type() == provider_type:
                 try:
@@ -396,38 +383,33 @@ class TTSProviderManager:
                     voices.extend(provider_voices)
                 except Exception as e:
                     logger.warning(f"Error getting voices from {provider_name}: {e}")
-        
+
         # Sort by name
         voices.sort(key=lambda x: x.get("name", ""))
         return voices
-    
+
     def get_providers(self) -> List[str]:
         """Get list of available provider names.
-        
+
         Returns:
             List of provider names that are available
         """
-        return [
-            name for name, provider in self._providers.items()
-            if provider.is_available()
-        ]
-    
+        return [name for name, provider in self._providers.items() if provider.is_available()]
+
     def get_provider(self, provider_name: str) -> Optional[TTSProvider]:
         """Get a specific provider instance.
-        
+
         Args:
             provider_name: Provider name ("edge_tts" or "pyttsx3")
-        
+
         Returns:
             TTSProvider instance or None if not found/not available
         """
         if provider_name not in self._providers:
             return None
-        
+
         provider = self._providers[provider_name]
         if not provider.is_available():
             return None
-        
+
         return provider
-
-

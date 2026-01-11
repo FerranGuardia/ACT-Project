@@ -14,9 +14,12 @@ from core.logger import get_logger
 
 from ..chapter_parser import extract_chapter_number, sort_chapters_by_number
 from ..config import (
-    REQUEST_DELAY, REQUEST_TIMEOUT,
-    PAGINATION_SUSPICIOUS_COUNTS, PAGINATION_CRITICAL_COUNT,
-    PAGINATION_SMALL_COUNT_THRESHOLD, PAGINATION_RANGE_COVERAGE_THRESHOLD
+    REQUEST_DELAY,
+    REQUEST_TIMEOUT,
+    PAGINATION_SUSPICIOUS_COUNTS,
+    PAGINATION_CRITICAL_COUNT,
+    PAGINATION_SMALL_COUNT_THRESHOLD,
+    PAGINATION_RANGE_COVERAGE_THRESHOLD,
 )
 from .url_extractor_extractors import ChapterUrlExtractors
 from .url_extractor_session import SessionManager
@@ -39,7 +42,7 @@ class UrlExtractor:
         base_url: str,
         timeout: int = REQUEST_TIMEOUT,
         delay: float = REQUEST_DELAY,
-        use_universal_detector: bool = True
+        use_universal_detector: bool = True,
     ):
         """
         Initialize the URL fetcher.
@@ -66,16 +69,13 @@ class UrlExtractor:
             # Legacy mode
             self._universal_detector = None
             self._extractors = ChapterUrlExtractors(
-                base_url=base_url,
-                session_manager=self._session_manager,
-                timeout=timeout,
-                delay=delay
+                base_url=base_url, session_manager=self._session_manager, timeout=timeout, delay=delay
             )
-    
+
     def get_session(self):  # type: ignore[return-type]
         """Get or create a requests session."""
         return self._session_manager.get_session()
-    
+
     def _rate_limit(self):
         """
         Enforce rate limiting between requests.
@@ -86,47 +86,49 @@ class UrlExtractor:
     def get_reference_count(self, toc_url: str, should_stop: Optional[Callable[[], bool]] = None) -> Optional[int]:
         """
         Get the reference/expected chapter count by fetching all URLs and counting them.
-        
+
         NOTE: This is a helper method for testing/validation purposes only.
         In normal scraping, users specify the chapter range/count they want to scrape.
         This method is not required for production use.
-        
+
         This mimics Novel-Grabber's approach: extract all chapter URLs and count them.
         More reliable than metadata extraction since count = actual URLs found.
-        
+
         Uses our existing fetch() method which tries all methods in order:
         1. JavaScript extraction (fastest)
         2. AJAX endpoints (fast)
         3. Playwright with scrolling (slow but gets all)
-        
+
         Args:
             toc_url: URL of the table of contents page
             should_stop: Optional callback that returns True if fetching should stop
-            
+
         Returns:
             Expected chapter count, or None if unable to determine
-            
+
         Note:
             This method fetches ALL chapter URLs, which can be slow for novels with
             many chapters. For production scraping, users should specify the chapter
             range/count they want instead of relying on automatic detection.
         """
         logger.info(f"Getting reference chapter count from {toc_url} (helper method for testing)")
-        
+
         # Use our existing fetch() method to get all chapter URLs
         # This uses all our methods (JS, AJAX, HTML, Playwright, etc.)
         urls, metadata = self.fetch(toc_url, should_stop=should_stop)
-        
+
         if urls:
             count = len(urls)
             method_used = metadata.get("method_used", "unknown")
             logger.info(f"Reference count via {method_used}: {count} chapters")
             return count
-        
+
         logger.warning("Could not fetch chapter URLs to determine count")
         return None
 
-    def _safe_regex_search(self, pattern: str, text: str, flags: int = 0, timeout_seconds: float = 1.0) -> Optional[re.Match[str]]:
+    def _safe_regex_search(
+        self, pattern: str, text: str, flags: int = 0, timeout_seconds: float = 1.0
+    ) -> Optional[re.Match[str]]:
         """
         Perform regex search with timeout protection to prevent ReDoS attacks.
 
@@ -211,23 +213,24 @@ class UrlExtractor:
                 return None
 
             html = response.text  # type: ignore[attr-defined]
-            
+
             # Pattern 1: Look for explicit total counts (avoid matching "Chapter 1")
             # These patterns require context like "total", "共", or number before "chapter"
             import re
+
             # Safer regex patterns with limited repetition to prevent ReDoS
             patterns = [
-                r'total[:\s]{0,10}(\d{1,6})\s{0,10}chapters?',  # "Total: 423 chapters"
-                r'共[：:\s]{0,10}(\d{1,6})\s{0,10}章',  # Chinese "共: 423 章"
-                r'总计[：:\s]{0,10}(\d{1,6})',  # Chinese "总计: 423"
-                r'(\d{1,6})\s{0,5}章[^\d]',  # Chinese "423章" (not "第423章")
-                r'chapters?[:\s]{0,10}(\d{1,6})[^\d]',  # "Chapters: 423" (not "Chapter 1")
+                r"total[:\s]{0,10}(\d{1,6})\s{0,10}chapters?",  # "Total: 423 chapters"
+                r"共[：:\s]{0,10}(\d{1,6})\s{0,10}章",  # Chinese "共: 423 章"
+                r"总计[：:\s]{0,10}(\d{1,6})",  # Chinese "总计: 423"
+                r"(\d{1,6})\s{0,5}章[^\d]",  # Chinese "423章" (not "第423章")
+                r"chapters?[:\s]{0,10}(\d{1,6})[^\d]",  # "Chapters: 423" (not "Chapter 1")
                 r'data-total-chapters=["\'](\d{1,6})["\']',
                 r'data-chapter-count=["\'](\d{1,6})["\']',
                 r'totalChapters["\']?\s{0,5}[:=]\s{0,5}(\d{1,6})',
                 r'chapterCount["\']?\s{0,5}[:=]\s{0,5}(\d{1,6})',
             ]
-            
+
             for pattern in patterns:
                 match = self._safe_regex_search(pattern, html, re.IGNORECASE)
                 if match:
@@ -236,16 +239,16 @@ class UrlExtractor:
                     if count > 1:
                         logger.debug(f"Found chapter count via pattern '{pattern}': {count}")
                         return count
-            
+
             # Pattern 2: Look in JavaScript variables
             js_patterns = [
-                r'var\s{1,10}totalChapters\s{0,5}=\s{0,5}(\d{1,6})',
-                r'let\s{1,10}totalChapters\s{0,5}=\s{0,5}(\d{1,6})',
-                r'const\s{1,10}totalChapters\s{0,5}=\s{0,5}(\d{1,6})',
+                r"var\s{1,10}totalChapters\s{0,5}=\s{0,5}(\d{1,6})",
+                r"let\s{1,10}totalChapters\s{0,5}=\s{0,5}(\d{1,6})",
+                r"const\s{1,10}totalChapters\s{0,5}=\s{0,5}(\d{1,6})",
                 r'totalChapters["\']?\s{0,5}[:=]\s{0,5}(\d{1,6})',
                 r'chapterCount["\']?\s{0,5}[:=]\s{0,5}(\d{1,6})',
             ]
-            
+
             for pattern in js_patterns:
                 match = self._safe_regex_search(pattern, html, re.IGNORECASE | re.DOTALL)
                 if match and len(match.groups()) > 0:
@@ -253,22 +256,22 @@ class UrlExtractor:
                     if count > 1:
                         logger.debug(f"Found chapter count in JS: {count}")
                         return count
-            
+
             # Pattern 3: Fallback - find maximum chapter number from chapter links
             # This works for sites like FanMTL where all chapters are listed
             # Extract all chapter numbers from links and use the maximum
             # Be conservative - only use if we're confident these are chapter numbers
             chapter_numbers: List[int] = []
-            
+
             # Pattern for "Chapter 423" or "第423章" or "/chapter-423" or similar
             # Focus on patterns that are clearly chapter-related
             chapter_link_patterns = [
-                r'chapter[-\s]{0,5}(\d{1,6})',  # "Chapter 423" or "chapter-423"
-                r'第(\d{1,6})章',  # Chinese "第423章"
-                r'/chapter[/-]{0,2}(\d{1,6})',  # URL pattern "/chapter/423"
+                r"chapter[-\s]{0,5}(\d{1,6})",  # "Chapter 423" or "chapter-423"
+                r"第(\d{1,6})章",  # Chinese "第423章"
+                r"/chapter[/-]{0,2}(\d{1,6})",  # URL pattern "/chapter/423"
                 r'href=["\'][^"\']{0,200}chapter[^"\']{0,50}(\d{1,6})',  # Chapter in href
             ]
-            
+
             for pattern in chapter_link_patterns:
                 matches = self._safe_regex_findall(pattern, html, re.IGNORECASE)
                 for match in matches:
@@ -280,12 +283,12 @@ class UrlExtractor:
                             chapter_numbers.append(num)
                     except ValueError:
                         continue
-            
+
             if chapter_numbers:
                 # Get unique chapter numbers and sort
                 unique_chapters: List[int] = sorted(set(chapter_numbers))
                 max_chapter: int = unique_chapters[-1]
-                
+
                 # Only use this fallback if:
                 # 1. We found a reasonable number of unique chapters (at least 10)
                 # 2. The max is reasonably high (not just a few chapters)
@@ -296,13 +299,13 @@ class UrlExtractor:
                     expected_range: int = max_chapter
                     found_in_range: int = len([n for n in unique_chapters if n <= max_chapter])
                     coverage: float = found_in_range / expected_range if expected_range > 0 else 0.0
-                    
+
                     # Only use if we have good coverage (at least 30% of chapters found)
                     # This helps avoid matching page numbers or other unrelated numbers
                     if coverage >= 0.3:
                         logger.debug(f"Found max chapter number from links: {max_chapter} (coverage: {coverage:.2%})")
                         return max_chapter
-            
+
             return None
         except Exception as e:
             logger.debug(f"Failed to extract chapter count from metadata: {e}")
@@ -314,7 +317,7 @@ class UrlExtractor:
         should_stop: Optional[Callable[[], bool]],
         use_reference: bool,
         min_chapter_number: Optional[int],
-        max_chapter_number: Optional[int]
+        max_chapter_number: Optional[int],
     ) -> Tuple[List[str], Dict[str, Any]]:
         """Fetch using the universal detector."""
         import asyncio
@@ -325,8 +328,11 @@ class UrlExtractor:
             if loop.is_running():
                 # We're in an async context, need to handle differently
                 import concurrent.futures
+
                 with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(self._run_async_detection, toc_url, should_stop, min_chapter_number, max_chapter_number)
+                    future = executor.submit(
+                        self._run_async_detection, toc_url, should_stop, min_chapter_number, max_chapter_number
+                    )
                     result = future.result()
             else:
                 result = loop.run_until_complete(
@@ -335,7 +341,7 @@ class UrlExtractor:
                         should_stop=should_stop,
                         min_chapter=min_chapter_number,
                         max_chapter=max_chapter_number,
-                        use_parallel=True
+                        use_parallel=True,
                     )
                 )
         except RuntimeError:
@@ -346,7 +352,7 @@ class UrlExtractor:
                     should_stop=should_stop,
                     min_chapter=min_chapter_number,
                     max_chapter=max_chapter_number,
-                    use_parallel=True
+                    use_parallel=True,
                 )
             )
 
@@ -368,16 +374,23 @@ class UrlExtractor:
 
         return result.urls, metadata
 
-    def _run_async_detection(self, toc_url: str, should_stop: Optional[Callable[[], bool]], min_chapter_number: Optional[int], max_chapter_number: Optional[int]):
+    def _run_async_detection(
+        self,
+        toc_url: str,
+        should_stop: Optional[Callable[[], bool]],
+        min_chapter_number: Optional[int],
+        max_chapter_number: Optional[int],
+    ):
         """Run async detection in a thread."""
         import asyncio
+
         return asyncio.run(
             self._universal_detector.detect_urls(
                 toc_url=toc_url,
                 should_stop=should_stop,
                 min_chapter=min_chapter_number,
                 max_chapter=max_chapter_number,
-                use_parallel=True
+                use_parallel=True,
             )
         )
 
@@ -387,7 +400,7 @@ class UrlExtractor:
         should_stop: Optional[Callable[[], bool]],
         use_reference: bool,
         min_chapter_number: Optional[int],
-        max_chapter_number: Optional[int]
+        max_chapter_number: Optional[int],
     ) -> Tuple[List[str], Dict[str, Any]]:
         """Fetch using the legacy detection methods."""
         metadata: Dict[str, Any] = {
@@ -434,7 +447,9 @@ class UrlExtractor:
 
                 # If we're missing more than configured threshold of chapters in the range, it's incomplete
                 if coverage < PAGINATION_RANGE_COVERAGE_THRESHOLD:
-                    logger.info(f"⚠ Range incomplete: Found {len(found_in_range)}/{len(requested_range)} chapters in range {min_chapter_number}-{max_chapter_number} (coverage: {coverage:.1%})")
+                    logger.info(
+                        f"⚠ Range incomplete: Found {len(found_in_range)}/{len(requested_range)} chapters in range {min_chapter_number}-{max_chapter_number} (coverage: {coverage:.1%})"
+                    )
                     return False
 
             return True
@@ -449,7 +464,9 @@ class UrlExtractor:
 
             # CRITICAL: If we have exactly the critical count, ALWAYS suspect pagination
             if url_count == PAGINATION_CRITICAL_COUNT:
-                logger.info(f"⚠ Detected pagination: Found exactly {PAGINATION_CRITICAL_COUNT} URLs - this is a common pagination limit")
+                logger.info(
+                    f"⚠ Detected pagination: Found exactly {PAGINATION_CRITICAL_COUNT} URLs - this is a common pagination limit"
+                )
                 return True
 
             # Extract all chapter numbers for additional checks
@@ -464,13 +481,21 @@ class UrlExtractor:
                 min_ch: int = min(chapter_numbers)  # type: ignore[arg-type]
 
                 # Round numbers with matching count suggest pagination
-                if url_count in PAGINATION_SUSPICIOUS_COUNTS and max_ch in PAGINATION_SUSPICIOUS_COUNTS and url_count == max_ch:
-                    logger.info(f"⚠ Detected pagination: Found exactly {url_count} URLs ending at round number {max_ch}")
+                if (
+                    url_count in PAGINATION_SUSPICIOUS_COUNTS
+                    and max_ch in PAGINATION_SUSPICIOUS_COUNTS
+                    and url_count == max_ch
+                ):
+                    logger.info(
+                        f"⚠ Detected pagination: Found exactly {url_count} URLs ending at round number {max_ch}"
+                    )
                     return True
 
                 # Additional pagination checks...
                 if min_chapter_number and min_chapter_number > max_ch and url_count >= PAGINATION_SUSPICIOUS_COUNTS[0]:
-                    logger.info(f"⚠ Detected pagination: Found {url_count} URLs (max chapter {max_ch}) but need {min_chapter_number}")
+                    logger.info(
+                        f"⚠ Detected pagination: Found {url_count} URLs (max chapter {max_ch}) but need {min_chapter_number}"
+                    )
                     return True
 
             return False
@@ -501,10 +526,7 @@ class UrlExtractor:
             from .url_extractor_playwright import PlaywrightExtractor
 
             playwright_extractor = PlaywrightExtractor(
-                base_url=self.base_url,
-                session_manager=self._session_manager,
-                timeout=self.timeout,
-                delay=self.delay
+                base_url=self.base_url, session_manager=self._session_manager, timeout=self.timeout, delay=self.delay
             )
 
             logger.info("Trying legacy method 3: Playwright with scrolling")
@@ -512,7 +534,7 @@ class UrlExtractor:
                 toc_url=toc_url,
                 should_stop=should_stop,
                 min_chapter_number=min_chapter_number,
-                max_chapter_number=max_chapter_number
+                max_chapter_number=max_chapter_number,
             )
             metadata["methods_tried"]["playwright"] = len(urls) if urls else 0
             if urls:
@@ -526,7 +548,14 @@ class UrlExtractor:
         logger.warning("All legacy methods failed to fetch sufficient chapter URLs")
         return [], metadata
 
-    def fetch(self, toc_url: str, should_stop: Optional[Callable[[], bool]] = None, use_reference: bool = False, min_chapter_number: Optional[int] = None, max_chapter_number: Optional[int] = None) -> Tuple[List[str], Dict[str, Any]]:
+    def fetch(
+        self,
+        toc_url: str,
+        should_stop: Optional[Callable[[], bool]] = None,
+        use_reference: bool = False,
+        min_chapter_number: Optional[int] = None,
+        max_chapter_number: Optional[int] = None,
+    ) -> Tuple[List[str], Dict[str, Any]]:
         """
         Fetch chapter URLs using the configured detection method.
 

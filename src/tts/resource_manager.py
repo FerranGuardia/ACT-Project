@@ -176,6 +176,7 @@ class TTSResourceManager:
     def _create_temp_file(self, suffix: str = ".mp3") -> Path:
         """Create a unique temporary file."""
         import tempfile
+
         temp_dir = Path(tempfile.gettempdir())
         timestamp = int(time.time() * 1000)
         temp_file = temp_dir / f"tts_temp_{timestamp}_{id(self)}{suffix}"
@@ -184,6 +185,7 @@ class TTSResourceManager:
     def _create_temp_directory(self) -> Path:
         """Create a unique temporary directory."""
         import tempfile
+
         temp_base = Path(tempfile.gettempdir())
         timestamp = int(time.time() * 1000)
         temp_dir = temp_base / f"tts_chunks_{timestamp}_{id(self)}"
@@ -201,7 +203,7 @@ class TTSResourceManager:
     def __del__(self):
         """Destructor - attempt cleanup if not already done."""
         try:
-            if hasattr(self, 'managed_resources') and self.managed_resources:
+            if hasattr(self, "managed_resources") and self.managed_resources:
                 logger.warning("TTSResourceManager being destroyed with uncleaned resources")
                 self.cleanup_all()
         except Exception:

@@ -10,7 +10,7 @@ from typing import Final
 
 class ButtonText:
     """Button text constants."""
-    
+
     # Common buttons
     ADD_TO_QUEUE: Final[str] = "➕ Add to Queue"
     CLEAR_QUEUE: Final[str] = "🗑️ Clear Queue"
@@ -18,21 +18,21 @@ class ButtonText:
     PAUSE: Final[str] = "⏸️ Pause"
     RESUME: Final[str] = "▶️ Resume"
     STOP: Final[str] = "⏹️ Stop"
-    
+
     # Scraper-specific
     START_SCRAPING: Final[str] = "▶️ Start Scraping"
-    
+
     # TTS-specific
     START_CONVERSION: Final[str] = "▶️ Start Conversion"
-    
+
     # Full Auto-specific
     START_PROCESSING: Final[str] = "▶️ Start Processing"
-    
+
     # Queue item actions
     MOVE_UP: Final[str] = "↑"
     MOVE_DOWN: Final[str] = "↓"
     REMOVE: Final[str] = "✖️ Remove"
-    
+
     # Other common buttons
     BROWSE: Final[str] = "Browse..."
     PREVIEW: Final[str] = "🔊 Preview"
@@ -42,7 +42,7 @@ class ButtonText:
 
 class StatusMessages:
     """Status message constants."""
-    
+
     # Common statuses
     READY: Final[str] = "Ready"
     PROCESSING: Final[str] = "Processing"
@@ -51,30 +51,30 @@ class StatusMessages:
     STOPPING: Final[str] = "Stopping..."
     ERROR_OCCURRED: Final[str] = "Error occurred"
     PENDING: Final[str] = "Pending"
-    
+
     # Queue statuses
     STATUS_PREFIX: Final[str] = "Status: "
 
 
 class DialogMessages:
     """Dialog message constants."""
-    
+
     # Validation errors
     VALIDATION_ERROR_TITLE: Final[str] = "Validation Error"
     ALREADY_RUNNING_TITLE: Final[str] = "Already Running"
     ALREADY_RUNNING_MSG: Final[str] = "Operation is already in progress"
-    
+
     # Success/Error
     SUCCESS_TITLE: Final[str] = "Success"
     ERROR_TITLE: Final[str] = "Error"
-    
+
     # Confirmation
     CLEAR_QUEUE_TITLE: Final[str] = "Clear Queue"
     CLEAR_QUEUE_MESSAGE: Final[str] = "Are you sure you want to clear the entire queue?"
-    
+
     # TTS-specific messages
     NO_TEXT_IN_EDITOR_MSG: Final[str] = "Please enter text in the editor to convert"
-    
+
     # Full Auto-specific messages
     EMPTY_QUEUE_TITLE: Final[str] = "Empty Queue"
     EMPTY_QUEUE_MSG: Final[str] = "Queue is empty. Please add items to process."
@@ -82,13 +82,13 @@ class DialogMessages:
     ALREADY_PROCESSING_MSG: Final[str] = "Processing is already in progress."
     NO_PENDING_ITEMS_TITLE: Final[str] = "No Pending Items"
     NO_PENDING_ITEMS_MSG: Final[str] = "No pending items in queue."
-    
+
     # Merger-specific messages
     NO_FILES_TITLE: Final[str] = "No Files"
     NO_FILES_MSG: Final[str] = "No audio files found in the selected folder"
     ERROR_READING_FOLDER_TITLE: Final[str] = "Error"
     ERROR_READING_FOLDER_MSG_FORMAT: Final[str] = "Error reading folder:\n{error}"
-    
+
     # Directory/file errors
     NO_DIRECTORY_TITLE: Final[str] = "No Directory"
     NO_DIRECTORY_MSG: Final[str] = "Please select an output directory first"
@@ -100,12 +100,12 @@ class DialogMessages:
 
 class QueueItemText:
     """Queue item display text constants."""
-    
+
     ALL_CHAPTERS: Final[str] = "All chapters"
     CHAPTERS_PREFIX: Final[str] = "Chapters "
     CHAPTERS_RANGE_FORMAT: Final[str] = "Chapters {from_ch}-{to_ch}"
     CHAPTERS_LIST_FORMAT: Final[str] = "Chapters: {chapters}"
-    
+
     # Validation messages
     NO_URL_MSG: Final[str] = "Please enter a novel URL"
     INVALID_URL_MSG: Final[str] = "Please enter a valid URL"
@@ -117,9 +117,8 @@ class QueueItemText:
 
 
 __all__ = [
-    'ButtonText',
-    'StatusMessages',
-    'DialogMessages',
-    'QueueItemText',
+    "ButtonText",
+    "StatusMessages",
+    "DialogMessages",
+    "QueueItemText",
 ]
-

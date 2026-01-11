@@ -17,7 +17,7 @@ from ui.ui_constants import DialogMessages
 def show_validation_error(parent: "QWidget", message: str) -> None:
     """
     Show validation error dialog.
-    
+
     Args:
         parent: Parent widget for the dialog
         message: Error message to display
@@ -28,21 +28,17 @@ def show_validation_error(parent: "QWidget", message: str) -> None:
 def show_already_running_error(parent: "QWidget") -> None:
     """
     Show already running error dialog.
-    
+
     Args:
         parent: Parent widget for the dialog
     """
-    QMessageBox.warning(
-        parent,
-        DialogMessages.ALREADY_RUNNING_TITLE,
-        DialogMessages.ALREADY_RUNNING_MSG
-    )
+    QMessageBox.warning(parent, DialogMessages.ALREADY_RUNNING_TITLE, DialogMessages.ALREADY_RUNNING_MSG)
 
 
 def show_success(parent: "QWidget", message: str) -> None:
     """
     Show success dialog.
-    
+
     Args:
         parent: Parent widget for the dialog
         message: Success message to display
@@ -53,7 +49,7 @@ def show_success(parent: "QWidget", message: str) -> None:
 def show_error(parent: "QWidget", message: str) -> None:
     """
     Show error dialog.
-    
+
     Args:
         parent: Parent widget for the dialog
         message: Error message to display
@@ -61,19 +57,15 @@ def show_error(parent: "QWidget", message: str) -> None:
     QMessageBox.warning(parent, DialogMessages.ERROR_TITLE, message)
 
 
-def show_confirmation(
-    parent: "QWidget",
-    title: str,
-    message: str
-) -> bool:
+def show_confirmation(parent: "QWidget", title: str, message: str) -> bool:
     """
     Show confirmation dialog.
-    
+
     Args:
         parent: Parent widget for the dialog
         title: Dialog title
         message: Confirmation message
-        
+
     Returns:
         True if user clicked Yes, False otherwise
     """
@@ -82,7 +74,7 @@ def show_confirmation(
         title,
         message,
         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        QMessageBox.StandardButton.No
+        QMessageBox.StandardButton.No,
     )
     return reply == QMessageBox.StandardButton.Yes
 
@@ -90,21 +82,17 @@ def show_confirmation(
 def show_no_directory_error(parent: "QWidget") -> None:
     """
     Show no directory selected error dialog.
-    
+
     Args:
         parent: Parent widget for the dialog
     """
-    QMessageBox.warning(
-        parent,
-        DialogMessages.NO_DIRECTORY_TITLE,
-        DialogMessages.NO_DIRECTORY_MSG
-    )
+    QMessageBox.warning(parent, DialogMessages.NO_DIRECTORY_TITLE, DialogMessages.NO_DIRECTORY_MSG)
 
 
 def show_directory_not_found_error(parent: "QWidget", directory_path: str) -> None:
     """
     Show directory not found error dialog.
-    
+
     Args:
         parent: Parent widget for the dialog
         directory_path: Path to the directory that was not found
@@ -112,14 +100,14 @@ def show_directory_not_found_error(parent: "QWidget", directory_path: str) -> No
     QMessageBox.warning(
         parent,
         DialogMessages.DIRECTORY_NOT_FOUND_TITLE,
-        DialogMessages.DIRECTORY_NOT_FOUND_MSG_FORMAT.format(path=directory_path)
+        DialogMessages.DIRECTORY_NOT_FOUND_MSG_FORMAT.format(path=directory_path),
     )
 
 
 def show_error_opening_folder(parent: "QWidget", error: str) -> None:
     """
     Show error opening folder dialog.
-    
+
     Args:
         parent: Parent widget for the dialog
         error: Error message
@@ -127,18 +115,17 @@ def show_error_opening_folder(parent: "QWidget", error: str) -> None:
     QMessageBox.warning(
         parent,
         DialogMessages.ERROR_OPENING_FOLDER_TITLE,
-        DialogMessages.ERROR_OPENING_FOLDER_MSG_FORMAT.format(error=error)
+        DialogMessages.ERROR_OPENING_FOLDER_MSG_FORMAT.format(error=error),
     )
 
 
 __all__ = [
-    'show_validation_error',
-    'show_already_running_error',
-    'show_success',
-    'show_error',
-    'show_confirmation',
-    'show_no_directory_error',
-    'show_directory_not_found_error',
-    'show_error_opening_folder',
+    "show_validation_error",
+    "show_already_running_error",
+    "show_success",
+    "show_error",
+    "show_confirmation",
+    "show_no_directory_error",
+    "show_directory_not_found_error",
+    "show_error_opening_folder",
 ]
-

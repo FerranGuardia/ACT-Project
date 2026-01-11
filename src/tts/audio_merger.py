@@ -41,19 +41,19 @@ def _validate_subprocess_args(args: List[str]) -> List[str]:
     validated_args = []
     for arg in args:
         # Check for shell metacharacters that could be used for injection
-        dangerous_chars = [';', '&', '|', '`', '$(', '${', '\n', '\r']
+        dangerous_chars = [";", "&", "|", "`", "$(", "${", "\n", "\r"]
         for char in dangerous_chars:
             if char in str(arg):
                 raise ValueError(f"Potentially dangerous character '{char}' in subprocess argument: {arg}")
 
         # Ensure paths are absolute and exist (for file paths)
-        if str(arg).endswith(('.mp3', '.wav', '.txt')) or '/' in str(arg) or '\\' in str(arg):
+        if str(arg).endswith((".mp3", ".wav", ".txt")) or "/" in str(arg) or "\\" in str(arg):
             path = Path(arg)
             if not path.is_absolute():
                 # Convert to absolute path
                 arg = str(path.resolve())
             # Validate that the path doesn't contain dangerous elements
-            if '..' in arg or arg.startswith('~'):
+            if ".." in arg or arg.startswith("~"):
                 raise ValueError(f"Potentially dangerous path pattern in argument: {arg}")
 
         validated_args.append(str(arg))
@@ -66,8 +66,13 @@ class AudioMerger:
 
     # Chunk conversion settings
     CONVERSION_TIMEOUT = 60.0  # 60 second timeout per chunk
-    
-    def __init__(self, provider_manager: TTSProviderManager, cleanup_callback: Optional[Callable[[List[Path]], None]] = None, config: Optional[Any] = None):
+
+    def __init__(
+        self,
+        provider_manager: TTSProviderManager,
+        cleanup_callback: Optional[Callable[[List[Path]], None]] = None,
+        config: Optional[Any] = None,
+    ):
         """
         Initialize audio merger.
 
@@ -77,10 +82,11 @@ class AudioMerger:
             config: Optional TTSConfig instance. If None, uses default TTSConfig.
         """
         from .tts_engine import TTSConfig  # Avoid circular import
+
         self.config = config or TTSConfig()
         self.provider_manager = provider_manager
         self.cleanup_callback = cleanup_callback
-    
+
     def chunk_text(self, text: str, max_bytes: int) -> List[str]:
         """
         Split text into chunks that don't exceed max_bytes when UTF-8 encoded.
@@ -104,7 +110,7 @@ class AudioMerger:
             return []
 
         # Convert to bytes once for efficiency
-        text_bytes = text.encode('utf-8')
+        text_bytes = text.encode("utf-8")
         if len(text_bytes) <= max_bytes:
             return [text]
 
@@ -126,7 +132,7 @@ class AudioMerger:
     def _split_by_sentences(self, text: str) -> List[str]:
         """Split text by sentence boundaries, preserving punctuation."""
         # Split on sentence endings followed by whitespace or end of string
-        pattern = r'(?<=[.!?])\s+|(?<=[.!?])$'
+        pattern = r"(?<=[.!?])\s+|(?<=[.!?])$"
         parts = re.split(pattern, text)
 
         sentences = []
@@ -147,7 +153,7 @@ class AudioMerger:
             # Add space between sentences (except for first)
             separator = " " if current_chunk else ""
             sentence_with_sep = separator + sentence
-            sentence_bytes = len(sentence_with_sep.encode('utf-8'))
+            sentence_bytes = len(sentence_with_sep.encode("utf-8"))
 
             if current_bytes + sentence_bytes <= max_bytes:
                 current_chunk += sentence_with_sep
@@ -159,7 +165,7 @@ class AudioMerger:
 
                 # Start new chunk
                 current_chunk = sentence
-                current_bytes = len(sentence.encode('utf-8'))
+                current_bytes = len(sentence.encode("utf-8"))
 
                 # If sentence itself is too big, split it by words
                 if current_bytes > max_bytes:
@@ -189,7 +195,7 @@ class AudioMerger:
             # Add space between words (except for first)
             separator = " " if current_chunk else ""
             word_with_sep = separator + word
-            word_bytes = len(word_with_sep.encode('utf-8'))
+            word_bytes = len(word_with_sep.encode("utf-8"))
 
             if current_bytes + word_bytes <= max_bytes:
                 current_chunk += word_with_sep
@@ -201,7 +207,7 @@ class AudioMerger:
 
                 # Start new chunk with this word
                 current_chunk = word
-                current_bytes = len(word.encode('utf-8'))
+                current_bytes = len(word.encode("utf-8"))
 
                 # If word itself is too big, split by characters
                 if current_bytes > max_bytes:
@@ -225,7 +231,7 @@ class AudioMerger:
         current_bytes = 0
 
         for char in text:
-            char_bytes = len(char.encode('utf-8'))
+            char_bytes = len(char.encode("utf-8"))
 
             if current_bytes + char_bytes <= max_bytes:
                 current_chunk += char
@@ -242,7 +248,7 @@ class AudioMerger:
             chunks.append(current_chunk)
 
         return chunks
-    
+
     async def convert_chunks_parallel(
         self,
         chunks: List[str],
@@ -252,7 +258,7 @@ class AudioMerger:
         provider: Optional[TTSProvider],
         rate: Optional[float] = None,
         pitch: Optional[float] = None,
-        volume: Optional[float] = None
+        volume: Optional[float] = None,
     ) -> List[Path]:
         """
         Convert chunks in parallel using provider abstraction.
@@ -319,7 +325,7 @@ class AudioMerger:
         provider: TTSProvider,
         rate: Optional[float],
         pitch: Optional[float],
-        volume: Optional[float]
+        volume: Optional[float],
     ) -> Path:
         """
         Convert a single chunk with retry logic and timeout.
@@ -347,14 +353,9 @@ class AudioMerger:
                 # Add timeout to prevent hanging
                 success = await asyncio.wait_for(
                     provider.convert_chunk_async(  # type: ignore[attr-defined]
-                        text=chunk,
-                        voice=voice,
-                        output_path=chunk_path,
-                        rate=rate,
-                        pitch=pitch,
-                        volume=volume
+                        text=chunk, voice=voice, output_path=chunk_path, rate=rate, pitch=pitch, volume=volume
                     ),
-                    timeout=self.config.CONVERSION_TIMEOUT
+                    timeout=self.config.CONVERSION_TIMEOUT,
                 )
 
                 # Verify output file exists and has content
@@ -399,7 +400,7 @@ class AudioMerger:
 
         except Exception:
             return False
-    
+
     def merge_audio_chunks(self, chunk_files: List[Path], output_path: Path) -> bool:
         """
         Merge multiple audio files into one.
@@ -423,11 +424,7 @@ class AudioMerger:
             raise ValueError(f"Chunk files do not exist: {missing_files}")
 
         # Try different merging strategies in order of preference
-        strategies = [
-            self._merge_with_pydub,
-            self._merge_with_ffmpeg,
-            self._merge_fallback_copy
-        ]
+        strategies = [self._merge_with_pydub, self._merge_with_ffmpeg, self._merge_fallback_copy]
 
         for strategy in strategies:
             try:
@@ -457,7 +454,7 @@ class AudioMerger:
                 combined += audio  # type: ignore[assignment]
 
             # Export with context manager to ensure file handle cleanup
-            with open(output_path, 'wb') as f:
+            with open(output_path, "wb") as f:
                 combined.export(f, format="mp3")  # type: ignore[attr-defined]
 
             logger.info(f"✓ Merged {len(chunk_files)} audio chunks using pydub")
@@ -471,7 +468,7 @@ class AudioMerger:
         """Merge using ffmpeg command line tool."""
         try:
             # Create temporary file list for ffmpeg concat
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8") as f:
                 temp_file_list = Path(f.name)
                 for chunk_file in chunk_files:
                     f.write(f"file '{chunk_file.absolute()}'\n")
@@ -490,15 +487,22 @@ class AudioMerger:
                     logger.error(f"Invalid temp file path for ffmpeg: {safe_temp_file}")
                     return False
 
-                cmd_args = _validate_subprocess_args([
-                    'ffmpeg', '-f', 'concat', '-safe', '0', '-i', str(safe_temp_file),
-                    '-c', 'copy', str(safe_output_path)
-                ])
+                cmd_args = _validate_subprocess_args(
+                    [
+                        "ffmpeg",
+                        "-f",
+                        "concat",
+                        "-safe",
+                        "0",
+                        "-i",
+                        str(safe_temp_file),
+                        "-c",
+                        "copy",
+                        str(safe_output_path),
+                    ]
+                )
                 result = subprocess.run(
-                    cmd_args,
-                    capture_output=True,
-                    text=True,
-                    timeout=FFMPEG_TIMEOUT_SECONDS  # Use constant
+                    cmd_args, capture_output=True, text=True, timeout=FFMPEG_TIMEOUT_SECONDS  # Use constant
                 )
 
                 if result.returncode == 0 and output_path.exists():

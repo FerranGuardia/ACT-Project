@@ -45,7 +45,7 @@ def extract_chapters_from_javascript(html: str, base_url: str) -> List[str]:
             url_matches = re.finditer(r'["\']([^"\']+)["\']', content)
             for url_match in url_matches:
                 url = url_match.group(1)
-                if 'chapter' in url.lower():
+                if "chapter" in url.lower():
                     full_url: str = urljoin(base_url, url)
                     urls.append(full_url)
 
@@ -66,25 +66,26 @@ def extract_novel_id_from_html(html: str) -> Optional[str]:
     """
     try:
         from bs4 import BeautifulSoup  # type: ignore[import-untyped]
-        soup = BeautifulSoup(html, 'html.parser')  # type: ignore[assignment]
+
+        soup = BeautifulSoup(html, "html.parser")  # type: ignore[assignment]
 
         # Try data attributes
         selectors = [
-            '#rating[data-novel-id]',
-            '[data-novel-id]',
-            '[data-book-id]',
-            '[data-id]',
+            "#rating[data-novel-id]",
+            "[data-novel-id]",
+            "[data-book-id]",
+            "[data-id]",
         ]
 
         for selector in selectors:
             tag = soup.select_one(selector)  # type: ignore[attr-defined]
             if tag:
-                novel_id: Optional[str] = tag.get('data-novel-id') or tag.get('data-book-id') or tag.get('data-id')  # type: ignore[attr-defined, assignment]
+                novel_id: Optional[str] = tag.get("data-novel-id") or tag.get("data-book-id") or tag.get("data-id")  # type: ignore[attr-defined, assignment]
                 if novel_id:
                     return str(novel_id).strip()
 
         # Try JavaScript variables
-        scripts = soup.find_all('script')  # type: ignore[attr-defined]
+        scripts = soup.find_all("script")  # type: ignore[attr-defined]
         for script in scripts:
             script_string_raw = script.string  # type: ignore[attr-defined]
             if script_string_raw:
@@ -97,7 +98,7 @@ def extract_novel_id_from_html(html: str) -> Optional[str]:
                 for pattern in patterns:
                     match = re.search(pattern, script_string, re.IGNORECASE)
                     if match:
-                        return match.group(1).strip().strip('"\'')
+                        return match.group(1).strip().strip("\"'")
     except ImportError:
         pass
     except Exception as e:
@@ -119,14 +120,15 @@ def discover_ajax_endpoints(html: str, base_url: str, novel_id: Optional[str] = 
         List of potential AJAX endpoint URLs
     """
     endpoints: List[str] = []
-    base_url = base_url.rstrip('/')
+    base_url = base_url.rstrip("/")
 
     try:
         from bs4 import BeautifulSoup  # type: ignore[import-untyped]
-        soup = BeautifulSoup(html, 'html.parser')  # type: ignore[assignment]
+
+        soup = BeautifulSoup(html, "html.parser")  # type: ignore[assignment]
 
         # Method 1: Check JavaScript variables
-        scripts = soup.find_all('script')  # type: ignore[attr-defined]
+        scripts = soup.find_all("script")  # type: ignore[attr-defined]
         for script in scripts:
             script_string_raw = script.string  # type: ignore[attr-defined]
             if script_string_raw:
@@ -141,10 +143,10 @@ def discover_ajax_endpoints(html: str, base_url: str, novel_id: Optional[str] = 
                     if match:
                         url: str = match.group(1)
                         if novel_id:
-                            url = url.replace('{novelId}', novel_id).replace('{id}', novel_id)
-                        if url.startswith('/'):
+                            url = url.replace("{novelId}", novel_id).replace("{id}", novel_id)
+                        if url.startswith("/"):
                             url = base_url + url
-                        elif not url.startswith('http'):
+                        elif not url.startswith("http"):
                             url = urljoin(base_url, url)
                         endpoints.append(url)
     except ImportError:

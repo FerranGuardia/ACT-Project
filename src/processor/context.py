@@ -47,6 +47,7 @@ class ProcessingContext:
     def wait_if_paused(self) -> None:
         """Wait while processing is paused."""
         import time
+
         while self.check_should_pause() and not self.check_should_stop():
             time.sleep(0.1)
 

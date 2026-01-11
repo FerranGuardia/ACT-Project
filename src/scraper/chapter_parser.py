@@ -24,6 +24,7 @@ from .html_parsing import (
 )
 from .url_processing import normalize_url
 
+
 # Legacy function - use extract_chapter_number instead
 def extract_novel_id(url: str):
     """
@@ -54,19 +55,15 @@ __all__ = [
     "extract_raw_chapter_number",
     "analyze_chapter_numbering",
     "normalize_chapter_number",
-
     # Sorting functions
     "sort_chapters_by_number",
     "sort_chapter_dicts_by_number",
-
     # HTML parsing functions
     "extract_chapters_from_javascript",
     "extract_novel_id_from_html",
     "discover_ajax_endpoints",
-
     # URL processing
     "normalize_url",
-
     # Legacy functions (deprecated)
     "extract_novel_id",
 ]

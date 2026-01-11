@@ -26,6 +26,7 @@ logger = get_logger("tts.voice_resolver")
 @dataclass
 class VoiceResolutionResult:
     """Result of voice resolution operation."""
+
     voice_id: str
     provider: TTSProvider
     voice_metadata: Dict[str, Any]
@@ -34,6 +35,7 @@ class VoiceResolutionResult:
 
 class VoiceNotFoundError(Exception):
     """Raised when a requested voice cannot be found."""
+
     pass
 
 
@@ -61,9 +63,7 @@ class VoiceResolver:
         logger.debug("VoiceResolver initialized")
 
     def resolve_voice(
-        self,
-        voice_name: Optional[str] = None,
-        preferred_provider: Optional[str] = None
+        self, voice_name: Optional[str] = None, preferred_provider: Optional[str] = None
     ) -> VoiceResolutionResult:
         """
         Resolve voice name/id to a concrete voice and provider.
@@ -112,11 +112,7 @@ class VoiceResolver:
 
         raise VoiceNotFoundError(f"Voice '{voice_name}' not found in any provider")
 
-    def _try_resolve_with_provider(
-        self,
-        voice_name: str,
-        provider_name: str
-    ) -> Optional[VoiceResolutionResult]:
+    def _try_resolve_with_provider(self, voice_name: str, provider_name: str) -> Optional[VoiceResolutionResult]:
         """Try to resolve voice with a specific provider."""
         # Check if provider is available
         provider = self.provider_manager.get_provider(provider_name)
@@ -129,11 +125,7 @@ class VoiceResolver:
         if voice_dict:
             voice_id = self._extract_voice_id(voice_dict)
             logger.info(f"Resolved voice '{voice_name}' to '{voice_id}' using provider '{provider_name}'")
-            return VoiceResolutionResult(
-                voice_id=voice_id,
-                provider=provider,
-                voice_metadata=voice_dict
-            )
+            return VoiceResolutionResult(voice_id=voice_id, provider=provider, voice_metadata=voice_dict)
 
         return None
 
@@ -144,25 +136,19 @@ class VoiceResolver:
 
         for voice_dict in all_voices:
             voice_id = self._extract_voice_id(voice_dict)
-            provider_name = voice_dict.get('provider')
+            provider_name = voice_dict.get("provider")
 
             # Check if this voice matches
             if self._voice_matches(voice_name, voice_dict):
                 provider = self.provider_manager.get_provider(provider_name)
                 if provider:
                     logger.info(f"Resolved voice '{voice_name}' to '{voice_id}' using provider '{provider_name}'")
-                    return VoiceResolutionResult(
-                        voice_id=voice_id,
-                        provider=provider,
-                        voice_metadata=voice_dict
-                    )
+                    return VoiceResolutionResult(voice_id=voice_id, provider=provider, voice_metadata=voice_dict)
 
         return None
 
     def _try_fuzzy_match(
-        self,
-        voice_name: str,
-        preferred_provider: Optional[str] = None
+        self, voice_name: str, preferred_provider: Optional[str] = None
     ) -> Optional[VoiceResolutionResult]:
         """Try fuzzy matching for voice names."""
         # Handle Windows SAPI voice names that might be selected in UI
@@ -190,7 +176,7 @@ class VoiceResolver:
         voice_name_lower = voice_name.lower().strip()
 
         for voice_dict in all_voices:
-            provider_name = voice_dict.get('provider')
+            provider_name = voice_dict.get("provider")
             voice_name_full = (voice_dict.get("name") or "").lower()
 
             # Check partial matches
@@ -200,10 +186,7 @@ class VoiceResolver:
                     voice_id = self._extract_voice_id(voice_dict)
                     logger.info(f"Fuzzy matched voice '{voice_name}' to '{voice_id}' using provider '{provider_name}'")
                     return VoiceResolutionResult(
-                        voice_id=voice_id,
-                        provider=provider,
-                        voice_metadata=voice_dict,
-                        fallback_used=True
+                        voice_id=voice_id, provider=provider, voice_metadata=voice_dict, fallback_used=True
                     )
 
         return None
@@ -217,25 +200,14 @@ class VoiceResolver:
         voice_name = (voice_dict.get("name") or "").lower()
         voice_short = (voice_dict.get("ShortName") or "").lower()
 
-        return (
-            voice_id == requested_lower or
-            voice_name == requested_lower or
-            voice_short == requested_lower
-        )
+        return voice_id == requested_lower or voice_name == requested_lower or voice_short == requested_lower
 
     def _extract_voice_id(self, voice_dict: Dict[str, Any]) -> str:
         """Extract the voice ID from voice metadata."""
-        return (
-            voice_dict.get("id") or
-            voice_dict.get("ShortName") or
-            voice_dict.get("name") or
-            str(voice_dict)
-        )
+        return voice_dict.get("id") or voice_dict.get("ShortName") or voice_dict.get("name") or str(voice_dict)
 
     def get_available_voices(
-        self,
-        locale: Optional[str] = None,
-        provider: Optional[str] = None
+        self, locale: Optional[str] = None, provider: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Get available voices with optional filtering.
@@ -253,11 +225,7 @@ class VoiceResolver:
 
         return self.voice_manager.get_voices(locale=locale, provider=provider)
 
-    def validate_voice_exists(
-        self,
-        voice_name: str,
-        provider: Optional[str] = None
-    ) -> bool:
+    def validate_voice_exists(self, voice_name: str, provider: Optional[str] = None) -> bool:
         """
         Check if a voice exists without resolving it.
 

@@ -30,6 +30,7 @@ def sort_chapters_by_number(chapter_urls: List[str]) -> List[str]:
         >>> sort_chapters_by_number(urls)
         ['chapter-1', 'chapter-2', 'chapter-3']
     """
+
     def get_chapter_num(url: str) -> int:
         num = extract_chapter_number(url)
         return num if num is not None else 999999
@@ -55,8 +56,9 @@ def sort_chapter_dicts_by_number(chapter_dicts: List[Dict[str, Any]]) -> List[Di
         >>> sort_chapter_dicts_by_number(chapters)
         [{"url": "chapter-1", "title": "Chapter 1"}, {"url": "chapter-3", "title": "Chapter 3"}]
     """
+
     def get_chapter_num(chapter_dict: Dict[str, Any]) -> int:
-        url = chapter_dict.get('url', '')
+        url = chapter_dict.get("url", "")
         num = extract_chapter_number(url)
         return num if num is not None else 999999
 

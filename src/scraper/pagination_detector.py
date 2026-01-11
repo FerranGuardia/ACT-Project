@@ -11,8 +11,10 @@ from collections import Counter
 from core.logger import get_logger
 from .chapter_parser import extract_chapter_number
 from .config import (
-    PAGINATION_SUSPICIOUS_COUNTS, PAGINATION_CRITICAL_COUNT,
-    PAGINATION_SMALL_COUNT_THRESHOLD, PAGINATION_RANGE_COVERAGE_THRESHOLD
+    PAGINATION_SUSPICIOUS_COUNTS,
+    PAGINATION_CRITICAL_COUNT,
+    PAGINATION_SMALL_COUNT_THRESHOLD,
+    PAGINATION_RANGE_COVERAGE_THRESHOLD,
 )
 
 logger = get_logger("scraper.pagination_detector")
@@ -22,11 +24,8 @@ class PaginationDetector:
     """Detects pagination patterns and analyzes completeness of chapter lists."""
 
     def analyze(
-        self,
-        urls: List[str],
-        min_chapter: Optional[int] = None,
-        max_chapter: Optional[int] = None
-    ) -> 'PaginationAnalysis':
+        self, urls: List[str], min_chapter: Optional[int] = None, max_chapter: Optional[int] = None
+    ) -> "PaginationAnalysis":
         """
         Analyze URLs for pagination patterns and completeness.
 
@@ -40,9 +39,7 @@ class PaginationDetector:
         """
         if not urls:
             return PaginationAnalysis(
-                is_paginated=False,
-                confidence=0.0,
-                suggested_action="retry_with_different_strategy"
+                is_paginated=False, confidence=0.0, suggested_action="retry_with_different_strategy"
             )
 
         # Extract chapter numbers
@@ -57,9 +54,7 @@ class PaginationDetector:
 
         # Check completeness for requested range
         if min_chapter and max_chapter:
-            completeness_check = self._check_range_completeness(
-                chapter_numbers, min_chapter, max_chapter
-            )
+            completeness_check = self._check_range_completeness(chapter_numbers, min_chapter, max_chapter)
             if completeness_check.is_paginated:
                 return completeness_check
 
@@ -68,11 +63,7 @@ class PaginationDetector:
         if pattern_check.is_paginated:
             return pattern_check
 
-        return PaginationAnalysis(
-            is_paginated=False,
-            confidence=0.9,
-            suggested_action="accept_result"
-        )
+        return PaginationAnalysis(is_paginated=False, confidence=0.9, suggested_action="accept_result")
 
     def _extract_chapter_numbers(self, urls: List[str]) -> List[int]:
         """Extract chapter numbers from URLs."""
@@ -83,11 +74,7 @@ class PaginationDetector:
                 chapter_numbers.append(num)
         return sorted(set(chapter_numbers))  # Remove duplicates and sort
 
-    def _check_pagination_signatures(
-        self,
-        url_count: int,
-        chapter_numbers: List[int]
-    ) -> 'PaginationAnalysis':
+    def _check_pagination_signatures(self, url_count: int, chapter_numbers: List[int]) -> "PaginationAnalysis":
         """Check for obvious pagination signatures."""
         # Critical count - almost always pagination
         if url_count == PAGINATION_CRITICAL_COUNT:
@@ -95,7 +82,7 @@ class PaginationDetector:
                 is_paginated=True,
                 confidence=0.95,
                 suggested_action="use_browser_automation",
-                estimated_total=self._estimate_total(url_count, chapter_numbers)
+                estimated_total=self._estimate_total(url_count, chapter_numbers),
             )
 
         # Suspicious counts
@@ -108,29 +95,22 @@ class PaginationDetector:
                     is_paginated=True,
                     confidence=0.85,
                     suggested_action="use_browser_automation",
-                    estimated_total=self._estimate_total(url_count, chapter_numbers)
+                    estimated_total=self._estimate_total(url_count, chapter_numbers),
                 )
 
             return PaginationAnalysis(
-                is_paginated=True,
-                confidence=0.7,
-                suggested_action="check_with_browser_automation"
+                is_paginated=True, confidence=0.7, suggested_action="check_with_browser_automation"
             )
 
         return PaginationAnalysis(is_paginated=False, confidence=0.0)
 
     def _check_range_completeness(
-        self,
-        chapter_numbers: List[int],
-        min_chapter: int,
-        max_chapter: int
-    ) -> 'PaginationAnalysis':
+        self, chapter_numbers: List[int], min_chapter: int, max_chapter: int
+    ) -> "PaginationAnalysis":
         """Check if the detected range covers the requested chapters."""
         if not chapter_numbers:
             return PaginationAnalysis(
-                is_paginated=True,
-                confidence=0.8,
-                suggested_action="retry_with_different_strategy"
+                is_paginated=True, confidence=0.8, suggested_action="retry_with_different_strategy"
             )
 
         max_found = max(chapter_numbers)
@@ -142,7 +122,7 @@ class PaginationDetector:
                 is_paginated=True,
                 confidence=0.9,
                 suggested_action="use_browser_automation",
-                estimated_total=max_chapter
+                estimated_total=max_chapter,
             )
 
         # Check coverage of requested range
@@ -155,7 +135,7 @@ class PaginationDetector:
                 is_paginated=True,
                 confidence=0.8,
                 suggested_action="use_browser_automation",
-                estimated_total=max_chapter
+                estimated_total=max_chapter,
             )
 
         # Check for gaps in sequence (potential pagination)
@@ -166,14 +146,12 @@ class PaginationDetector:
 
             if sequence_coverage < 0.8:  # Less than 80% of expected sequence
                 return PaginationAnalysis(
-                    is_paginated=True,
-                    confidence=0.7,
-                    suggested_action="check_with_browser_automation"
+                    is_paginated=True, confidence=0.7, suggested_action="check_with_browser_automation"
                 )
 
         return PaginationAnalysis(is_paginated=False, confidence=0.0)
 
-    def _check_suspicious_patterns(self, chapter_numbers: List[int]) -> 'PaginationAnalysis':
+    def _check_suspicious_patterns(self, chapter_numbers: List[int]) -> "PaginationAnalysis":
         """Check for other suspicious patterns that might indicate pagination."""
         if len(chapter_numbers) < 10:
             return PaginationAnalysis(is_paginated=False, confidence=0.0)
@@ -185,14 +163,12 @@ class PaginationDetector:
             suspicious_endings = sum(1 for num in chapter_numbers if num in PAGINATION_SUSPICIOUS_COUNTS)
             if suspicious_endings > len(chapter_numbers) * 0.3:  # 30% end at suspicious numbers
                 return PaginationAnalysis(
-                    is_paginated=True,
-                    confidence=0.6,
-                    suggested_action="verify_with_browser_automation"
+                    is_paginated=True, confidence=0.6, suggested_action="verify_with_browser_automation"
                 )
 
         # Check for very regular intervals (might be sampling)
         if len(chapter_numbers) > 20:
-            diffs = [chapter_numbers[i+1] - chapter_numbers[i] for i in range(len(chapter_numbers)-1)]
+            diffs = [chapter_numbers[i + 1] - chapter_numbers[i] for i in range(len(chapter_numbers) - 1)]
             avg_diff = sum(diffs) / len(diffs)
 
             # If average difference is suspiciously regular
@@ -200,15 +176,13 @@ class PaginationDetector:
                 regularity = sum(abs(d - avg_diff) for d in diffs) / len(diffs)
                 if regularity < 2:  # Very regular spacing
                     return PaginationAnalysis(
-                        is_paginated=True,
-                        confidence=0.5,
-                        suggested_action="check_with_browser_automation"
+                        is_paginated=True, confidence=0.5, suggested_action="check_with_browser_automation"
                     )
 
         # Check for concentration at certain ranges
         if len(chapter_numbers) > 50:
             # Look for unnatural clustering
-            ranges = [(i*100, (i+1)*100) for i in range(max_chapter // 100 + 1)]
+            ranges = [(i * 100, (i + 1) * 100) for i in range(max_chapter // 100 + 1)]
             counts_per_range = []
 
             for start, end in ranges:
@@ -221,9 +195,7 @@ class PaginationDetector:
                 max_count = max(counts_per_range)
                 if max_count > avg_count * 3:  # Some ranges have 3x more chapters
                     return PaginationAnalysis(
-                        is_paginated=True,
-                        confidence=0.4,
-                        suggested_action="verify_with_browser_automation"
+                        is_paginated=True, confidence=0.4, suggested_action="verify_with_browser_automation"
                     )
 
         return PaginationAnalysis(is_paginated=False, confidence=0.0)
@@ -263,7 +235,7 @@ class PaginationAnalysis:
         is_paginated: bool = False,
         confidence: float = 0.0,
         suggested_action: str = "",
-        estimated_total: Optional[int] = None
+        estimated_total: Optional[int] = None,
     ):
         self.is_paginated = is_paginated
         self.confidence = confidence

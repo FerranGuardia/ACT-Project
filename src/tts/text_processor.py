@@ -21,20 +21,16 @@ from .audio_merger import AudioMerger
 logger = get_logger("tts.text_processor")
 
 # Deprecation warning
-warnings.warn(
-    "TextProcessor is deprecated. Use TextProcessingPipeline instead.",
-    DeprecationWarning,
-    stacklevel=2
-)
+warnings.warn("TextProcessor is deprecated. Use TextProcessingPipeline instead.", DeprecationWarning, stacklevel=2)
 
 
 class TextProcessor:
     """Handles text preparation and SSML building."""
-    
+
     def __init__(self, provider_manager: TTSProviderManager, base_text_cleaner: Optional[Callable[[str], str]] = None):
         """
         Initialize text processor.
-        
+
         Args:
             provider_manager: TTSProviderManager for SSML support checks
             base_text_cleaner: Optional function to clean text before TTS cleaning
@@ -43,48 +39,53 @@ class TextProcessor:
         self.base_text_cleaner = base_text_cleaner
         self.config = get_config()
         self.audio_merger = AudioMerger(provider_manager)
-    
+
     def prepare_text(self, text: str) -> Optional[str]:
         """
         Clean and validate text for TTS conversion.
-        
+
         Args:
             text: Raw text to prepare
-        
+
         Returns:
             Cleaned text suitable for TTS, or None if validation fails
         """
         # Clean text for TTS
         cleaned_text = clean_text_for_tts(text, self.base_text_cleaner)
-        
+
         # Validate text is not empty
         if not cleaned_text or not cleaned_text.strip():
             logger.error(f"Text is empty after cleaning - cannot convert to speech")
             return None
-        
+
         # Log text length for debugging
         text_length = len(cleaned_text)
-        text_bytes = len(cleaned_text.encode('utf-8'))
+        text_bytes = len(cleaned_text.encode("utf-8"))
         logger.info(f"Text length after cleaning: {text_length} characters ({text_bytes} bytes)")
         if text_length > 0:
-            preview = cleaned_text[:100].replace('\n', ' ').strip()
+            preview = cleaned_text[:100].replace("\n", " ").strip()
             logger.info(f"Text preview (first 100 chars): {preview}...")
-        
+
         return cleaned_text
-    
-    def build_text_for_conversion(self, text: str, provider_instance: Optional[TTSProvider], 
-                                   rate: Optional[float] = None, pitch: Optional[float] = None, 
-                                   volume: Optional[float] = None) -> tuple[str, bool]:
+
+    def build_text_for_conversion(
+        self,
+        text: str,
+        provider_instance: Optional[TTSProvider],
+        rate: Optional[float] = None,
+        pitch: Optional[float] = None,
+        volume: Optional[float] = None,
+    ) -> tuple[str, bool]:
         """
         Build final text for conversion with SSML if supported.
-        
+
         Args:
             text: Cleaned text to convert
             provider_instance: Provider instance to check SSML support
             rate: Speech rate adjustment (or None for default)
             pitch: Pitch adjustment (or None for default)
             volume: Volume adjustment (or None for default)
-        
+
         Returns:
             Tuple of (text_to_convert: str, use_ssml: bool)
         """
@@ -98,7 +99,7 @@ class TextProcessor:
             default_provider = self.provider_manager.get_available_provider()
             if default_provider:
                 use_ssml_for_provider = default_provider.supports_ssml()
-        
+
         # Build SSML if supported
         if use_ssml_for_provider:
             # Ensure we pass float values (use 0.0 as default if None)
@@ -112,7 +113,7 @@ class TextProcessor:
             # For other providers, use plain text (SSML not supported)
             text_to_convert = text
             use_ssml = False
-        
+
         return text_to_convert, use_ssml
 
     def chunk_text(self, text: str, max_length: int) -> list[str]:
@@ -160,6 +161,6 @@ class TextProcessor:
             else:
                 # Split long chunks at character boundaries
                 for i in range(0, len(chunk), max_length):
-                    final_chunks.append(chunk[i:i + max_length])
+                    final_chunks.append(chunk[i : i + max_length])
 
         return final_chunks

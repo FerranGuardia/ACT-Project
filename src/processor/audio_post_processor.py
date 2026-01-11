@@ -21,9 +21,10 @@ class AudioPostProcessor:
     def __init__(self, context: ProcessingContext):
         self.context = context
         from .file_manager import FileManager
-        self.file_manager = FileManager(context.project_name,
-                                      base_output_dir=context.base_output_dir,
-                                      novel_title=context.novel_title)
+
+        self.file_manager = FileManager(
+            context.project_name, base_output_dir=context.base_output_dir, novel_title=context.novel_title
+        )
 
     def merge_audio_files(self, output_format: Optional[Dict[str, Any]] = None) -> bool:
         """Merge processed audio files according to the specified output format."""
@@ -52,9 +53,9 @@ class AudioPostProcessor:
             audio_merger = AudioMerger(provider_manager)
 
             # Determine merge type
-            output_format = output_format or {'type': 'merged_mp3'}
+            output_format = output_format or {"type": "merged_mp3"}
 
-            if output_format.get('type') == 'batched_mp3':
+            if output_format.get("type") == "batched_mp3":
                 return self._merge_in_batches(audio_merger, audio_files_sorted, output_format)
             else:
                 return self._merge_single_file(audio_merger, audio_files_sorted)
@@ -63,10 +64,9 @@ class AudioPostProcessor:
             logger.error(f"Error during audio file merging: {e}")
             return False
 
-    def _merge_in_batches(self, audio_merger, audio_files: List[Path],
-                         output_format: Dict[str, Any]) -> bool:
+    def _merge_in_batches(self, audio_merger, audio_files: List[Path], output_format: Dict[str, Any]) -> bool:
         """Merge audio files in batches."""
-        batch_size = output_format.get('batch_size', 50)
+        batch_size = output_format.get("batch_size", 50)
         logger.info(f"Merging {len(audio_files)} audio files in batches of {batch_size}...")
 
         success_count = 0
@@ -121,8 +121,9 @@ class AudioPostProcessor:
     def _extract_chapter_num(self, path: Path) -> int:
         """Extract chapter number from filename."""
         import re
+
         filename = path.name
-        match = re.search(r'chapter_(\d+)', filename)
+        match = re.search(r"chapter_(\d+)", filename)
         return int(match.group(1)) if match else 0
 
 

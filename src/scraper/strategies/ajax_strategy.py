@@ -31,7 +31,9 @@ class AjaxStrategy(BaseDetectionStrategy):
             # First, fetch the TOC page to discover endpoints
             response = self._fetch_with_retry(toc_url)
             if not response:
-                return self._create_result([], confidence=0.0, error="Failed to fetch page", response_time=time.time() - start_time)
+                return self._create_result(
+                    [], confidence=0.0, error="Failed to fetch page", response_time=time.time() - start_time
+                )
 
             html = response.text
 
@@ -42,7 +44,9 @@ class AjaxStrategy(BaseDetectionStrategy):
             endpoints = self._discover_endpoints(html, novel_id)
 
             if not endpoints:
-                return self._create_result([], confidence=0.0, error="No AJAX endpoints found", response_time=time.time() - start_time)
+                return self._create_result(
+                    [], confidence=0.0, error="No AJAX endpoints found", response_time=time.time() - start_time
+                )
 
             # Try each endpoint
             all_urls = []
@@ -62,7 +66,9 @@ class AjaxStrategy(BaseDetectionStrategy):
                     break
 
             if not all_urls:
-                return self._create_result([], confidence=0.0, error="No URLs from AJAX endpoints", response_time=time.time() - start_time)
+                return self._create_result(
+                    [], confidence=0.0, error="No URLs from AJAX endpoints", response_time=time.time() - start_time
+                )
 
             # Remove duplicates and validate
             all_urls = self._normalize_urls(all_urls)
@@ -82,8 +88,8 @@ class AjaxStrategy(BaseDetectionStrategy):
                 metadata={
                     "extraction_method": "ajax_endpoints",
                     "endpoints_tried": len(endpoints),
-                    "successful_endpoints": successful_endpoints
-                }
+                    "successful_endpoints": successful_endpoints,
+                },
             )
 
         except Exception as e:
@@ -114,15 +120,15 @@ class AjaxStrategy(BaseDetectionStrategy):
         for pattern in js_patterns:
             match = re.search(pattern, html, re.IGNORECASE)
             if match:
-                novel_id = match.group(1).strip().strip('"\'')
+                novel_id = match.group(1).strip().strip("\"'")
                 if novel_id.isdigit():
                     return novel_id
 
         # Try URL patterns
         url_patterns = [
-            r'/novel/(\d+)/',
-            r'/book/(\d+)/',
-            r'/b/([^/]+)',
+            r"/novel/(\d+)/",
+            r"/book/(\d+)/",
+            r"/b/([^/]+)",
         ]
 
         parsed_url = urlparse(self.base_url)
@@ -193,28 +199,28 @@ class AjaxStrategy(BaseDetectionStrategy):
 
         # Handle template variables
         if novel_id:
-            expanded = url.replace('{novelId}', novel_id)
-            expanded = expanded.replace('{id}', novel_id)
-            expanded = expanded.replace('{novel_id}', novel_id)
+            expanded = url.replace("{novelId}", novel_id)
+            expanded = expanded.replace("{id}", novel_id)
+            expanded = expanded.replace("{novel_id}", novel_id)
             endpoints.append(expanded)
 
         # Add pagination variations
-        base_endpoint = url.split('?')[0] if '?' in url else url
-        query = parse_qs(url.split('?', 1)[1]) if '?' in url else {}
+        base_endpoint = url.split("?")[0] if "?" in url else url
+        query = parse_qs(url.split("?", 1)[1]) if "?" in url else {}
 
         # Try different pagination parameters
         pagination_params = [
-            ('page', '1'),
-            ('offset', '0'),
-            ('start', '0'),
-            ('p', '1'),
+            ("page", "1"),
+            ("offset", "0"),
+            ("start", "0"),
+            ("p", "1"),
         ]
 
         for param_name, param_value in pagination_params:
             if param_name not in query:
                 paginated_query = query.copy()
                 paginated_query[param_name] = [param_value]
-                paginated_url = base_endpoint + '?' + '&'.join([f"{k}={v[0]}" for k, v in paginated_query.items()])
+                paginated_url = base_endpoint + "?" + "&".join([f"{k}={v[0]}" for k, v in paginated_query.items()])
                 endpoints.append(paginated_url)
 
         return endpoints
@@ -223,18 +229,18 @@ class AjaxStrategy(BaseDetectionStrategy):
         """Try to fetch chapter URLs from an AJAX endpoint."""
         try:
             # Make endpoint absolute
-            if not endpoint.startswith(('http://', 'https://')):
+            if not endpoint.startswith(("http://", "https://")):
                 endpoint = urljoin(self.base_url, endpoint)
 
             response = self._fetch_with_retry(endpoint)
             if not response:
                 return []
 
-            content_type = response.headers.get('content-type', '').lower()
+            content_type = response.headers.get("content-type", "").lower()
 
-            if 'json' in content_type:
+            if "json" in content_type:
                 return self._parse_json_response(response.text)
-            elif 'html' in content_type or 'text' in content_type:
+            elif "html" in content_type or "text" in content_type:
                 return self._parse_html_response(response.text)
             else:
                 # Try JSON first, then HTML
@@ -291,8 +297,14 @@ class AjaxStrategy(BaseDetectionStrategy):
 
         # Common keys that might contain chapter arrays
         chapter_keys = [
-            'chapters', 'chapterList', 'data', 'list', 'items',
-            'chapter_data', 'chapters_list', 'chapter_items'
+            "chapters",
+            "chapterList",
+            "data",
+            "list",
+            "items",
+            "chapter_data",
+            "chapters_list",
+            "chapter_items",
         ]
 
         def search_obj(obj, path=""):
@@ -315,7 +327,7 @@ class AjaxStrategy(BaseDetectionStrategy):
         for chapter in chapters:
             if isinstance(chapter, dict):
                 # Try common URL field names
-                url_fields = ['url', 'href', 'link', 'chapter_url', 'chapterUrl']
+                url_fields = ["url", "href", "link", "chapter_url", "chapterUrl"]
 
                 for field in url_fields:
                     if field in chapter and isinstance(chapter[field], str):
@@ -331,11 +343,11 @@ class AjaxStrategy(BaseDetectionStrategy):
         url_lower = url.lower()
 
         # Must have chapter indicator
-        chapter_indicators = ['chapter', 'ch', 'chap', 'episode', 'ep', '第', '章']
+        chapter_indicators = ["chapter", "ch", "chap", "episode", "ep", "第", "章"]
         has_indicator = any(indicator in url_lower for indicator in chapter_indicators)
 
         # Must have number
-        has_number = bool(re.search(r'\d+', url))
+        has_number = bool(re.search(r"\d+", url))
 
         # Reasonable length
         reasonable_length = 10 <= len(url) <= 500

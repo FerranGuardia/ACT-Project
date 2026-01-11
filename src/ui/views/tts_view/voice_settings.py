@@ -4,29 +4,24 @@ Voice Settings Section - Handles voice selection and audio parameters.
 
 from typing import Optional
 
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QComboBox, QSlider, QGroupBox
-)
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox, QSlider, QGroupBox
 from PySide6.QtCore import Qt
 
-from ui.styles import (
-    get_combo_box_style, get_slider_style, get_group_box_style, COLORS
-)
+from ui.styles import get_combo_box_style, get_slider_style, get_group_box_style, COLORS
 from ui.view_config import ViewConfig
 
 
 class VoiceSettings(QGroupBox):
     """Voice settings section with provider, voice, rate, pitch, and volume controls."""
-    
+
     def __init__(self, parent=None):
         super().__init__("Voice Settings", parent)
         self.setup_ui()
-    
+
     def setup_ui(self):
         """Set up the voice settings UI."""
         layout = QVBoxLayout()
-        
+
         # Provider selector
         provider_layout = QHBoxLayout()
         provider_label = QLabel("Provider:")
@@ -38,7 +33,7 @@ class VoiceSettings(QGroupBox):
         provider_layout.addWidget(self.provider_combo)
         provider_layout.addStretch()
         layout.addLayout(provider_layout)
-        
+
         # Voice selector with preview buttons
         voice_select_layout = QHBoxLayout()
         voice_label = QLabel("Voice:")
@@ -57,7 +52,7 @@ class VoiceSettings(QGroupBox):
         voice_select_layout.addWidget(self.stop_preview_button)
         voice_select_layout.addStretch()
         layout.addLayout(voice_select_layout)
-        
+
         # Rate slider
         rate_layout = QHBoxLayout()
         rate_label = QLabel("Rate:")
@@ -73,7 +68,7 @@ class VoiceSettings(QGroupBox):
         rate_layout.addWidget(self.rate_slider)
         rate_layout.addWidget(self.rate_label)
         layout.addLayout(rate_layout)
-        
+
         # Pitch slider
         pitch_layout = QHBoxLayout()
         pitch_label = QLabel("Pitch:")
@@ -89,7 +84,7 @@ class VoiceSettings(QGroupBox):
         pitch_layout.addWidget(self.pitch_slider)
         pitch_layout.addWidget(self.pitch_label)
         layout.addLayout(pitch_layout)
-        
+
         # Volume slider
         volume_layout = QHBoxLayout()
         volume_label = QLabel("Volume:")
@@ -105,32 +100,31 @@ class VoiceSettings(QGroupBox):
         volume_layout.addWidget(self.volume_slider)
         volume_layout.addWidget(self.volume_label)
         layout.addLayout(volume_layout)
-        
+
         self.setLayout(layout)
         self.setStyleSheet(get_group_box_style())
-    
+
     def get_selected_provider(self) -> Optional[str]:
         """Get the currently selected provider name."""
         current_index = self.provider_combo.currentIndex()
         if current_index < 0:
             return None
         return self.provider_combo.itemData(current_index)
-    
+
     def get_selected_voice(self) -> str:
         """Get the currently selected voice name."""
         voice_display = self.voice_combo.currentText()
         # Extract voice name from formatted string (e.g., "en-US-AndrewNeural - Male" -> "en-US-AndrewNeural")
         return voice_display.split(" - ")[0] if " - " in voice_display else voice_display
-    
+
     def get_rate(self) -> int:
         """Get the current rate value."""
         return self.rate_slider.value()
-    
+
     def get_pitch(self) -> int:
         """Get the current pitch value."""
         return self.pitch_slider.value()
-    
+
     def get_volume(self) -> int:
         """Get the current volume value."""
         return self.volume_slider.value()
-

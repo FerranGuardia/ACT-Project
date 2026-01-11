@@ -30,7 +30,9 @@ class JavaScriptStrategy(BaseDetectionStrategy):
             # Fetch the page
             response = self._fetch_with_retry(toc_url)
             if not response:
-                return self._create_result([], confidence=0.0, error="Failed to fetch page", response_time=time.time() - start_time)
+                return self._create_result(
+                    [], confidence=0.0, error="Failed to fetch page", response_time=time.time() - start_time
+                )
 
             html = response.text
 
@@ -38,7 +40,9 @@ class JavaScriptStrategy(BaseDetectionStrategy):
             urls = self._extract_from_javascript(html)
 
             if not urls:
-                return self._create_result([], confidence=0.0, error="No URLs found in JavaScript", response_time=time.time() - start_time)
+                return self._create_result(
+                    [], confidence=0.0, error="No URLs found in JavaScript", response_time=time.time() - start_time
+                )
 
             # Validate and normalize URLs
             urls, validation_score = self._validate_urls(urls)
@@ -58,10 +62,7 @@ class JavaScriptStrategy(BaseDetectionStrategy):
                 estimated_total=estimated_total,
                 validation_score=validation_score,
                 response_time=time.time() - start_time,
-                metadata={
-                    "extraction_method": "javascript_variables",
-                    "patterns_found": len(urls) > 0
-                }
+                metadata={"extraction_method": "javascript_variables", "patterns_found": len(urls) > 0},
             )
 
         except Exception as e:
@@ -74,15 +75,15 @@ class JavaScriptStrategy(BaseDetectionStrategy):
 
         # Pattern 1: Direct array assignments (most common)
         array_patterns = [
-            r'chapters\s*[:=]\s*\[([^\]]+)\]',
-            r'chapterList\s*[:=]\s*\[([^\]]+)\]',
-            r'chapterUrls\s*[:=]\s*\[([^\]]+)\]',
-            r'chaptersArray\s*[:=]\s*\[([^\]]+)\]',
-            r'chapter_data\s*[:=]\s*\[([^\]]+)\]',
-            r'window\.chapters\s*[:=]\s*\[([^\]]+)\]',
-            r'var\s+chapters\s*[:=]\s*\[([^\]]+)\]',
-            r'let\s+chapters\s*[:=]\s*\[([^\]]+)\]',
-            r'const\s+chapters\s*[:=]\s*\[([^\]]+)\]',
+            r"chapters\s*[:=]\s*\[([^\]]+)\]",
+            r"chapterList\s*[:=]\s*\[([^\]]+)\]",
+            r"chapterUrls\s*[:=]\s*\[([^\]]+)\]",
+            r"chaptersArray\s*[:=]\s*\[([^\]]+)\]",
+            r"chapter_data\s*[:=]\s*\[([^\]]+)\]",
+            r"window\.chapters\s*[:=]\s*\[([^\]]+)\]",
+            r"var\s+chapters\s*[:=]\s*\[([^\]]+)\]",
+            r"let\s+chapters\s*[:=]\s*\[([^\]]+)\]",
+            r"const\s+chapters\s*[:=]\s*\[([^\]]+)\]",
         ]
 
         for pattern in array_patterns:
@@ -95,7 +96,7 @@ class JavaScriptStrategy(BaseDetectionStrategy):
         # Pattern 2: JSON.parse() calls with chapter data
         json_patterns = [
             r'JSON\.parse\(\s*[\'"]([^\'"]*chapters?[^\'"]*)[\'"]\s*\)',
-            r'JSON\.parse\(\s*`([^`]*(?:chapters?|chapters?_list)[^`]*)`\s*\)',
+            r"JSON\.parse\(\s*`([^`]*(?:chapters?|chapters?_list)[^`]*)`\s*\)",
         ]
 
         for pattern in json_patterns:
@@ -107,8 +108,8 @@ class JavaScriptStrategy(BaseDetectionStrategy):
 
         # Pattern 3: Object property access
         object_patterns = [
-            r'chapters\s*[:=]\s*\{[^}]*urls?\s*:\s*\[([^\]]+)\]',
-            r'chapterList\s*[:=]\s*\{[^}]*data\s*:\s*\[([^\]]+)\]',
+            r"chapters\s*[:=]\s*\{[^}]*urls?\s*:\s*\[([^\]]+)\]",
+            r"chapterList\s*[:=]\s*\{[^}]*data\s*:\s*\[([^\]]+)\]",
         ]
 
         for pattern in object_patterns:
@@ -120,8 +121,8 @@ class JavaScriptStrategy(BaseDetectionStrategy):
 
         # Pattern 4: Function calls that return chapter data
         function_patterns = [
-            r'getChapters\(\)\s*[:=]\s*\[([^\]]+)\]',
-            r'loadChapters\(\)\s*[:=]\s*\[([^\]]+)\]',
+            r"getChapters\(\)\s*[:=]\s*\[([^\]]+)\]",
+            r"loadChapters\(\)\s*[:=]\s*\[([^\]]+)\]",
         ]
 
         for pattern in function_patterns:
@@ -155,8 +156,8 @@ class JavaScriptStrategy(BaseDetectionStrategy):
             # Basic URL validation
             if self._is_likely_chapter_url(potential_url):
                 # Normalize relative URLs
-                if not potential_url.startswith(('http://', 'https://', '//')):
-                    if potential_url.startswith('/'):
+                if not potential_url.startswith(("http://", "https://", "//")):
+                    if potential_url.startswith("/"):
                         urls.append(potential_url)  # Already absolute path
                     else:
                         urls.append(f"/{potential_url}")  # Make it absolute
@@ -171,7 +172,7 @@ class JavaScriptStrategy(BaseDetectionStrategy):
 
         try:
             # Unescape common JavaScript escape sequences
-            json_str = json_str.replace('\\n', '').replace('\\t', '').replace('\\r', '')
+            json_str = json_str.replace("\\n", "").replace("\\t", "").replace("\\r", "")
 
             # Try to parse as JSON
             data = json.loads(json_str)
@@ -180,7 +181,7 @@ class JavaScriptStrategy(BaseDetectionStrategy):
             def extract_urls_from_obj(obj):
                 if isinstance(obj, dict):
                     for key, value in obj.items():
-                        if key.lower() in ['url', 'href', 'link', 'chapter_url']:
+                        if key.lower() in ["url", "href", "link", "chapter_url"]:
                             if isinstance(value, str) and self._is_likely_chapter_url(value):
                                 urls.append(value)
                         else:
@@ -203,14 +204,22 @@ class JavaScriptStrategy(BaseDetectionStrategy):
 
         # Must contain some chapter indicator
         chapter_indicators = [
-            'chapter', 'ch', 'chap', 'episode', 'ep', 'part',
-            '第', '章', '话', '节'  # Chinese chapter indicators
+            "chapter",
+            "ch",
+            "chap",
+            "episode",
+            "ep",
+            "part",
+            "第",
+            "章",
+            "话",
+            "节",  # Chinese chapter indicators
         ]
 
         has_chapter_indicator = any(indicator in url_lower for indicator in chapter_indicators)
 
         # Must have a number (chapter number)
-        has_number = bool(re.search(r'\d+', url))
+        has_number = bool(re.search(r"\d+", url))
 
         # Should not be too short (likely not a real URL)
         reasonable_length = len(url) > 10
@@ -236,10 +245,10 @@ class JavaScriptStrategy(BaseDetectionStrategy):
         """Estimate total chapters from JavaScript variables."""
         # Look for explicit total counts
         total_patterns = [
-            r'totalChapters\s*[:=]\s*(\d+)',
-            r'chapterCount\s*[:=]\s*(\d+)',
-            r'total_count\s*[:=]\s*(\d+)',
-            r'maxChapter\s*[:=]\s*(\d+)',
+            r"totalChapters\s*[:=]\s*(\d+)",
+            r"chapterCount\s*[:=]\s*(\d+)",
+            r"total_count\s*[:=]\s*(\d+)",
+            r"maxChapter\s*[:=]\s*(\d+)",
         ]
 
         for pattern in total_patterns:

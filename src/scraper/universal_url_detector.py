@@ -20,9 +20,12 @@ from .extractors.url_extractor_session import SessionManager
 from .extractors.url_extractor_validators import is_chapter_url
 from .chapter_parser import extract_chapter_number, normalize_url
 from .config import (
-    REQUEST_TIMEOUT, REQUEST_DELAY,
-    PAGINATION_SUSPICIOUS_COUNTS, PAGINATION_CRITICAL_COUNT,
-    PAGINATION_SMALL_COUNT_THRESHOLD, PAGINATION_RANGE_COVERAGE_THRESHOLD
+    REQUEST_TIMEOUT,
+    REQUEST_DELAY,
+    PAGINATION_SUSPICIOUS_COUNTS,
+    PAGINATION_CRITICAL_COUNT,
+    PAGINATION_SMALL_COUNT_THRESHOLD,
+    PAGINATION_RANGE_COVERAGE_THRESHOLD,
 )
 from .adaptive_config import get_adaptive_config_manager
 
@@ -32,6 +35,7 @@ logger = get_logger("scraper.universal_detector")
 @dataclass
 class DetectionResult:
     """Result from a single detection strategy."""
+
     urls: List[str] = field(default_factory=list)
     confidence: float = 0.0  # 0.0-1.0
     method: str = ""
@@ -47,6 +51,7 @@ class DetectionResult:
 @dataclass
 class ValidationResult:
     """Result from URL validation."""
+
     is_valid: bool = False
     confidence: float = 0.0
     chapter_number: Optional[int] = None
@@ -56,6 +61,7 @@ class ValidationResult:
 @dataclass
 class PaginationAnalysis:
     """Analysis of pagination patterns."""
+
     is_paginated: bool = False
     confidence: float = 0.0
     suggested_action: str = ""  # "try_next_page", "use_browser", "accept_partial", etc.
@@ -65,6 +71,7 @@ class PaginationAnalysis:
 @dataclass
 class SiteConfig:
     """Site-specific configuration learned over time."""
+
     domain: str
     strategy_success_rates: Dict[str, float] = field(default_factory=dict)
     optimal_strategy_order: List[str] = field(default_factory=list)
@@ -89,11 +96,7 @@ class BaseDetectionStrategy(ABC):
 
     def _create_result(self, urls: List[str], **kwargs) -> DetectionResult:
         """Create a DetectionResult with timing information."""
-        return DetectionResult(
-            urls=urls,
-            method=self.name,
-            **kwargs
-        )
+        return DetectionResult(urls=urls, method=self.name, **kwargs)
 
     def _fetch_with_retry(self, url: str, timeout: int = REQUEST_TIMEOUT) -> Optional[Any]:
         """Fetch URL with session management and retry logic."""
@@ -156,14 +159,14 @@ class BaseDetectionStrategy(ABC):
         if chapter_num and chapter_num > 0:
             confidence += 0.3  # Has valid chapter number
 
-        if 'chapter' in url.lower():
+        if "chapter" in url.lower():
             confidence += 0.2  # Contains 'chapter' in URL
 
         return ValidationResult(
             is_valid=is_valid,
             confidence=min(confidence, 1.0),
             chapter_number=chapter_num,
-            validation_method="universal_validator"
+            validation_method="universal_validator",
         )
 
 
@@ -198,7 +201,7 @@ class UniversalUrlDetector:
         should_stop: Optional[Callable[[], bool]] = None,
         min_chapter: Optional[int] = None,
         max_chapter: Optional[int] = None,
-        use_parallel: bool = True
+        use_parallel: bool = True,
     ) -> DetectionResult:
         """
         Detect chapter URLs using optimal strategy combination.
@@ -244,7 +247,7 @@ class UniversalUrlDetector:
         strategy_order: List[str],
         should_stop: Optional[Callable[[], bool]],
         min_chapter: Optional[int],
-        max_chapter: Optional[int]
+        max_chapter: Optional[int],
     ) -> DetectionResult:
         """Run strategies in parallel and return best result."""
         strategy_map = {s.name: s for s in self.strategies}
@@ -278,7 +281,7 @@ class UniversalUrlDetector:
         strategy_order: List[str],
         should_stop: Optional[Callable[[], bool]],
         min_chapter: Optional[int],
-        max_chapter: Optional[int]
+        max_chapter: Optional[int],
     ) -> DetectionResult:
         """Run strategies sequentially, returning first good result."""
         strategy_map = {s.name: s for s in self.strategies}
@@ -299,10 +302,7 @@ class UniversalUrlDetector:
         return DetectionResult(error="No strategy found sufficient results")
 
     def _select_best_result(
-        self,
-        results: List[DetectionResult],
-        min_chapter: Optional[int],
-        max_chapter: Optional[int]
+        self, results: List[DetectionResult], min_chapter: Optional[int], max_chapter: Optional[int]
     ) -> DetectionResult:
         """Select the best result from multiple strategy results."""
         if not results:
@@ -318,12 +318,7 @@ class UniversalUrlDetector:
         scored_results.sort(key=lambda x: x[0], reverse=True)
         return scored_results[0][1]
 
-    def _score_result(
-        self,
-        result: DetectionResult,
-        min_chapter: Optional[int],
-        max_chapter: Optional[int]
-    ) -> float:
+    def _score_result(self, result: DetectionResult, min_chapter: Optional[int], max_chapter: Optional[int]) -> float:
         """Score a detection result."""
         score = result.confidence
 
@@ -343,10 +338,7 @@ class UniversalUrlDetector:
         return min(score, 1.0)
 
     def _result_meets_requirements(
-        self,
-        result: DetectionResult,
-        min_chapter: Optional[int],
-        max_chapter: Optional[int]
+        self, result: DetectionResult, min_chapter: Optional[int], max_chapter: Optional[int]
     ) -> bool:
         """Check if result meets the chapter requirements."""
         if not min_chapter or not result.urls:
@@ -399,10 +391,12 @@ class UniversalUrlDetector:
         """Validate a single URL."""
         # Use existing validator as base
         from .extractors.url_extractor_validators import is_chapter_url
+
         is_valid = is_chapter_url(url)
 
         # Extract chapter number for additional validation
         from .chapter_parser import extract_chapter_number
+
         chapter_num = extract_chapter_number(url)
 
         # Calculate confidence based on multiple factors
@@ -414,14 +408,14 @@ class UniversalUrlDetector:
         if chapter_num and chapter_num > 0:
             confidence += 0.3  # Has valid chapter number
 
-        if 'chapter' in url.lower():
+        if "chapter" in url.lower():
             confidence += 0.2  # Contains 'chapter' in URL
 
         return ValidationResult(
             is_valid=is_valid,
             confidence=min(confidence, 1.0),
             chapter_number=chapter_num,
-            validation_method="universal_validator"
+            validation_method="universal_validator",
         )
 
     def _learn_from_result(self, result: DetectionResult):
@@ -430,13 +424,7 @@ class UniversalUrlDetector:
             return
 
         success = result.confidence > 0.5  # Consider it successful if confidence > 50%
-        self.adaptive_config.update_profile(
-            self.base_url,
-            result.method,
-            success,
-            result.response_time
-        )
-
+        self.adaptive_config.update_profile(self.base_url, result.method, success, result.response_time)
 
 
 # Import strategies at the end to avoid circular imports

@@ -20,6 +20,7 @@ logger = get_logger("tts.text_processing_pipeline")
 @dataclass
 class ProcessedText:
     """Result of text processing pipeline."""
+
     original: str
     cleaned: str
     enhanced: str
@@ -30,7 +31,7 @@ class ProcessedText:
         provider: TTSProvider,
         rate: Optional[float] = None,
         pitch: Optional[float] = None,
-        volume: Optional[float] = None
+        volume: Optional[float] = None,
     ) -> Tuple[str, bool]:
         """
         Build final text for conversion with SSML if supported.
@@ -51,12 +52,7 @@ class ProcessedText:
             pitch_val = pitch if pitch is not None else 0.0
             volume_val = volume if volume is not None else 0.0
 
-            ssml_text = build_ssml(
-                self.enhanced,
-                rate=rate_val,
-                pitch=pitch_val,
-                volume=volume_val
-            )
+            ssml_text = build_ssml(self.enhanced, rate=rate_val, pitch=pitch_val, volume=volume_val)
             use_ssml = ssml_text != self.enhanced
             return ssml_text if use_ssml else self.enhanced, use_ssml
         else:
@@ -103,11 +99,11 @@ class TextValidator:
 
         # Log text statistics
         text_length = len(processed_text.enhanced)
-        text_bytes = len(processed_text.enhanced.encode('utf-8'))
+        text_bytes = len(processed_text.enhanced.encode("utf-8"))
         logger.info(f"Text length after processing: {text_length} characters ({text_bytes} bytes)")
 
         if text_length > 0:
-            preview = processed_text.enhanced[:100].replace('\n', ' ').strip()
+            preview = processed_text.enhanced[:100].replace("\n", " ").strip()
             logger.info(f"Text preview (first 100 chars): {preview}...")
 
         return True
@@ -123,11 +119,7 @@ class TextProcessingPipeline:
     - SSML preparation detection
     """
 
-    def __init__(
-        self,
-        cleaners: Optional[List[TextCleaner]] = None,
-        validator: Optional[TextValidator] = None
-    ):
+    def __init__(self, cleaners: Optional[List[TextCleaner]] = None, validator: Optional[TextValidator] = None):
         """
         Initialize text processing pipeline.
 
@@ -160,7 +152,7 @@ class TextProcessingPipeline:
             original=text,
             cleaned=cleaned_text,
             enhanced=cleaned_text,  # For now, enhanced is same as cleaned
-            ssml_supported=self._detect_ssml_need(cleaned_text)
+            ssml_supported=self._detect_ssml_need(cleaned_text),
         )
 
         # Validate the processed text

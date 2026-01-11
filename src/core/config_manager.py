@@ -92,10 +92,7 @@ class ConfigManager:
                 with open(self.config_file, "r", encoding="utf-8") as f:
                     file_config = json.load(f)
                     # Merge with defaults to ensure all keys exist
-                    self._config = self._merge_config(
-                        self._default_config, 
-                        cast(Dict[str, Any], file_config)
-                    )
+                    self._config = self._merge_config(self._default_config, cast(Dict[str, Any], file_config))
                 logger.info(f"Configuration loaded from {self.config_file}")
             except (json.JSONDecodeError, IOError) as e:
                 logger.warning(f"Error loading config file: {e}. Using defaults.")
@@ -129,10 +126,7 @@ class ConfigManager:
         result = default.copy()
         for key, value in user.items():
             if key in result and isinstance(result[key], dict) and isinstance(value, dict):
-                result[key] = self._merge_config(
-                    cast(Dict[str, Any], result[key]), 
-                    cast(Dict[str, Any], value)
-                )
+                result[key] = self._merge_config(cast(Dict[str, Any], result[key]), cast(Dict[str, Any], value))
             else:
                 result[key] = value
         return result
@@ -240,9 +234,3 @@ def get_config() -> ConfigManager:
         >>> voice = config.get('tts.voice')
     """
     return ConfigManager()
-
-
-
-
-
-

@@ -39,7 +39,6 @@ CONTENT_SELECTORS = [
     "div.text-left",
     "div#text-chapter",
     "div.chapter-content-wrapper",
-
     # General novel site selectors
     "div.chapter-content",
     "div#chapter-content",
@@ -53,7 +52,6 @@ CONTENT_SELECTORS = [
     "div.chapter-text",
     "div#novel-content",
     "div.novel-content",
-
     # Additional common selectors
     "div.entry-content",
     "div.post-content",

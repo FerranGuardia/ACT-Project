@@ -14,7 +14,7 @@ from text_utils import clean_text
 from .chapter_parser import extract_chapter_number as _extract_chapter_number, sort_chapters_by_number
 from .config import REQUEST_TIMEOUT, REQUEST_DELAY, MAX_RETRIES
 
-__all__ = ['BaseScraper']
+__all__ = ["BaseScraper"]
 
 logger = get_logger("scraper.base")
 
@@ -174,4 +174,3 @@ class BaseScraper(ABC):
         """
         log_func = getattr(self.logger, level.lower(), self.logger.info)
         log_func(message)
-

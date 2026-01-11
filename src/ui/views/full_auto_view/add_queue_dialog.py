@@ -6,9 +6,21 @@ from pathlib import Path
 from typing import Optional, Dict, Any, Tuple
 
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QLineEdit, QDialogButtonBox, QFormLayout, QComboBox, QRadioButton,
-    QButtonGroup, QSpinBox, QFileDialog, QGroupBox, QWidget
+    QDialog,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QLineEdit,
+    QDialogButtonBox,
+    QFormLayout,
+    QComboBox,
+    QRadioButton,
+    QButtonGroup,
+    QSpinBox,
+    QFileDialog,
+    QGroupBox,
+    QWidget,
 )
 from PySide6.QtCore import Qt
 
@@ -22,7 +34,7 @@ logger = get_logger("ui.full_auto_view.add_queue_dialog")
 
 class AddQueueDialog(QDialog):
     """Dialog for adding items to the queue."""
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Add to Queue")
@@ -32,22 +44,22 @@ class AddQueueDialog(QDialog):
         self._providers_loaded = False
         self.setup_ui()
         # Don't load providers/voices on init - do it lazily when needed
-    
+
     def setup_ui(self):
         """Set up the dialog UI."""
         layout = QVBoxLayout()
-        
+
         # URL and Title
         form_layout = QFormLayout()
-        
+
         self.url_input = QLineEdit()
         self.url_input.setPlaceholderText("https://novel-site.com/novel-name")
         form_layout.addRow("Novel URL:", self.url_input)
-        
+
         self.title_input = QLineEdit()
         self.title_input.setPlaceholderText("Novel Title (optional)")
         form_layout.addRow("Title:", self.title_input)
-        
+
         # Output Folder Selection
         folder_layout = QHBoxLayout()
         self.folder_input = QLineEdit()
@@ -57,13 +69,13 @@ class AddQueueDialog(QDialog):
         folder_layout.addWidget(self.folder_input, 1)
         folder_layout.addWidget(folder_button)
         form_layout.addRow("Output Folder:", folder_layout)
-        
+
         layout.addLayout(form_layout)
-        
+
         # Voice Selection
         voice_group = QGroupBox("Voice Settings")
         voice_layout = QVBoxLayout()
-        
+
         # Provider selector
         provider_layout = QHBoxLayout()
         provider_layout.addWidget(QLabel("Provider:"))
@@ -75,27 +87,27 @@ class AddQueueDialog(QDialog):
         provider_layout.addWidget(self.provider_button, 1)
         provider_layout.addWidget(self.provider_status_label)
         voice_layout.addLayout(provider_layout)
-        
+
         voice_select_layout = QHBoxLayout()
         voice_select_layout.addWidget(QLabel("Voice:"))
         self.voice_combo = QComboBox()
         self.voice_combo.setMinimumWidth(ViewConfig.COMBO_BOX_VOICE_DIALOG_MIN_WIDTH)
         voice_select_layout.addWidget(self.voice_combo, 1)
         voice_layout.addLayout(voice_select_layout)
-        
+
         voice_group.setLayout(voice_layout)
         layout.addWidget(voice_group)
-        
+
         # Chapter Selection
         chapter_group = QGroupBox("Chapter Selection")
         chapter_layout = QVBoxLayout()
         self.chapter_group = QButtonGroup()
-        
+
         self.all_chapters_radio = QRadioButton("All chapters")
         self.all_chapters_radio.setChecked(True)
         self.chapter_group.addButton(self.all_chapters_radio, 0)
         chapter_layout.addWidget(self.all_chapters_radio)
-        
+
         range_layout = QHBoxLayout()
         self.range_radio = QRadioButton("Range:")
         self.chapter_group.addButton(self.range_radio, 1)
@@ -114,7 +126,7 @@ class AddQueueDialog(QDialog):
         range_layout.addWidget(self.to_spin)
         range_layout.addStretch()
         chapter_layout.addLayout(range_layout)
-        
+
         self.specific_radio = QRadioButton("Specific chapters:")
         self.chapter_group.addButton(self.specific_radio, 2)
         self.specific_input = QLineEdit()
@@ -123,7 +135,7 @@ class AddQueueDialog(QDialog):
         self.specific_radio.toggled.connect(self.specific_input.setEnabled)
         chapter_layout.addWidget(self.specific_radio)
         chapter_layout.addWidget(self.specific_input)
-        
+
         chapter_group.setLayout(chapter_layout)
         layout.addWidget(chapter_group)
 
@@ -182,20 +194,17 @@ class AddQueueDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
-        
+
         self.setLayout(layout)
-    
+
     def _select_folder(self):
         """Open folder selection dialog."""
         folder = QFileDialog.getExistingDirectory(
-            self,
-            "Select Output Folder",
-            str(Path.home() / "Desktop"),
-            QFileDialog.Option.ShowDirsOnly
+            self, "Select Output Folder", str(Path.home() / "Desktop"), QFileDialog.Option.ShowDirsOnly
         )
         if folder:
             self.folder_input.setText(folder)
-    
+
     def _load_providers(self):
         """Load available providers and set default."""
         try:
@@ -220,7 +229,7 @@ class AddQueueDialog(QDialog):
             self.selected_provider = "edge_tts"
             self._update_provider_display()
             self._providers_loaded = True
-    
+
     def _select_provider(self):
         """Open provider selection dialog."""
         # Load providers if not already loaded
@@ -233,31 +242,31 @@ class AddQueueDialog(QDialog):
             self._update_provider_display()
             # Reload voices for the selected provider
             self._load_voices()
-    
+
     def _update_provider_display(self):
         """Update provider button and status display."""
         if not self.selected_provider:
             self.provider_button.setText("Select Provider...")
             self.provider_status_label.setText("")
             return
-        
+
         # Get provider info
-        provider_labels = {
-            "edge_tts": "Edge TTS",
-            "pyttsx3": "pyttsx3 (Offline)"
-        }
-        
+        provider_labels = {"edge_tts": "Edge TTS", "pyttsx3": "pyttsx3 (Offline)"}
+
         label = provider_labels.get(self.selected_provider, self.selected_provider)
         self.provider_button.setText(f"Provider: {label}")
-        
+
         # Check status and update indicator
         try:
             from tts.providers.provider_manager import TTSProviderManager
+
             provider_manager = TTSProviderManager()
             provider = provider_manager.get_provider(self.selected_provider)
             if provider and provider.is_available():
                 self.provider_status_label.setText("🟡")
-                self.provider_status_label.setToolTip("Provider library available - Use dialog to test audio generation")
+                self.provider_status_label.setToolTip(
+                    "Provider library available - Use dialog to test audio generation"
+                )
             else:
                 self.provider_status_label.setText("🔴")
                 self.provider_status_label.setToolTip("Provider is unavailable")
@@ -265,14 +274,14 @@ class AddQueueDialog(QDialog):
             logger.error(f"Error checking provider status: {e}")
             self.provider_status_label.setText("🔴")
             self.provider_status_label.setToolTip("Error checking status")
-    
+
     def _get_selected_provider(self) -> Optional[str]:
         """Get the currently selected provider name."""
         # If no provider selected yet, try to load providers and pick default
         if self.selected_provider is None and not self._providers_loaded:
             self._load_providers()
         return self.selected_provider
-    
+
     def _load_voices(self):
         """Load available voices into the combo box based on selected provider."""
         try:
@@ -289,6 +298,7 @@ class AddQueueDialog(QDialog):
 
             # Check if provider is available
             from tts.providers.provider_manager import TTSProviderManager
+
             provider_manager = TTSProviderManager()
             provider_instance = provider_manager.get_provider(provider)
             if not provider_instance:
@@ -325,7 +335,7 @@ class AddQueueDialog(QDialog):
             logger.error(f"Error loading voices: {e}")
             self.voice_combo.addItems(["Error loading voices"])
             self.voice_combo.setEnabled(False)
-    
+
     def get_data(self) -> Tuple[str, str, str, Optional[str], Dict[str, Any], Dict[str, Any], Optional[str]]:
         """Get the entered URL, title, voice, provider, chapter selection, output format, and output folder."""
         url = self.url_input.text().strip()
@@ -337,36 +347,25 @@ class AddQueueDialog(QDialog):
 
         # Get output folder
         output_folder = self.folder_input.text().strip() or None
-        
+
         # Get chapter selection
         if self.all_chapters_radio.isChecked():
-            chapter_selection: Dict[str, Any] = {'type': 'all'}
+            chapter_selection: Dict[str, Any] = {"type": "all"}
         elif self.range_radio.isChecked():
-            chapter_selection = {
-                'type': 'range',
-                'from': self.from_spin.value(),
-                'to': self.to_spin.value()
-            }
+            chapter_selection = {"type": "range", "from": self.from_spin.value(), "to": self.to_spin.value()}
         else:  # specific
             try:
-                chapters = [int(x.strip()) for x in self.specific_input.text().split(',')]
-                chapter_selection = {
-                    'type': 'specific',
-                    'chapters': chapters
-                }
+                chapters = [int(x.strip()) for x in self.specific_input.text().split(",")]
+                chapter_selection = {"type": "specific", "chapters": chapters}
             except ValueError:
-                chapter_selection = {'type': 'all'}  # Default to all if invalid
+                chapter_selection = {"type": "all"}  # Default to all if invalid
 
         # Get output format selection
         if self.merged_mp3_radio.isChecked():
-            output_format = {'type': 'merged_mp3'}
+            output_format = {"type": "merged_mp3"}
         elif self.batch_mp3_radio.isChecked():
-            output_format = {
-                'type': 'batched_mp3',
-                'batch_size': self.batch_size_spin.value()
-            }
+            output_format = {"type": "batched_mp3", "batch_size": self.batch_size_spin.value()}
         else:
-            output_format = {'type': 'individual_mp3s'}
+            output_format = {"type": "individual_mp3s"}
 
         return url, title, voice, provider, chapter_selection, output_format, output_folder
-

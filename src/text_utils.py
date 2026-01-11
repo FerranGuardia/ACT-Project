@@ -204,33 +204,145 @@ def clean_text(text: Optional[str]) -> str:
     # Step 12: Handle emojis and special Unicode characters for TTS
     # Convert common emojis to text descriptions or remove them
     emoji_replacements = {
-        '🗿': ' (stone face) ',  # Moai emoji - common in Royal Road
-        '😀': '', '😃': '', '😄': '', '😁': '', '😆': '', '😅': '', '🤣': '', '😂': '',
-        '🙂': '', '🙃': '', '😉': '', '😊': '', '😇': '', '🥰': '', '😍': '', '🤩': '',
-        '😘': '', '😗': '', '😚': '', '😙': '', '😋': '', '😛': '', '😜': '', '🤪': '',
-        '😝': '', '🤑': '', '🤗': '', '🤭': '', '🤫': '', '🤔': '', '🤐': '', '🤨': '',
-        '😐': '', '😑': '', '😶': '', '😏': '', '😒': '', '🙄': '', '😬': '', '🤥': '',
-        '😌': '', '😔': '', '😪': '', '🤤': '', '😴': '', '😷': '', '🤒': '', '🤕': '',
-        '🤢': '', '🤮': '', '🤧': '', '🥵': '', '🥶': '', '😵': '', '🤯': '', '🤠': '',
-        '🥳': '', '😎': '', '🤓': '', '🧐': '', '😕': '', '😟': '', '🙁': '', '☹️': '',
-        '😮': '', '😯': '', '😲': '', '😳': '', '🥺': '', '😦': '', '😧': '', '😨': '',
-        '😰': '', '😥': '', '😢': '', '😭': '', '😱': '', '😖': '', '😣': '', '😞': '',
-        '😓': '', '😩': '', '😫': '', '🥱': '', '😤': '', '😡': '', '😠': '', '🤬': '',
-        '😈': '', '👿': '', '💀': '', '☠️': '', '💩': '', '🤡': '', '👹': '', '👺': '',
-        '👻': '', '👽': '', '👾': '', '🤖': '', '😺': '', '😸': '', '😹': '', '😻': '',
-        '😼': '', '😽': '', '🙀': '', '😿': '', '😾': '',
+        "🗿": " (stone face) ",  # Moai emoji - common in Royal Road
+        "😀": "",
+        "😃": "",
+        "😄": "",
+        "😁": "",
+        "😆": "",
+        "😅": "",
+        "🤣": "",
+        "😂": "",
+        "🙂": "",
+        "🙃": "",
+        "😉": "",
+        "😊": "",
+        "😇": "",
+        "🥰": "",
+        "😍": "",
+        "🤩": "",
+        "😘": "",
+        "😗": "",
+        "😚": "",
+        "😙": "",
+        "😋": "",
+        "😛": "",
+        "😜": "",
+        "🤪": "",
+        "😝": "",
+        "🤑": "",
+        "🤗": "",
+        "🤭": "",
+        "🤫": "",
+        "🤔": "",
+        "🤐": "",
+        "🤨": "",
+        "😐": "",
+        "😑": "",
+        "😶": "",
+        "😏": "",
+        "😒": "",
+        "🙄": "",
+        "😬": "",
+        "🤥": "",
+        "😌": "",
+        "😔": "",
+        "😪": "",
+        "🤤": "",
+        "😴": "",
+        "😷": "",
+        "🤒": "",
+        "🤕": "",
+        "🤢": "",
+        "🤮": "",
+        "🤧": "",
+        "🥵": "",
+        "🥶": "",
+        "😵": "",
+        "🤯": "",
+        "🤠": "",
+        "🥳": "",
+        "😎": "",
+        "🤓": "",
+        "🧐": "",
+        "😕": "",
+        "😟": "",
+        "🙁": "",
+        "☹️": "",
+        "😮": "",
+        "😯": "",
+        "😲": "",
+        "😳": "",
+        "🥺": "",
+        "😦": "",
+        "😧": "",
+        "😨": "",
+        "😰": "",
+        "😥": "",
+        "😢": "",
+        "😭": "",
+        "😱": "",
+        "😖": "",
+        "😣": "",
+        "😞": "",
+        "😓": "",
+        "😩": "",
+        "😫": "",
+        "🥱": "",
+        "😤": "",
+        "😡": "",
+        "😠": "",
+        "🤬": "",
+        "😈": "",
+        "👿": "",
+        "💀": "",
+        "☠️": "",
+        "💩": "",
+        "🤡": "",
+        "👹": "",
+        "👺": "",
+        "👻": "",
+        "👽": "",
+        "👾": "",
+        "🤖": "",
+        "😺": "",
+        "😸": "",
+        "😹": "",
+        "😻": "",
+        "😼": "",
+        "😽": "",
+        "🙀": "",
+        "😿": "",
+        "😾": "",
         # Common symbols that TTS might read awkwardly
-        '→': ' to ', '←': ' from ', '↑': ' up ', '↓': ' down ',
-        '⇒': ' then ', '⇐': ' from ', '⇔': ' or ',
-        '★': ' star ', '☆': ' star ', '✦': ' star ', '✧': ' star ',
-        '♥': ' heart ', '♡': ' heart ', '♦': ' diamond ', '♣': ' club ', '♠': ' spade ',
-        '♪': ' note ', '♫': ' notes ', '♬': ' notes ',
-        '©': ' copyright ', '®': ' registered ', '™': ' trademark ',
-        '…': '...',  # Ellipsis character to three dots
-        '—': ' - ',  # Em dash to hyphen
-        '–': ' - ',  # En dash to hyphen
-        '"': '"', '"': '"',  # Smart quotes to regular quotes
-        ''': "'", ''': "'",  # Smart apostrophes to regular apostrophes
+        "→": " to ",
+        "←": " from ",
+        "↑": " up ",
+        "↓": " down ",
+        "⇒": " then ",
+        "⇐": " from ",
+        "⇔": " or ",
+        "★": " star ",
+        "☆": " star ",
+        "✦": " star ",
+        "✧": " star ",
+        "♥": " heart ",
+        "♡": " heart ",
+        "♦": " diamond ",
+        "♣": " club ",
+        "♠": " spade ",
+        "♪": " note ",
+        "♫": " notes ",
+        "♬": " notes ",
+        "©": " copyright ",
+        "®": " registered ",
+        "™": " trademark ",
+        "…": "...",  # Ellipsis character to three dots
+        "—": " - ",  # Em dash to hyphen
+        "–": " - ",  # En dash to hyphen
+        '"': '"',
+        '"': '"',  # Smart quotes to regular quotes
+        """: "'", """: "'",  # Smart apostrophes to regular apostrophes
     }
 
     # Replace known emojis and symbols
@@ -248,19 +360,19 @@ def clean_text(text: Optional[str]) -> str:
         # Check Unicode category
         category = unicodedata.category(char)
         # Keep punctuation, symbols that are common in text
-        if category in ('Po', 'Pd', 'Pe', 'Pf', 'Pi', 'Ps', 'Sc', 'Sk', 'Sm', 'So'):
+        if category in ("Po", "Pd", "Pe", "Pf", "Pi", "Ps", "Sc", "Sk", "Sm", "So"):
             # But skip emoji and pictographic symbols
-            if category == 'So' and ord(char) > 0x1F000:  # Emoji range
+            if category == "So" and ord(char) > 0x1F000:  # Emoji range
                 return False
             return True
         return False
 
     # Filter out problematic Unicode characters
-    text = ''.join(char if is_tts_safe(char) else ' ' for char in text)
+    text = "".join(char if is_tts_safe(char) else " " for char in text)
 
     # Step 13: Replace square brackets with parentheses for TTS compatibility
     # TTS engines may read [] as "bracket" or "square bracket", so use () instead
-    text = text.replace('[', '(').replace(']', ')')
+    text = text.replace("[", "(").replace("]", ")")
 
     # Step 14: Normalize punctuation for TTS
     # Multiple punctuation marks can confuse TTS
@@ -283,9 +395,13 @@ def clean_text(text: Optional[str]) -> str:
     # But preserve ellipses and quotes - don't add space after them
     text = re.sub(r"\s+([,.!?;:])", r"\1", text)  # Remove space before punctuation
     # Add space after punctuation if missing, but not after ellipses, quotes, or between consecutive punctuation
-    text = re.sub(r"([,.!?;:])([^\s,.!?;:\"\'`])", r"\1 \2", text)  # Add space after punctuation if next char is not punctuation or quotes
+    text = re.sub(
+        r"([,.!?;:])([^\s,.!?;:\"\'`])", r"\1 \2", text
+    )  # Add space after punctuation if next char is not punctuation or quotes
     # Handle ellipses separately - ensure space after "..."
-    text = re.sub(r"\.{3}([^\s,.!?;:\"\'`])", r"... \1", text)  # Add space after "..." if next char is not punctuation or quotes
+    text = re.sub(
+        r"\.{3}([^\s,.!?;:\"\'`])", r"... \1", text
+    )  # Add space after "..." if next char is not punctuation or quotes
 
     # Step 16: Handle special formatting that might confuse TTS
     # Remove standalone symbols on their own lines
@@ -335,30 +451,30 @@ def clean_text_for_tts(text: str, base_cleaner: Optional[Callable[[str], str]] =
             logger.warning(f"Error applying base cleaner: {e}")
 
     # Precompile regex patterns once for performance
-    RE_SEPARATORS = re.compile(r'(=+|-{3,}|_{3,}|\*{3,}|#{2,}|~{2,}|\|{2,})')
-    RE_STANDALONE = re.compile(r'\s+[=*#~|_-]+\s+')
-    RE_SYMBOL_LINES = re.compile(r'^\s*[=*#~|_-]+\s*$', flags=re.MULTILINE)
-    RE_PUNCT = re.compile(r'(\.{4,}|!{3,}|\?{3,})')
-    RE_BRACKETS = re.compile(r'[\[\]]')
-    RE_SPACES = re.compile(r'[ \t]+')
-    RE_NEWLINES = re.compile(r'\n\s*\n\s*\n+')
+    RE_SEPARATORS = re.compile(r"(=+|-{3,}|_{3,}|\*{3,}|#{2,}|~{2,}|\|{2,})")
+    RE_STANDALONE = re.compile(r"\s+[=*#~|_-]+\s+")
+    RE_SYMBOL_LINES = re.compile(r"^\s*[=*#~|_-]+\s*$", flags=re.MULTILINE)
+    RE_PUNCT = re.compile(r"(\.{4,}|!{3,}|\?{3,})")
+    RE_BRACKETS = re.compile(r"[\[\]]")
+    RE_SPACES = re.compile(r"[ \t]+")
+    RE_NEWLINES = re.compile(r"\n\s*\n\s*\n+")
 
     # Remove separators
-    text = RE_SEPARATORS.sub(' ', text)
+    text = RE_SEPARATORS.sub(" ", text)
 
     # Remove standalone symbol groups
-    text = RE_STANDALONE.sub(' ', text)
-    text = RE_SYMBOL_LINES.sub('', text)
+    text = RE_STANDALONE.sub(" ", text)
+    text = RE_SYMBOL_LINES.sub("", text)
 
     # Normalize punctuation
-    text = RE_PUNCT.sub(lambda m: m.group(0)[0] * 3 if m.group(0)[0] in '.!?' else m.group(0), text)
+    text = RE_PUNCT.sub(lambda m: m.group(0)[0] * 3 if m.group(0)[0] in ".!?" else m.group(0), text)
 
     # Replace brackets with parentheses
-    text = RE_BRACKETS.sub(lambda m: '(' if m.group(0) == '[' else ')', text)
+    text = RE_BRACKETS.sub(lambda m: "(" if m.group(0) == "[" else ")", text)
 
     # Whitespace cleanup
-    text = RE_SPACES.sub(' ', text)
-    text = RE_NEWLINES.sub('\n\n', text)
+    text = RE_SPACES.sub(" ", text)
+    text = RE_NEWLINES.sub("\n\n", text)
 
     return text.strip()
 
@@ -373,7 +489,6 @@ __all__ = [
     # Main functions
     "clean_text",
     "clean_text_for_tts",
-
     # Backwards compatibility (deprecated)
     "scraper_clean_text",
     "tts_clean_text_for_tts",

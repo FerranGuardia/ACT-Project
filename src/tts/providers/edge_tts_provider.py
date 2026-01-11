@@ -24,21 +24,25 @@ logger = get_logger("tts.providers.edge_tts")
 
 class EdgeTTSError(Exception):
     """Base class for Edge TTS errors"""
+
     pass
 
 
 class EdgeTTSValidationError(EdgeTTSError):
     """User input validation errors (don't trigger circuit breaker)"""
+
     pass
 
 
 class EdgeTTSServiceError(EdgeTTSError):
     """Service/network errors (do trigger circuit breaker)"""
+
     pass
 
 
 class EdgeTTSConnectivityError(EdgeTTSServiceError):
     """Network connectivity issues"""
+
     pass
 
 
@@ -90,6 +94,7 @@ class EdgeTTSProvider(TTSProvider):
         """Check if Edge TTS is available asynchronously"""
         try:
             import edge_tts
+
             voices = await edge_tts.list_voices()
             available = len(voices) > 0
             if available:
@@ -120,6 +125,7 @@ class EdgeTTSProvider(TTSProvider):
     async def _async_check_availability(self) -> List[Dict]:
         """Asynchronously check Edge TTS availability and return voices"""
         import edge_tts
+
         voices = await edge_tts.list_voices()
         # Convert Voice objects to dicts for our interface
         return [dict(voice) for voice in voices]
@@ -133,13 +139,11 @@ class EdgeTTSProvider(TTSProvider):
                     limit=10,  # Max connections
                     limit_per_host=2,  # Max connections per host
                     ttl_dns_cache=300,  # DNS cache TTL
-                    use_dns_cache=True
+                    use_dns_cache=True,
                 ),
                 timeout=aiohttp.ClientTimeout(
-                    total=30,  # Total timeout
-                    connect=10,  # Connection timeout
-                    sock_read=20  # Socket read timeout
-                )
+                    total=30, connect=10, sock_read=20  # Total timeout  # Connection timeout  # Socket read timeout
+                ),
             )
         return self._session
 
@@ -147,11 +151,12 @@ class EdgeTTSProvider(TTSProvider):
         """Close HTTP session if it exists"""
         if self._session:
             try:
-                if hasattr(self._session, 'close') and not getattr(self._session, 'closed', True):
+                if hasattr(self._session, "close") and not getattr(self._session, "closed", True):
                     close_method = self._session.close
-                    if hasattr(close_method, '__call__'):
+                    if hasattr(close_method, "__call__"):
                         # Check if it's async (has __call__ and is coroutine function)
                         import asyncio
+
                         if asyncio.iscoroutinefunction(close_method):
                             await close_method()
                         else:
@@ -162,15 +167,15 @@ class EdgeTTSProvider(TTSProvider):
                 pass
             finally:
                 self._session = None
-    
+
     def get_provider_name(self) -> str:
         """Return provider name"""
         return "edge_tts"
-    
+
     def get_provider_type(self) -> ProviderType:
         """Return provider type"""
         return ProviderType.CLOUD
-    
+
     def is_available(self) -> bool:
         """Check if provider is available (lazy loading)"""
         if not self._available:
@@ -182,7 +187,7 @@ class EdgeTTSProvider(TTSProvider):
         if not self._available:
             self._available = await self._check_availability_async()
         return self._available
-    
+
     def get_voices(self, locale: Optional[str] = None) -> List[Dict]:
         """Get available Edge TTS voices, filtered by locale.
 
@@ -214,14 +219,16 @@ class EdgeTTSProvider(TTSProvider):
                 voice_locale = voice.get("Locale", "")
                 # Only include English US voices
                 if voice_locale == "en-US":
-                    voices.append({
-                        "id": voice.get("ShortName", voice.get("Name", "")),
-                        "name": voice.get("FriendlyName", voice.get("Name", "")),
-                        "language": voice_locale,
-                        "gender": voice.get("Gender", "neutral").lower(),
-                        "quality": "high",
-                        "provider": "edge_tts"
-                    })
+                    voices.append(
+                        {
+                            "id": voice.get("ShortName", voice.get("Name", "")),
+                            "name": voice.get("FriendlyName", voice.get("Name", "")),
+                            "language": voice_locale,
+                            "gender": voice.get("Gender", "neutral").lower(),
+                            "quality": "high",
+                            "provider": "edge_tts",
+                        }
+                    )
 
             # Sort by name
             voices.sort(key=lambda x: x.get("name", ""))
@@ -244,15 +251,16 @@ class EdgeTTSProvider(TTSProvider):
     async def _async_get_voices(self) -> List[Dict]:
         """Asynchronously get Edge TTS voices"""
         import edge_tts
+
         voices = await edge_tts.list_voices()
         # Convert Voice objects to dicts for our interface
         return [dict(voice) for voice in voices]
-    
+
     @circuit(
         failure_threshold=4,  # Fail after 4 consecutive failures so the 5th call falls back
         recovery_timeout=60,  # Wait 60 seconds before trying again
         expected_exception=Exception,
-        fallback_function=lambda *args, **kwargs: False  # Return False on circuit breaker open
+        fallback_function=lambda *args, **kwargs: False,  # Return False on circuit breaker open
     )
     def convert_text_to_speech(
         self,
@@ -261,7 +269,7 @@ class EdgeTTSProvider(TTSProvider):
         output_path: Path,
         rate: Optional[float] = None,
         pitch: Optional[float] = None,
-        volume: Optional[float] = None
+        volume: Optional[float] = None,
     ) -> bool:
         """Convert text to speech using Edge TTS with circuit breaker protection.
 
@@ -288,9 +296,7 @@ class EdgeTTSProvider(TTSProvider):
 
         # Use asyncio.run() for proper async execution
         # Circuit breaker will catch exceptions that bubble up
-        return asyncio.run(self._async_convert_text_to_speech(
-            text, voice, output_path, rate, pitch, volume
-        ))
+        return asyncio.run(self._async_convert_text_to_speech(text, voice, output_path, rate, pitch, volume))
 
     async def _async_convert_text_to_speech(
         self,
@@ -299,7 +305,7 @@ class EdgeTTSProvider(TTSProvider):
         output_path: Path,
         rate: Optional[float] = None,
         pitch: Optional[float] = None,
-        volume: Optional[float] = None
+        volume: Optional[float] = None,
     ) -> bool:
         """Async implementation of text-to-speech conversion"""
         try:
@@ -339,10 +345,7 @@ class EdgeTTSProvider(TTSProvider):
 
         # Create communicate object
         # Only pass rate/pitch/volume if they are not None (edge_tts doesn't accept None)
-        communicate_kwargs = {
-            "text": text,
-            "voice": voice
-        }
+        communicate_kwargs = {"text": text, "voice": voice}
         if rate_str is not None:
             communicate_kwargs["rate"] = rate_str
         if pitch_str is not None:
@@ -394,27 +397,27 @@ class EdgeTTSProvider(TTSProvider):
             error = EdgeTTSServiceError("Edge TTS conversion failed: file not created or empty")
             logger.error(str(error))
             raise error
-    
+
     def supports_rate(self) -> bool:
         """Edge TTS supports rate adjustment"""
         return True
-    
+
     def supports_pitch(self) -> bool:
         """Edge TTS supports pitch adjustment"""
         return True
-    
+
     def supports_volume(self) -> bool:
         """Edge TTS supports volume adjustment"""
         return True
-    
+
     def supports_ssml(self) -> bool:
         """Edge TTS supports SSML (Speech Synthesis Markup Language)"""
         return True
-    
+
     def supports_chunking(self) -> bool:
         """Edge TTS supports chunking for long texts"""
         return True
-    
+
     def get_max_text_bytes(self) -> Optional[int]:
         """Edge TTS has a limit of approximately 3000 bytes per request"""
         return 3000
@@ -426,7 +429,7 @@ class EdgeTTSProvider(TTSProvider):
         output_path: Path,
         rate: Optional[float] = None,
         pitch: Optional[float] = None,
-        volume: Optional[float] = None
+        volume: Optional[float] = None,
     ) -> bool:
         """Convert a single chunk of text to speech asynchronously.
 
@@ -482,10 +485,7 @@ class EdgeTTSProvider(TTSProvider):
                     volume_str = f"+{volume_int}%" if volume_int >= 0 else f"{volume_int}%"
 
             # Create communicate object
-            communicate_kwargs = {
-                "text": text,
-                "voice": voice
-            }
+            communicate_kwargs = {"text": text, "voice": voice}
             if rate_str is not None:
                 communicate_kwargs["rate"] = rate_str
             if pitch_str is not None:
@@ -513,5 +513,3 @@ class EdgeTTSProvider(TTSProvider):
         finally:
             # Clean up session when done
             await self._close_session()
-
-

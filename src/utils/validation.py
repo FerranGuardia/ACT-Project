@@ -20,6 +20,7 @@ logger = get_logger("utils.validation")
 
 class ValidationError(Exception):
     """Raised when input validation fails"""
+
     pass
 
 
@@ -29,45 +30,25 @@ class InputValidator:
     def __init__(self):
         """Initialize validator with schemas"""
         self.url_schema = {
-            'url': {
-                'type': 'string',
-                'regex': r'^https?://[^\s/$.?#].[^\s]*$',
-                'required': True,
-                'maxlength': 2048  # Reasonable URL length limit
+            "url": {
+                "type": "string",
+                "regex": r"^https?://[^\s/$.?#].[^\s]*$",
+                "required": True,
+                "maxlength": 2048,  # Reasonable URL length limit
             }
         }
 
         self.tts_request_schema = {
-            'text': {
-                'type': 'string',
-                'required': True,
-                'maxlength': 50000,  # Reasonable text limit
-                'minlength': 1
+            "text": {"type": "string", "required": True, "maxlength": 50000, "minlength": 1},  # Reasonable text limit
+            "voice": {
+                "type": "string",
+                "required": True,
+                "regex": r"^[a-zA-Z0-9\-_\.]+$",  # Alphanumeric with safe chars
+                "maxlength": 100,
             },
-            'voice': {
-                'type': 'string',
-                'required': True,
-                'regex': r'^[a-zA-Z0-9\-_\.]+$',  # Alphanumeric with safe chars
-                'maxlength': 100
-            },
-            'rate': {
-                'type': 'number',
-                'required': False,
-                'min': -100,
-                'max': 100
-            },
-            'pitch': {
-                'type': 'number',
-                'required': False,
-                'min': -100,
-                'max': 100
-            },
-            'volume': {
-                'type': 'number',
-                'required': False,
-                'min': -100,
-                'max': 100
-            }
+            "rate": {"type": "number", "required": False, "min": -100, "max": 100},
+            "pitch": {"type": "number", "required": False, "min": -100, "max": 100},
+            "volume": {"type": "number", "required": False, "min": -100, "max": 100},
         }
 
         self.url_validator = Validator(self.url_schema)
@@ -95,15 +76,15 @@ class InputValidator:
                 return False, "Potentially malicious URL detected"
 
             # Check for null bytes (security risk)
-            if '\x00' in url or '%00' in url:
+            if "\x00" in url or "%00" in url:
                 return False, "URL contains null bytes"
 
             # Sanitize URL
             clean_url = self._sanitize_url(url)
 
             # Validate against schema
-            if not self.url_validator.validate({'url': clean_url}):
-                error_msg = "; ".join(self.url_validator.errors.get('url', ['Invalid URL']))
+            if not self.url_validator.validate({"url": clean_url}):
+                error_msg = "; ".join(self.url_validator.errors.get("url", ["Invalid URL"]))
                 return False, f"URL validation failed: {error_msg}"
 
             # Check for known novel sites
@@ -128,8 +109,8 @@ class InputValidator:
         """
         try:
             # Sanitize text content
-            if 'text' in request_data:
-                request_data['text'] = self._sanitize_text(request_data['text'])
+            if "text" in request_data:
+                request_data["text"] = self._sanitize_text(request_data["text"])
 
             # Validate against schema
             if not self.tts_validator.validate(request_data):
@@ -140,7 +121,7 @@ class InputValidator:
                 return False, f"TTS validation failed: {error_msg}"
 
             # Additional content checks
-            text = request_data.get('text', '')
+            text = request_data.get("text", "")
             if self._is_suspicious_content(text):
                 return False, "Text content appears suspicious or potentially harmful"
 
@@ -164,7 +145,7 @@ class InputValidator:
         url = bleach.clean(url, tags=[], strip=True)
 
         # Remove any null bytes or other dangerous characters
-        url = url.replace('\x00', '').replace('\r', '').replace('\n', '')
+        url = url.replace("\x00", "").replace("\r", "").replace("\n", "")
 
         # Normalize the URL
         try:
@@ -188,22 +169,24 @@ class InputValidator:
         """
         # Remove HTML tags and potentially harmful content
         import bleach
+
         text = bleach.clean(text, tags=[], strip=True)
 
         # Remove dangerous URL schemes
         import re
-        text = re.sub(r'javascript:[^\s]*', '', text, flags=re.IGNORECASE)
-        text = re.sub(r'data:[^\s]*', '', text, flags=re.IGNORECASE)
+
+        text = re.sub(r"javascript:[^\s]*", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"data:[^\s]*", "", text, flags=re.IGNORECASE)
         # Remove event handlers
-        text = re.sub(r'on\w+\s*=\s*[^\s>]*', '', text, flags=re.IGNORECASE)
+        text = re.sub(r"on\w+\s*=\s*[^\s>]*", "", text, flags=re.IGNORECASE)
 
         # Remove potentially harmful characters but preserve readability
         # Allow basic punctuation and common characters
-        text = ''.join(char for char in text if ord(char) >= 32 or char in '\n\t')
+        text = "".join(char for char in text if ord(char) >= 32 or char in "\n\t")
 
         # Remove excessive whitespace
-        text = re.sub(r'\n{3,}', '\n\n', text)  # Max 2 consecutive newlines
-        text = re.sub(r' {2,}', ' ', text)  # Max 1 consecutive space
+        text = re.sub(r"\n{3,}", "\n\n", text)  # Max 2 consecutive newlines
+        text = re.sub(r" {2,}", " ", text)  # Max 1 consecutive space
 
         # Limit total length (reasonable for TTS)
         if len(text) > 50000:
@@ -227,12 +210,12 @@ class InputValidator:
 
             # Check for suspicious patterns
             suspicious_patterns = [
-                r'\.\.\.?[/\\]',  # Directory traversal (forward or backward slashes)
-                r'<script',  # Script injection
-                r'javascript:',  # JavaScript URLs
-                r'data:',  # Data URLs (can be dangerous)
-                r'\x00',  # Null bytes
-                r'%00',  # URL-encoded null bytes
+                r"\.\.\.?[/\\]",  # Directory traversal (forward or backward slashes)
+                r"<script",  # Script injection
+                r"javascript:",  # JavaScript URLs
+                r"data:",  # Data URLs (can be dangerous)
+                r"\x00",  # Null bytes
+                r"%00",  # URL-encoded null bytes
             ]
 
             url_str = url.lower()
@@ -242,7 +225,7 @@ class InputValidator:
                     return True
 
             # Check for extremely long domain/path segments
-            if len(parsed.netloc) > 253 or any(len(part) > 63 for part in parsed.netloc.split('.')):
+            if len(parsed.netloc) > 253 or any(len(part) > 63 for part in parsed.netloc.split(".")):
                 return True
 
             return False
@@ -262,12 +245,12 @@ class InputValidator:
             True if from supported site
         """
         supported_domains = [
-            'novelfull.com',
-            'novelbin.com',
-            'novelbin.net',
-            'novelfull.net',
-            'lightnovelworld.com',
-            'readlightnovel.org',
+            "novelfull.com",
+            "novelbin.com",
+            "novelbin.net",
+            "novelfull.net",
+            "lightnovelworld.com",
+            "readlightnovel.org",
             # Add more as needed
         ]
 
@@ -277,7 +260,7 @@ class InputValidator:
 
             # Check exact matches and subdomain matches
             for supported in supported_domains:
-                if domain == supported or domain.endswith('.' + supported):
+                if domain == supported or domain.endswith("." + supported):
                     return True
 
             return False
@@ -296,17 +279,17 @@ class InputValidator:
             True if potentially suspicious
         """
         # Check for excessive special characters
-        special_char_ratio = len(re.findall(r'[^a-zA-Z0-9\s]', text)) / max(len(text), 1)
+        special_char_ratio = len(re.findall(r"[^a-zA-Z0-9\s]", text)) / max(len(text), 1)
         if special_char_ratio > 0.3:  # More than 30% special characters
             return True
 
         # Check for potential script injection
         suspicious_patterns = [
-            r'<script',
-            r'javascript:',
-            r'on\w+\s*=',
-            r'<iframe',
-            r'<object',
+            r"<script",
+            r"javascript:",
+            r"on\w+\s*=",
+            r"<iframe",
+            r"<object",
         ]
 
         text_lower = text.lower()
@@ -342,23 +325,27 @@ class InputValidator:
             path_str = str(resolved_path)
 
             # Prevent directory traversal attacks
-            if '..' in path_str or path_str.startswith('~'):
+            if ".." in path_str or path_str.startswith("~"):
                 return False, "Path contains directory traversal patterns"
 
             # Prevent absolute path manipulation
             if os.path.isabs(path_str):
                 # For Windows, prevent UNC paths and other dangerous patterns
-                if os.name == 'nt':
-                    if path_str.startswith('\\\\') or ':\\' not in path_str:
+                if os.name == "nt":
+                    if path_str.startswith("\\\\") or ":\\" not in path_str:
                         return False, "Invalid Windows path format"
                 else:
                     # For Unix-like systems, ensure path is under allowed directories
-                    if not (path_str.startswith('/tmp/') or path_str.startswith('/home/') or
-                           path_str.startswith('/var/tmp/') or path_str.startswith(str(Path.home()))):
+                    if not (
+                        path_str.startswith("/tmp/")
+                        or path_str.startswith("/home/")
+                        or path_str.startswith("/var/tmp/")
+                        or path_str.startswith(str(Path.home()))
+                    ):
                         return False, "Path must be under user home or temporary directory"
 
             # Check file extension for safety
-            if resolved_path.suffix.lower() not in ['.txt', '.mp3', '.wav', '.json', '.log']:
+            if resolved_path.suffix.lower() not in [".txt", ".mp3", ".wav", ".json", ".log"]:
                 return False, f"Unsafe file extension: {resolved_path.suffix}"
 
             # Check path length
@@ -370,14 +357,35 @@ class InputValidator:
                 return False, f"Parent directory does not exist: {resolved_path.parent}"
 
             # Additional Windows-specific checks
-            if os.name == 'nt':
+            if os.name == "nt":
                 # Prevent paths with reserved names
-                reserved_names = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4',
-                                'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2',
-                                'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9']
+                reserved_names = [
+                    "CON",
+                    "PRN",
+                    "AUX",
+                    "NUL",
+                    "COM1",
+                    "COM2",
+                    "COM3",
+                    "COM4",
+                    "COM5",
+                    "COM6",
+                    "COM7",
+                    "COM8",
+                    "COM9",
+                    "LPT1",
+                    "LPT2",
+                    "LPT3",
+                    "LPT4",
+                    "LPT5",
+                    "LPT6",
+                    "LPT7",
+                    "LPT8",
+                    "LPT9",
+                ]
                 parts = resolved_path.parts
                 for part in parts:
-                    if part.upper() in reserved_names or part.upper().endswith(('.TXT', '.MP3', '.WAV')):
+                    if part.upper() in reserved_names or part.upper().endswith((".TXT", ".MP3", ".WAV")):
                         return False, f"Reserved filename detected: {part}"
 
             return True, str(resolved_path)
@@ -409,17 +417,17 @@ class InputValidator:
             path_str = str(resolved_path)
 
             # Check for dangerous patterns
-            if '..' in path_str or path_str.startswith('~'):
+            if ".." in path_str or path_str.startswith("~"):
                 return False, "Path contains directory traversal patterns"
 
             # Prevent absolute path manipulation
             if os.path.isabs(path_str):
-                if os.name == 'nt':
-                    if path_str.startswith('\\\\') or ':\\' not in path_str:
+                if os.name == "nt":
+                    if path_str.startswith("\\\\") or ":\\" not in path_str:
                         return False, "Invalid Windows path format"
                 else:
                     # Allow common user directories
-                    allowed_prefixes = ['/tmp/', '/home/', '/var/tmp/', str(Path.home())]
+                    allowed_prefixes = ["/tmp/", "/home/", "/var/tmp/", str(Path.home())]
                     if not any(path_str.startswith(prefix) for prefix in allowed_prefixes):
                         return False, "Path must be under user home or temporary directory"
 
@@ -435,11 +443,32 @@ class InputValidator:
                 return False, f"Path exists but is not a directory: {resolved_path}"
 
             # Additional Windows-specific checks
-            if os.name == 'nt':
+            if os.name == "nt":
                 # Prevent paths with reserved names
-                reserved_names = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4',
-                                'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2',
-                                'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9']
+                reserved_names = [
+                    "CON",
+                    "PRN",
+                    "AUX",
+                    "NUL",
+                    "COM1",
+                    "COM2",
+                    "COM3",
+                    "COM4",
+                    "COM5",
+                    "COM6",
+                    "COM7",
+                    "COM8",
+                    "COM9",
+                    "LPT1",
+                    "LPT2",
+                    "LPT3",
+                    "LPT4",
+                    "LPT5",
+                    "LPT6",
+                    "LPT7",
+                    "LPT8",
+                    "LPT9",
+                ]
                 parts = resolved_path.parts
                 for part in parts:
                     if part.upper() in reserved_names:

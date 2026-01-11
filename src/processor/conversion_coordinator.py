@@ -25,9 +25,9 @@ class ConversionCoordinator:
     def __init__(self, context: ProcessingContext):
         self.context = context
         self.project_manager = ProjectManager(context.project_name)
-        self.file_manager = FileManager(context.project_name,
-                                      base_output_dir=context.base_output_dir,
-                                      novel_title=context.novel_title)
+        self.file_manager = FileManager(
+            context.project_name, base_output_dir=context.base_output_dir, novel_title=context.novel_title
+        )
         self.tts_engine = TTSEngine()
 
     def convert_chapter_to_audio(
@@ -36,7 +36,7 @@ class ConversionCoordinator:
         content: str,
         title: Optional[str],
         skip_if_exists: bool = True,
-        on_failure: Optional[Callable[[int, Exception], None]] = None
+        on_failure: Optional[Callable[[int, Exception], None]] = None,
     ) -> bool:
         """Convert a single chapter to audio."""
         if self.context.check_should_stop():
@@ -56,11 +56,7 @@ class ConversionCoordinator:
                 return False
 
             # Step 1: Save text file
-            text_file_path = self.file_manager.save_text_file(
-                chapter_num,
-                content,
-                title
-            )
+            text_file_path = self.file_manager.save_text_file(chapter_num, content, title)
             chapter.text_file_path = str(text_file_path)
 
             # Check for pause/stop before TTS conversion
@@ -73,21 +69,20 @@ class ConversionCoordinator:
 
             # Format text with chapter title and pauses for TTS
             from tts.tts_engine import format_chapter_intro
+
             chapter_title = f"Chapter {chapter_num}"
             formatted_text = format_chapter_intro(chapter_title, content)
 
             # Create temporary audio file path
             import tempfile
+
             temp_dir = Path(tempfile.gettempdir())
             temp_audio_path = temp_dir / f"chapter_{chapter_num}_temp.mp3"
 
             # Convert to speech
             voice = self.context.voice if self.context.voice else None
             success = self.tts_engine.convert_text_to_speech(
-                text=formatted_text,
-                output_path=temp_audio_path,
-                voice=voice,
-                provider=self.context.provider
+                text=formatted_text, output_path=temp_audio_path, voice=voice, provider=self.context.provider
             )
 
             # Check stop flag after TTS conversion
@@ -101,11 +96,7 @@ class ConversionCoordinator:
                 return False
 
             # Step 3: Save audio file
-            audio_file_path = self.file_manager.save_audio_file(
-                chapter_num,
-                temp_audio_path,
-                title
-            )
+            audio_file_path = self.file_manager.save_audio_file(chapter_num, temp_audio_path, title)
 
             # Verify audio file was saved correctly
             if not audio_file_path.exists() or audio_file_path.stat().st_size == 0:
@@ -124,9 +115,7 @@ class ConversionCoordinator:
             chapter_manager = self.project_manager.get_chapter_manager()
             if chapter_manager:
                 chapter_manager.update_chapter_files(
-                    chapter_num,
-                    text_file_path=str(text_file_path),
-                    audio_file_path=str(audio_file_path)
+                    chapter_num, text_file_path=str(text_file_path), audio_file_path=str(audio_file_path)
                 )
 
             # Save project state

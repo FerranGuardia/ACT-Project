@@ -27,17 +27,14 @@ class BrowserAutomationStrategy(BaseDetectionStrategy):
         toc_url: str,
         should_stop: Optional[Callable[[], bool]] = None,
         min_chapter: Optional[int] = None,
-        max_chapter: Optional[int] = None
+        max_chapter: Optional[int] = None,
     ) -> DetectionResult:
         """Detect chapter URLs using browser automation."""
         start_time = time.time()
 
         if not self._playwright_available:
             return self._create_result(
-                [],
-                confidence=0.0,
-                error="Playwright not available",
-                response_time=time.time() - start_time
+                [], confidence=0.0, error="Playwright not available", response_time=time.time() - start_time
             )
 
         try:
@@ -48,7 +45,7 @@ class BrowserAutomationStrategy(BaseDetectionStrategy):
                     [],
                     confidence=0.0,
                     error="No URLs found via browser automation",
-                    response_time=time.time() - start_time
+                    response_time=time.time() - start_time,
                 )
 
             # Validate and normalize
@@ -65,25 +62,18 @@ class BrowserAutomationStrategy(BaseDetectionStrategy):
                 coverage_range=coverage_range,
                 validation_score=validation_score,
                 response_time=time.time() - start_time,
-                metadata={
-                    "extraction_method": "browser_automation",
-                    "playwright_used": True
-                }
+                metadata={"extraction_method": "browser_automation", "playwright_used": True},
             )
 
         except Exception as e:
             logger.debug(f"Browser automation strategy failed: {e}")
-            return self._create_result(
-                [],
-                confidence=0.0,
-                error=str(e),
-                response_time=time.time() - start_time
-            )
+            return self._create_result([], confidence=0.0, error=str(e), response_time=time.time() - start_time)
 
     def _check_playwright_available(self) -> bool:
         """Check if Playwright is available."""
         try:
             import playwright
+
             return True
         except ImportError:
             return False
@@ -93,7 +83,7 @@ class BrowserAutomationStrategy(BaseDetectionStrategy):
         toc_url: str,
         should_stop: Optional[Callable[[], bool]],
         min_chapter: Optional[int],
-        max_chapter: Optional[int]
+        max_chapter: Optional[int],
     ) -> List[str]:
         """Run browser automation to extract chapter URLs."""
         try:
@@ -102,8 +92,8 @@ class BrowserAutomationStrategy(BaseDetectionStrategy):
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=True)
                 context = await browser.new_context(
-                    viewport={'width': 1280, 'height': 720},
-                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                    viewport={"width": 1280, "height": 720},
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
                 )
 
                 page = await context.new_page()
@@ -111,14 +101,15 @@ class BrowserAutomationStrategy(BaseDetectionStrategy):
                 try:
                     # Set up request interception for API monitoring
                     api_urls = []
+
                     def handle_request(request):
-                        if any(keyword in request.url.lower() for keyword in ['chapter', 'api', 'ajax']):
+                        if any(keyword in request.url.lower() for keyword in ["chapter", "api", "ajax"]):
                             api_urls.append(request.url)
 
-                    page.on('request', handle_request)
+                    page.on("request", handle_request)
 
                     # Navigate to the page
-                    await page.goto(toc_url, wait_until='networkidle')
+                    await page.goto(toc_url, wait_until="networkidle")
 
                     # Wait for dynamic content to load
                     await page.wait_for_timeout(2000)
@@ -181,9 +172,11 @@ class BrowserAutomationStrategy(BaseDetectionStrategy):
                 await page.wait_for_timeout(500)
 
                 # Check if we reached the bottom
-                at_bottom = await page.evaluate("""
+                at_bottom = await page.evaluate(
+                    """
                     window.innerHeight + window.scrollY >= document.body.offsetHeight - 100
-                """)
+                """
+                )
 
                 if at_bottom:
                     break
@@ -199,12 +192,12 @@ class BrowserAutomationStrategy(BaseDetectionStrategy):
         """Extract chapter URLs from the rendered page content."""
         try:
             # Get all links that might be chapters
-            links = await page.query_selector_all('a')
+            links = await page.query_selector_all("a")
 
             urls = []
             for link in links:
                 try:
-                    href = await link.get_attribute('href')
+                    href = await link.get_attribute("href")
                     text = await link.inner_text()
 
                     if href and self._is_chapter_link(href, text.strip()):
@@ -226,14 +219,14 @@ class BrowserAutomationStrategy(BaseDetectionStrategy):
             'a[href*="chapter"]',
             'a[href*="chap"]',
             'a[href*="ch-"]',
-            '.chapter-list a',
-            '.chapter-item a',
-            '.toc a',
-            '#toc a',
+            ".chapter-list a",
+            ".chapter-item a",
+            ".toc a",
+            "#toc a",
             'li a[href*="chapter"]',
             'td a[href*="chapter"]',
-            '.chapter-link',
-            '.chapter-title a',
+            ".chapter-link",
+            ".chapter-title a",
         ]
 
         urls = []
@@ -244,7 +237,7 @@ class BrowserAutomationStrategy(BaseDetectionStrategy):
 
                 for element in elements:
                     try:
-                        href = await element.get_attribute('href')
+                        href = await element.get_attribute("href")
                         if href:
                             full_url = self._normalize_url(href)
                             urls.append(full_url)
@@ -266,7 +259,7 @@ class BrowserAutomationStrategy(BaseDetectionStrategy):
                 await page.goto(api_url)
 
                 # Try to parse JSON response
-                content = await page.inner_text('pre, body')
+                content = await page.inner_text("pre, body")
                 if content:
                     json_urls = self._parse_json_for_urls(content)
                     urls.extend(json_urls)
@@ -336,6 +329,7 @@ class BrowserAutomationStrategy(BaseDetectionStrategy):
         """Parse JSON content for chapter URLs."""
         try:
             import json
+
             data = json.loads(content)
 
             urls = []
@@ -343,8 +337,8 @@ class BrowserAutomationStrategy(BaseDetectionStrategy):
             def extract_urls(obj):
                 if isinstance(obj, dict):
                     for key, value in obj.items():
-                        if key.lower() in ['url', 'href', 'link', 'chapter_url'] and isinstance(value, str):
-                            if 'chapter' in value.lower():
+                        if key.lower() in ["url", "href", "link", "chapter_url"] and isinstance(value, str):
+                            if "chapter" in value.lower():
                                 urls.append(value)
                         else:
                             extract_urls(value)
@@ -366,15 +360,15 @@ class BrowserAutomationStrategy(BaseDetectionStrategy):
         text_lower = text.lower()
 
         # Text indicators
-        text_indicators = ['chapter', 'chap', 'ch ', 'episode', 'ep ', '第', '章']
+        text_indicators = ["chapter", "chap", "ch ", "episode", "ep ", "第", "章"]
         has_text_indicator = any(indicator in text_lower for indicator in text_indicators)
 
         # URL indicators
-        url_indicators = ['chapter', 'chap', 'ch-', 'ch_', 'episode', '/c/', '/chapter/']
+        url_indicators = ["chapter", "chap", "ch-", "ch_", "episode", "/c/", "/chapter/"]
         has_url_indicator = any(indicator in url_lower for indicator in url_indicators)
 
         # Must have numbers
-        has_number = bool(re.search(r'\d+', url))
+        has_number = bool(re.search(r"\d+", url))
 
         return (has_text_indicator or has_url_indicator) and has_number
 
@@ -383,10 +377,11 @@ class BrowserAutomationStrategy(BaseDetectionStrategy):
         if not url:
             return url
 
-        if url.startswith(('http://', 'https://')):
+        if url.startswith(("http://", "https://")):
             return url
         else:
             from urllib.parse import urljoin
+
             return urljoin(self.base_url, url)
 
     def _deduplicate_urls(self, urls: List[str]) -> List[str]:
@@ -402,10 +397,7 @@ class BrowserAutomationStrategy(BaseDetectionStrategy):
         return unique_urls
 
     def _filter_by_chapter_range(
-        self,
-        urls: List[str],
-        min_chapter: Optional[int],
-        max_chapter: Optional[int]
+        self, urls: List[str], min_chapter: Optional[int], max_chapter: Optional[int]
     ) -> List[str]:
         """Filter URLs by chapter number range."""
         if not min_chapter and not max_chapter:

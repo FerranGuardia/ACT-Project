@@ -13,14 +13,11 @@ from .logger import get_logger
 
 logger = get_logger("core.error_handling")
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 def handle_errors(
-    operation_name: str,
-    default_value: Any = None,
-    log_level: int = logging.ERROR,
-    reraise: bool = False
+    operation_name: str, default_value: Any = None, log_level: int = logging.ERROR, reraise: bool = False
 ) -> Callable:
     """
     Decorator for consistent error handling.
@@ -39,29 +36,25 @@ def handle_errors(
         def load_config():
             return json.load(open('config.json'))
     """
+
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @wraps(func)
         def wrapper(*args, **kwargs) -> T:
             try:
                 return func(*args, **kwargs)
             except Exception as e:
-                logger.log(
-                    log_level,
-                    f"Error in {operation_name}: {e}",
-                    exc_info=log_level <= logging.DEBUG
-                )
+                logger.log(log_level, f"Error in {operation_name}: {e}", exc_info=log_level <= logging.DEBUG)
                 if reraise:
                     raise
                 return default_value
+
         return wrapper
+
     return decorator
 
 
 def safe_operation(
-    operation: Callable[..., T],
-    operation_name: str,
-    default_value: Any = None,
-    log_level: int = logging.WARNING
+    operation: Callable[..., T], operation_name: str, default_value: Any = None, log_level: int = logging.WARNING
 ) -> T:
     """
     Execute an operation safely with error handling.
@@ -85,11 +78,7 @@ def safe_operation(
     try:
         return operation()
     except Exception as e:
-        logger.log(
-            log_level,
-            f"Error in {operation_name}: {e}",
-            exc_info=log_level <= logging.DEBUG
-        )
+        logger.log(log_level, f"Error in {operation_name}: {e}", exc_info=log_level <= logging.DEBUG)
         return default_value
 
 
@@ -108,7 +97,7 @@ class ErrorContext:
         operation_name: str,
         cleanup: Optional[Callable[[], None]] = None,
         log_level: int = logging.ERROR,
-        reraise: bool = False
+        reraise: bool = False,
     ):
         self.operation_name = operation_name
         self.cleanup = cleanup
@@ -121,9 +110,7 @@ class ErrorContext:
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is not None:
             logger.log(
-                self.log_level,
-                f"Error in {self.operation_name}: {exc_val}",
-                exc_info=self.log_level <= logging.DEBUG
+                self.log_level, f"Error in {self.operation_name}: {exc_val}", exc_info=self.log_level <= logging.DEBUG
             )
 
             # Run cleanup if provided

@@ -30,7 +30,9 @@ class HtmlParsingStrategy(BaseDetectionStrategy):
         try:
             response = self._fetch_with_retry(toc_url)
             if not response:
-                return self._create_result([], confidence=0.0, error="Failed to fetch page", response_time=time.time() - start_time)
+                return self._create_result(
+                    [], confidence=0.0, error="Failed to fetch page", response_time=time.time() - start_time
+                )
 
             html = response.text
 
@@ -38,7 +40,9 @@ class HtmlParsingStrategy(BaseDetectionStrategy):
             urls = self._extract_from_html(html)
 
             if not urls:
-                return self._create_result([], confidence=0.0, error="No chapter links found", response_time=time.time() - start_time)
+                return self._create_result(
+                    [], confidence=0.0, error="No chapter links found", response_time=time.time() - start_time
+                )
 
             # Validate and normalize
             urls, validation_score = self._validate_urls(urls)
@@ -58,10 +62,7 @@ class HtmlParsingStrategy(BaseDetectionStrategy):
                 coverage_range=coverage_range,
                 validation_score=validation_score,
                 response_time=time.time() - start_time,
-                metadata={
-                    "extraction_method": "html_parsing",
-                    "selectors_used": len(self._adaptive_selectors)
-                }
+                metadata={"extraction_method": "html_parsing", "selectors_used": len(self._adaptive_selectors)},
             )
 
         except Exception as e:
@@ -97,11 +98,12 @@ class HtmlParsingStrategy(BaseDetectionStrategy):
 
         try:
             from bs4 import BeautifulSoup
-            soup = BeautifulSoup(html, 'html.parser')
+
+            soup = BeautifulSoup(html, "html.parser")
 
             # Try adaptive selectors based on site learning
             for selector_info in self._adaptive_selectors:
-                selector = selector_info['selector']
+                selector = selector_info["selector"]
                 try:
                     elements = soup.select(selector)
                     for element in elements:
@@ -119,9 +121,9 @@ class HtmlParsingStrategy(BaseDetectionStrategy):
                 'a[href*="ch_"]',
                 'a[href*="episode"]',
                 'a[href*="part"]',
-                '.chapter-link a',
-                '.chapter-item a',
-                '.chapter-list a',
+                ".chapter-link a",
+                ".chapter-item a",
+                ".chapter-list a",
                 'li a[href*="chapter"]',
                 'td a[href*="chapter"]',
                 '.toc a[href*="chapter"]',
@@ -147,7 +149,7 @@ class HtmlParsingStrategy(BaseDetectionStrategy):
     def _extract_url_from_element(self, element) -> Optional[str]:
         """Extract URL from a BeautifulSoup element."""
         try:
-            href = element.get('href')
+            href = element.get("href")
             if not href:
                 return None
 
@@ -210,14 +212,15 @@ class HtmlParsingStrategy(BaseDetectionStrategy):
         for match in matches:
             try:
                 import json
+
                 data = json.loads(match.group(1))
 
                 # Look for chapter URLs in structured data
                 def find_chapter_urls(obj):
                     if isinstance(obj, dict):
                         for key, value in obj.items():
-                            if key.lower() in ['url', 'sameAs'] and isinstance(value, str):
-                                if 'chapter' in value.lower():
+                            if key.lower() in ["url", "sameAs"] and isinstance(value, str):
+                                if "chapter" in value.lower():
                                     urls.append(value)
                             else:
                                 find_chapter_urls(value)
@@ -238,23 +241,17 @@ class HtmlParsingStrategy(BaseDetectionStrategy):
         text_lower = text.lower()
 
         # Text-based indicators
-        text_indicators = [
-            'chapter', 'chap', 'ch ', 'episode', 'ep ', 'part',
-            '第', '章', '话', '节', '回'  # Chinese
-        ]
+        text_indicators = ["chapter", "chap", "ch ", "episode", "ep ", "part", "第", "章", "话", "节", "回"]  # Chinese
 
         has_text_indicator = any(indicator in text_lower for indicator in text_indicators)
 
         # URL-based indicators
-        url_indicators = [
-            'chapter', 'chap', 'ch-', 'ch_', 'episode', 'ep-',
-            '/c/', '/chapter/', '/chap/'
-        ]
+        url_indicators = ["chapter", "chap", "ch-", "ch_", "episode", "ep-", "/c/", "/chapter/", "/chap/"]
 
         has_url_indicator = any(indicator in url_lower for indicator in url_indicators)
 
         # Must have numbers (chapter numbers)
-        has_number = bool(re.search(r'\d+', url))
+        has_number = bool(re.search(r"\d+", url))
 
         # Not too short
         reasonable_length = len(url) > 5
@@ -280,11 +277,11 @@ class HtmlParsingStrategy(BaseDetectionStrategy):
         """Load adaptive selectors based on site learning."""
         # Default selectors that work for most sites
         default_selectors = [
-            {'selector': 'a[href*="chapter"]', 'success_rate': 0.8},
-            {'selector': '.chapter-list a', 'success_rate': 0.7},
-            {'selector': '.toc a[href*="chapter"]', 'success_rate': 0.6},
-            {'selector': 'li a[href*="chap"]', 'success_rate': 0.5},
-            {'selector': 'td a[href*="chapter"]', 'success_rate': 0.4},
+            {"selector": 'a[href*="chapter"]', "success_rate": 0.8},
+            {"selector": ".chapter-list a", "success_rate": 0.7},
+            {"selector": '.toc a[href*="chapter"]', "success_rate": 0.6},
+            {"selector": 'li a[href*="chap"]', "success_rate": 0.5},
+            {"selector": 'td a[href*="chapter"]', "success_rate": 0.4},
         ]
 
         # In a real implementation, this would load from a learned configuration
@@ -296,14 +293,15 @@ class HtmlParsingStrategy(BaseDetectionStrategy):
         """Learn successful patterns for future use."""
         try:
             from bs4 import BeautifulSoup
-            soup = BeautifulSoup(html, 'html.parser')
+
+            soup = BeautifulSoup(html, "html.parser")
 
             # Find common patterns in successful URLs
             successful_patterns = []
 
             for url in successful_urls[:10]:  # Sample first 10
                 # Find the element containing this URL
-                element = soup.find('a', href=url)
+                element = soup.find("a", href=url)
                 if element:
                     # Generate CSS selector for this element
                     selector = self._generate_selector(element)
@@ -313,17 +311,16 @@ class HtmlParsingStrategy(BaseDetectionStrategy):
             # Update adaptive selectors with successful patterns
             for pattern in successful_patterns:
                 # Add or update success rate
-                existing = next((s for s in self._adaptive_selectors if s['selector'] == pattern), None)
+                existing = next((s for s in self._adaptive_selectors if s["selector"] == pattern), None)
                 if existing:
-                    existing['success_rate'] = min(existing['success_rate'] + 0.1, 1.0)
+                    existing["success_rate"] = min(existing["success_rate"] + 0.1, 1.0)
                 else:
-                    self._adaptive_selectors.append({
-                        'selector': pattern,
-                        'success_rate': 0.6  # Initial success rate for new patterns
-                    })
+                    self._adaptive_selectors.append(
+                        {"selector": pattern, "success_rate": 0.6}  # Initial success rate for new patterns
+                    )
 
             # Sort by success rate
-            self._adaptive_selectors.sort(key=lambda x: x['success_rate'], reverse=True)
+            self._adaptive_selectors.sort(key=lambda x: x["success_rate"], reverse=True)
 
         except (ImportError, Exception):
             pass  # Learning failed, but don't break the main flow
@@ -335,20 +332,20 @@ class HtmlParsingStrategy(BaseDetectionStrategy):
             selectors = []
 
             # ID is most specific
-            element_id = element.get('id')
+            element_id = element.get("id")
             if element_id:
-                selectors.append(f'#{element_id}')
+                selectors.append(f"#{element_id}")
 
             # Class combinations
-            classes = element.get('class', [])
+            classes = element.get("class", [])
             if classes:
-                class_selector = '.'.join(classes)
-                selectors.append(f'a.{class_selector}')
+                class_selector = ".".join(classes)
+                selectors.append(f"a.{class_selector}")
 
             # Parent element context
             parent = element.parent
             if parent and parent.name:
-                parent_classes = parent.get('class', [])
+                parent_classes = parent.get("class", [])
                 if parent_classes:
                     parent_selector = f'{parent.name}.{".".join(parent_classes)} a'
                     selectors.append(parent_selector)

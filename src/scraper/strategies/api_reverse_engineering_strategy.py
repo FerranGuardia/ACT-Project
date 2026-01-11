@@ -33,7 +33,7 @@ class ApiReverseEngineeringStrategy(BaseDetectionStrategy):
                 [],
                 confidence=0.0,
                 error="Playwright not available for API monitoring",
-                response_time=time.time() - start_time
+                response_time=time.time() - start_time,
             )
 
         try:
@@ -41,10 +41,7 @@ class ApiReverseEngineeringStrategy(BaseDetectionStrategy):
 
             if not urls:
                 return self._create_result(
-                    [],
-                    confidence=0.0,
-                    error="No API endpoints or URLs found",
-                    response_time=time.time() - start_time
+                    [], confidence=0.0, error="No API endpoints or URLs found", response_time=time.time() - start_time
                 )
 
             # Validate and normalize
@@ -61,25 +58,18 @@ class ApiReverseEngineeringStrategy(BaseDetectionStrategy):
                 coverage_range=coverage_range,
                 validation_score=validation_score,
                 response_time=time.time() - start_time,
-                metadata={
-                    "extraction_method": "api_reverse_engineering",
-                    "api_driven": True
-                }
+                metadata={"extraction_method": "api_reverse_engineering", "api_driven": True},
             )
 
         except Exception as e:
             logger.debug(f"API reverse engineering strategy failed: {e}")
-            return self._create_result(
-                [],
-                confidence=0.0,
-                error=str(e),
-                response_time=time.time() - start_time
-            )
+            return self._create_result([], confidence=0.0, error=str(e), response_time=time.time() - start_time)
 
     def _check_playwright_available(self) -> bool:
         """Check if Playwright is available."""
         try:
             import playwright
+
             return True
         except ImportError:
             return False
@@ -92,8 +82,8 @@ class ApiReverseEngineeringStrategy(BaseDetectionStrategy):
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=True)
                 context = await browser.new_context(
-                    viewport={'width': 1280, 'height': 720},
-                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    viewport={"width": 1280, "height": 720},
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                 )
 
                 page = await context.new_page()
@@ -115,10 +105,10 @@ class ApiReverseEngineeringStrategy(BaseDetectionStrategy):
                         urls.extend(endpoint_urls)
 
                     # Also extract any chapter URLs found directly in responses
-                    for response_data in network_data['responses']:
-                        if response_data.get('content_type', '').startswith('application/json'):
+                    for response_data in network_data["responses"]:
+                        if response_data.get("content_type", "").startswith("application/json"):
                             try:
-                                data = json.loads(response_data['body'])
+                                data = json.loads(response_data["body"])
                                 response_urls = self._extract_urls_from_api_response(data)
                                 urls.extend(response_urls)
                             except (json.JSONDecodeError, KeyError):
@@ -135,51 +125,49 @@ class ApiReverseEngineeringStrategy(BaseDetectionStrategy):
             logger.debug(f"API monitoring failed: {e}")
             return []
 
-    async def _monitor_network_requests(self, page, toc_url: str, should_stop: Optional[Callable[[], bool]]) -> Dict[str, Any]:
+    async def _monitor_network_requests(
+        self, page, toc_url: str, should_stop: Optional[Callable[[], bool]]
+    ) -> Dict[str, Any]:
         """Monitor network requests and responses."""
-        network_data = {
-            'requests': [],
-            'responses': [],
-            'api_candidates': []
-        }
+        network_data = {"requests": [], "responses": [], "api_candidates": []}
 
         def handle_request(request):
             request_info = {
-                'url': request.url,
-                'method': request.method,
-                'headers': dict(request.headers),
-                'timestamp': time.time()
+                "url": request.url,
+                "method": request.method,
+                "headers": dict(request.headers),
+                "timestamp": time.time(),
             }
-            network_data['requests'].append(request_info)
+            network_data["requests"].append(request_info)
 
             # Identify potential API endpoints
             if self._is_api_candidate(request.url):
-                network_data['api_candidates'].append(request.url)
+                network_data["api_candidates"].append(request.url)
 
         def handle_response(response):
             # Only capture responses that might contain chapter data
             if self._should_capture_response(response):
                 try:
                     # Get response body (this might fail for large responses)
-                    body = response.text() if hasattr(response, 'text') else ''
+                    body = response.text() if hasattr(response, "text") else ""
                     response_info = {
-                        'url': response.url,
-                        'status': response.status,
-                        'headers': dict(response.headers),
-                        'content_type': response.headers.get('content-type', ''),
-                        'body': body[:50000],  # Limit size
-                        'timestamp': time.time()
+                        "url": response.url,
+                        "status": response.status,
+                        "headers": dict(response.headers),
+                        "content_type": response.headers.get("content-type", ""),
+                        "body": body[:50000],  # Limit size
+                        "timestamp": time.time(),
                     }
-                    network_data['responses'].append(response_info)
+                    network_data["responses"].append(response_info)
                 except Exception:
                     pass
 
         # Set up event handlers
-        page.on('request', handle_request)
-        page.on('response', handle_response)
+        page.on("request", handle_request)
+        page.on("response", handle_response)
 
         # Navigate and interact with the page
-        await page.goto(toc_url, wait_until='networkidle')
+        await page.goto(toc_url, wait_until="networkidle")
 
         # Wait for dynamic content and scroll to trigger API calls
         await page.wait_for_timeout(2000)
@@ -208,9 +196,9 @@ class ApiReverseEngineeringStrategy(BaseDetectionStrategy):
                 'button:has-text("Load More")',
                 'button:has-text("Show More")',
                 'a:has-text("Next")',
-                '.load-more',
-                '#load-more',
-                '[data-action="load-more"]'
+                ".load-more",
+                "#load-more",
+                '[data-action="load-more"]',
             ]
 
             for selector in load_more_selectors:
@@ -232,19 +220,16 @@ class ApiReverseEngineeringStrategy(BaseDetectionStrategy):
         parsed = urlparse(url)
 
         # API-like patterns
-        api_indicators = [
-            '/api/', '/ajax/', '/graphql', '/rest/',
-            'chapters', 'chapter-list', 'novel-chapters'
-        ]
+        api_indicators = ["/api/", "/ajax/", "/graphql", "/rest/", "chapters", "chapter-list", "novel-chapters"]
 
         has_api_indicator = any(indicator in url_lower for indicator in api_indicators)
 
         # JSON-like query parameters
         query_params = parse_qs(parsed.query)
-        has_json_params = any(key in ['json', 'format', 'type'] for key in query_params)
+        has_json_params = any(key in ["json", "format", "type"] for key in query_params)
 
         # RESTful patterns
-        path_parts = parsed.path.strip('/').split('/')
+        path_parts = parsed.path.strip("/").split("/")
         has_rest_pattern = len(path_parts) >= 2 and any(part.isdigit() for part in path_parts)
 
         return has_api_indicator or has_json_params or has_rest_pattern
@@ -253,14 +238,14 @@ class ApiReverseEngineeringStrategy(BaseDetectionStrategy):
         """Determine if we should capture this response."""
         try:
             url = response.url.lower()
-            content_type = response.headers.get('content-type', '').lower()
+            content_type = response.headers.get("content-type", "").lower()
 
             # Capture JSON responses from API-like URLs
-            if 'json' in content_type and any(keyword in url for keyword in ['api', 'ajax', 'chapter']):
+            if "json" in content_type and any(keyword in url for keyword in ["api", "ajax", "chapter"]):
                 return True
 
             # Capture responses from known API endpoints
-            if any(keyword in url for keyword in ['/api/', '/ajax/', '/chapters']):
+            if any(keyword in url for keyword in ["/api/", "/ajax/", "/chapters"]):
                 return True
 
             return False
@@ -274,15 +259,15 @@ class ApiReverseEngineeringStrategy(BaseDetectionStrategy):
 
         # Extract unique API candidate URLs
         seen_urls = set()
-        for url in network_data['api_candidates']:
+        for url in network_data["api_candidates"]:
             if url not in seen_urls:
                 seen_urls.add(url)
                 endpoints.append(url)
 
         # Also check successful API responses
-        for response in network_data['responses']:
-            if response.get('status') == 200:
-                url = response['url']
+        for response in network_data["responses"]:
+            if response.get("status") == 200:
+                url = response["url"]
                 if url not in seen_urls and self._is_api_candidate(url):
                     seen_urls.add(url)
                     endpoints.append(url)
@@ -302,12 +287,12 @@ class ApiReverseEngineeringStrategy(BaseDetectionStrategy):
 
         # Common pagination patterns
         pagination_patterns = [
-            ('page', '1'),
-            ('offset', '0'),
-            ('start', '0'),
-            ('limit', '50'),
-            ('p', '1'),
-            ('skip', '0'),
+            ("page", "1"),
+            ("offset", "0"),
+            ("start", "0"),
+            ("limit", "50"),
+            ("p", "1"),
+            ("skip", "0"),
         ]
 
         for param_name, param_value in pagination_patterns:
@@ -316,7 +301,7 @@ class ApiReverseEngineeringStrategy(BaseDetectionStrategy):
                 new_query[param_name] = [param_value]
 
                 # Rebuild query string
-                query_string = '&'.join([f"{k}={v[0]}" for k, v in new_query.items()])
+                query_string = "&".join([f"{k}={v[0]}" for k, v in new_query.items()])
                 new_url = parsed._replace(query=query_string).geturl()
 
                 endpoints.append(new_url)
@@ -330,7 +315,7 @@ class ApiReverseEngineeringStrategy(BaseDetectionStrategy):
             await page.goto(endpoint)
 
             # Try to get the response content
-            content_element = await page.query_selector('pre, body')
+            content_element = await page.query_selector("pre, body")
             if content_element:
                 content = await content_element.inner_text()
                 if content:
@@ -375,8 +360,8 @@ class ApiReverseEngineeringStrategy(BaseDetectionStrategy):
         def extract_from_obj(obj):
             if isinstance(obj, dict):
                 for key, value in obj.items():
-                    if key.lower() in ['url', 'href', 'link', 'chapter_url', 'chapterUrl']:
-                        if isinstance(value, str) and 'chapter' in value.lower():
+                    if key.lower() in ["url", "href", "link", "chapter_url", "chapterUrl"]:
+                        if isinstance(value, str) and "chapter" in value.lower():
                             urls.append(value)
                     else:
                         extract_from_obj(value)

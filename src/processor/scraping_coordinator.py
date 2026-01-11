@@ -32,7 +32,7 @@ class ScrapingCoordinator:
         novel_url: Optional[str] = None,
         toc_url: Optional[str] = None,
         novel_title: Optional[str] = None,
-        novel_author: Optional[str] = None
+        novel_author: Optional[str] = None,
     ) -> bool:
         """Initialize or load a project."""
         # Try to load existing project
@@ -53,10 +53,7 @@ class ScrapingCoordinator:
 
         logger.info(f"Creating new project: {self.context.project_name}")
         self.project_manager.create_project(
-            novel_url=novel_url,
-            toc_url=toc_url,
-            novel_title=novel_title,
-            novel_author=novel_author
+            novel_url=novel_url, toc_url=toc_url, novel_title=novel_title, novel_author=novel_author
         )
         return True
 
@@ -111,16 +108,15 @@ class ScrapingCoordinator:
 
         # Check for URL/chapter number mismatch
         from scraper.chapter_parser import extract_chapter_number
+
         url_chapter_num = extract_chapter_number(chapter.url)
         if url_chapter_num and url_chapter_num != chapter_num:
-            logger.warning(f"⚠ URL mismatch detected: Chapter {chapter_num} but URL suggests chapter {url_chapter_num} ({chapter.url})")
+            logger.warning(
+                f"⚠ URL mismatch detected: Chapter {chapter_num} but URL suggests chapter {url_chapter_num} ({chapter.url})"
+            )
 
         if self.progress_tracker:
-            self.progress_tracker.update_chapter(
-                chapter_num,
-                ProcessingStatus.SCRAPING,
-                "Scraping chapter content"
-            )
+            self.progress_tracker.update_chapter(chapter_num, ProcessingStatus.SCRAPING, "Scraping chapter content")
 
         if not self.scraper:
             return None, None, "Scraper not initialized"
@@ -146,11 +142,7 @@ class ScrapingCoordinator:
 
         # Update progress
         if self.progress_tracker:
-            self.progress_tracker.update_chapter(
-                chapter_num,
-                ProcessingStatus.SCRAPED,
-                "Chapter scraped successfully"
-            )
+            self.progress_tracker.update_chapter(chapter_num, ProcessingStatus.SCRAPED, "Chapter scraped successfully")
 
         return content, title, None
 
@@ -161,17 +153,11 @@ class ScrapingCoordinator:
             return []
 
         all_chapters = chapter_manager.get_all_chapters()
-        chapters_to_process = [
-            ch for ch in all_chapters
-            if ch.number >= start_from
-        ]
+        chapters_to_process = [ch for ch in all_chapters if ch.number >= start_from]
 
         # Filter by specific chapters if set
         if self.context.specific_chapters:
-            chapters_to_process = [
-                ch for ch in chapters_to_process
-                if ch.number in self.context.specific_chapters
-            ]
+            chapters_to_process = [ch for ch in chapters_to_process if ch.number in self.context.specific_chapters]
 
         if max_chapters:
             chapters_to_process = chapters_to_process[:max_chapters]
@@ -204,7 +190,7 @@ class ScrapingCoordinator:
             total_chapters=total_chapters,
             on_progress=self.context.on_progress,
             on_status_change=self.context.on_status_change,
-            on_chapter_update=self.context.on_chapter_update
+            on_chapter_update=self.context.on_chapter_update,
         )
 
     def _extract_base_url(self, url: str) -> str:

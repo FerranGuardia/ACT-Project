@@ -24,6 +24,7 @@ from utils.validation import validate_file_path
 logger = get_logger("ui.tts_view.handlers")
 try:
     from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
+
     QT_MULTIMEDIA_AVAILABLE = True
 except ImportError:
     QT_MULTIMEDIA_AVAILABLE = False
@@ -35,7 +36,7 @@ except ImportError:
 @contextmanager
 def suppress_stderr():
     """Temporarily suppress stderr output."""
-    with open(os.devnull, 'w') as devnull:
+    with open(os.devnull, "w") as devnull:
         old_stderr = sys.stderr
         sys.stderr = devnull
         try:
@@ -46,8 +47,8 @@ def suppress_stderr():
 
 class TTSViewHandlers:
     """Handles business logic and event handlers for TTS view."""
-    
-    def __init__(self, view: 'QWidget'):
+
+    def __init__(self, view: "QWidget"):
         self.view = view
         self.tts_engine = TTSEngine()
         self.voice_manager = VoiceManager()
@@ -58,7 +59,7 @@ class TTSViewHandlers:
         self.preview_button = None
         self.stop_preview_button = None
         self.multimedia_available = False  # Track if multimedia actually works
-        
+
         # Initialize audio playback if available
         if QT_MULTIMEDIA_AVAILABLE and QMediaPlayer is not None and QAudioOutput is not None:
             try:
@@ -76,13 +77,13 @@ class TTSViewHandlers:
                 self.preview_player = None
                 self.preview_audio_output = None
                 self.multimedia_available = False
-    
+
     def set_preview_ui_elements(self, status_label, preview_button, stop_preview_button):
         """Set UI elements for preview state updates."""
         self.preview_status_label = status_label
         self.preview_button = preview_button
         self.stop_preview_button = stop_preview_button
-    
+
     def load_providers(self, provider_combo):
         """Load available providers into the combo box."""
         try:
@@ -92,17 +93,14 @@ class TTSViewHandlers:
                 provider_combo.addItems(["No providers available"])
                 provider_combo.setEnabled(False)
                 return
-            
+
             # Add provider names with display labels
-            provider_labels = {
-                "edge_tts": "Edge TTS (Cloud)",
-                "pyttsx3": "pyttsx3 (Offline)"
-            }
-            
+            provider_labels = {"edge_tts": "Edge TTS (Cloud)", "pyttsx3": "pyttsx3 (Offline)"}
+
             for provider in providers:
                 label = provider_labels.get(provider, provider)
                 provider_combo.addItem(label, provider)
-            
+
             # Set default to first provider
             if providers:
                 provider_combo.setCurrentIndex(0)
@@ -110,13 +108,13 @@ class TTSViewHandlers:
             logger.error(f"Error loading providers: {e}")
             # Fallback to Edge TTS
             provider_combo.addItem("Edge TTS (Cloud)", "edge_tts")
-    
+
     def load_voices(self, voice_combo, provider_combo):
         """Load available voices into the combo box based on selected provider."""
         try:
             # Clear existing voices
             voice_combo.clear()
-            
+
             # Get selected provider
             current_index = provider_combo.currentIndex()
             if current_index < 0:
@@ -125,7 +123,7 @@ class TTSViewHandlers:
                 logger.info("No provider selected, defaulting to Edge TTS")
             else:
                 provider = provider_combo.itemData(current_index)
-            
+
             # Load voices for the selected provider (filtered to en-US only)
             logger.info(f"Loading voices for provider: {provider}")
             voices = self.voice_manager.get_voice_list(locale="en-US", provider=provider)
@@ -137,10 +135,10 @@ class TTSViewHandlers:
                 return
 
             logger.info(f"Loaded {len(voices)} voices: {voices[:3]}...")
-            
+
             voice_combo.setEnabled(True)
             voice_combo.addItems(voices)
-            
+
             # Set default to first voice if available
             if voices:
                 voice_combo.setCurrentIndex(0)
@@ -148,16 +146,13 @@ class TTSViewHandlers:
             logger.error(f"Error loading voices: {e}")
             # Fallback to default voices
             voice_combo.addItems(["en-US-AndrewNeural", "en-US-AriaNeural", "en-US-GuyNeural"])
-    
+
     def add_files(self, file_paths, files_list):
         """Add text files via file dialog."""
         files, _ = QFileDialog.getOpenFileNames(
-            self.view,
-            "Select Text Files",
-            "",
-            "Text Files (*.txt *.md);;All Files (*.*)"
+            self.view, "Select Text Files", "", "Text Files (*.txt *.md);;All Files (*.*)"
         )
-        
+
         if files:
             for file_path in files:
                 if file_path not in file_paths:
@@ -165,25 +160,25 @@ class TTSViewHandlers:
                     filename = os.path.basename(file_path)
                     files_list.addItem(filename)
             logger.info(f"Added {len(files)} file(s)")
-    
+
     def add_folder(self, file_paths, files_list):
         """Add all text files from a folder."""
         folder = QFileDialog.getExistingDirectory(self.view, "Select Folder")
         if not folder:
             return
-        
+
         try:
             added_count = 0
             for root, dirs, files in os.walk(folder):
                 for file in files:
-                    if file.endswith(('.txt', '.md')):
+                    if file.endswith((".txt", ".md")):
                         file_path = os.path.join(root, file)
                         if file_path not in file_paths:
                             file_paths.append(file_path)
                             filename = os.path.basename(file_path)
                             files_list.addItem(filename)
                             added_count += 1
-            
+
             if added_count > 0:
                 logger.info(f"Added {added_count} file(s) from folder")
             else:
@@ -191,22 +186,33 @@ class TTSViewHandlers:
         except Exception as e:
             QMessageBox.warning(self.view, "Error", f"Error reading folder:\n{str(e)}")
             logger.error(f"Error adding folder: {e}")
-    
+
     def remove_selected_files(self, file_paths, files_list):
         """Remove selected files from the list."""
         selected_items = files_list.selectedItems()
         if not selected_items:
             return
-        
+
         for item in selected_items:
             row = files_list.row(item)
             if 0 <= row < len(file_paths):
                 removed_path = file_paths.pop(row)
                 files_list.takeItem(row)
                 logger.debug(f"Removed file: {removed_path}")
-    
-    def preview_voice(self, voice_combo, provider_combo, rate_slider, pitch_slider, 
-                     volume_slider, text_editor, input_tabs, status_label, preview_button, stop_preview_button):
+
+    def preview_voice(
+        self,
+        voice_combo,
+        provider_combo,
+        rate_slider,
+        pitch_slider,
+        volume_slider,
+        text_editor,
+        input_tabs,
+        status_label,
+        preview_button,
+        stop_preview_button,
+    ):
         """Preview the selected voice with sample text."""
         # Extract voice name from formatted string
         voice_display = voice_combo.currentText()
@@ -214,16 +220,16 @@ class TTSViewHandlers:
         if not voice:
             QMessageBox.warning(self.view, "No Voice", "Please select a voice")
             return
-        
+
         # Stop any currently playing preview
         if self.multimedia_available and self.preview_player and QMediaPlayer is not None:
             if self.preview_player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:  # type: ignore[attr-defined, comparison-overlap]
                 self.preview_player.stop()  # type: ignore[attr-defined]
-        
+
         # Get selected provider
         current_index = provider_combo.currentIndex()
         provider = provider_combo.itemData(current_index) if current_index >= 0 else None
-        
+
         # Use text from editor if editor tab is active and has text, otherwise use sample text
         sample_text = "Hello, this is a preview of the selected voice."
         current_tab = input_tabs.currentIndex()
@@ -231,24 +237,26 @@ class TTSViewHandlers:
             editor_text = text_editor.toPlainText().strip()
             if editor_text:
                 # Use first N characters of editor text for preview
-                sample_text = editor_text[:PREVIEW_TEXT_LENGTH] + ("..." if len(editor_text) > PREVIEW_TEXT_LENGTH else "")
-        
+                sample_text = editor_text[:PREVIEW_TEXT_LENGTH] + (
+                    "..." if len(editor_text) > PREVIEW_TEXT_LENGTH else ""
+                )
+
         try:
             status_label.setText("Generating preview...")
             preview_button.setEnabled(False)
-            
+
             # Create temporary output file
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tmp:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
                 temp_path = tmp.name
-            
+
             # Store temp file path for cleanup
             self.preview_temp_file = temp_path
-            
+
             # Get voice settings
             rate = ((rate_slider.value() - 100) / 100) * 50
             pitch = pitch_slider.value()
             volume = ((volume_slider.value() - 100) / 100) * 50
-            
+
             # Convert preview with provider
             success = self.tts_engine.convert_text_to_speech(
                 text=sample_text,
@@ -257,9 +265,9 @@ class TTSViewHandlers:
                 rate=rate,
                 pitch=pitch,
                 volume=volume,
-                provider=provider
+                provider=provider,
             )
-            
+
             if success:
                 # Play the preview using QMediaPlayer if available
                 if self.multimedia_available and self.preview_player:
@@ -285,12 +293,12 @@ class TTSViewHandlers:
                     logger.info(f"Validated temp file path for external player: {safe_temp_path}")
 
                     try:
-                        if platform.system() == 'Windows':
+                        if platform.system() == "Windows":
                             os.startfile(safe_temp_path)
-                        elif platform.system() == 'Darwin':  # macOS
-                            subprocess.run(['afplay', safe_temp_path], check=True)
+                        elif platform.system() == "Darwin":  # macOS
+                            subprocess.run(["afplay", safe_temp_path], check=True)
                         else:  # Linux
-                            subprocess.run(['xdg-open', safe_temp_path], check=True)
+                            subprocess.run(["xdg-open", safe_temp_path], check=True)
                         status_label.setText("Preview playing in external player...")
                         logger.info(f"Preview opened in external player for voice: {voice}")
                     except (subprocess.SubprocessError, OSError) as e:
@@ -306,7 +314,7 @@ class TTSViewHandlers:
             status_label.setText("Ready")
             preview_button.setEnabled(True)
             logger.error(f"Preview error: {e}")
-    
+
     def stop_preview(self, status_label, preview_button, stop_preview_button):
         """Stop the currently playing preview."""
         if self.multimedia_available and self.preview_player:
@@ -315,7 +323,7 @@ class TTSViewHandlers:
             stop_preview_button.setEnabled(False)
             preview_button.setEnabled(True)
             logger.info("Preview stopped by user")
-    
+
     def _on_preview_state_changed(self, state):
         """Handle preview playback state changes for cleanup."""
         if self.multimedia_available and QMediaPlayer is not None:
@@ -328,11 +336,12 @@ class TTSViewHandlers:
                     self.stop_preview_button.setEnabled(False)
                 if self.preview_button:
                     self.preview_button.setEnabled(True)
-                
+
                 # Clean up temporary file after a short delay
                 temp_file = self.preview_temp_file
                 if temp_file:
                     try:
+
                         def cleanup_temp_file():
                             try:
                                 if temp_file and os.path.exists(temp_file):
@@ -342,23 +351,23 @@ class TTSViewHandlers:
                                 logger.warning(f"Failed to cleanup preview temp file: {e}")
                             finally:
                                 self.preview_temp_file = None
-                        
+
                         QTimer.singleShot(TEMP_FILE_CLEANUP_DELAY_MS, cleanup_temp_file)
                     except Exception as e:
                         logger.warning(f"Error scheduling temp file cleanup: {e}")
-    
+
     def browse_output_dir(self, output_dir_input):
         """Open directory browser for output."""
         directory = QFileDialog.getExistingDirectory(self.view, "Select Output Directory")
         if directory:
             output_dir_input.setText(directory)
             logger.info(f"Output directory selected: {directory}")
-    
+
     def validate_inputs(self, file_paths, input_tabs, text_editor, output_dir_input) -> tuple[bool, str]:
         """Validate user inputs."""
         # Check which tab is active
         current_tab = input_tabs.currentIndex()
-        
+
         if current_tab == 0:  # Files tab
             if not file_paths:
                 return False, "Please add at least one text file to convert"
@@ -366,10 +375,9 @@ class TTSViewHandlers:
             editor_text = text_editor.toPlainText().strip()
             if not editor_text:
                 return False, "Please enter text in the editor to convert"
-        
+
         output_dir = output_dir_input.text().strip()
         if not output_dir:
             return False, "Please select an output directory"
-        
-        return True, ""
 
+        return True, ""

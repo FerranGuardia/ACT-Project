@@ -102,9 +102,12 @@ class TTSEngine:
     This is a compatibility layer that uses the new modular TTS architecture.
     """
 
-    def __init__(self, base_text_cleaner: Optional[Callable[[str], str]] = None,
-                 provider_manager: Optional[TTSProviderManager] = None,
-                 config: Optional[TTSConfig] = None):
+    def __init__(
+        self,
+        base_text_cleaner: Optional[Callable[[str], str]] = None,
+        provider_manager: Optional[TTSProviderManager] = None,
+        config: Optional[TTSConfig] = None,
+    ):
         """
         Initialize TTS engine.
 
@@ -134,12 +137,14 @@ class TTSEngine:
             provider_manager=self.provider_manager,
             voice_resolver=self.voice_resolver,
             text_pipeline=self.text_pipeline,
-            resource_manager=self.resource_manager
+            resource_manager=self.resource_manager,
         )
 
         logger.info("TTSEngine initialized with new architecture")
 
-    def get_available_voices(self, locale: Optional[str] = None, provider: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_available_voices(
+        self, locale: Optional[str] = None, provider: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """Get available voices (delegates to coordinator)."""
         return self.coordinator.get_available_voices(locale=locale, provider=provider)
 
@@ -151,7 +156,7 @@ class TTSEngine:
         rate: Optional[float] = None,
         pitch: Optional[float] = None,
         volume: Optional[float] = None,
-        provider: Optional[str] = None
+        provider: Optional[str] = None,
     ) -> bool:
         """
         Convert text to speech and save as audio file.
@@ -172,14 +177,9 @@ class TTSEngine:
         """
         # Delegate to the coordinator
         return self.coordinator.convert_text_to_speech(
-            text=text,
-            output_path=output_path,
-            voice=voice,
-            rate=rate,
-            pitch=pitch,
-            volume=volume,
-            provider=provider
+            text=text, output_path=output_path, voice=voice, rate=rate, pitch=pitch, volume=volume, provider=provider
         )
+
     async def _convert_chunks_parallel(
         self,
         chunks: List[str],
@@ -189,7 +189,7 @@ class TTSEngine:
         provider: Optional[str | TTSProvider] = None,
         rate: Optional[float] = None,
         pitch: Optional[float] = None,
-        volume: Optional[float] = None
+        volume: Optional[float] = None,
     ) -> List[Path]:
         """Delegate to AudioMerger for parallel chunk conversion."""
         # Handle both string provider names and TTSProvider objects (for backward compatibility with tests)
@@ -200,7 +200,7 @@ class TTSEngine:
             else:
                 # Assume it's already a TTSProvider object
                 provider_instance = provider
-        
+
         # audio_merger.convert_chunks_parallel is async and returns List[Path]
         return await self.audio_merger.convert_chunks_parallel(
             chunks, voice, temp_dir, output_stem, provider_instance, rate, pitch, volume
@@ -214,28 +214,35 @@ class TTSEngine:
         rate: Optional[float],
         pitch: Optional[float],
         volume: Optional[float],
-        provider: Optional[str]
+        provider: Optional[str],
     ) -> bool:
         """Delegate to AudioMerger for chunked conversion with merging."""
         try:
             # Use temp directory for chunks
             import time
+
             temp_dir = Path(tempfile.gettempdir()) / f"tts_chunks_{int(time.time() * 1000)}"
             temp_dir.mkdir(parents=True, exist_ok=True)
-            
+
             try:
                 # Chunk the text
                 chunks = self._chunk_text(text, self.config.DEFAULT_MAX_CHUNK_BYTES)
                 logger.info(f"Split text into {len(chunks)} chunks")
-                
+
                 # Convert chunks in parallel
                 chunk_files = AsyncBridge.run_async(
                     self._convert_chunks_parallel(
-                        chunks, voice, temp_dir, output_path.stem,
-                        provider=provider, rate=rate, pitch=pitch, volume=volume
+                        chunks,
+                        voice,
+                        temp_dir,
+                        output_path.stem,
+                        provider=provider,
+                        rate=rate,
+                        pitch=pitch,
+                        volume=volume,
                     )
                 )
-                
+
                 # Merge the chunks
                 if not self._merge_audio_chunks(chunk_files, output_path):
                     logger.error("Failed to merge audio chunks")
@@ -244,30 +251,31 @@ class TTSEngine:
 
                 # Clean up chunk files
                 self.tts_utils.cleanup_files(chunk_files)
-                
+
                 # Verify output
                 if not output_path.exists():
                     logger.error(f"Audio file was not created: {output_path}")
                     return False
-                
+
                 file_size = output_path.stat().st_size
                 if file_size == 0:
                     logger.error(f"Audio file is empty (0 bytes): {output_path}")
                     output_path.unlink()
                     return False
-                
+
                 logger.info(f"✓ Created audio file: {output_path} ({file_size} bytes)")
                 return True
-            
+
             finally:
                 # Clean up temp directory
                 try:
                     import shutil
+
                     shutil.rmtree(temp_dir)
                     logger.info(f"Cleaned up temp directory: {temp_dir}")
                 except Exception as e:
                     logger.warning(f"Failed to clean up temp directory {temp_dir}: {e}")
-        
+
         except Exception as e:
             error_msg = str(e)
             error_type = type(e).__name__
@@ -295,7 +303,7 @@ class TTSEngine:
         rate: Optional[float] = None,
         pitch: Optional[float] = None,
         volume: Optional[float] = None,
-        provider: Optional[str] = None
+        provider: Optional[str] = None,
     ) -> bool:
         """
         Convert text file to speech.
@@ -320,6 +328,5 @@ class TTSEngine:
             rate=rate,
             pitch=pitch,
             volume=volume,
-            provider=provider
+            provider=provider,
         )
-
