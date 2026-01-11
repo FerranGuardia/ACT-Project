@@ -14,15 +14,27 @@ echo Checking for slow tests and performance issues...
 echo.
 
 echo ========================================
-echo    Running Unit Tests
+echo    Running Unit Tests (Non-UI)
 echo ========================================
 echo.
-echo Running unit tests with coverage...
+echo Running unit tests with coverage (excluding UI tests)...
+echo UI tests run separately due to Qt threading constraints.
 echo This may take a few minutes...
 echo.
 
-python -m pytest tests/unit/ -v --tb=short
+python -m pytest tests/unit/ -v --tb=short -m "not ui"
 set UNIT_TEST_EXIT=%ERRORLEVEL%
+
+echo.
+echo ========================================
+echo    Running UI Tests (Sequential)
+echo ========================================
+echo.
+echo Running UI tests sequentially (Qt components)...
+echo.
+
+python -m pytest tests/unit/ui/ -v --tb=short -n0
+set UI_TEST_EXIT=%ERRORLEVEL%
 
 echo.
 echo ========================================
@@ -66,6 +78,12 @@ if %UNIT_TEST_EXIT% EQU 0 (
     echo [FAIL] Unit Tests: FAILED
 )
 
+if %UI_TEST_EXIT% EQU 0 (
+    echo [OK] UI Tests: PASSED
+) else (
+    echo [FAIL] UI Tests: FAILED
+)
+
 if %INTEGRATION_TEST_EXIT% EQU 0 (
     echo [OK] Integration Tests: PASSED
 ) else (
@@ -73,20 +91,25 @@ if %INTEGRATION_TEST_EXIT% EQU 0 (
 )
 echo.
 
-if %UNIT_TEST_EXIT% NEQ 0 (
-    echo ========================================
-    echo    Some tests FAILED
-    echo ========================================
-    pause
-    exit /b %UNIT_TEST_EXIT%
-)
+REM Check for any failures
+set OVERALL_EXIT=0
+if %UNIT_TEST_EXIT% NEQ 0 set OVERALL_EXIT=1
+if %UI_TEST_EXIT% NEQ 0 set OVERALL_EXIT=1
+if %INTEGRATION_TEST_EXIT% NEQ 0 set OVERALL_EXIT=1
 
-if %INTEGRATION_TEST_EXIT% NEQ 0 (
+if %OVERALL_EXIT% NEQ 0 (
     echo ========================================
     echo    Some tests FAILED
     echo ========================================
+    echo.
+    echo Failed test suites:
+    if %UNIT_TEST_EXIT% NEQ 0 echo - Unit Tests (Non-UI)
+    if %UI_TEST_EXIT% NEQ 0 echo - UI Tests
+    if %INTEGRATION_TEST_EXIT% NEQ 0 echo - Integration Tests
+    echo.
+    echo Check the output above for failure details.
     pause
-    exit /b %INTEGRATION_TEST_EXIT%
+    exit /b 1
 )
 
 echo ========================================
