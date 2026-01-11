@@ -169,7 +169,7 @@ class TestProcessingPipeline:
             assert new_pipeline.progress_tracker.total_chapters == 2
     
     
-    @patch('processor.pipeline.GenericScraper')
+    @patch('processor.scraping_coordinator.GenericScraper')
     def test_fetch_chapter_urls(self, mock_scraper_class, pipeline):
         """Test fetching chapter URLs."""
         # Mock scraper
@@ -191,7 +191,7 @@ class TestProcessingPipeline:
         assert chapter_manager.get_total_count() == 3
         assert pipeline.progress_tracker.total_chapters == 3
     
-    @patch('processor.pipeline.GenericScraper')
+    @patch('processor.scraping_coordinator.GenericScraper')
     def test_fetch_chapter_urls_no_urls(self, mock_scraper_class, pipeline):
         """Test fetching chapter URLs when none are found."""
         mock_scraper = MagicMock()
@@ -220,13 +220,13 @@ class TestProcessingPipeline:
         audio_file.parent.mkdir(parents=True, exist_ok=True)
         audio_file.write_bytes(b"fake audio")
         
-        # Mock scraper (shouldn't be called)
-        pipeline.scraper = Mock()
-        
+        # Mock scraping coordinator (shouldn't be called when skipping)
+        pipeline.scraping_coordinator.scrape_chapter_content = Mock()
+
         success = pipeline.process_chapter(chapter, skip_if_exists=True)
-        
+
         assert success is True
-        pipeline.scraper.scrape_chapter.assert_not_called()
+        pipeline.scraping_coordinator.scrape_chapter_content.assert_not_called()
     
     def test_check_should_stop(self, pipeline):
         """Test checking if processing should stop."""
@@ -253,7 +253,7 @@ class TestProcessingPipeline:
         # Verify project file is deleted
         assert not pipeline.project_manager.project_exists()
     
-    @patch('processor.pipeline.GenericScraper')
+    @patch('processor.scraping_coordinator.GenericScraper')
     def test_process_all_chapters_error_isolation(self, mock_scraper_class, pipeline, temp_dir):
         """Test error isolation - continue processing when ignore_errors=True (Phase 1 - yt-dlp pattern)."""
         # Mock scraper
@@ -276,9 +276,12 @@ class TestProcessingPipeline:
             return "Content", "Title", None
         mock_scraper.scrape_chapter.side_effect = mock_scrape_side_effect
         
-        # Mock TTS to always succeed
-        pipeline.tts_engine = Mock()
-        pipeline.tts_engine.convert_text_to_speech.return_value = True
+        # Mock TTS to always succeed and create the temp file
+        def mock_tts_convert(text, output_path, voice=None, provider=None):
+            Path(output_path).write_bytes(b"fake audio content")
+            return True
+        pipeline.conversion_coordinator.tts_engine = Mock()
+        pipeline.conversion_coordinator.tts_engine.convert_text_to_speech.side_effect = mock_tts_convert
         
         # Mock file manager - create actual files so pipeline validation passes
         def mock_save_text_file(chapter_num, content, title=None):
@@ -307,7 +310,7 @@ class TestProcessingPipeline:
             assert result["failed"] >= 1  # Chapter 2 should fail
             assert result["completed"] >= 1  # Other chapters should succeed
     
-    @patch('processor.pipeline.GenericScraper')
+    @patch('processor.scraping_coordinator.GenericScraper')
     def test_process_all_chapters_error_isolation_disabled(self, mock_scraper_class, pipeline, temp_dir):
         """Test error isolation disabled - stops on first error when ignore_errors=False."""
         # Mock scraper
@@ -342,26 +345,29 @@ class TestProcessingPipeline:
         pipeline.initialize_project(toc_url="https://example.com/toc")
         chapter_manager = pipeline.project_manager.get_chapter_manager()
         chapter = chapter_manager.add_chapter(1, "https://example.com/1")
-        
+
         # Ensure chapter doesn't have audio file (so it won't be skipped)
         pipeline.file_manager.audio_file_exists = Mock(return_value=False)
-        
+
         # Create progress tracker
         pipeline.progress_tracker = Mock()
         pipeline.progress_tracker.update_chapter = Mock()
-        
-        # Mock scraper to raise an exception (callback is only called for exceptions, not scraping failures)
-        pipeline.scraper = Mock()
-        pipeline.scraper.scrape_chapter.side_effect = Exception("Scraping error")
-        
+
+        # Mock scraping coordinator to succeed
+        pipeline.scraping_coordinator.scrape_chapter_content = Mock(return_value=("Content", "Title", None))
+
         # Create failure callback
         failure_callback_called = []
         def failure_callback(chapter_num, exception):
             failure_callback_called.append((chapter_num, exception))
-        
-        # Process chapter (should fail and call callback)
+
+        # Process chapter with mocked TTS that raises exception during conversion
+        # The failure callback should be called from within convert_chapter_to_audio's try-catch
+        pipeline.tts_engine = Mock()
+        pipeline.tts_engine.convert_text_to_speech.side_effect = Exception("TTS conversion failed")
+
         success = pipeline.process_chapter(chapter, on_failure=failure_callback, skip_if_exists=False)
-        
+
         # Verify callback was called
         assert success is False
         assert len(failure_callback_called) == 1
@@ -374,11 +380,11 @@ class TestProcessingPipeline:
             return True
 
         pipeline.set_pause_check_callback(pause_callback)
-        assert pipeline._check_paused_callback == pause_callback
+        assert pipeline.context._check_paused_callback == pause_callback
 
     def test_check_should_pause_no_callback(self, pipeline):
         """Test pause check when no callback is set."""
-        assert pipeline._check_should_pause() == False
+        assert pipeline.context.check_should_pause() == False
 
     def test_check_should_pause_with_callback(self, pipeline):
         """Test pause check with callback set."""
@@ -386,13 +392,13 @@ class TestProcessingPipeline:
             return True
 
         pipeline.set_pause_check_callback(pause_callback)
-        assert pipeline._check_should_pause() == True
+        assert pipeline.context.check_should_pause() == True
 
         def no_pause_callback():
             return False
 
         pipeline.set_pause_check_callback(no_pause_callback)
-        assert pipeline._check_should_pause() == False
+        assert pipeline.context.check_should_pause() == False
 
     @patch('time.sleep')
     def test_wait_if_paused(self, mock_sleep, pipeline):
@@ -405,7 +411,7 @@ class TestProcessingPipeline:
 
         pipeline.set_pause_check_callback(pause_callback)
 
-        pipeline._wait_if_paused()
+        pipeline.context.wait_if_paused()
 
         # Should have slept twice (while paused)
         assert mock_sleep.call_count == 2
@@ -419,7 +425,7 @@ class TestProcessingPipeline:
         pipeline.set_pause_check_callback(pause_callback)
         pipeline.should_stop = True  # Stop immediately
 
-        pipeline._wait_if_paused()
+        pipeline.context.wait_if_paused()
 
         # Should not have slept since we stopped immediately
         assert mock_sleep.call_count == 0
@@ -440,41 +446,41 @@ class TestProcessingPipeline:
         """Test failure callback cleans up temp files (Phase 1 - RQ pattern)."""
         import tempfile
         from pathlib import Path
-        
+
         # Setup
         pipeline.initialize_project(toc_url="https://example.com/toc")
         chapter_manager = pipeline.project_manager.get_chapter_manager()
         chapter = chapter_manager.add_chapter(1, "https://example.com/1")
-        
+
         # Create progress tracker
         pipeline.progress_tracker = Mock()
         pipeline.progress_tracker.update_chapter = Mock()
-        
+
         # Mock scraper to succeed
         pipeline.scraper = Mock()
         pipeline.scraper.scrape_chapter.return_value = ("Content", "Title", None)
-        
-        # Mock TTS to fail (creates temp file but fails)
-        temp_dir_path = Path(tempfile.gettempdir())
-        temp_file = temp_dir_path / "chapter_1_temp.mp3"
-        temp_file.write_bytes(b"temp audio")
-        
+
+        # Mock TTS to fail with exception (creates temp file but fails)
         pipeline.tts_engine = Mock()
-        pipeline.tts_engine.convert_text_to_speech.return_value = False
-        
+        pipeline.tts_engine.convert_text_to_speech.side_effect = Exception("TTS conversion failed")
+
         # Mock file manager
         pipeline.file_manager.audio_file_exists = Mock(return_value=False)
-        
+
+        # Define temp dir path
+        temp_dir_path = Path(tempfile.gettempdir())
+
         # Create failure callback that cleans up temp file
         def cleanup_callback(chapter_num, exception):
             temp_file_path = temp_dir_path / f"chapter_{chapter_num}_temp.mp3"
             if temp_file_path.exists():
                 temp_file_path.unlink()
-        
+
         # Process chapter (should fail at TTS)
-        success = pipeline.process_chapter(chapter, on_failure=cleanup_callback)
-        
+        success = pipeline.process_chapter(chapter, on_failure=cleanup_callback, skip_if_exists=False)
+
         # Verify callback cleaned up temp file
         assert success is False
-        assert not temp_file.exists(), "Temp file should be cleaned up by failure callback"
+        temp_file_path = temp_dir_path / "chapter_1_temp.mp3"
+        assert not temp_file_path.exists(), "Temp file should be cleaned up by failure callback"
 

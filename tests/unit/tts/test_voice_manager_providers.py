@@ -241,12 +241,12 @@ class TestVoiceManagerProviders:
         mock_voices = [
             {"id": "voice1", "name": "Voice 1", "language": "en-US", "gender": "male", "provider": "edge_tts"}
         ]
-        mock_manager.get_all_voices.return_value = mock_voices
+        mock_manager.get_voices_by_provider.return_value = mock_voices
         mock_manager_class.return_value = mock_manager
-        
+
         manager = VoiceManager(provider_manager=mock_manager)
         voice_list = manager.get_voice_list()
-        
+
         assert len(voice_list) == 1
         assert isinstance(voice_list[0], str)
         assert "Voice 1" in voice_list[0]
