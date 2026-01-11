@@ -21,10 +21,25 @@ Modular Python application for converting webnovels to audiobooks using automate
 - **GUI Interface**: PySide6-based application with 4 operational modes
 - **Project Management**: State persistence with resume capability
 - **Queue Processing**: Batch processing with progress tracking
+- **Modular Architecture**: Refactored from monolithic to 5 focused coordinators (472x performance improvement)
 - **Testing Suite**: 200+ automated tests with comprehensive coverage (unit, integration, E2E)
-  - Modular architecture enables isolated testing of components
+  - Unified UI test suite (63 tests) combining unit and integration testing
+  - Component-based test organization for better maintainability
   - Circuit breaker pattern testing for fault tolerance
   - Property-based testing for edge cases
+
+## Architecture Highlights (v1.1.0)
+
+### Modular Processing Pipeline
+- **Refactored from monolithic to micro-services**: Split 846-line ProcessingPipeline into 5 focused coordinators
+- **Single Responsibility**: Each coordinator handles one aspect (scraping, conversion, post-processing, etc.)
+- **Zero Breaking Changes**: All existing APIs maintained through backward compatibility
+- **Performance**: 472x faster text processing with precompiled regex patterns
+
+### Unified Testing Framework
+- **Component-Based Organization**: Tests organized by component (views, dialogs, components, utils)
+- **Combined Coverage**: Each component has both unit tests (mocked Qt) and integration tests (real Qt)
+- **Better Maintainability**: Easier to find and maintain tests for specific UI components
 
 ## Requirements
 

@@ -41,6 +41,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Moved network-dependent tests: `test_scraper_real.py`, `test_full_pipeline_e2e.py`, `test_tts_multi_provider.py`
 - Integration tests now focus on internal component interactions only
 
+##### UI Test Suite Unification
+- **Unified UI Testing**: Consolidated unit (`tests/unit/ui/`) and integration (`tests/integration/ui/`) tests into single `tests/ui/` directory
+- **Component-Based Organization**: Tests organized by component (components/, views/, dialogs/, utils/)
+- **Combined Coverage**: Each UI component now has both unit tests (with mocked Qt) and integration tests (with real Qt widgets)
+- **Improved Maintainability**: 63 comprehensive tests with better organization and easier maintenance
+- **Dead Code Removal**: Eliminated duplicate test files and consolidated redundant test logic
+
 ##### Test Execution Improvements
 - Added parallel test execution configuration (`-n auto`) in `pytest.ini`
 - Automatic CPU core detection for optimal parallelization
@@ -90,14 +97,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `src/tts/text_processor.py` - Added chunk_text method and AudioMerger integration
 - `pytest.ini` - Added parallel execution and E2E test markers
 - `tests/e2e/` - New E2E test directory with moved tests
-- `tests/integration/` - Updated integration test documentation
+- `tests/ui/` - New unified UI test directory with consolidated test suite
+- `tests/unit/ui/` - Removed (consolidated into `tests/ui/`)
+- `tests/integration/ui/` - Removed (consolidated into `tests/ui/`)
+- `.gitignore` - Updated to reflect new test structure
+- `docs/modules/BLOCK_6_UI.md` - Updated to reflect unified test structure
 - Various test files - Circuit breaker isolation and E2E test markers
 
 ### Migration Notes
 - E2E tests now located in `tests/e2e/` directory
 - Integration tests focus on internal component interactions only
+- UI tests unified into `tests/ui/` directory with component-based organization
 - Parallel execution enabled by default (`-n auto`)
 - Use `pytest -m "not e2e"` to skip network-dependent E2E tests in CI/CD
+- Use `pytest tests/ui/` to run unified UI test suite
 
 ## [1.0.0] - 2025-12-15
 

@@ -25,8 +25,11 @@ Threading: QThread subclasses with signal/slot pattern for UI updates.
 
 ## Testing
 
-- Unit tests: 88 tests (`tests/unit/ui/`)
-- Integration tests: 18 tests (`tests/integration/ui/`)
+- **Unified Test Suite**: 63 comprehensive tests (`tests/ui/`)
+  - Component-based organization (components/, views/, dialogs/, utils/)
+  - Unit tests with mocked Qt dependencies
+  - Integration tests with real Qt widgets
+  - Combined coverage per component for better maintainability
 
 ## Launch
 
