@@ -72,6 +72,7 @@ class ConfigManager:
         )
 
         # Use temp directory for tests to avoid desktop pollution
+        temp_base = None
         if is_test_env:
             temp_base = Path(tempfile.gettempdir()) / "act_test"
             temp_base.mkdir(exist_ok=True)
@@ -83,9 +84,9 @@ class ConfigManager:
                 "language": "es",
             },
             "paths": {
-                "output_dir": str(temp_base / "output") if is_test_env else str(Path.home() / "Documents" / "ACT" / "output"),
-                "scraped_dir": str(temp_base / "scraped") if is_test_env else str(Path.home() / "Documents" / "ACT" / "scraped"),
-                "projects_dir": str(temp_base / "projects") if is_test_env else str(Path.home() / "Documents" / "ACT" / "projects"),
+                "output_dir": str(temp_base / "output") if is_test_env and temp_base else str(Path.home() / "Documents" / "ACT" / "output"),
+                "scraped_dir": str(temp_base / "scraped") if is_test_env and temp_base else str(Path.home() / "Documents" / "ACT" / "scraped"),
+                "projects_dir": str(temp_base / "projects") if is_test_env and temp_base else str(Path.home() / "Documents" / "ACT" / "projects"),
             },
             "tts": {
                 "voice": "es-ES-ElviraNeural",

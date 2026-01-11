@@ -5,18 +5,18 @@ This module contains the PipelineOrchestrator class that coordinates
 between specialized coordinators and maintains backward compatibility.
 """
 
-from typing import Optional, Dict, Any, List, Callable
 from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from core.logger import get_logger
 from core.config_manager import get_config
+from core.logger import get_logger
 
-from .chapter_manager import Chapter
-from .progress_tracker import ProcessingStatus
-from .context import ProcessingContext
-from .scraping_coordinator import ScrapingCoordinator
-from .conversion_coordinator import ConversionCoordinator
 from .audio_post_processor import AudioPostProcessor
+from .chapter_manager import Chapter
+from .context import ProcessingContext
+from .conversion_coordinator import ConversionCoordinator
+from .progress_tracker import ProcessingStatus
+from .scraping_coordinator import ScrapingCoordinator
 
 logger = get_logger("processor.pipeline_orchestrator")
 
@@ -31,9 +31,9 @@ class PipelineOrchestrator:
     def __init__(
         self,
         project_name: str,
-        on_progress: Optional[callable] = None,
-        on_status_change: Optional[callable] = None,
-        on_chapter_update: Optional[callable] = None,
+        on_progress: Optional[Callable] = None,
+        on_status_change: Optional[Callable] = None,
+        on_chapter_update: Optional[Callable] = None,
         voice: Optional[str] = None,
         provider: Optional[str] = None,
         base_output_dir: Optional[Path] = None,
@@ -85,17 +85,17 @@ class PipelineOrchestrator:
         return self.audio_post_processor.file_manager
 
     @property
-    def on_progress(self) -> Optional[callable]:
+    def on_progress(self) -> Optional[Callable]:
         """Get progress callback (backward compatibility)."""
         return self.context.on_progress
 
     @property
-    def on_status_change(self) -> Optional[callable]:
+    def on_status_change(self) -> Optional[Callable]:
         """Get status change callback (backward compatibility)."""
         return self.context.on_status_change
 
     @property
-    def on_chapter_update(self) -> Optional[callable]:
+    def on_chapter_update(self) -> Optional[Callable]:
         """Get chapter update callback (backward compatibility)."""
         return self.context.on_chapter_update
 
@@ -147,18 +147,87 @@ class PipelineOrchestrator:
 
     def fetch_chapter_urls(self, toc_url: str) -> List[str]:
         """Fetch chapter URLs (backward compatibility)."""
-        return self.scraping_coordinator.fetch_chapter_urls(toc_url)
+        success = self.scraping_coordinator.fetch_chapter_urls(toc_url)
+        if not success:
+            return []
+        # Return URLs from the chapter manager
+        chapter_manager = self.scraping_coordinator.project_manager.get_chapter_manager()
+        if chapter_manager:
+            chapters = chapter_manager.get_all_chapters()
+            return [ch.url for ch in chapters]
+        return []
 
-    def process_chapter(self, chapter_url: str, chapter_num: int, skip_if_exists: bool = True) -> bool:
-        """Process single chapter (backward compatibility)."""
-        return self.conversion_coordinator.process_chapter(chapter_url, chapter_num, skip_if_exists)
+    def _process_chapter_impl(
+        self,
+        chapter,
+        skip_if_exists: bool = True,
+        on_failure: Optional[Callable] = None
+    ) -> bool:
+        """Process a single chapter: scrape → convert → save."""
+        # Check if we should skip due to existing audio file
+        if skip_if_exists and self.file_manager.audio_file_exists(chapter.number):
+            logger.info(f"Chapter {chapter.number} already exists, skipping")
+            return True
 
-    def process_all_chapters(self, chapter_urls: List[str], start_from: int = 1,
-                           max_chapters: Optional[int] = None, error_isolation: bool = True) -> bool:
-        """Process all chapters (backward compatibility)."""
-        return self.conversion_coordinator.process_all_chapters(
-            chapter_urls, start_from, max_chapters, error_isolation
+        # Step 1: Scrape chapter content
+        content, title, error = self.scraping_coordinator.scrape_chapter_content(chapter)
+
+        if error or content is None:
+            error_msg = error or "Failed to scrape chapter content"
+            # Update progress tracker with failure
+            if self.scraping_coordinator.progress_tracker:
+                self.scraping_coordinator.progress_tracker.update_chapter(
+                    chapter.number,
+                    ProcessingStatus.FAILED,
+                    error_msg
+                )
+            return False
+
+        # Step 2: Convert to audio
+        return self.conversion_coordinator.convert_chapter_to_audio(
+            chapter, content, title, skip_if_exists, on_failure
         )
+
+    def process_chapter(self, *args, **kwargs) -> bool:
+        """Process a single chapter with flexible arguments for backward compatibility."""
+        if len(args) == 1 and hasattr(args[0], 'number'):
+            # New API: process_chapter(chapter, skip_if_exists=True, on_failure=None)
+            chapter = args[0]
+            skip_if_exists = kwargs.get('skip_if_exists', True)
+            on_failure = kwargs.get('on_failure')
+            return self._process_chapter_impl(chapter, skip_if_exists, on_failure)
+        elif len(args) >= 2 and isinstance(args[1], int):
+            # Old API: process_chapter(chapter_url, chapter_num, skip_if_exists=True)
+            chapter_url = args[0]
+            chapter_num = args[1]
+            skip_if_exists = args[2] if len(args) > 2 else kwargs.get('skip_if_exists', True)
+            from .chapter_manager import Chapter
+            chapter = Chapter(number=chapter_num, url=chapter_url)
+            return self._process_chapter_impl(chapter, skip_if_exists)
+        else:
+            raise TypeError("Invalid arguments for process_chapter")
+
+    def process_all_chapters(self, *args, **kwargs):
+        """Process all chapters with flexible arguments for backward compatibility."""
+        if len(args) >= 1 and isinstance(args[0], list):
+            # Old API: process_all_chapters(chapter_urls, start_from=1, max_chapters=None, error_isolation=True)
+            chapter_urls = args[0]  # ignored in new implementation
+            start_from = kwargs.get('start_from', 1)
+            max_chapters = kwargs.get('max_chapters')
+            error_isolation = kwargs.get('error_isolation', True)
+            result = self._process_all_chapters_impl(
+                start_from=start_from,
+                max_chapters=max_chapters,
+                ignore_errors=not error_isolation
+            )
+            return result.get("success", False)
+        else:
+            # New API: process_all_chapters(start_from=1, max_chapters=None, skip_if_exists=True, ignore_errors=False)
+            start_from = kwargs.get('start_from', 1)
+            max_chapters = kwargs.get('max_chapters')
+            skip_if_exists = kwargs.get('skip_if_exists', True)
+            ignore_errors = kwargs.get('ignore_errors', False)
+            return self._process_all_chapters_impl(start_from, max_chapters, skip_if_exists, ignore_errors)
 
     def _check_should_stop(self) -> bool:
         """Check if processing should stop (backward compatibility)."""
@@ -174,9 +243,11 @@ class PipelineOrchestrator:
 
     def _check_paused_callback(self) -> bool:
         """Check paused callback (backward compatibility)."""
-        return self.context._check_paused_callback()
+        if self.context._check_paused_callback:
+            return self.context._check_paused_callback()
+        return False
 
-    def set_pause_check_callback(self, callback: callable) -> None:
+    def set_pause_check_callback(self, callback: Callable) -> None:
         """Set a callback function to check if processing should be paused."""
         self.context.set_pause_check_callback(callback)
 
@@ -236,7 +307,7 @@ class PipelineOrchestrator:
 
         return result
 
-    def process_all_chapters(
+    def _process_all_chapters_impl(
         self,
         start_from: int = 1,
         max_chapters: Optional[int] = None,
@@ -336,35 +407,6 @@ class PipelineOrchestrator:
         logger.info(f"Processing complete: {completed} completed, {failed} failed")
         return result
 
-    def process_chapter(
-        self,
-        chapter,
-        skip_if_exists: bool = True,
-        on_failure: Optional[callable] = None
-    ) -> bool:
-        """Process a single chapter: scrape → convert → save."""
-        # Check if we should skip due to existing audio file
-        if skip_if_exists and self.file_manager.audio_file_exists(chapter.number):
-            logger.info(f"Chapter {chapter.number} already exists, skipping")
-            return True
-
-        # Step 1: Scrape chapter content
-        content, title, error = self.scraping_coordinator.scrape_chapter_content(chapter)
-
-        if error:
-            # Update progress tracker with failure
-            if self.scraping_coordinator.progress_tracker:
-                self.scraping_coordinator.progress_tracker.update_chapter(
-                    chapter.number,
-                    ProcessingStatus.FAILED,
-                    error
-                )
-            return False
-
-        # Step 2: Convert to audio
-        return self.conversion_coordinator.convert_chapter_to_audio(
-            chapter, content, title, skip_if_exists, on_failure
-        )
 
     def merge_audio_files(self, output_format: Optional[Dict[str, Any]] = None) -> bool:
         """Merge processed audio files."""

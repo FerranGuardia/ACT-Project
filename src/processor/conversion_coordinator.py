@@ -98,7 +98,28 @@ class ConversionCoordinator:
             if not success:
                 error_msg = "Failed to convert to audio"
                 logger.error(f"Error converting chapter {chapter_num}: {error_msg}")
+                # Check if temp file exists despite failure
+                if temp_audio_path.exists():
+                    logger.warning(f"Temp audio file exists despite convert_text_to_speech returning False: {temp_audio_path}")
+                    try:
+                        temp_audio_path.unlink()
+                    except Exception as e:
+                        logger.warning(f"Could not delete temp file: {e}")
                 return False
+
+            # Verify temp audio file was actually created
+            if not temp_audio_path.exists():
+                error_msg = f"TTS engine reported success but temp audio file was not created: {temp_audio_path}"
+                logger.error(error_msg)
+                return False
+
+            if temp_audio_path.stat().st_size == 0:
+                error_msg = f"Temp audio file is empty: {temp_audio_path}"
+                logger.error(error_msg)
+                temp_audio_path.unlink()
+                return False
+
+            logger.debug(f"Temp audio file created successfully: {temp_audio_path} ({temp_audio_path.stat().st_size} bytes)")
 
             # Step 3: Save audio file
             audio_file_path = self.file_manager.save_audio_file(
