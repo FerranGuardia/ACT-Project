@@ -5,9 +5,9 @@ Handles voice lookup, validation, and resolution with a clean pipeline approach.
 Simplifies the complex voice management that was spread across VoiceManager and VoiceValidator.
 """
 
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass
 import warnings
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 from core.config_manager import get_config
 from core.logger import get_logger
@@ -81,6 +81,10 @@ class VoiceResolver:
         # Get voice name with config fallback
         voice_name = voice_name or self.config.get("tts.voice", "en-US-AndrewNeural")
 
+        # Ensure voice_name is not None
+        if voice_name is None:
+            voice_name = "en-US-AndrewNeural"
+
         # Clean voice name
         voice_name = voice_name.strip()
 
@@ -107,16 +111,17 @@ class VoiceResolver:
         if available_voices:
             first_voice = available_voices[0]
             provider_name = first_voice.get('provider')
-            provider = self.provider_manager.get_provider(provider_name)
-            if provider:
-                voice_id = self._extract_voice_id(first_voice)
-                logger.warning(f"Voice '{voice_name}' not found, falling back to '{voice_id}'")
-                return VoiceResolutionResult(
-                    voice_id=voice_id,
-                    provider=provider,
-                    voice_metadata=first_voice,
-                    fallback_used=True
-                )
+            if provider_name:
+                provider = self.provider_manager.get_provider(provider_name)
+                if provider:
+                    voice_id = self._extract_voice_id(first_voice)
+                    logger.warning(f"Voice '{voice_name}' not found, falling back to '{voice_id}'")
+                    return VoiceResolutionResult(
+                        voice_id=voice_id,
+                        provider=provider,
+                        voice_metadata=first_voice,
+                        fallback_used=True
+                    )
 
         # All resolution attempts failed
         logger.error(f"Voice '{voice_name}' not found. Available voices: {len(available_voices)}")
@@ -162,7 +167,7 @@ class VoiceResolver:
             provider_name = voice_dict.get('provider')
 
             # Check if this voice matches
-            if self._voice_matches(voice_name, voice_dict):
+            if self._voice_matches(voice_name, voice_dict) and provider_name:
                 provider = self.provider_manager.get_provider(provider_name)
                 if provider:
                     logger.info(f"Resolved voice '{voice_name}' to '{voice_id}' using provider '{provider_name}'")
@@ -204,14 +209,15 @@ class VoiceResolver:
                     voice_id = self._extract_voice_id(voice_dict)
                     if voice_id == edge_voice or voice_dict.get('name') == edge_voice:
                         provider_name = voice_dict.get('provider')
-                        provider = self.provider_manager.get_provider(provider_name)
-                        if provider:
-                            logger.info(f"Resolved mapped Windows voice '{voice_name}' to '{voice_id}' using provider '{provider_name}'")
-                            return VoiceResolutionResult(
-                                voice_id=voice_id,
-                                provider=provider,
-                                voice_metadata=voice_dict
-                            )
+                        if provider_name:
+                            provider = self.provider_manager.get_provider(provider_name)
+                            if provider:
+                                logger.info(f"Resolved mapped Windows voice '{voice_name}' to '{voice_id}' using provider '{provider_name}'")
+                                return VoiceResolutionResult(
+                                    voice_id=voice_id,
+                                    provider=provider,
+                                    voice_metadata=voice_dict
+                                )
 
         # Try partial matching
         all_voices = self.voice_manager.get_voices()
@@ -222,7 +228,7 @@ class VoiceResolver:
             voice_name_full = (voice_dict.get("name") or "").lower()
 
             # Check partial matches
-            if voice_name_lower in voice_name_full or voice_name_full.startswith(voice_name_lower):
+            if (voice_name_lower in voice_name_full or voice_name_full.startswith(voice_name_lower)) and provider_name:
                 provider = self.provider_manager.get_provider(provider_name)
                 if provider:
                     voice_id = self._extract_voice_id(voice_dict)

@@ -204,14 +204,29 @@ class Pyttsx3Provider(TTSProvider):
             
             # Save to file
             output_path.parent.mkdir(parents=True, exist_ok=True)
+            logger.debug(f"pyttsx3: Saving to file {output_path}")
             self._engine.save_to_file(text, str(output_path))  # type: ignore[attr-defined]
             self._engine.runAndWait()  # type: ignore[attr-defined]
             
+            # pyttsx3 may not immediately close the file, so add a small delay
+            import time
+            time.sleep(0.2)  # Increase delay from 0.1 to 0.2
+            
             # Verify file was created
-            if output_path.exists() and output_path.stat().st_size > 0:
-                return True
+            if output_path.exists():
+                file_size = output_path.stat().st_size
+                logger.debug(f"pyttsx3: File exists at {output_path}, size: {file_size} bytes")
+                if file_size > 0:
+                    logger.debug(f"pyttsx3 conversion successful: {output_path} ({file_size} bytes)")
+                    return True
+                else:
+                    logger.error(f"pyttsx3 conversion failed: file is empty at {output_path}")
+                    return False
             else:
-                logger.error(f"pyttsx3 conversion failed: file not created or empty")
+                logger.error(f"pyttsx3 conversion failed: file not created at {output_path}")
+                # Debug: check if parent directory exists
+                if not output_path.parent.exists():
+                    logger.error(f"Parent directory does not exist: {output_path.parent}")
                 return False
                 
         except Exception as e:

@@ -136,10 +136,20 @@ class DirectConversionStrategy(ConversionStrategy):
             )
 
             if success:
-                logger.info("Direct conversion successful")
+                # Verify file was actually created
+                if not output_path.exists():
+                    logger.error(f"Direct: Provider reported success but output file does not exist: {output_path}")
+                    return False
+                
+                file_size = output_path.stat().st_size
+                if file_size == 0:
+                    logger.error(f"Direct: Provider reported success but output file is empty (0 bytes): {output_path}")
+                    return False
+                
+                logger.info(f"Direct conversion successful ({file_size} bytes)")
                 return True
             else:
-                logger.error(f"Direct conversion failed for voice '{voice_resolution.voice_id}'")
+                logger.error(f"Direct conversion failed for voice '{voice_resolution.voice_id}' - provider returned False")
                 return False
 
         except Exception as e:
