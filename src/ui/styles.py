@@ -26,6 +26,10 @@ COLORS: Dict[str, str] = {
 # Font family
 FONT_FAMILY: str = 'Segoe UI'
 
+# Font sizes
+FONT_SIZE_BASE: str = '10pt'
+FONT_SIZE_LARGE: str = '12pt'
+
 
 def get_main_window_style() -> str:
     """Get the main window stylesheet."""
@@ -546,4 +550,148 @@ def get_card_style() -> str:
         border: 2px solid {COLORS['accent']};
     }}
     """
+
+
+def get_card_title_style() -> str:
+    """Get card title style for landing page."""
+    return f"""
+    QLabel {{
+        color: {COLORS['accent']};
+        font-family: '{FONT_FAMILY}';
+        font-size: 14pt;
+        font-weight: bold;
+        margin-bottom: 8px;
+    }}
+    """
+
+
+def get_card_description_style() -> str:
+    """Get card description style for landing page."""
+    return f"""
+    QLabel {{
+        color: {COLORS['text_primary']};
+        font-family: '{FONT_FAMILY}';
+        font-size: 10pt;
+        margin-bottom: 15px;
+    }}
+    """
+
+
+def get_card_icon_style() -> str:
+    """Get card icon style for landing page."""
+    return f"""
+    QLabel {{
+        color: {COLORS['accent']};
+        font-family: '{FONT_FAMILY}';
+        font-size: 24pt;
+        margin-bottom: 10px;
+    }}
+    """
+
+
+def get_card_arrow_style() -> str:
+    """Get card arrow style for landing page."""
+    return f"""
+    QLabel {{
+        color: {COLORS['text_secondary']};
+        font-family: '{FONT_FAMILY}';
+        font-size: 16pt;
+        margin-top: 10px;
+    }}
+    QLabel:hover {{
+        color: {COLORS['accent']};
+    }}
+    """
+
+
+def get_status_label_style() -> str:
+    """Get status label style."""
+    return f"""
+    QLabel {{
+        color: {COLORS['accent']};
+        font-family: '{FONT_FAMILY}';
+        font-size: 10pt;
+        font-weight: bold;
+    }}
+    """
+
+
+def get_primary_text_style() -> str:
+    """Get primary text style."""
+    return f"""
+    QLabel {{
+        color: {COLORS['text_primary']};
+        font-family: '{FONT_FAMILY}';
+        font-size: 10pt;
+        font-weight: bold;
+    }}
+    """
+
+
+def get_secondary_text_style() -> str:
+    """Get secondary text style."""
+    return f"""
+    QLabel {{
+        color: {COLORS['text_secondary']};
+        font-family: '{FONT_FAMILY}';
+        font-size: 9pt;
+    }}
+    """
+
+
+# Widget styling functions
+def set_button_primary(button) -> None:
+    """Apply primary button style to a button widget."""
+    if hasattr(button, 'setStyleSheet'):
+        button.setStyleSheet(get_button_primary_style())
+
+
+def get_icon_container_style() -> str:
+    """Get icon container style."""
+    return f"""
+    QWidget {{
+        background-color: transparent;
+        border: none;
+        padding: 10px;
+    }}
+    """
+
+
+def get_queue_item_style() -> str:
+    """Get queue item style."""
+    return f"""
+    QWidget {{
+        background-color: {COLORS['bg_medium']};
+        border: 1px solid {COLORS['border']};
+        border-radius: 5px;
+        padding: 8px;
+        margin: 2px;
+    }}
+    QWidget:hover {{
+        background-color: {COLORS['bg_light']};
+        border: 1px solid {COLORS['accent']};
+    }}
+    """
+
+
+def register_font_family_mapping(font_map: dict) -> None:
+    """Register font family mapping (placeholder function)."""
+    # This function can be expanded to handle font family mappings
+    pass
+
+
+# Font utility functions
+def get_font_family() -> str:
+    """Get the default font family."""
+    return FONT_FAMILY
+
+
+def get_font_size_base() -> str:
+    """Get the base font size."""
+    return FONT_SIZE_BASE
+
+
+def get_font_size_large() -> str:
+    """Get the large font size."""
+    return FONT_SIZE_LARGE
 
