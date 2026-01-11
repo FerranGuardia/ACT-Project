@@ -9,7 +9,9 @@ Tests chapter management functionality including:
 """
 
 # Path setup is handled by conftest.py
-from processor.chapter_manager import ChapterManager, Chapter, ChapterStatus
+from typing import Any, Dict, List
+
+from processor.chapter_manager import Chapter, ChapterManager, ChapterStatus
 
 
 class TestChapter:
@@ -49,7 +51,7 @@ class TestChapter:
     
     def test_chapter_from_dict(self):
         """Test creating chapter from dictionary."""
-        data = {
+        data: Dict[str, Any] = {
             "number": 3,
             "url": "https://example.com/chapter/3",
             "title": "Chapter 3",
@@ -116,7 +118,7 @@ class TestChapterManager:
         """Test adding multiple chapters from URLs."""
         manager = ChapterManager()
         
-        urls = [
+        urls: List[str] = [
             "https://example.com/1",
             "https://example.com/2",
             "https://example.com/3"
@@ -126,15 +128,21 @@ class TestChapterManager:
         
         assert len(chapters) == 3
         assert manager.get_total_count() == 3
-        assert manager.get_chapter(1).url == urls[0]
-        assert manager.get_chapter(2).url == urls[1]
-        assert manager.get_chapter(3).url == urls[2]
+        chapter1 = manager.get_chapter(1)
+        assert chapter1 is not None
+        assert chapter1.url == urls[0]
+        chapter2 = manager.get_chapter(2)
+        assert chapter2 is not None
+        assert chapter2.url == urls[1]
+        chapter3 = manager.get_chapter(3)
+        assert chapter3 is not None
+        assert chapter3.url == urls[2]
     
     def test_add_chapters_from_urls_custom_start(self):
         """Test adding chapters with custom start number."""
         manager = ChapterManager()
         
-        urls = ["https://example.com/1", "https://example.com/2"]
+        urls: List[str] = ["https://example.com/1", "https://example.com/2"]
         manager.add_chapters_from_urls(urls, start_number=10)
         
         assert manager.get_chapter(10) is not None
@@ -247,6 +255,7 @@ class TestChapterManager:
         
         assert success is True
         chapter = manager.get_chapter(1)
+        assert chapter is not None
         assert chapter.content == "Chapter content"
         assert chapter.title == "New Title"
         assert chapter.status == ChapterStatus.SCRAPED
@@ -268,6 +277,7 @@ class TestChapterManager:
         
         assert success is True
         chapter = manager.get_chapter(1)
+        assert chapter is not None
         assert chapter.status == ChapterStatus.FAILED
         assert chapter.error_message == "Error occurred"
     
@@ -284,6 +294,7 @@ class TestChapterManager:
         
         assert success is True
         chapter = manager.get_chapter(1)
+        assert chapter is not None
         assert chapter.text_file_path == "/path/to/text.txt"
         assert chapter.audio_file_path == "/path/to/audio.mp3"
         assert chapter.status == ChapterStatus.CONVERTED
@@ -320,7 +331,7 @@ class TestChapterManager:
     
     def test_from_dict(self):
         """Test creating manager from dictionary."""
-        data = {
+        data: Dict[str, Any] = {
             "chapters": [
                 {
                     "number": 1,
@@ -339,8 +350,10 @@ class TestChapterManager:
         manager = ChapterManager.from_dict(data)
         
         assert manager.get_total_count() == 2
-        assert manager.get_chapter(1).title == "Chapter 1"
-        assert manager.get_chapter(1).status == ChapterStatus.SCRAPED
+        chapter1 = manager.get_chapter(1)
+        assert chapter1 is not None
+        assert chapter1.title == "Chapter 1"
+        assert chapter1.status == ChapterStatus.SCRAPED
 
 
 
