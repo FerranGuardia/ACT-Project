@@ -247,8 +247,8 @@ class TestFullConversionPipeline:
             resolver = VoiceResolver(mock_provider_manager)
 
             # Mock the voice manager's lookup
-            with patch.object(resolver.voice_manager, 'get_voice_by_name') as mock_lookup:
-                mock_lookup.return_value = mock_voice
+            with patch.object(resolver.voice_manager, 'get_voices') as mock_lookup:
+                mock_lookup.return_value = [mock_voice]
 
                 # Test voice resolution
                 result = resolver.resolve_voice('en-US-TestNeural')

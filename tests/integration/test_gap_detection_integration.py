@@ -66,7 +66,7 @@ class TestGapDetectionIntegration:
         pipeline1 = ProcessingPipeline(
             project_name=project_name,
             base_output_dir=temp_output_dir,
-            voice="pyttsx3"  # Use faster offline TTS provider
+            voice="en-US-AndrewNeural", provider="edge_tts"  # Use valid voice
         )
 
         result1 = pipeline1.run_full_pipeline(
@@ -74,7 +74,7 @@ class TestGapDetectionIntegration:
             novel_url=test_novel_url,
             start_from=1,
             max_chapters=2,
-            voice="pyttsx3"  # Use faster offline TTS provider
+            voice="en-US-AndrewNeural", provider="edge_tts"  # Use valid voice
         )
 
         # Handle network failures gracefully - try with mock data if network fails
@@ -123,7 +123,7 @@ class TestGapDetectionIntegration:
         pipeline2 = ProcessingPipeline(
             project_name=project_name,
             base_output_dir=temp_output_dir,
-            voice="pyttsx3"  # Use faster offline TTS provider
+            voice="en-US-AndrewNeural", provider="edge_tts"  # Use valid voice
         )
 
         # Initialize project to load existing data
@@ -162,7 +162,7 @@ class TestGapDetectionIntegration:
             novel_url=test_novel_url,
             start_from=1,
             max_chapters=2,
-            voice="pyttsx3"  # Use faster offline TTS provider
+            voice="en-US-AndrewNeural", provider="edge_tts"  # Use valid voice
         )
         
         assert result2.get('success') == True, f"Resume processing failed: {result2.get('error')}"
@@ -198,7 +198,7 @@ class TestGapDetectionIntegration:
         pipeline1 = ProcessingPipeline(
             project_name=project_name,
             base_output_dir=temp_output_dir,
-            voice="pyttsx3"  # Use faster offline TTS provider
+            voice="en-US-AndrewNeural", provider="edge_tts"  # Use valid voice
         )
 
         result1 = pipeline1.run_full_pipeline(
@@ -206,7 +206,7 @@ class TestGapDetectionIntegration:
             novel_url=test_novel_url,
             start_from=1,
             max_chapters=2,
-            voice="pyttsx3"  # Use faster offline TTS provider
+            voice="en-US-AndrewNeural", provider="edge_tts"  # Use valid voice
         )
         
         # Handle network failures gracefully - try with mock data if network fails
@@ -223,7 +223,7 @@ class TestGapDetectionIntegration:
         pipeline2 = ProcessingPipeline(
             project_name=project_name,
             base_output_dir=temp_output_dir,
-            voice="pyttsx3"  # Use faster offline TTS provider
+            voice="en-US-AndrewNeural", provider="edge_tts"  # Use valid voice
         )
         
         if not pipeline2.initialize_project(toc_url=test_novel_url):

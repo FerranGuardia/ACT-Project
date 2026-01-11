@@ -125,7 +125,7 @@ class TestPipelineComponentIntegration:
     @pytest.fixture
     def pipeline(self, temp_dir):
         """Create ProcessingPipeline with temp directory."""
-        with patch('processor.pipeline.get_config') as mock_config, \
+        with patch('core.config_manager.get_config') as mock_config, \
              patch('processor.project_manager.get_config') as mock_pm_config, \
              patch('processor.file_manager.get_config') as mock_fm_config:
             config_dict = {
@@ -150,7 +150,7 @@ class TestPipelineComponentIntegration:
         assert pipeline.project_manager.metadata["novel_title"] == "Test Novel"
         assert pipeline.file_manager is not None
     
-    @patch('processor.pipeline.GenericScraper')
+    @patch('scraper.GenericScraper')
     def test_pipeline_fetch_and_save_workflow(self, mock_scraper_class, pipeline, temp_dir):
         """Test complete workflow: fetch URLs → save project."""
         # Mock scraper
@@ -285,7 +285,7 @@ class TestErrorHandlingIntegration:
     @pytest.fixture
     def pipeline(self, temp_dir):
         """Create ProcessingPipeline with temp directory."""
-        with patch('processor.pipeline.get_config') as mock_config, \
+        with patch('core.config_manager.get_config') as mock_config, \
              patch('processor.project_manager.get_config') as mock_pm_config, \
              patch('processor.file_manager.get_config') as mock_fm_config:
             config_dict = {
@@ -299,7 +299,7 @@ class TestErrorHandlingIntegration:
             # CRITICAL: Pass base_output_dir to prevent creating folders outside temp_dir
             yield ProcessingPipeline("test_project", base_output_dir=temp_dir / "output")
     
-    @patch('processor.pipeline.GenericScraper')
+    @patch('scraper.GenericScraper')
     def test_error_isolation_continues_processing(self, mock_scraper_class, pipeline, temp_dir):
         """Test that error isolation allows processing to continue (Phase 1 - yt-dlp pattern)."""
         # Mock scraper

@@ -70,6 +70,21 @@ class PipelineOrchestrator:
         return self.context.project_name
 
     @property
+    def project_manager(self):
+        """Get project manager (backward compatibility)."""
+        return self.scraping_coordinator.project_manager
+
+    @project_manager.setter
+    def project_manager(self, value):
+        """Set project manager (backward compatibility)."""
+        self.scraping_coordinator.project_manager = value
+
+    @property
+    def file_manager(self):
+        """Get file manager (backward compatibility)."""
+        return self.audio_post_processor.file_manager
+
+    @property
     def on_progress(self) -> Optional[callable]:
         """Get progress callback (backward compatibility)."""
         return self.context.on_progress
