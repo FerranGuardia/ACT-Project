@@ -690,7 +690,7 @@ class PlaywrightExtractor:
         if unique_urls:
             logger.info(f"✓ Playwright found {len(unique_urls)} unique chapter URLs")
         else:
-            logger.warning(f"⚠ Playwright found {len(unique_links)} links but extracted 0 chapter URLs")
+            logger.warning(f"⚠ Playwright found {len(chapter_urls)} links but extracted 0 chapter URLs")
         
         return unique_urls
 

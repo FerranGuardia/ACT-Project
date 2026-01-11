@@ -293,7 +293,7 @@ class ChapterExtractor:
                 logger.debug("Found content element with last fallback: body tag")
         
         if not content_elem:
-            logger.debug(f"No content element found for chapter {chapter_url}")
+            logger.debug("No content element found for chapter")
             return None
         
         # Extract paragraphs - prefer p tags, avoid nested duplication

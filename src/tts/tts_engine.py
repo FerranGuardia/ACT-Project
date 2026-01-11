@@ -6,6 +6,7 @@ Handles conversion of text to audio files using the new TTSConversionCoordinator
 """
 
 import asyncio
+import tempfile
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 

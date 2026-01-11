@@ -13,7 +13,7 @@ import shlex
 import tempfile
 import time
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Any, Callable, List, Optional
 
 from core.logger import get_logger
 from core.constants import FFMPEG_TIMEOUT_SECONDS
@@ -67,7 +67,7 @@ class AudioMerger:
     # Chunk conversion settings
     CONVERSION_TIMEOUT = 60.0  # 60 second timeout per chunk
     
-    def __init__(self, provider_manager: TTSProviderManager, cleanup_callback: Optional[Callable[[List[Path]], None]] = None, config: Optional['TTSConfig'] = None):
+    def __init__(self, provider_manager: TTSProviderManager, cleanup_callback: Optional[Callable[[List[Path]], None]] = None, config: Optional[Any] = None):
         """
         Initialize audio merger.
 

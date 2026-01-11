@@ -234,7 +234,7 @@ pytest tests/integration/
 - **Block 5 (Processor)**: Complete
 - **Block 6 (UI)**: Complete
 
-**Status**: v1.0.0 Complete
+**Status**: v1.1.0 Complete
 
 ## License
 
@@ -259,5 +259,5 @@ If you find this project helpful, consider supporting its development:
 
 ---
 
-**Version**: 1.0.0  
-**Last Updated**: 2025-12-12
+**Version**: 1.1.0  
+**Last Updated**: 2026-01-11
