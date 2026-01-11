@@ -26,7 +26,7 @@ if str(src_path) not in sys.path:
 
 from processor.chapter_manager import Chapter, ChapterManager, ChapterStatus
 from processor.file_manager import FileManager
-from processor.pipeline import ProcessingPipeline
+from processor.pipeline_orchestrator import ProcessingPipeline
 from processor.progress_tracker import ProcessingStatus, ProgressTracker
 from processor.project_manager import ProjectManager
 

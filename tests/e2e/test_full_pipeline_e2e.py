@@ -21,7 +21,7 @@ sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "src"))
 
 from core.logger import get_logger
-from processor.pipeline import ProcessingPipeline
+from processor.pipeline_orchestrator import ProcessingPipeline
 
 logger = get_logger("test.e2e")
 

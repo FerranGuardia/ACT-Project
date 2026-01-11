@@ -26,7 +26,7 @@ if str(src_path) not in sys.path:
 @pytest.mark.timeout(300)  # 5 minute timeout for E2E test
 def test_single_chapter_e2e_isolated(tmp_path):
     """E2E test: Process single chapter with real components but isolated environment"""
-    from processor.pipeline import ProcessingPipeline
+    from processor.pipeline_orchestrator import ProcessingPipeline
 
     # Create isolated output directory
     output_dir = tmp_path / "e2e_output"

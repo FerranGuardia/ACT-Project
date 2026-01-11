@@ -14,7 +14,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
 # Path setup is handled by conftest.py
-from processor.pipeline import ProcessingPipeline
+from processor.pipeline_orchestrator import ProcessingPipeline
 
 
 class TestProcessingPipeline:

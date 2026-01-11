@@ -26,7 +26,7 @@ sys.path.insert(0, str(project_root / "src"))
 
 from core.logger import get_logger
 from processor.gap_detector import GapDetector
-from processor.pipeline import ProcessingPipeline
+from processor.pipeline_orchestrator import ProcessingPipeline
 
 logger = get_logger("test.gap_detection_integration")
 
