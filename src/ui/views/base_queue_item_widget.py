@@ -7,7 +7,7 @@ to reduce code duplication.
 
 from typing import List
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (QHBoxLayout, QLabel, QProgressBar, QPushButton,
                                QVBoxLayout, QWidget)
@@ -78,14 +78,19 @@ class BaseQueueItemWidget(QWidget):
         
         # Action buttons
         actions_layout = QVBoxLayout()
-        self.up_button = QPushButton("↑ Move Up")
+        self.up_button = QPushButton("↑")
         self.up_button.setMaximumWidth(ViewConfig.QUEUE_ACTION_BUTTON_WIDTH)
-        self.down_button = QPushButton("↓ Move Down")
+        self.up_button.setToolTip("Move Up")
+        self.down_button = QPushButton("↓")
         self.down_button.setMaximumWidth(ViewConfig.QUEUE_ACTION_BUTTON_WIDTH)
-        self.remove_button = QPushButton("✖️ Remove")
+        self.down_button.setToolTip("Move Down")
+        self.remove_button = QPushButton("✖️")
+        self.remove_button.setToolTip("Remove")
+        self.remove_button.setMaximumWidth(ViewConfig.QUEUE_ACTION_BUTTON_WIDTH)
         # Make sure buttons are visible and properly styled
         for btn in [self.up_button, self.down_button, self.remove_button]:
-            btn.setMinimumWidth(70)
+            btn.setMinimumWidth(50)  # Comfortable clickable size for icon buttons
+            btn.setMaximumWidth(60)  # Keep compact but usable
             btn.setVisible(True)
             btn.setEnabled(True)
         actions_layout.addWidget(self.up_button)
@@ -96,7 +101,26 @@ class BaseQueueItemWidget(QWidget):
         
         self.setLayout(layout)
         self.setStyleSheet(get_queue_item_style())
-    
+
+    def sizeHint(self) -> QSize:
+        """Override sizeHint to ensure all 6 elements fit properly."""
+        # Width: icon + content area + button column
+        icon_width = ViewConfig.QUEUE_ITEM_ICON_SIZE
+        button_width = ViewConfig.QUEUE_ACTION_BUTTON_WIDTH  # 60px
+        margins = ViewConfig.QUEUE_ITEM_MARGINS[1] + ViewConfig.QUEUE_ITEM_MARGINS[3]  # left + right
+
+        # Content area gets remaining space, minimum 280px for comfortable text display
+        content_min_width = 280
+        total_width = icon_width + content_min_width + button_width + margins
+
+        # Height: accommodate content (title + secondary + progress) and buttons
+        # Content needs adequate space for wrapping text and multiple labels
+        content_height = 80  # Title (potentially wrapping), URL, status, progress bar
+        button_height = 90   # 3 buttons × 30px each
+        total_height = max(content_height, button_height) + ViewConfig.QUEUE_ITEM_MARGINS[0] + ViewConfig.QUEUE_ITEM_MARGINS[2]
+
+        return QSize(total_width, total_height)
+
     def update_status(self, status: str, progress: int = 0) -> None:
         """Update the status and progress of the queue item."""
         self.status = status

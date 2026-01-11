@@ -161,17 +161,18 @@ class FullAutoView(BaseView):
                 item['title'],
                 item['url'],
                 item['status'],
-                item['progress'],
-                parent=None  # Explicitly set parent
+                item['progress']
             )
-            
-            # Connect action buttons using handlers
-            self.handlers.connect_queue_item_buttons(
-                queue_widget,
-                idx,
-                self._move_queue_item_up,
-                self._move_queue_item_down,
-                self._remove_queue_item
+
+            # Connect action buttons using direct object references (consistent with other views)
+            queue_widget.up_button.clicked.connect(
+                lambda checked, row=idx: self._move_queue_item_up(row)
+            )
+            queue_widget.down_button.clicked.connect(
+                lambda checked, row=idx: self._move_queue_item_down(row)
+            )
+            queue_widget.remove_button.clicked.connect(
+                lambda checked, row=idx: self._remove_queue_item(row)
             )
             
             list_item = QListWidgetItem()
