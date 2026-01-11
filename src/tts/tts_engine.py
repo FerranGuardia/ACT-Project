@@ -20,6 +20,7 @@ from .providers.provider_manager import TTSProviderManager
 from .providers.base_provider import TTSProvider
 from .audio_merger import AudioMerger
 from .voice_manager import VoiceManager  # For backward compatibility
+from .tts_utils import TTSUtils  # For backward compatibility
 
 logger = get_logger("tts.tts_engine")
 
@@ -67,13 +68,9 @@ class AsyncBridge:
         try:
             # Check if we're already in an async context
             loop = asyncio.get_running_loop()
-            # If we get here, we're in an async context - create a task and wait for it
-            if asyncio.iscoroutine(coro):
-                task = loop.create_task(coro)
-                return loop.run_until_complete(task)
-            else:
-                # coro is already a task or future
-                return loop.run_until_complete(coro)
+            # If we get here, we're in an async context - we can't use run_until_complete
+            # For now, raise an error to indicate this shouldn't be called from async context
+            raise RuntimeError("AsyncBridge.run_async cannot be called from an async context. Use 'await coro' instead.")
         except RuntimeError:
             # No running loop, we can safely use asyncio.run
             return asyncio.run(coro)
@@ -144,6 +141,7 @@ class TTSEngine:
         self.voice_manager = VoiceManager(provider_manager=self.provider_manager)  # Deprecated but needed for tests
         self.voice_validator = self.voice_resolver  # Alias for backward compatibility
         self.text_processor = self.text_pipeline  # Alias for backward compatibility
+        self.tts_utils = TTSUtils(self.provider_manager)  # For backward compatibility
 
         logger.info("TTSEngine initialized with new architecture")
 

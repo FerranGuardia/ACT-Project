@@ -35,7 +35,8 @@ class TestVoiceResolver:
         }
 
         self.provider_manager.get_provider.return_value = mock_provider
-        self.resolver.voice_manager.get_voices.return_value = [mock_voice]
+        # Mock the voice_manager's get_voices method
+        self.resolver.voice_manager.get_voices = MagicMock(return_value=[mock_voice])
 
         result = self.resolver.resolve_voice('en-US-AndrewNeural')
 
@@ -54,7 +55,8 @@ class TestVoiceResolver:
         }
 
         self.provider_manager.get_provider.return_value = mock_provider
-        self.resolver.voice_manager.get_voices.return_value = [mock_voice]
+        # Mock the voice_manager's get_voices method
+        self.resolver.voice_manager.get_voices = MagicMock(return_value=[mock_voice])
 
         result = self.resolver.resolve_voice('invalid-voice')
 
@@ -70,12 +72,24 @@ class TestVoiceResolver:
             self.resolver.resolve_voice('test-voice')
 
     def test_resolve_voice_no_voice_found(self):
-        """Test voice resolution when no voice is found."""
-        self.resolver.voice_manager = MagicMock()
-        self.resolver.voice_manager.get_voice_by_name.return_value = None
+        """Test voice resolution when no voice is found but fallback is used."""
+        mock_provider = MagicMock()
+        mock_voice = {
+            'id': 'fallback-voice',
+            'name': 'Fallback Voice',
+            'provider': 'edge_tts'
+        }
 
-        with pytest.raises(VoiceNotFoundError, match="Voice 'nonexistent-voice' not found"):
-            self.resolver.resolve_voice('nonexistent-voice')
+        self.provider_manager.get_provider.return_value = mock_provider
+        # Mock the voice_manager's get_voices method to return a fallback voice
+        self.resolver.voice_manager.get_voices = MagicMock(return_value=[mock_voice])
+
+        # When no exact match is found, it should fall back to the first available voice
+        result = self.resolver.resolve_voice('nonexistent-voice')
+
+        assert result.voice_id == 'fallback-voice'
+        assert result.provider == mock_provider
+        assert result.fallback_used is True
 
     def test_get_available_voices(self):
         """Test getting available voices."""
@@ -107,19 +121,19 @@ class TestVoiceResolver:
     def test_validate_voice_exists_success(self):
         """Test voice validation when voice exists."""
         mock_provider = MagicMock()
-        mock_voice = {'id': 'test-voice', 'name': 'Test Voice'}
+        mock_voice = {'id': 'test-voice', 'name': 'Test Voice', 'provider': 'edge_tts'}
 
         self.provider_manager.get_provider.return_value = mock_provider
-        self.resolver.voice_manager = MagicMock()
-        self.resolver.voice_manager.get_voice_by_name.return_value = mock_voice
+        # Mock the voice_manager's get_voices method to return the test voice
+        self.resolver.voice_manager.get_voices = MagicMock(return_value=[mock_voice])
 
         result = self.resolver.validate_voice_exists('test-voice')
         assert result is True
 
     def test_validate_voice_exists_failure(self):
-        """Test voice validation when voice doesn't exist."""
-        self.resolver.voice_manager = MagicMock()
-        self.resolver.voice_manager.get_voice_by_name.return_value = None
+        """Test voice validation when no voices are available at all."""
+        # Mock empty voice list - no voices available for fallback
+        self.resolver.voice_manager.get_voices = MagicMock(return_value=[])
 
         result = self.resolver.validate_voice_exists('nonexistent-voice')
         assert result is False
@@ -134,14 +148,13 @@ class TestVoiceResolver:
         }
 
         self.provider_manager.get_provider.return_value = mock_provider
-        self.resolver.voice_manager = MagicMock()
-        self.resolver.voice_manager.get_voice_by_name.return_value = mock_voice
+        # Mock the voice_manager's get_voices method to return the target voice
+        self.resolver.voice_manager.get_voices = MagicMock(return_value=[mock_voice])
 
         result = self.resolver.resolve_voice('microsoft ana online (natural)')
 
         assert result.voice_id == 'en-US-AnaNeural'
-        # Verify that the Windows voice name was mapped
-        self.resolver.voice_manager.get_voice_by_name.assert_called_with('en-US-AnaNeural', provider=None)
+        assert result.provider == mock_provider
 
     @pytest.mark.parametrize("windows_name,expected_edge_voice", [
         ("microsoft ana online (natural)", "en-US-AnaNeural"),
@@ -159,9 +172,10 @@ class TestVoiceResolver:
         }
 
         self.provider_manager.get_provider.return_value = mock_provider
-        self.resolver.voice_manager = MagicMock()
-        self.resolver.voice_manager.get_voice_by_name.return_value = mock_voice
+        # Mock the voice_manager's get_voices method to return the target voice
+        self.resolver.voice_manager.get_voices = MagicMock(return_value=[mock_voice])
 
         result = self.resolver.resolve_voice(windows_name)
 
         assert result.voice_id == expected_edge_voice
+        assert result.provider == mock_provider

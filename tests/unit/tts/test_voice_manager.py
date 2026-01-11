@@ -117,7 +117,7 @@ class TestVoiceManager:
             mock_voices = [
                 {"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "ShortName": "en-US-AndrewNeural", "Locale": "en-US", "Gender": "Male"}
             ]
-            mock_pm.get_all_voices.return_value = mock_voices
+            mock_pm.get_voices_by_provider.return_value = mock_voices
             mock_pm_class.return_value = mock_pm
             
             manager = VoiceManager(provider_manager=mock_pm)

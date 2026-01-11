@@ -46,6 +46,9 @@ if "tts.providers.provider_manager" not in sys.modules:
     class MockTTSProviderManager:
         def get_all_voices(self, locale=None):
             return [{"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male", "language": "en-US", "quality": "high", "provider": "edge_tts"}]
+
+        def get_voices_by_provider(self, provider, locale=None):
+            return [{"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "gender": "male", "language": "en-US", "quality": "high", "provider": provider}]
     provider_manager_module.TTSProviderManager = MockTTSProviderManager  # type: ignore[attr-defined]
     sys.modules["tts.providers.provider_manager"] = provider_manager_module
 if "tts.voice_manager" not in sys.modules:

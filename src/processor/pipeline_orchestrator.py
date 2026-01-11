@@ -90,6 +90,21 @@ class PipelineOrchestrator:
         return self.context.on_progress
 
     @property
+    def on_status_change(self) -> Optional[callable]:
+        """Get status change callback (backward compatibility)."""
+        return self.context.on_status_change
+
+    @property
+    def on_chapter_update(self) -> Optional[callable]:
+        """Get chapter update callback (backward compatibility)."""
+        return self.context.on_chapter_update
+
+    @property
+    def progress_tracker(self):
+        """Get progress tracker (backward compatibility)."""
+        return getattr(self.scraping_coordinator, 'progress_tracker', None)
+
+    @property
     def should_stop(self) -> bool:
         """Get stop flag (backward compatibility)."""
         return self.context.should_stop

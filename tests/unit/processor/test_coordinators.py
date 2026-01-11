@@ -276,9 +276,14 @@ class TestConversionCoordinator:
         # Reinitialize coordinator to use mocked TTS
         coordinator.tts_engine = mock_tts
 
+        # Create a temporary file for the audio file
+        import tempfile
+        temp_audio_file = Path(tempfile.mktemp(suffix=".mp3"))
+        temp_audio_file.write_bytes(b"fake audio data")  # Make it exist with content
+
         # Mock file manager
         coordinator.file_manager.save_text_file = Mock(return_value=Path("text.txt"))
-        coordinator.file_manager.save_audio_file = Mock(return_value=Path("audio.mp3"))
+        coordinator.file_manager.save_audio_file = Mock(return_value=temp_audio_file)
         coordinator.file_manager.audio_file_exists = Mock(return_value=False)
 
         # Mock chapter manager
@@ -290,13 +295,18 @@ class TestConversionCoordinator:
         mock_chapter = Mock()
         mock_chapter.number = 1
 
-        # Mock format_chapter_intro
-        with patch('tts.tts_engine.format_chapter_intro', return_value="Formatted text"):
-            success = coordinator.convert_chapter_to_audio(
-                mock_chapter, "Chapter content", "Chapter 1"
-            )
+        try:
+            # Mock format_chapter_intro
+            with patch('tts.tts_engine.format_chapter_intro', return_value="Formatted text"):
+                success = coordinator.convert_chapter_to_audio(
+                    mock_chapter, "Chapter content", "Chapter 1"
+                )
 
-        assert success is True
+            assert success is True
+        finally:
+            # Clean up
+            if temp_audio_file.exists():
+                temp_audio_file.unlink()
         coordinator.file_manager.save_text_file.assert_called_once()
         coordinator.file_manager.save_audio_file.assert_called_once()
 
@@ -331,7 +341,7 @@ class TestConversionCoordinator:
         chapters = [mock_chapter1, mock_chapter2, mock_chapter3]
 
         # Mock file manager - chapter 2 is missing
-        coordinator.file_manager.audio_file_exists.side_effect = lambda num: num != 2
+        coordinator.file_manager.audio_file_exists = Mock(side_effect=lambda num: num != 2)
 
         first_missing = coordinator.get_first_missing_chapter(chapters)
 

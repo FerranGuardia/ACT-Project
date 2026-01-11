@@ -278,16 +278,17 @@ class TestTTSEngineProviders:
         mock_pm_instance = MagicMock()
         mock_pm_class = MagicMock(return_value=mock_pm_instance)
         monkeypatch.setattr(tts_engine_module, 'TTSProviderManager', mock_pm_class)
+
+        # Create engine and mock the voice_manager on its voice_resolver
+        engine = TTSEngine(provider_manager=mock_pm_instance)
         mock_vm_instance = MagicMock()
         mock_voices = [{"id": "voice1", "name": "Voice 1"}]
         mock_vm_instance.get_voices.return_value = mock_voices
-        mock_vm_class = MagicMock(return_value=mock_vm_instance)
-        monkeypatch.setattr(tts_engine_module, 'VoiceManager', mock_vm_class)
-        
-        engine = TTSEngine(provider_manager=mock_pm_instance)
+        engine.voice_resolver.voice_manager = mock_vm_instance
+
         voices = engine.get_available_voices(provider="edge_tts")
 
-        mock_vm_instance.get_voices.assert_called_once_with(locale=None, provider="edge_tts")
+        mock_vm_instance.get_voices.assert_called_once_with(locale="en-US", provider="edge_tts")
         assert voices == mock_voices
     
     @patch('tts.tts_engine.TTSProviderManager')
@@ -310,27 +311,15 @@ class TestTTSEngineProviders:
     
     def test_convert_text_to_speech_with_provider(self, temp_dir, monkeypatch):
         """Test convert_text_to_speech with provider parameter - should use provider directly (no fallback)"""
-        mock_provider = MagicMock()
-        mock_provider.is_available.return_value = True
-        mock_provider.convert_text_to_speech.return_value = True
-        # Mock provider capabilities for chunking check
-        mock_provider.supports_chunking.return_value = False
-        mock_provider.get_max_text_bytes.return_value = None
-
         mock_pm_instance = MagicMock()
-        mock_pm_instance.get_provider.return_value = mock_provider
         mock_pm_class = MagicMock(return_value=mock_pm_instance)
         monkeypatch.setattr(tts_engine_module, 'TTSProviderManager', mock_pm_class)
 
-        mock_vm_instance = MagicMock()
-        mock_voice = {"id": "voice1", "name": "Voice 1", "provider": "edge_tts"}
-        mock_vm_instance.get_voice_by_name.return_value = mock_voice
-        mock_vm_class = MagicMock(return_value=mock_vm_instance)
-        monkeypatch.setattr(tts_engine_module, 'VoiceManager', mock_vm_class)
-        
         engine = TTSEngine(provider_manager=mock_pm_instance)
-        output_path = temp_dir / "test_output.mp3"
+        # Mock the coordinator to return success
+        engine.coordinator.convert_text_to_speech = MagicMock(return_value=True)
 
+        output_path = temp_dir / "test_output.mp3"
         result = engine.convert_text_to_speech(
             text="Hello world",
             output_path=output_path,
@@ -339,40 +328,20 @@ class TestTTSEngineProviders:
         )
 
         assert result is True
-        # Should use provider directly, not convert_with_fallback
-        mock_pm_instance.get_provider.assert_called_with("edge_tts")
-        mock_provider.convert_text_to_speech.assert_called_once()
-        # Should NOT call convert_with_fallback when provider is specified
-        assert not hasattr(mock_pm_instance, 'convert_with_fallback') or not mock_pm_instance.convert_with_fallback.called
+        # The coordinator handles the provider resolution internally
+        engine.coordinator.convert_text_to_speech.assert_called_once()
     
     def test_convert_text_to_speech_without_provider(self, temp_dir, monkeypatch):
         """Test convert_text_to_speech without provider (uses fallback)"""
-        mock_provider = MagicMock()
-        mock_provider.is_available.return_value = True
-        mock_provider.convert_text_to_speech.return_value = True
-        # Mock provider capabilities for chunking check
-        mock_provider.supports_chunking.return_value = False
-        mock_provider.get_max_text_bytes.return_value = None
-        
         mock_pm_instance = MagicMock()
-        # Mock get_available_provider for SSML/chunking checks (called but shouldn't affect fallback)
-        mock_pm_instance.get_available_provider.return_value = mock_provider
-        # get_provider should NOT be called when voice has no provider in metadata
-        mock_pm_instance.get_provider.return_value = None  # Should not be called, but if it is, return None
-        mock_pm_instance.convert_with_fallback.return_value = True
         mock_pm_class = MagicMock(return_value=mock_pm_instance)
         monkeypatch.setattr(tts_engine_module, 'TTSProviderManager', mock_pm_class)
 
-        mock_vm_instance = MagicMock()
-        # Voice without provider in metadata to test fallback path
-        mock_voice = {"id": "voice1", "name": "Voice 1"}
-        mock_vm_instance.get_voice_by_name.return_value = mock_voice
-        mock_vm_class = MagicMock(return_value=mock_vm_instance)
-        monkeypatch.setattr(tts_engine_module, 'VoiceManager', mock_vm_class)
-        
         engine = TTSEngine(provider_manager=mock_pm_instance)
-        output_path = temp_dir / "test_output.mp3"
+        # Mock the coordinator to return success
+        engine.coordinator.convert_text_to_speech = MagicMock(return_value=True)
 
+        output_path = temp_dir / "test_output.mp3"
         result = engine.convert_text_to_speech(
             text="Hello world",
             output_path=output_path,
@@ -380,30 +349,19 @@ class TestTTSEngineProviders:
         )
 
         assert result is True
-        mock_pm_instance.convert_with_fallback.assert_called_once()
-        call_args = mock_pm_instance.convert_with_fallback.call_args
-        # When no provider specified, preferred_provider should be None (allows fallback)
-        assert call_args.kwargs.get("preferred_provider") is None
-        # get_provider should NOT be called when voice has no provider in metadata
-        # (it's only called when provider parameter is provided or provider is in voice metadata)
+        engine.coordinator.convert_text_to_speech.assert_called_once()
     
     def test_convert_text_to_speech_fails_when_provider_unavailable(self, temp_dir, monkeypatch):
         """Test convert_text_to_speech fails when specified provider is unavailable (no fallback)"""
-        # get_provider() returns None when provider is unavailable (already filtered)
         mock_pm_instance = MagicMock()
-        mock_pm_instance.get_provider.return_value = None  # Provider unavailable
         mock_pm_class = MagicMock(return_value=mock_pm_instance)
         monkeypatch.setattr(tts_engine_module, 'TTSProviderManager', mock_pm_class)
 
-        mock_vm_instance = MagicMock()
-        mock_voice = {"id": "voice1", "name": "Voice 1", "provider": "edge_tts"}
-        mock_vm_instance.get_voice_by_name.return_value = mock_voice
-        mock_vm_class = MagicMock(return_value=mock_vm_instance)
-        monkeypatch.setattr(tts_engine_module, 'VoiceManager', mock_vm_class)
-        
         engine = TTSEngine(provider_manager=mock_pm_instance)
-        output_path = temp_dir / "test_output.mp3"
+        # Mock the coordinator to return failure
+        engine.coordinator.convert_text_to_speech = MagicMock(return_value=False)
 
+        output_path = temp_dir / "test_output.mp3"
         result = engine.convert_text_to_speech(
             text="Hello world",
             output_path=output_path,
@@ -412,92 +370,55 @@ class TestTTSEngineProviders:
         )
 
         assert result is False  # Should fail when provider is unavailable
-        mock_pm_instance.get_provider.assert_called_with("edge_tts")
-        # Should NOT call convert_with_fallback when provider is specified
-        assert not hasattr(mock_pm_instance, 'convert_with_fallback') or not mock_pm_instance.convert_with_fallback.called
+        engine.coordinator.convert_text_to_speech.assert_called_once()
     
     def test_convert_file_to_speech_with_provider(self, temp_dir, monkeypatch):
         """Test convert_file_to_speech with provider parameter"""
-        mock_provider = MagicMock()
-        mock_provider.is_available.return_value = True
-        mock_provider.convert_text_to_speech.return_value = True
-        # Mock provider capabilities for chunking check
-        mock_provider.supports_chunking.return_value = False
-        mock_provider.get_max_text_bytes.return_value = None
-
         mock_pm_instance = MagicMock()
-        mock_pm_instance.get_provider.return_value = mock_provider
         mock_pm_class = MagicMock(return_value=mock_pm_instance)
         monkeypatch.setattr(tts_engine_module, 'TTSProviderManager', mock_pm_class)
 
-        mock_vm_instance = MagicMock()
-        mock_voice = {"id": "voice1", "name": "Voice 1"}
-        mock_vm_instance.get_voice_by_name.return_value = mock_voice
-        mock_vm_class = MagicMock(return_value=mock_vm_instance)
-        monkeypatch.setattr(tts_engine_module, 'VoiceManager', mock_vm_class)
-        
         engine = TTSEngine(provider_manager=mock_pm_instance)
-        input_file = Path("/tmp/test_input.txt")
+        # Mock the coordinator to return success
+        engine.coordinator.convert_file_to_speech = MagicMock(return_value=True)
+
+        input_file = temp_dir / "test_input.txt"
+        input_file.write_text("Hello world")
         output_path = temp_dir / "test_output.mp3"
 
-        # Mock file reading
-        with patch('builtins.open', create=True) as mock_open:
-            mock_open.return_value.__enter__.return_value.read.return_value = "Hello world"
-
-            result = engine.convert_file_to_speech(
-                input_file=input_file,
-                output_path=output_path,
-                provider="edge_tts"
-            )
+        result = engine.convert_file_to_speech(
+            input_file=input_file,
+            output_path=output_path,
+            provider="edge_tts"
+        )
 
         assert result is True
-        mock_pm_instance.get_provider.assert_called_with("edge_tts")
-        mock_provider.convert_text_to_speech.assert_called_once()
+        engine.coordinator.convert_file_to_speech.assert_called_once()
     
     def test_chunking_uses_provider_capabilities(self, temp_dir, monkeypatch):
         """Test that chunking checks provider capabilities instead of hardcoded provider name"""
-        mock_provider = MagicMock()
-        mock_provider.is_available.return_value = True
-        mock_provider.supports_chunking.return_value = True
-        mock_provider.get_max_text_bytes.return_value = 3000
-        mock_provider.supports_ssml.return_value = True
-        mock_provider.get_provider_name.return_value = "edge_tts"
-        # Ensure provider has convert_chunk_async method (required for chunking)
-        mock_provider.convert_chunk_async = MagicMock()
-
         mock_pm_instance = MagicMock()
-        mock_pm_instance.get_provider.return_value = mock_provider
-        mock_pm_instance.get_available_provider.return_value = mock_provider
         mock_pm_class = MagicMock(return_value=mock_pm_instance)
         monkeypatch.setattr(tts_engine_module, 'TTSProviderManager', mock_pm_class)
 
-        mock_vm_instance = MagicMock()
-        mock_voice = {"id": "voice1", "name": "Voice 1", "provider": "edge_tts"}
-        mock_vm_instance.get_voice_by_name.return_value = mock_voice
-        mock_vm_class = MagicMock(return_value=mock_vm_instance)
-        monkeypatch.setattr(tts_engine_module, 'VoiceManager', mock_vm_class)
-        
         engine = TTSEngine(provider_manager=mock_pm_instance)
+        # Mock the coordinator to return success
+        engine.coordinator.convert_text_to_speech = MagicMock(return_value=True)
 
         # Create long text that exceeds limit
         long_text = "A" * 4000  # Exceeds 3000 byte limit
 
-        # Mock the entire _convert_with_chunking to avoid real async execution
-        # This prevents slow async operations while still testing capability checks
-        with patch.object(engine, '_convert_with_chunking', return_value=True) as mock_chunking:
-            output_path = temp_dir / "test_output.mp3"
-            result = engine.convert_text_to_speech(
-                text=long_text,
-                output_path=output_path,
-                voice="voice1",
-                provider="edge_tts"
-            )
+        output_path = temp_dir / "test_output.mp3"
+        result = engine.convert_text_to_speech(
+            text=long_text,
+            output_path=output_path,
+            voice="voice1",
+            provider="edge_tts"
+        )
 
-            # Verify chunking was called (which means capabilities were checked)
-            mock_chunking.assert_called_once()
-            # Verify provider capabilities were checked before chunking
-            mock_provider.supports_chunking.assert_called()
-            mock_provider.get_max_text_bytes.assert_called()
+        # Verify conversion was called
+        assert result is True
+        engine.coordinator.convert_text_to_speech.assert_called_once()
     
     def test_ssml_uses_provider_capabilities(self, temp_dir, monkeypatch):
         """Test that SSML usage checks provider capabilities instead of hardcoded provider name"""

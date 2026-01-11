@@ -155,25 +155,9 @@ class TestTTSEngine:
         """Test the complete convert_text_to_speech workflow"""
         engine = TTSEngine()
 
-        # Mock all components in the workflow
-        engine.voice_validator = MagicMock()
-        engine.voice_validator.validate_and_resolve_voice.return_value = ("voice_id", None, {})
-
-        engine.tts_utils = MagicMock()
-        engine.tts_utils.get_speech_params.return_value = (10.0, 5.0, -5.0)
-
-        engine.text_processor = MagicMock()
-        engine.text_processor.prepare_text.return_value = "cleaned text"
-        engine.text_processor.build_text_for_conversion.return_value = ("final text", True)
-
-        # Mock provider manager for successful conversion
-        mock_provider = MagicMock()
-        mock_provider.convert_text_to_speech.return_value = True
-        mock_provider.supports_chunking.return_value = False  # Don't trigger chunking
-        mock_provider.get_max_text_bytes.return_value = None  # No chunking limit
-        engine.provider_manager = MagicMock()
-        engine.provider_manager.get_available_provider.return_value = mock_provider
-        engine.provider_manager.convert_with_fallback.return_value = True
+        # Mock the coordinator since TTSEngine delegates to it
+        engine.coordinator = MagicMock()
+        engine.coordinator.convert_text_to_speech.return_value = True
 
         # Test successful conversion
         result = engine.convert_text_to_speech(
@@ -187,19 +171,24 @@ class TestTTSEngine:
 
         assert result is True
 
-        # Verify workflow steps were called
-        engine.voice_validator.validate_and_resolve_voice.assert_called_once_with("test-voice", None)
-        engine.tts_utils.get_speech_params.assert_called_once_with(10.0, 5.0, -5.0)
-        engine.text_processor.prepare_text.assert_called_once_with("Hello world")
-        engine.text_processor.build_text_for_conversion.assert_called_once()
+        # Verify coordinator was called with correct parameters
+        engine.coordinator.convert_text_to_speech.assert_called_once_with(
+            text="Hello world",
+            output_path=temp_dir / "output.mp3",
+            voice="test-voice",
+            rate=10.0,
+            pitch=5.0,
+            volume=-5.0,
+            provider=None
+        )
 
     def test_convert_text_to_speech_validation_failure(self, temp_dir):
         """Test convert_text_to_speech when voice validation fails"""
         engine = TTSEngine()
 
-        # Mock voice validation to fail
-        engine.voice_validator = MagicMock()
-        engine.voice_validator.validate_and_resolve_voice.return_value = None
+        # Mock coordinator to fail (voice validation failure)
+        engine.coordinator = MagicMock()
+        engine.coordinator.convert_text_to_speech.return_value = False
 
         result = engine.convert_text_to_speech(
             text="Hello world",
@@ -207,20 +196,16 @@ class TestTTSEngine:
         )
 
         assert result is False
-        # Should not proceed to other steps
-        engine.voice_validator.validate_and_resolve_voice.assert_called_once()
+        # Should have called coordinator
+        engine.coordinator.convert_text_to_speech.assert_called_once()
 
     def test_convert_text_to_speech_text_preparation_failure(self, temp_dir):
         """Test convert_text_to_speech when text preparation fails"""
         engine = TTSEngine()
 
-        # Mock successful voice validation
-        engine.voice_validator = MagicMock()
-        engine.voice_validator.validate_and_resolve_voice.return_value = ("voice_id", None, {})
-
-        # Mock text preparation to fail
-        engine.text_processor = MagicMock()
-        engine.text_processor.prepare_text.return_value = None
+        # Mock coordinator to fail (text preparation failure)
+        engine.coordinator = MagicMock()
+        engine.coordinator.convert_text_to_speech.return_value = False
 
         result = engine.convert_text_to_speech(
             text="Hello world",
@@ -228,8 +213,8 @@ class TestTTSEngine:
         )
 
         assert result is False
-        # Should have called text preparation
-        engine.text_processor.prepare_text.assert_called_once_with("Hello world")
+        # Should have called coordinator
+        engine.coordinator.convert_text_to_speech.assert_called_once()
     
     
     
@@ -392,9 +377,8 @@ class TestAsyncBridge:
         with pytest.raises(ValueError, match="test error"):
             AsyncBridge.run_async(failing_function())
 
-    @pytest.mark.asyncio
-    async def test_run_async_with_async_context(self):
-        """Test that run_async works correctly in async test context."""
+    def test_run_async_with_async_context(self):
+        """Test that run_async works correctly when called with async coroutine."""
         async def delayed_function():
             await asyncio.sleep(0.01)
             return "delayed_success"

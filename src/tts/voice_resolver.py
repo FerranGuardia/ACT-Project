@@ -102,8 +102,23 @@ class VoiceResolver:
         if result:
             return result
 
-        # All resolution attempts failed
+        # As a last resort, fall back to the first available voice
         available_voices = self.get_available_voices()
+        if available_voices:
+            first_voice = available_voices[0]
+            provider_name = first_voice.get('provider')
+            provider = self.provider_manager.get_provider(provider_name)
+            if provider:
+                voice_id = self._extract_voice_id(first_voice)
+                logger.warning(f"Voice '{voice_name}' not found, falling back to '{voice_id}'")
+                return VoiceResolutionResult(
+                    voice_id=voice_id,
+                    provider=provider,
+                    voice_metadata=first_voice,
+                    fallback_used=True
+                )
+
+        # All resolution attempts failed
         logger.error(f"Voice '{voice_name}' not found. Available voices: {len(available_voices)}")
         if available_voices:
             logger.error("First 5 available voices:")
@@ -183,7 +198,20 @@ class VoiceResolver:
         for windows_name, edge_voice in windows_mappings.items():
             if windows_name in voice_name_lower:
                 logger.info(f"Mapped Windows voice '{voice_name}' to Edge TTS voice '{edge_voice}'")
-                return self.resolve_voice(edge_voice, preferred_provider)
+                # Try to find the mapped voice directly to avoid recursion
+                all_voices = self.voice_manager.get_voices()
+                for voice_dict in all_voices:
+                    voice_id = self._extract_voice_id(voice_dict)
+                    if voice_id == edge_voice or voice_dict.get('name') == edge_voice:
+                        provider_name = voice_dict.get('provider')
+                        provider = self.provider_manager.get_provider(provider_name)
+                        if provider:
+                            logger.info(f"Resolved mapped Windows voice '{voice_name}' to '{voice_id}' using provider '{provider_name}'")
+                            return VoiceResolutionResult(
+                                voice_id=voice_id,
+                                provider=provider,
+                                voice_metadata=voice_dict
+                            )
 
         # Try partial matching
         all_voices = self.voice_manager.get_voices()
