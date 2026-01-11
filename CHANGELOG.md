@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.1.0] - 2026-01-11
 
+## [1.1.1] - 2026-01-11
+
+### Hotfix
+- Restore missing UI style functions lost during branch sync merge
+- Merge `dev` into `main` to include hotfix
+- Version bumped to 1.1.1
+
 ### Architecture Refactoring
 
 #### Processing Pipeline Modularization
