@@ -14,7 +14,7 @@ with patch('PySide6.QtWidgets'), \
      patch('core.logger.get_logger', return_value=MagicMock()):
 
     # Import the real LandingPage
-    from src.ui.landing_page import LandingPage
+    from ui.landing_page import LandingPage
 
 
 class TestLandingPageInitialization:

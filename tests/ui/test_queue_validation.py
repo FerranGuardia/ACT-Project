@@ -30,9 +30,9 @@ with patch('PySide6.QtWidgets'), \
      patch('core.logger.get_logger', return_value=mock_logger):
 
     # Import the real implementations
-    from src.ui.ui_constants import StatusMessages
-    from src.ui.views.full_auto_view.queue_manager import (QueueManager,
-                                                           ValidationError)
+    from ui.ui_constants import StatusMessages
+    from ui.views.full_auto_view.queue_manager import (QueueManager,
+                                                       ValidationError)
 
 
 class TestQueueValidation:

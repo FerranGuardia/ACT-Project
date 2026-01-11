@@ -13,7 +13,7 @@ with patch('PySide6.QtWidgets'), \
      patch('PySide6.QtGui'):
 
     # Import the real CardsSection
-    from src.ui.landing_page_cards import CardsSection
+    from ui.landing_page_cards import CardsSection
 
 
 class TestCardsSectionInitialization:
