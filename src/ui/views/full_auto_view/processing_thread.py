@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any
 from PySide6.QtCore import QThread, Signal
 
 from core.logger import get_logger
-from processor import ProcessingPipeline
+from processor.pipeline_orchestrator import ProcessingPipeline
 from processor.gap_detector import GapDetector
 
 logger = get_logger("ui.full_auto_view.processing_thread")
