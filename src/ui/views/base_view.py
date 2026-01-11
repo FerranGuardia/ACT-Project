@@ -25,6 +25,8 @@ class BaseView(QWidget):
         super().__init__(parent)
         self._setup_base_ui()
         self.setup_ui()
+        # Add stretch BEFORE footer to push content up and footer to bottom
+        self.get_main_layout().addStretch()
         self._add_footer()
         # Ensure the composed layout is applied to the widget so content renders
         if hasattr(self, '_main_layout'):
@@ -54,9 +56,7 @@ class BaseView(QWidget):
         from PySide6.QtCore import Qt, QUrl
         from PySide6.QtGui import QDesktopServices
 
-        # Add stretch to push footer to bottom
-        self._main_layout.addStretch()
-
+        # Stretch was already added in __init__ to push footer to bottom
         # Create footer with version info
         footer_layout = QHBoxLayout()
         footer_layout.setContentsMargins(0, 10, 0, 5)

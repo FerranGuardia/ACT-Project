@@ -102,8 +102,6 @@ class TTSView(BaseView):
         # Progress section (for current processing)
         self.progress_section = ProgressSection()
         main_layout.addWidget(self.progress_section)
-        
-        main_layout.addStretch()
     
     def _connect_handlers(self) -> None:
         """Connect all button handlers."""

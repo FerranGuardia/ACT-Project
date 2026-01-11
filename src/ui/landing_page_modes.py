@@ -31,7 +31,8 @@ class ModeConfig:
             title=self.title,
             description=self.description,
             icon=self.icon,
-            callback=lambda: callback(self.id)
+            callback=lambda: callback(self.id),
+            mode_id=self.id
         )
 
 

@@ -21,6 +21,7 @@ from ui.styles import (
     get_card_style, get_card_title_style, get_card_description_style,
     get_card_icon_style, get_card_arrow_style
 )
+from ui.utils.event_logger import UIEventLogger
 
 __all__ = ['ClickableLabel', 'CardTitle', 'CardDescription', 'CardIcon', 'CardArrow', 'GenreCard']
 
@@ -142,11 +143,13 @@ class GenreCard(QFrame):
         description: str,
         icon: Optional[str] = None,
         callback: Optional[Callable[[], None]] = None,
+        mode_id: Optional[str] = None,
         parent: Optional[QFrame] = None
     ):
         super().__init__(parent)
         self.title = title
         self.callback = callback
+        self.mode_id = mode_id
         self.title_label: Optional[CardTitle] = None
         self.setup_ui(title, description, icon)
     
@@ -220,6 +223,10 @@ class GenreCard(QFrame):
     
     def _on_title_clicked(self):
         """Handle title click."""
+        # Log the event
+        if hasattr(self, 'mode_id'):
+            UIEventLogger.log_button_click(f"Mode Card: {self.mode_id}", "selected")
+        
         if self.callback:
             self.callback()
     

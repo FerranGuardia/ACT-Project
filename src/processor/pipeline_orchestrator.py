@@ -160,7 +160,7 @@ class PipelineOrchestrator:
     def _process_chapter_impl(
         self,
         chapter,
-        skip_if_exists: bool = True,
+        skip_if_exists: bool = False,
         on_failure: Optional[Callable] = None
     ) -> bool:
         """Process a single chapter: scrape → convert → save."""
@@ -191,16 +191,16 @@ class PipelineOrchestrator:
     def process_chapter(self, *args, **kwargs) -> bool:
         """Process a single chapter with flexible arguments for backward compatibility."""
         if len(args) == 1 and hasattr(args[0], 'number'):
-            # New API: process_chapter(chapter, skip_if_exists=True, on_failure=None)
+            # New API: process_chapter(chapter, skip_if_exists=False, on_failure=None)
             chapter = args[0]
-            skip_if_exists = kwargs.get('skip_if_exists', True)
+            skip_if_exists = kwargs.get('skip_if_exists', False)
             on_failure = kwargs.get('on_failure')
             return self._process_chapter_impl(chapter, skip_if_exists, on_failure)
         elif len(args) >= 2 and isinstance(args[1], int):
-            # Old API: process_chapter(chapter_url, chapter_num, skip_if_exists=True)
+            # Old API: process_chapter(chapter_url, chapter_num, skip_if_exists=False)
             chapter_url = args[0]
             chapter_num = args[1]
-            skip_if_exists = args[2] if len(args) > 2 else kwargs.get('skip_if_exists', True)
+            skip_if_exists = args[2] if len(args) > 2 else kwargs.get('skip_if_exists', False)
             from .chapter_manager import Chapter
             chapter = Chapter(number=chapter_num, url=chapter_url)
             return self._process_chapter_impl(chapter, skip_if_exists)
@@ -222,10 +222,10 @@ class PipelineOrchestrator:
             )
             return result.get("success", False)
         else:
-            # New API: process_all_chapters(start_from=1, max_chapters=None, skip_if_exists=True, ignore_errors=False)
+            # New API: process_all_chapters(start_from=1, max_chapters=None, skip_if_exists=False, ignore_errors=False)
             start_from = kwargs.get('start_from', 1)
             max_chapters = kwargs.get('max_chapters')
-            skip_if_exists = kwargs.get('skip_if_exists', True)
+            skip_if_exists = kwargs.get('skip_if_exists', False)
             ignore_errors = kwargs.get('ignore_errors', False)
             return self._process_all_chapters_impl(start_from, max_chapters, skip_if_exists, ignore_errors)
 
@@ -270,7 +270,8 @@ class PipelineOrchestrator:
         start_from: int = 1,
         max_chapters: Optional[int] = None,
         voice: Optional[str] = None,
-        provider: Optional[str] = None
+        provider: Optional[str] = None,
+        skip_if_exists: bool = False
     ) -> Dict[str, Any]:
         """Run the complete pipeline from TOC URL to finished audiobook."""
         logger.info("Starting full pipeline...")
@@ -302,7 +303,8 @@ class PipelineOrchestrator:
         result = self.process_all_chapters(
             ignore_errors=True,  # Continue processing other chapters on failure
             start_from=start_from,
-            max_chapters=max_chapters
+            max_chapters=max_chapters,
+            skip_if_exists=skip_if_exists
         )
 
         return result
@@ -311,10 +313,11 @@ class PipelineOrchestrator:
         self,
         start_from: int = 1,
         max_chapters: Optional[int] = None,
-        skip_if_exists: bool = True,
+        skip_if_exists: bool = False,
         ignore_errors: bool = False
     ) -> Dict[str, Any]:
         """Process all chapters in the project."""
+        logger.debug(f"_process_all_chapters_impl called with skip_if_exists={skip_if_exists}")
         if not self.scraping_coordinator.progress_tracker:
             logger.error("Progress tracker not initialized")
             return {"success": False, "error": "Progress tracker not initialized"}

@@ -100,8 +100,6 @@ class ScraperView(BaseView):
         # Output files list
         self.output_files_section = OutputFilesSection()
         main_layout.addWidget(self.output_files_section)
-        
-        main_layout.addStretch()
     
     def _connect_handlers(self) -> None:
         """Connect all button handlers."""
@@ -117,29 +115,42 @@ class ScraperView(BaseView):
         """
         Start the scraping operation.
         
-        Validates inputs, checks if already running, then creates and starts
-        the scraping thread. Updates UI state accordingly.
+        Processes the first item from the queue. If no queue items exist,
+        validates and uses input form. Checks if already running, then creates
+        and starts the scraping thread. Updates UI state accordingly.
         """
-        # Validate inputs
-        valid, error_msg = self.handlers.validate_inputs(
-            self.url_input_section,
-            self.chapter_selection_section,
-            self.output_settings
-        )
-        if not valid:
-            show_validation_error(self, error_msg)
-            return
-        
         # Check if already running
         if self.scraping_thread and self.scraping_thread.isRunning():
             show_already_running_error(self)
             return
         
-        # Get parameters
-        url = self.url_input_section.get_url()
-        output_dir = self.output_settings.get_output_dir()
-        file_format = self.output_settings.get_file_format()
-        chapter_selection = self.chapter_selection_section.get_chapter_selection()
+        # Determine the source: queue items first, then input form
+        if self.queue_items:
+            # Process first queue item
+            queue_item = self.queue_items[0]
+            url = queue_item['url']
+            output_dir = queue_item['output_dir']
+            file_format = queue_item['file_format']
+            chapter_selection = queue_item['chapter_selection']
+            
+            logger.debug(f"Processing queue item: {url}")
+        else:
+            # No queue items - validate and use input form
+            valid, error_msg = self.handlers.validate_inputs(
+                self.url_input_section,
+                self.chapter_selection_section,
+                self.output_settings
+            )
+            if not valid:
+                show_validation_error(self, error_msg)
+                return
+            
+            url = self.url_input_section.get_url()
+            output_dir = self.output_settings.get_output_dir()
+            file_format = self.output_settings.get_file_format()
+            chapter_selection = self.chapter_selection_section.get_chapter_selection()
+            
+            logger.debug("Processing from input form")
         
         # Create and start thread
         self.scraping_thread = ScrapingThread(url, chapter_selection, output_dir, file_format)
