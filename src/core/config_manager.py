@@ -56,12 +56,20 @@ class ConfigManager:
         # Read version from VERSION file
         version = get_version()
 
-        # Detect if running in test environment
+        # Detect if running in test environment (robust)
         import os
+        import sys
         import tempfile
-        is_test_env = ("PYTEST_CURRENT_TEST" in os.environ or
-                      "pytest" in str(Path.cwd()) or
-                      any("test" in part for part in str(Path.cwd()).lower().split(os.sep)))
+        # Multiple signals: env vars, pytest module presence, cwd hints, and explicit override
+        is_test_env = (
+            os.environ.get("ACT_TEST_MODE") == "1" or
+            "PYTEST_CURRENT_TEST" in os.environ or
+            "PYTEST_ADDOPTS" in os.environ or
+            "PYTEST_WORKER" in os.environ or
+            ("pytest" in sys.modules) or
+            ("pytest" in str(Path.cwd()).lower()) or
+            any("test" in part for part in str(Path.cwd()).lower().split(os.sep))
+        )
 
         # Use temp directory for tests to avoid desktop pollution
         if is_test_env:
@@ -75,7 +83,7 @@ class ConfigManager:
                 "language": "es",
             },
             "paths": {
-                "output_dir": str(temp_base / "output") if is_test_env else str(Path.home() / "Desktop"),
+                "output_dir": str(temp_base / "output") if is_test_env else str(Path.home() / "Documents" / "ACT" / "output"),
                 "scraped_dir": str(temp_base / "scraped") if is_test_env else str(Path.home() / "Documents" / "ACT" / "scraped"),
                 "projects_dir": str(temp_base / "projects") if is_test_env else str(Path.home() / "Documents" / "ACT" / "projects"),
             },
@@ -178,10 +186,65 @@ class ConfigManager:
         try:
             for k in keys:
                 value = value[k]
+            # Validate path values to prevent desktop pollution
+            if key in ['paths.output_dir', 'paths.scraped_dir', 'paths.projects_dir']:
+                value = self._validate_path_value(key, value)
             return value
         except (KeyError, TypeError):
             logger.debug(f"Config key '{key}' not found, returning default")
             return default
+
+    def _validate_path_value(self, key: str, value: Any) -> str:
+        """
+        Validate and fix path configuration values.
+
+        Prevents directories from being created in problematic locations like Desktop.
+        This protects against config files that have been manually edited with invalid paths.
+
+        Args:
+            key: Configuration key
+            value: Raw value from config
+
+        Returns:
+            Validated path string
+        """
+        if not isinstance(value, str):
+            logger.warning(f"Config key '{key}' should be a string, got {type(value).__name__}")
+            return self._get_default_path(key)
+
+        path = Path(value)
+
+        # Check for problematic paths
+        problematic_paths = [
+            Path.home() / "Desktop",
+            Path.home(),  # Don't allow root user directory
+        ]
+
+        for problematic in problematic_paths:
+            try:
+                if path.resolve() == problematic.resolve():
+                    logger.warning(f"Config key '{key}' points to problematic location: {value}. Using default.")
+                    return self._get_default_path(key)
+            except (OSError, RuntimeError):
+                # Path resolution failed, use default
+                logger.warning(f"Could not resolve path for '{key}': {value}. Using default.")
+                return self._get_default_path(key)
+
+        # Ensure path is absolute
+        if not path.is_absolute():
+            logger.warning(f"Config key '{key}' should be an absolute path: {value}. Using default.")
+            return self._get_default_path(key)
+
+        return str(path)
+
+    def _get_default_path(self, key: str) -> str:
+        """Get default path for a configuration key."""
+        defaults = {
+            'paths.output_dir': str(Path.home() / "Documents" / "ACT" / "output"),
+            'paths.scraped_dir': str(Path.home() / "Documents" / "ACT" / "scraped"),
+            'paths.projects_dir': str(Path.home() / "Documents" / "ACT" / "projects"),
+        }
+        return defaults.get(key, str(Path.home() / "Documents" / "ACT"))
 
     def set(self, key: str, value: Any, save: bool = True) -> None:
         """

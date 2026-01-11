@@ -210,8 +210,18 @@ class TestScrapingCoordinator:
 
     def test_get_chapters_to_process(self, coordinator):
         """Test getting chapters to process."""
+        # Initialize a project first
+        success = coordinator.initialize_project(
+            novel_url="https://example.com",
+            toc_url="https://example.com/toc",
+            novel_title="Test Novel",
+            novel_author="Test Author"
+        )
+        assert success
+
         # Create chapter manager with chapters
         chapter_manager = coordinator.project_manager.get_chapter_manager()
+        assert chapter_manager is not None
         chapter_manager.add_chapter(1, "https://example.com/1")
         chapter_manager.add_chapter(2, "https://example.com/2")
         chapter_manager.add_chapter(3, "https://example.com/3")
@@ -361,7 +371,7 @@ class TestAudioPostProcessor:
         assert processor._extract_chapter_num(Path("chapter_042_title.mp3")) == 42
         assert processor._extract_chapter_num(Path("other_file.mp3")) == 0
 
-    @patch('processor.audio_post_processor.AudioMerger')
+    @patch('tts.audio_merger.AudioMerger')
     def test_merge_single_file(self, mock_merger_class, processor):
         """Test merging audio files into single file."""
         # Mock audio merger
@@ -383,7 +393,7 @@ class TestAudioPostProcessor:
         assert success is True
         mock_merger.merge_audio_chunks.assert_called_once()
 
-    @patch('processor.audio_post_processor.AudioMerger')
+    @patch('tts.audio_merger.AudioMerger')
     def test_merge_in_batches(self, mock_merger_class, processor):
         """Test merging audio files in batches."""
         # Mock audio merger

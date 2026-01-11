@@ -3,6 +3,7 @@ Processing Thread - Handles background processing pipeline operations.
 """
 
 from pathlib import Path
+from core.config_manager import get_config
 from typing import Optional, Dict, Any
 
 from PySide6.QtCore import QThread, Signal
@@ -33,7 +34,9 @@ class ProcessingThread(QThread):
         self.provider = provider
         self.chapter_selection = chapter_selection or {'type': 'all'}
         self.output_format = output_format or {'type': 'individual_mp3s'}
-        self.output_folder = output_folder or str(Path.home() / "Desktop")
+        # Default to configured output_dir to avoid writing to Desktop during tests
+        default_output = get_config().get('paths.output_dir')
+        self.output_folder = output_folder or str(default_output)
         self.novel_title = novel_title or project_name
         self.pipeline: Optional[ProcessingPipeline] = None
         self.should_stop = False

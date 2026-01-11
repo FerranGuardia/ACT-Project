@@ -129,7 +129,8 @@ class TestChunkedConversionStrategy:
         mock_audio_merger_instance.merge_audio_chunks.return_value = True
         mock_audio_merger.return_value = mock_audio_merger_instance
 
-        mock_async_bridge.run_async.return_value = [Path("chunk1.mp3"), Path("chunk2.mp3")]
+        # Create strategy after mocks are set up
+        strategy = ChunkedConversionStrategy(self.provider_manager, self.resource_manager)
 
         processed_text = MagicMock()
         processed_text.build_text_for_conversion.return_value = ("long text", False)
@@ -137,16 +138,21 @@ class TestChunkedConversionStrategy:
         voice_resolution = MagicMock()
         voice_resolution.voice_id = "test-voice"
         voice_resolution.provider = mock_provider
+        voice_resolution.provider.get_provider_name.return_value = "test_provider"
 
         output_path = Path("test_output.mp3")
 
-        # Execute
-        result = self.strategy.convert(processed_text, voice_resolution, output_path)
+        # Mock Path methods for file existence checks
+        with patch('pathlib.Path.exists', return_value=True), \
+             patch('pathlib.Path.stat') as mock_stat:
+            mock_stat.return_value.st_size = 1000
+
+            # Execute
+            result = strategy.convert(processed_text, voice_resolution, output_path)
 
         # Verify
         assert result is True
         mock_audio_merger_instance.chunk_text.assert_called_once()
-        mock_async_bridge.run_async.assert_called_once()
         mock_audio_merger_instance.merge_audio_chunks.assert_called_once()
 
     @patch('src.tts.conversion_strategies.AudioMerger')

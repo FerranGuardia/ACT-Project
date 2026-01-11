@@ -54,9 +54,9 @@ class TestProcessingPipeline:
     def test_initialization(self, pipeline):
         """Test pipeline initialization."""
         assert pipeline.project_name == "test_project"
-        assert pipeline.project_manager is not None
-        assert pipeline.file_manager is not None
-        assert pipeline.tts_engine is not None
+        assert pipeline.scraping_coordinator is not None
+        assert pipeline.conversion_coordinator is not None
+        assert pipeline.audio_post_processor is not None
         assert pipeline.should_stop is False
     
     def test_initialization_with_callbacks(self, temp_dir):

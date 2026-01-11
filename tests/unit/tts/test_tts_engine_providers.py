@@ -242,7 +242,7 @@ class TestTTSEngineProviders:
     def test_initialization_with_provider_manager(self, monkeypatch):
         """Test TTSEngine initialization with ProviderManager"""
         mock_pm_instance = MagicMock()
-        mock_pm_class = MagicMock(return_value=mock_pm_class)
+        mock_pm_class = MagicMock(return_value=mock_pm_instance)
         monkeypatch.setattr(tts_engine_module, 'TTSProviderManager', mock_pm_class)
 
         # Mock VoiceResolver since that's what TTSEngine now uses internally

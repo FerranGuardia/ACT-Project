@@ -62,6 +62,75 @@ class PipelineOrchestrator:
         if not self.context.voice:
             self.context.voice = self.config.get("tts.voice", "en-US-AndrewNeural")
 
+    # Backward compatibility properties and methods for tests
+
+    @property
+    def project_name(self) -> str:
+        """Get project name (backward compatibility)."""
+        return self.context.project_name
+
+    @property
+    def on_progress(self) -> Optional[callable]:
+        """Get progress callback (backward compatibility)."""
+        return self.context.on_progress
+
+    @property
+    def should_stop(self) -> bool:
+        """Get stop flag (backward compatibility)."""
+        return self.context.should_stop
+
+    @should_stop.setter
+    def should_stop(self, value: bool) -> None:
+        """Set stop flag (backward compatibility)."""
+        self.context.should_stop = value
+
+    def initialize_project(self, toc_url: str, novel_url: Optional[str] = None,
+                          novel_title: Optional[str] = None, novel_author: Optional[str] = None) -> bool:
+        """Initialize project (backward compatibility)."""
+        return self.scraping_coordinator.initialize_project(
+            toc_url=toc_url,
+            novel_url=novel_url,
+            novel_title=novel_title,
+            novel_author=novel_author
+        )
+
+    def _extract_base_url(self, url: str) -> str:
+        """Extract base URL (backward compatibility)."""
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        return f"{parsed.scheme}://{parsed.netloc}"
+
+    def fetch_chapter_urls(self, toc_url: str) -> List[str]:
+        """Fetch chapter URLs (backward compatibility)."""
+        return self.scraping_coordinator.fetch_chapter_urls(toc_url)
+
+    def process_chapter(self, chapter_url: str, chapter_num: int, skip_if_exists: bool = True) -> bool:
+        """Process single chapter (backward compatibility)."""
+        return self.conversion_coordinator.process_chapter(chapter_url, chapter_num, skip_if_exists)
+
+    def process_all_chapters(self, chapter_urls: List[str], start_from: int = 1,
+                           max_chapters: Optional[int] = None, error_isolation: bool = True) -> bool:
+        """Process all chapters (backward compatibility)."""
+        return self.conversion_coordinator.process_all_chapters(
+            chapter_urls, start_from, max_chapters, error_isolation
+        )
+
+    def _check_should_stop(self) -> bool:
+        """Check if processing should stop (backward compatibility)."""
+        return self.context.should_stop
+
+    def _check_should_pause(self) -> bool:
+        """Check if processing should pause (backward compatibility)."""
+        return self.context._check_should_pause()
+
+    def _wait_if_paused(self) -> None:
+        """Wait if paused (backward compatibility)."""
+        self.context._wait_if_paused()
+
+    def _check_paused_callback(self) -> bool:
+        """Check paused callback (backward compatibility)."""
+        return self.context._check_paused_callback()
+
     def set_pause_check_callback(self, callback: callable) -> None:
         """Set a callback function to check if processing should be paused."""
         self.context.set_pause_check_callback(callback)

@@ -1,7 +1,7 @@
 {
   "domain": "example.com",
   "strategy_success_rates": {
-    "javascript": 0.704755
+    "javascript": 0.843094701955
   },
   "optimal_strategy_order": [],
   "known_patterns": {},
@@ -9,9 +9,9 @@
   "average_response_times": {
     "javascript": 0.0
   },
-  "total_attempts": 5,
-  "successful_attempts": 5,
-  "last_updated": 1768088768.2431304,
+  "total_attempts": 11,
+  "successful_attempts": 11,
+  "last_updated": 1768100225.9493756,
   "custom_selectors": [],
   "pagination_patterns": [],
   "api_endpoints": []

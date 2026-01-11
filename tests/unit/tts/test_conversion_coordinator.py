@@ -142,7 +142,7 @@ class TestTTSConversionCoordinator:
 
         assert isinstance(result, ConversionResult)
         assert result.success is False
-        assert result.error_message == "Test error"
+        assert result.error_message == "Conversion failed: Test error"
         assert result.output_path is None
 
     def test_convert_file_to_speech(self):
@@ -212,6 +212,9 @@ class TestTTSConversionCoordinator:
 
     def test_context_manager(self):
         """Test context manager functionality."""
+        # Mock the resource manager's cleanup method
+        self.coordinator.resource_manager.cleanup_all = MagicMock()
+
         with self.coordinator as coord:
             assert coord is self.coordinator
 

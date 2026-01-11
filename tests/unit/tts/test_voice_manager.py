@@ -30,15 +30,15 @@ class TestVoiceManager:
         """Test getting all voices"""
         try:
             from src.tts.voice_manager import VoiceManager  # type: ignore
-            
+
             # Mock provider manager
             mock_pm = MagicMock()
             mock_voices = [
                 {"id": "en-US-AndrewNeural", "name": "en-US-AndrewNeural", "ShortName": "en-US-AndrewNeural", "Locale": "en-US", "Gender": "Male"}
             ]
-            mock_pm.get_all_voices.return_value = mock_voices
+            mock_pm.get_voices_by_provider.return_value = mock_voices
             mock_pm_class.return_value = mock_pm
-            
+
             manager = VoiceManager(provider_manager=mock_pm)
             voices = manager.get_voices()
             

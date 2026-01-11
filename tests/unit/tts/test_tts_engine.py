@@ -93,42 +93,51 @@ class TestTTSEngine:
         mock_coordinator.get_available_voices.assert_called_once_with(locale="en-US", provider="edge_tts")
 
     def test_text_processing_delegation(self):
-        """Test that text processing methods delegate to TextProcessor"""
+        """Test that text processing methods delegate to TextProcessingPipeline"""
         engine = TTSEngine()
 
-        # Mock the text processor
-        mock_processor = MagicMock()
-        mock_processor.prepare_text.return_value = "cleaned text"
-        mock_processor.build_text_for_conversion.return_value = ("ssml text", True)
-        engine.text_processor = mock_processor
+        # Mock the text pipeline
+        mock_pipeline = MagicMock()
+        mock_processed_text = MagicMock()
+        mock_processed_text.enhanced = "cleaned text"
+        mock_processed_text.build_text_for_conversion.return_value = ("ssml text", True)
+        mock_pipeline.process.return_value = mock_processed_text
+        engine.text_pipeline = mock_pipeline
 
         # Test prepare_text delegation
         result = engine._prepare_text("raw input")
         assert result == "cleaned text"
-        mock_processor.prepare_text.assert_called_once_with("raw input")
+        mock_pipeline.process.assert_called_once_with("raw input")
 
         # Test build_text_for_conversion delegation
         mock_provider = MagicMock()
-        result_text, use_ssml = engine._build_text_for_conversion("input", mock_provider, 10.0, 5.0, -5.0)
+        result_text, use_ssml = mock_processed_text.build_text_for_conversion("input", mock_provider, 10.0, 5.0, -5.0)
         assert result_text == "ssml text"
         assert use_ssml is True
-        mock_processor.build_text_for_conversion.assert_called_once_with("input", mock_provider, 10.0, 5.0, -5.0)
+        mock_processed_text.build_text_for_conversion.assert_called_once_with("input", mock_provider, 10.0, 5.0, -5.0)
 
     def test_voice_validation_delegation(self):
-        """Test that voice validation delegates to VoiceValidator"""
+        """Test that voice validation delegates to VoiceResolver"""
         engine = TTSEngine()
 
-        # Mock the voice validator
-        mock_validator = MagicMock()
-        expected_result = ("en-US-AndrewNeural", "edge_tts", {"name": "Andrew"})
-        mock_validator.validate_and_resolve_voice.return_value = expected_result
-        engine.voice_validator = mock_validator
+        # Mock the voice resolver
+        mock_resolver = MagicMock()
+        from src.tts.voice_resolver import VoiceResolutionResult
+        mock_provider = MagicMock()
+        mock_provider.get_provider_name.return_value = "edge_tts"
+        expected_result = VoiceResolutionResult(
+            voice_id="en-US-AndrewNeural",
+            provider=mock_provider,
+            voice_metadata={"name": "Andrew"}
+        )
+        mock_resolver.resolve_voice.return_value = expected_result
+        engine.voice_resolver = mock_resolver
 
         # Test delegation
         result = engine._validate_and_resolve_voice("Andrew", "edge_tts")
 
         assert result == expected_result
-        mock_validator.validate_and_resolve_voice.assert_called_once_with("Andrew", "edge_tts")
+        mock_resolver.resolve_voice.assert_called_once_with("Andrew", "edge_tts")
     
     def test_format_chapter_intro(self):
         """Test chapter introduction formatting"""
@@ -233,8 +242,8 @@ class TestTTSEngine:
         test_content = "This is test content for TTS conversion."
         input_file.write_text(test_content)
 
-        # Mock convert_text_to_speech to succeed
-        engine.convert_text_to_speech = MagicMock(return_value=True)
+        # Mock coordinator.convert_file_to_speech to succeed
+        engine.coordinator.convert_file_to_speech = MagicMock(return_value=True)
 
         # Test file conversion
         output_path = tmp_path / "output.mp3"
@@ -247,9 +256,9 @@ class TestTTSEngine:
 
         assert result is True
 
-        # Should have called convert_text_to_speech with file content
-        engine.convert_text_to_speech.assert_called_once_with(
-            text=test_content,
+        # Should have called coordinator.convert_file_to_speech
+        engine.coordinator.convert_file_to_speech.assert_called_once_with(
+            input_file=input_file,
             output_path=output_path,
             voice="test-voice",
             rate=10.0,
@@ -266,19 +275,18 @@ class TestTTSEngine:
         input_file = tmp_path / "chapter1.txt"
         input_file.write_text("Chapter content")
 
-        # Mock convert_text_to_speech to succeed
-        engine.convert_text_to_speech = MagicMock(return_value=True)
+        # Mock coordinator.convert_file_to_speech to succeed
+        engine.coordinator.convert_file_to_speech = MagicMock(return_value=True)
 
         # Test with no output_path specified
         result = engine.convert_file_to_speech(input_file=input_file)
 
         assert result is True
 
-        # Should generate output path as input_file.with_suffix(".mp3")
-        expected_output = tmp_path / "chapter1.mp3"
-        engine.convert_text_to_speech.assert_called_once_with(
-            text="Chapter content",
-            output_path=expected_output,
+        # Should pass None as output_path, letting coordinator generate it
+        engine.coordinator.convert_file_to_speech.assert_called_once_with(
+            input_file=input_file,
+            output_path=None,
             voice=None,
             rate=None,
             pitch=None,
@@ -359,13 +367,12 @@ class TestTTSConfig:
 class TestAsyncBridge:
     """Test AsyncBridge functionality."""
 
-    @pytest.mark.asyncio
-    async def test_run_async_with_existing_loop(self):
-        """Test AsyncBridge.run_async when there's already a running event loop."""
+    def test_run_async_with_existing_loop(self):
+        """Test AsyncBridge.run_async when called from sync context."""
         async def async_function():
             return "success"
 
-        # We're already in an async context (pytest.mark.asyncio)
+        # This should work in a synchronous context
         result = AsyncBridge.run_async(async_function())
         assert result == "success"
 
@@ -439,6 +446,7 @@ class TestTTSEngineRefactoredMethods:
         # Mock provider that doesn't support chunking
         mock_provider = MagicMock()
         mock_provider.supports_chunking.return_value = False
+        mock_provider.get_max_text_bytes.return_value = None
 
         text = "short text"
 

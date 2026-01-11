@@ -39,7 +39,7 @@ class UrlExtractor:
         base_url: str,
         timeout: int = REQUEST_TIMEOUT,
         delay: float = REQUEST_DELAY,
-        use_universal_detector: bool = True
+        use_universal_detector: bool = False
     ):
         """
         Initialize the URL fetcher.

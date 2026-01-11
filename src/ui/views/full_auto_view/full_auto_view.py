@@ -4,6 +4,7 @@ Main orchestrator that combines all components.
 """
 
 from pathlib import Path
+from core.config_manager import get_config
 from typing import Optional, List, Dict, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -230,7 +231,9 @@ class FullAutoView(BaseView):
         provider: Optional[str] = item.get('provider')
         chapter_selection: Dict[str, Any] = item.get('chapter_selection', {'type': 'all'})
         output_format: Dict[str, Any] = item.get('output_format', {'type': 'individual_mp3s'})
-        output_folder: Optional[str] = item.get('output_folder', str(Path.home() / "Desktop"))
+        # Default to configured output_dir to avoid Desktop writes in tests
+        default_output = get_config().get('paths.output_dir')
+        output_folder: Optional[str] = item.get('output_folder', str(default_output))
         novel_title: Optional[str] = item.get('title', project_name)
         self.current_processing = ProcessingThread(
             item['url'],

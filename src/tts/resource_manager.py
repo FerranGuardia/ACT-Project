@@ -147,6 +147,8 @@ class TTSResourceManager:
             # File is automatically cleaned up
         """
         temp_file = self._create_temp_file(suffix)
+        # Create the actual file
+        temp_file.touch()
         self.register_temp_file(temp_file)
 
         try:

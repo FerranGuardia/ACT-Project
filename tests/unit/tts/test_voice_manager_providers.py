@@ -176,13 +176,13 @@ class TestVoiceManagerProviders:
         mock_voices = [
             {"id": "voice1", "name": "Voice 1", "language": "en-US", "gender": "male", "provider": "edge_tts"}
         ]
-        mock_manager.get_all_voices.return_value = mock_voices
+        mock_manager.get_voices_by_provider.return_value = mock_voices
         mock_manager_class.return_value = mock_manager
-        
+
         manager = VoiceManager(provider_manager=mock_manager)
         voices = manager.get_voices()
-        
-        mock_manager.get_all_voices.assert_called_once_with(locale="en-US")
+
+        mock_manager.get_voices_by_provider.assert_called_once_with("edge_tts", locale="en-US")
         assert len(voices) == 1
         assert voices[0]["language"] == "en-US"
     
@@ -193,13 +193,13 @@ class TestVoiceManagerProviders:
         mock_voices = [
             {"id": "voice1", "name": "Voice 1", "language": "es-ES", "gender": "male", "provider": "edge_tts"}
         ]
-        mock_manager.get_all_voices.return_value = mock_voices
+        mock_manager.get_voices_by_provider.return_value = mock_voices
         mock_manager_class.return_value = mock_manager
-        
+
         manager = VoiceManager(provider_manager=mock_manager)
         voices = manager.get_voices(locale="es-ES")
-        
-        mock_manager.get_all_voices.assert_called_once_with(locale="es-ES")
+
+        mock_manager.get_voices_by_provider.assert_called_once_with("edge_tts", locale="es-ES")
         assert len(voices) == 1
     
     @patch('tts.voice_manager.TTSProviderManager')

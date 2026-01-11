@@ -35,8 +35,7 @@ class TestVoiceResolver:
         }
 
         self.provider_manager.get_provider.return_value = mock_provider
-        self.resolver.voice_manager = MagicMock()
-        self.resolver.voice_manager.get_voice_by_name.return_value = mock_voice
+        self.resolver.voice_manager.get_voices.return_value = [mock_voice]
 
         result = self.resolver.resolve_voice('en-US-AndrewNeural')
 
@@ -55,8 +54,7 @@ class TestVoiceResolver:
         }
 
         self.provider_manager.get_provider.return_value = mock_provider
-        self.resolver.voice_manager = MagicMock()
-        self.resolver.voice_manager.get_voice_by_name.return_value = mock_voice
+        self.resolver.voice_manager.get_voices.return_value = [mock_voice]
 
         result = self.resolver.resolve_voice('invalid-voice')
 

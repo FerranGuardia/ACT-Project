@@ -26,36 +26,62 @@ class TestTTSResourceManager:
     def test_register_temp_file(self):
         """Test registering temporary files."""
         manager = TTSResourceManager()
-        temp_file = Path("test_temp.mp3")
 
-        manager.register_temp_file(temp_file)
+        # Create an actual temporary file
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as f:
+            temp_file = Path(f.name)
 
-        assert temp_file in manager.temp_files
-        assert temp_file in manager.managed_resources
-        assert manager.get_temp_file_count() == 1
+        try:
+            manager.register_temp_file(temp_file)
+
+            assert temp_file in manager.temp_files
+            assert temp_file in manager.managed_resources
+            assert manager.get_temp_file_count() == 1
+        finally:
+            # Clean up
+            if temp_file.exists():
+                temp_file.unlink()
 
     def test_register_temp_directory(self):
         """Test registering temporary directories."""
         manager = TTSResourceManager()
-        temp_dir = Path("test_temp_dir")
 
-        manager.register_temp_directory(temp_dir)
+        # Create an actual temporary directory
+        import tempfile
+        temp_dir = Path(tempfile.mkdtemp())
 
-        assert temp_dir in manager.temp_directories
-        assert temp_dir in manager.managed_resources
-        assert manager.get_temp_directory_count() == 1
+        try:
+            manager.register_temp_directory(temp_dir)
+
+            assert temp_dir in manager.temp_directories
+            assert temp_dir in manager.managed_resources
+            assert manager.get_temp_directory_count() == 1
+        finally:
+            # Clean up
+            import shutil
+            if temp_dir.exists():
+                shutil.rmtree(temp_dir)
 
     def test_unregister_resource(self):
         """Test unregistering resources."""
         manager = TTSResourceManager()
-        temp_file = Path("test_temp.mp3")
 
-        manager.register_temp_file(temp_file)
-        assert temp_file in manager.temp_files
+        # Create an actual temporary file
+        with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as f:
+            temp_file = Path(f.name)
 
-        manager.unregister_resource(temp_file)
-        assert temp_file not in manager.temp_files
-        assert temp_file not in manager.managed_resources
+        try:
+            manager.register_temp_file(temp_file)
+            assert temp_file in manager.temp_files
+
+            manager.unregister_resource(temp_file)
+            assert temp_file not in manager.temp_files
+            assert temp_file not in manager.managed_resources
+        finally:
+            # Clean up
+            if temp_file.exists():
+                temp_file.unlink()
 
     def test_cleanup_temp_files(self):
         """Test cleaning up temporary files."""
@@ -161,7 +187,9 @@ class TestTTSResourceManager:
         manager = TTSResourceManager()
 
         with manager:
-            temp_file = Path("test.mp3")
+            # Create an actual temporary file
+            with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as f:
+                temp_file = Path(f.name)
             manager.register_temp_file(temp_file)
             assert temp_file in manager.managed_resources
 
@@ -176,13 +204,30 @@ class TestTTSResourceManager:
         assert manager.get_temp_file_count() == 0
         assert manager.get_temp_directory_count() == 0
 
-        manager.register_temp_file(Path("file1.mp3"))
-        manager.register_temp_file(Path("file2.mp3"))
-        manager.register_temp_directory(Path("dir1"))
+        # Create actual temporary files and directories
+        with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as f1, \
+             tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as f2:
+            file1 = Path(f1.name)
+            file2 = Path(f2.name)
 
-        assert manager.get_resource_count() == 3
-        assert manager.get_temp_file_count() == 2
-        assert manager.get_temp_directory_count() == 1
+        temp_dir = Path(tempfile.mkdtemp())
+
+        try:
+            manager.register_temp_file(file1)
+            manager.register_temp_file(file2)
+            manager.register_temp_directory(temp_dir)
+
+            assert manager.get_resource_count() == 3
+            assert manager.get_temp_file_count() == 2
+            assert manager.get_temp_directory_count() == 1
+        finally:
+            # Clean up
+            for f in [file1, file2]:
+                if f.exists():
+                    f.unlink()
+            import shutil
+            if temp_dir.exists():
+                shutil.rmtree(temp_dir)
 
     @patch('src.tts.resource_manager.logger')
     def test_cleanup_file_error_handling(self, mock_logger):
@@ -232,9 +277,9 @@ class TestTTSResourceManager:
         # but we can verify the cleanup method exists and works
         manager.__del__()
 
-        # File should still exist (since we can't force garbage collection reliably)
-        # But the cleanup logic should be sound
-        assert temp_path in manager.managed_resources
+        # File should be cleaned up by destructor
+        # Resources should be removed from managed_resources
+        assert temp_path not in manager.managed_resources
 
         # Manual cleanup
         manager.cleanup_all()

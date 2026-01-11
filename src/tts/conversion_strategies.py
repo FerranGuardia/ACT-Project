@@ -10,7 +10,7 @@ import tempfile
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING, Any
 
 from core.logger import get_logger
 
@@ -24,6 +24,32 @@ if TYPE_CHECKING:
     from .text_processing_pipeline import ProcessedText
 
 logger = get_logger("tts.conversion_strategies")
+
+
+class AsyncBridge:
+    """Simple async/sync bridge for running coroutines in sync context."""
+
+    @staticmethod
+    def run_async(coro) -> Any:
+        """
+        Run an async coroutine in a synchronous context.
+
+        Handles both cases: when there's already a running event loop
+        and when we need to create a new one.
+        """
+        try:
+            # Check if we're already in an async context
+            loop = asyncio.get_running_loop()
+            # If we get here, we're in an async context - create a task and wait for it
+            if asyncio.iscoroutine(coro):
+                task = loop.create_task(coro)
+                return loop.run_until_complete(task)
+            else:
+                # coro is already a task or future
+                return loop.run_until_complete(coro)
+        except RuntimeError:
+            # No running loop, we can safely use asyncio.run
+            return asyncio.run(coro)
 
 
 class ConversionStrategy(ABC):

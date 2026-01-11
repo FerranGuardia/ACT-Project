@@ -51,7 +51,7 @@ class AddQueueDialog(QDialog):
         # Output Folder Selection
         folder_layout = QHBoxLayout()
         self.folder_input = QLineEdit()
-        self.folder_input.setPlaceholderText("Select output folder (default: Desktop)")
+        self.folder_input.setPlaceholderText("Select output folder (default: Documents/ACT/output)")
         folder_button = QPushButton("Browse...")
         folder_button.clicked.connect(self._select_folder)
         folder_layout.addWidget(self.folder_input, 1)
@@ -190,7 +190,7 @@ class AddQueueDialog(QDialog):
         folder = QFileDialog.getExistingDirectory(
             self,
             "Select Output Folder",
-            str(Path.home() / "Desktop"),
+            str(Path.home() / "Documents" / "ACT" / "output"),
             QFileDialog.Option.ShowDirsOnly
         )
         if folder:

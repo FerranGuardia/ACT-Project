@@ -371,13 +371,15 @@ class InputValidator:
 
             # Additional Windows-specific checks
             if os.name == 'nt':
-                # Prevent paths with reserved names
+                # Prevent paths with reserved names (check filename without extension)
                 reserved_names = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4',
                                 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2',
                                 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9']
                 parts = resolved_path.parts
                 for part in parts:
-                    if part.upper() in reserved_names or part.upper().endswith(('.TXT', '.MP3', '.WAV')):
+                    # Check filename without extension for reserved names
+                    stem = Path(part).stem.upper()
+                    if stem in reserved_names:
                         return False, f"Reserved filename detected: {part}"
 
             return True, str(resolved_path)

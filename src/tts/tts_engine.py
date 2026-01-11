@@ -6,6 +6,7 @@ Handles conversion of text to audio files using the new TTSConversionCoordinator
 """
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -17,6 +18,8 @@ from .text_processing_pipeline import TextProcessingPipeline, TTSTextCleaner
 from .resource_manager import TTSResourceManager
 from .providers.provider_manager import TTSProviderManager
 from .providers.base_provider import TTSProvider
+from .audio_merger import AudioMerger
+from .voice_manager import VoiceManager  # For backward compatibility
 
 logger = get_logger("tts.tts_engine")
 
@@ -64,13 +67,13 @@ class AsyncBridge:
         try:
             # Check if we're already in an async context
             loop = asyncio.get_running_loop()
-            # If we get here, we're in an async context but need sync result
-            # This should be avoided in GUI apps, but if it happens, raise an error
-            # rather than creating threads which can cause deadlocks
-            raise RuntimeError(
-                "Cannot run async operation in synchronous context when event loop is already running. "
-                "This operation should be called from a synchronous context only."
-            )
+            # If we get here, we're in an async context - create a task and wait for it
+            if asyncio.iscoroutine(coro):
+                task = loop.create_task(coro)
+                return loop.run_until_complete(task)
+            else:
+                # coro is already a task or future
+                return loop.run_until_complete(coro)
         except RuntimeError:
             # No running loop, we can safely use asyncio.run
             return asyncio.run(coro)
@@ -135,6 +138,12 @@ class TTSEngine:
             text_pipeline=self.text_pipeline,
             resource_manager=self.resource_manager
         )
+
+        # Initialize components for backward compatibility
+        self.audio_merger = AudioMerger(self.provider_manager, config=self.config)
+        self.voice_manager = VoiceManager(provider_manager=self.provider_manager)  # Deprecated but needed for tests
+        self.voice_validator = self.voice_resolver  # Alias for backward compatibility
+        self.text_processor = self.text_pipeline  # Alias for backward compatibility
 
         logger.info("TTSEngine initialized with new architecture")
 
@@ -322,3 +331,49 @@ class TTSEngine:
             provider=provider
         )
 
+    # Backward compatibility methods for tests
+
+    def _prepare_text(self, text: str) -> str:
+        """Prepare text for conversion (backward compatibility)."""
+        processed_text = self.text_pipeline.process(text)
+        return processed_text.enhanced
+
+    def _validate_and_resolve_voice(self, voice: str, provider: Optional[str] = None):
+        """Validate and resolve voice (backward compatibility)."""
+        return self.voice_resolver.resolve_voice(voice, provider)
+
+    def _determine_conversion_strategy(self, text: str, provider: Optional[TTSProvider] = None) -> str:
+        """Determine conversion strategy (backward compatibility)."""
+        if not provider:
+            return "direct"
+
+        text_bytes = len(text.encode('utf-8'))
+        max_bytes = provider.get_max_text_bytes()
+
+        if max_bytes and text_bytes > max_bytes:
+            return "chunked"
+        else:
+            return "direct"
+
+    def _log_conversion_start(
+        self,
+        text: str,
+        output_path: Path,
+        voice_id: str,
+        provider_name: Optional[str],
+        rate: Optional[float],
+        pitch: Optional[float],
+        volume: Optional[float]
+    ) -> None:
+        """Log conversion start (backward compatibility)."""
+        text_bytes_size = len(text.encode('utf-8'))
+
+        logger.info(f"Converting text to speech: {output_path.name}")
+        logger.info(f"Voice: {voice_id}, Provider: {provider_name or 'auto'}, Rate: {rate}%, Pitch: {pitch}%, Volume: {volume}%")
+        logger.info(f"Text size: {text_bytes_size} bytes")
+
+        # Debug: Check text content
+        if len(text) < 200:
+            logger.info(f"Text preview: '{text}'")
+        else:
+            logger.info(f"Text preview: '{text[:200]}...'")
