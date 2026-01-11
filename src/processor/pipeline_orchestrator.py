@@ -5,7 +5,7 @@ This module contains the PipelineOrchestrator class that coordinates
 between specialized coordinators and maintains backward compatibility.
 """
 
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Callable
 from pathlib import Path
 
 from core.logger import get_logger
@@ -105,6 +105,21 @@ class PipelineOrchestrator:
         return getattr(self.scraping_coordinator, 'progress_tracker', None)
 
     @property
+    def scraper(self):
+        """Get scraper (backward compatibility)."""
+        return getattr(self.scraping_coordinator, 'scraper', None)
+
+    @scraper.setter
+    def scraper(self, value):
+        """Set scraper (backward compatibility)."""
+        self.scraping_coordinator.scraper = value
+
+    @progress_tracker.setter
+    def progress_tracker(self, value):
+        """Set progress tracker (backward compatibility)."""
+        self.scraping_coordinator.progress_tracker = value
+
+    @property
     def should_stop(self) -> bool:
         """Get stop flag (backward compatibility)."""
         return self.context.should_stop
@@ -151,11 +166,11 @@ class PipelineOrchestrator:
 
     def _check_should_pause(self) -> bool:
         """Check if processing should pause (backward compatibility)."""
-        return self.context._check_should_pause()
+        return self.context.check_should_pause()
 
     def _wait_if_paused(self) -> None:
         """Wait if paused (backward compatibility)."""
-        self.context._wait_if_paused()
+        self.context.wait_if_paused()
 
     def _check_paused_callback(self) -> bool:
         """Check paused callback (backward compatibility)."""
@@ -328,6 +343,11 @@ class PipelineOrchestrator:
         on_failure: Optional[callable] = None
     ) -> bool:
         """Process a single chapter: scrape → convert → save."""
+        # Check if we should skip due to existing audio file
+        if skip_if_exists and self.file_manager.audio_file_exists(chapter.number):
+            logger.info(f"Chapter {chapter.number} already exists, skipping")
+            return True
+
         # Step 1: Scrape chapter content
         content, title, error = self.scraping_coordinator.scrape_chapter_content(chapter)
 
@@ -349,6 +369,52 @@ class PipelineOrchestrator:
     def merge_audio_files(self, output_format: Optional[Dict[str, Any]] = None) -> bool:
         """Merge processed audio files."""
         return self.audio_post_processor.merge_audio_files(output_format)
+
+    def merge_audio_batches(
+        self,
+        batch_size: int = 50,
+        progress_callback: Optional[Callable[[int, int], None]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Merge existing audio files into batches.
+
+        This is called independently of processing and can be used for:
+        - Post-processing existing projects
+        - Manual batch merging
+        - Recovery operations
+
+        Args:
+            batch_size: Number of chapters per batch
+            progress_callback: Optional callback for progress updates
+
+        Returns:
+            List of batch merge results
+        """
+        from .batch_audio_merger import BatchAudioMerger
+
+        project_dir = self.context.base_output_dir or Path.home() / ".act" / "projects" / self.context.project_name
+        merger = BatchAudioMerger(project_dir, batch_size)
+
+        def wrapped_progress(current, total):
+            if progress_callback:
+                progress_callback(current, total)
+            # Also update internal progress tracker if available
+            if self.progress_tracker:
+                self.progress_tracker.update_progress(current / total * 100)
+
+        results = merger.merge_pending_batches(wrapped_progress, self._check_should_stop)
+
+        # Convert to dict format for compatibility
+        return [
+            {
+                "success": r.success,
+                "batch_number": r.batch_number,
+                "chapters_processed": r.chapters_processed,
+                "output_file": str(r.output_file) if r.output_file else None,
+                "error_message": r.error_message
+            }
+            for r in results
+        ]
 
     def _ensure_chapter_urls_available(self, toc_url: str) -> bool:
         """Ensure chapter URLs are available, fetching if needed."""

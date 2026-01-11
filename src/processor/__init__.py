@@ -10,6 +10,7 @@ from .context import ProcessingContext
 from .scraping_coordinator import ScrapingCoordinator
 from .conversion_coordinator import ConversionCoordinator
 from .audio_post_processor import AudioPostProcessor
+from .batch_audio_merger import BatchAudioMerger, BatchMergeResult, merge_project_batches
 
 # Legacy components (for backward compatibility and internal use)
 from .project_manager import ProjectManager
@@ -25,6 +26,9 @@ __all__ = [
     "ScrapingCoordinator",
     "ConversionCoordinator",
     "AudioPostProcessor",
+    "BatchAudioMerger",
+    "BatchMergeResult",
+    "merge_project_batches",
 
     # Legacy components
     "ProjectManager",

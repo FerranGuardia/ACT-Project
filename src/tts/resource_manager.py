@@ -148,7 +148,8 @@ class TTSResourceManager:
         """
         temp_file = self._create_temp_file(suffix)
         # Create the actual file
-        temp_file.touch()
+        temp_file.parent.mkdir(parents=True, exist_ok=True)
+        temp_file.write_bytes(b"")  # Create empty file
         self.register_temp_file(temp_file)
 
         try:
