@@ -23,7 +23,15 @@ class ViewConfig:
     QUEUE_ITEM_MARGINS: Final[tuple[int, int, int, int]] = (10, 10, 10, 10)
     QUEUE_ITEM_ICON_SIZE: Final[int] = 60
     QUEUE_ACTION_BUTTON_WIDTH: Final[int] = 60
-    
+
+    # Queue item internal dimensions
+    QUEUE_ITEM_BUTTON_FIXED_WIDTH: Final[int] = 50      # Button width
+    QUEUE_ITEM_BUTTON_MIN_HEIGHT: Final[int] = 35      # Button min height
+    QUEUE_ITEM_BUTTON_MAX_HEIGHT: Final[int] = 40      # Button max height
+    QUEUE_ITEM_CONTENT_MIN_WIDTH: Final[int] = 280     # Minimum content area width
+    QUEUE_ITEM_CONTENT_MIN_HEIGHT: Final[int] = 80     # Minimum content area height
+    QUEUE_ITEM_LAYOUT_SPACING: Final[int] = 6          # Default button spacing
+
     # Merger view file item settings
     MERGER_FILE_ITEM_MARGINS: Final[tuple[int, int, int, int]] = (5, 5, 5, 5)
     MERGER_INDEX_LABEL_WIDTH: Final[int] = 30

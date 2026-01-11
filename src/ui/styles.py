@@ -150,6 +150,7 @@ __all__ = [
     'get_progress_bar_style',
     'get_spin_box_style',
     'get_status_label_style',
+    'get_queue_item_button_style',
     'get_combo_box_style',
     'get_plain_text_edit_style',
     'get_tab_widget_style',
@@ -689,6 +690,35 @@ def get_icon_container_style() -> str:
         background-color: {colors['bg_light']};
         border-radius: 5px;
         border: 1px solid {colors['border']};
+    """
+
+
+def get_queue_item_button_style() -> str:
+    """Get queue item button style to match theme."""
+    colors = _get_colors()
+    return f"""
+        QPushButton {{
+            background-color: {colors['bg_light']};
+            border: 1px solid {colors['border']};
+            border-radius: 3px;
+            color: {colors['text_primary']};
+            text-align: center;
+            padding: 2px;
+            font-size: 14px;
+        }}
+        QPushButton:hover {{
+            background-color: {colors['bg_lighter']};
+            border: 1px solid {colors['accent']};
+        }}
+        QPushButton:pressed {{
+            background-color: {colors['bg_medium']};
+            border: 1px solid {colors['accent_pressed']};
+        }}
+        QPushButton:disabled {{
+            background-color: {colors['bg_dark']};
+            color: {colors['text_secondary']};
+            border: 1px solid {colors['bg_dark']};
+        }}
     """
 
 
