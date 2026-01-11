@@ -5,9 +5,10 @@ Tests the JavaScript variable mining strategy for extracting chapter URLs.
 """
 
 import json
-import pytest
-from unittest.mock import Mock, patch, MagicMock
 from typing import List
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 from src.scraper.strategies.javascript_strategy import JavaScriptStrategy
 from src.scraper.universal_url_detector import DetectionResult

@@ -9,8 +9,8 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Optional, cast
 
-from .logger import get_logger
 from .constants import get_version
+from .logger import get_logger
 
 logger = get_logger("core.config_manager")
 
@@ -60,6 +60,7 @@ class ConfigManager:
         import os
         import sys
         import tempfile
+
         # Multiple signals: env vars, pytest module presence, cwd hints, and explicit override
         is_test_env = (
             os.environ.get("ACT_TEST_MODE") == "1" or

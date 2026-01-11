@@ -8,9 +8,10 @@ This is typically the fastest and most reliable method for modern webnovel sites
 import json
 import re
 import time
-from typing import List, Optional, Callable, Any, Tuple
+from typing import Any, Callable, List, Optional, Tuple
 
 from core.logger import get_logger
+
 from ..universal_url_detector import BaseDetectionStrategy, DetectionResult
 
 logger = get_logger("scraper.strategies.javascript")
