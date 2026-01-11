@@ -167,9 +167,8 @@ qt_designer/
 # Legacy UI tests - will be removed after UI refactoring
 tests/unit/old ui test/
 
-# UI tests - being refactored, ignore all UI test directories
+# UI tests - being refactored, ignore refactoring directories
 tests/unit/ui_tests_refactoring/
-tests/integration/ui/
 tests/integration/ui_tests_refactoring/
 tests/legacy/
 
