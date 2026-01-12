@@ -255,7 +255,7 @@ class PaginationDetector:
             # Try patterns to see if they work
             for pattern in pagination_patterns:
                 try:
-                    test_url = pattern.format(2)
+                    test_url = pattern.format(2)  # Keep .format() for dynamic pattern strings
                     if self._test_pagination_pattern(page, test_url, toc_url):
                         # Pattern works, construct URLs
                         estimated_pages = min(max(10, 50), self.max_pages)  # Estimate based on chapters

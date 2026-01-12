@@ -126,22 +126,26 @@ class EdgeTTSProvider(TTSProvider):
 
     async def _ensure_session(self) -> aiohttp.ClientSession:
         """Ensure we have an active HTTP session"""
-        if self._session is None or self._session.closed:
-            # Create session with connection pooling
-            self._session = aiohttp.ClientSession(
-                connector=aiohttp.TCPConnector(
-                    limit=10,  # Max connections
-                    limit_per_host=2,  # Max connections per host
-                    ttl_dns_cache=300,  # DNS cache TTL
-                    use_dns_cache=True
-                ),
-                timeout=aiohttp.ClientTimeout(
-                    total=30,  # Total timeout
-                    connect=10,  # Connection timeout
-                    sock_read=20  # Socket read timeout
+        try:
+            if self._session is None or self._session.closed:
+                # Create session with connection pooling
+                self._session = aiohttp.ClientSession(
+                    connector=aiohttp.TCPConnector(
+                        limit=10,  # Max connections
+                        limit_per_host=2,  # Max connections per host
+                        ttl_dns_cache=300,  # DNS cache TTL
+                        use_dns_cache=True
+                    ),
+                    timeout=aiohttp.ClientTimeout(
+                        total=30,  # Total timeout
+                        connect=10,  # Connection timeout
+                        sock_read=20  # Socket read timeout
+                    )
                 )
-            )
-        return self._session
+            return self._session
+        except Exception as e:
+            logger.error(f"Failed to create HTTP session: {e}")
+            raise
 
     async def _close_session(self) -> None:
         """Close HTTP session if it exists"""
@@ -243,10 +247,14 @@ class EdgeTTSProvider(TTSProvider):
 
     async def _async_get_voices(self) -> List[Dict]:
         """Asynchronously get Edge TTS voices"""
-        import edge_tts
-        voices = await edge_tts.list_voices()
-        # Convert Voice objects to dicts for our interface
-        return [dict(voice) for voice in voices]
+        try:
+            import edge_tts
+            voices = await edge_tts.list_voices()
+            # Convert Voice objects to dicts for our interface
+            return [dict(voice) for voice in voices]
+        except Exception as e:
+            logger.warning(f"Failed to get Edge TTS voices: {e}")
+            return []
     
     @circuit(
         failure_threshold=4,  # Fail after 4 consecutive failures so the 5th call falls back
