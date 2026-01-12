@@ -7,7 +7,7 @@ Convert web novels to audiobooks using automated scraping and text-to-speech con
 
 ## Features
 
-- **Web Scraping**: Extract chapters from web novel sites
+- **Advanced Web Scraping**: Extract chapters using adaptive multi-strategy detection
 - **Text-to-Speech**: Convert text to speech using online or offline TTS engines
 - **Audio Processing**: Combine audio files into complete audiobooks
 - **Project Management**: Resume interrupted conversions

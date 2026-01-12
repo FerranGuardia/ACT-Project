@@ -10,6 +10,10 @@ from .context import ProcessingContext
 from .scraping_coordinator import ScrapingCoordinator
 from .conversion_coordinator import ConversionCoordinator
 from .audio_post_processor import AudioPostProcessor
+from .batch_processing_coordinator import BatchProcessingCoordinator
+from .processing_metadata_service import ProcessingMetadataService
+from .pause_stop_manager import PauseStopManager
+from .backward_compatibility_adapter import BackwardCompatibilityAdapter
 from .batch_audio_merger import BatchAudioMerger, BatchMergeResult, merge_project_batches
 
 # Legacy components (for backward compatibility and internal use)
@@ -26,6 +30,10 @@ __all__ = [
     "ScrapingCoordinator",
     "ConversionCoordinator",
     "AudioPostProcessor",
+    "BatchProcessingCoordinator",
+    "ProcessingMetadataService",
+    "PauseStopManager",
+    "BackwardCompatibilityAdapter",
     "BatchAudioMerger",
     "BatchMergeResult",
     "merge_project_batches",

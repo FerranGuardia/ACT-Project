@@ -285,7 +285,7 @@ class AddQueueDialog(QDialog):
             # from the ProviderSelectionDialog which already tested audio generation.
             # If it passed that test, we should trust it can load voices.
 
-            # Load voices for the selected provider (filtered to en-US only)
+            # Load voices for the selected provider (filtered to English voices)
             voices = self.voice_manager.get_voice_list(locale="en-US", provider=provider)
 
             if not voices:

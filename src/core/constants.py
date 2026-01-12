@@ -21,13 +21,6 @@ DEFAULT_REQUEST_DELAY: Final[int] = 1
 MAX_RETRIES: Final[int] = 3
 FFMPEG_TIMEOUT_SECONDS: Final[int] = 300  # 5 minutes
 
-# UI constants
-MAIN_WINDOW_MIN_WIDTH: Final[int] = 1200
-MAIN_WINDOW_MIN_HEIGHT: Final[int] = 700
-BACK_BUTTON_HEIGHT: Final[int] = 42
-BACK_BUTTON_WIDTH: Final[int] = 160
-DIALOG_MIN_WIDTH: Final[int] = 600
-DIALOG_MIN_HEIGHT: Final[int] = 500
 
 # TTS constants
 AUDIO_CHUNK_SIZE_CHARS: Final[int] = 5000  # Characters per audio chunk

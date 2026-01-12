@@ -5,30 +5,48 @@
 
 ## Overview
 
-Handles web scraping and content extraction from novel websites.
+Handles web scraping and content extraction from novel websites using an adaptive multi-strategy approach.
 
 ## Components
 
-- **GenericScraper**: Main scraper for web novel sites
-- **URL extractors**: Multi-strategy URL discovery with fallback
+- **NovelScraper**: Main scraper for web novel sites
+- **Universal URL Detector**: Adaptive multi-strategy URL discovery system
+- **Detection Strategies**: Parallel execution of 5 different extraction methods:
+  - JavaScript variable extraction
+  - AJAX endpoint discovery
+  - HTML parsing
+  - Browser automation (Playwright)
+  - API reverse engineering
 - **Content extractors**: Chapter content extraction
-- **Base classes**: Abstract scraper implementations
+- **Adaptive Configuration**: Machine learning-based optimization per website
 
 ## Features
 
+- **Parallel strategy execution** for optimal performance
+- **Adaptive learning** that improves detection over time
+- **Machine learning optimization** per website domain
+- **Comprehensive fallback** through multiple extraction methods
 - Retry logic with backoff
 - Rate limiting and delays
 - Progress tracking
 - Error handling
 
+## Architecture
+
+The scraper uses a **unified Universal URL Detector** that:
+1. Runs multiple detection strategies in parallel
+2. Learns from successful/failed attempts per site
+3. Selects optimal strategies based on historical performance
+4. Provides comprehensive coverage for modern web applications
+
 ## Usage
 
 ```python
-from scraper import GenericScraper
+from scraper import NovelScraper
 
-scraper = GenericScraper()
-chapters = scraper.fetch_chapter_urls(url)
-content = scraper.scrape_chapter(url)
+scraper = NovelScraper("https://example-novel.com")
+chapter_urls = scraper.get_chapter_urls(toc_url)
+content, title, error = scraper.scrape_chapter(chapter_url)
 ```
 
 ## Testing

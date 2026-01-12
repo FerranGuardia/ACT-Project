@@ -149,7 +149,7 @@ class TTSViewHandlers:
             else:
                 provider = provider_combo.itemData(current_index)
             
-            # Load voices for the selected provider (filtered to en-US only)
+            # Load voices for the selected provider (filtered to English voices)
             logger.info(f"Loading voices for provider: {provider}")
             voices = self.voice_manager.get_voice_list(locale="en-US", provider=provider)
 

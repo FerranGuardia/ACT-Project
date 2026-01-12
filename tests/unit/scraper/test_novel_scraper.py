@@ -71,7 +71,8 @@ class TestNovelScraperInputValidation:
         mock_url_extractor.assert_called_once_with(
             base_url="https://example.com",
             timeout=REQUEST_TIMEOUT,
-            delay=REQUEST_DELAY
+            delay=REQUEST_DELAY,
+            use_universal_detector=True
         )
         mock_chapter_extractor.assert_called_once_with(
             base_url="https://example.com",

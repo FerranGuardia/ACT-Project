@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Optional, cast
 
-from .constants import get_version
+from .constants import get_version, DEFAULT_AUDIO_BITRATE, DEFAULT_AUDIO_FORMAT
 from .logger import get_logger
 
 logger = get_logger("core.config_manager")
@@ -80,8 +80,7 @@ class ConfigManager:
         return {
             "app": {
                 "version": version,
-                "theme": "light",
-                "language": "es",
+                "language": "en",
             },
             "paths": {
                 "output_dir": str(temp_base / "output") if is_test_env else str(Path.home() / "Documents" / "ACT" / "output"),
@@ -89,12 +88,12 @@ class ConfigManager:
                 "projects_dir": str(temp_base / "projects") if is_test_env else str(Path.home() / "Documents" / "ACT" / "projects"),
             },
             "tts": {
-                "voice": "es-ES-ElviraNeural",
+                "voice": "en-US-AndrewNeural",
                 "rate": "+0%",
                 "pitch": "+0Hz",
                 "volume": "+0%",
-                "output_format": "mp3",
-                "bitrate": "128k",
+                "output_format": DEFAULT_AUDIO_FORMAT,
+                "bitrate": DEFAULT_AUDIO_BITRATE,
             },
             "scraper": {
                 "chapters_per_file": 1,
@@ -171,7 +170,7 @@ class ConfigManager:
         Get a configuration value using dot notation.
 
         Args:
-            key: Configuration key (e.g., 'tts.voice' or 'app.theme')
+            key: Configuration key (e.g., 'tts.voice' or 'app.language')
             default: Default value if key not found
 
         Returns:
@@ -258,7 +257,7 @@ class ConfigManager:
 
         Example:
             >>> config = ConfigManager()
-            >>> config.set('tts.voice', 'es-ES-ElviraNeural')
+            >>> config.set('tts.voice', 'en-US-AndrewNeural')
         """
         keys = key.split(".")
         config = self._config
