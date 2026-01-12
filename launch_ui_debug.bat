@@ -17,6 +17,6 @@ REM Activate virtual environment
 call .venv\Scripts\activate.bat
 
 REM Run with verbose logging
-python launch_ui_debug.py
+python launch_ui.py
 
 pause

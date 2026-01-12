@@ -68,7 +68,17 @@ class UIEventLogger:
             
             if not has_console:
                 import sys
-                console_handler = logging.StreamHandler(sys.stdout)
+                import io
+
+                # Wrap stdout with UTF-8 encoding to handle Unicode characters
+                try:
+                    # Try to create a UTF-8 wrapper for stdout
+                    utf8_stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+                    console_handler = logging.StreamHandler(utf8_stdout)
+                except (AttributeError, OSError):
+                    # Fallback to regular stdout if wrapping fails
+                    console_handler = logging.StreamHandler(sys.stdout)
+
                 console_handler.setLevel(logging.DEBUG)
                 formatter = logging.Formatter(
                     "[UI EVENT] %(levelname)-8s | %(message)s"

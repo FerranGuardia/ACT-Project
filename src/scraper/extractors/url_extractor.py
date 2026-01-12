@@ -1,10 +1,8 @@
 """
 URL extractor module.
 
-Handles extracting chapter URLs from table of contents pages using methods optimized for speed and reliability:
-1. JavaScript variable extraction (fastest) - direct variable parsing
-2. AJAX endpoint discovery (fast) - handles lazy-loaded & paginated content
-3. Playwright with scrolling (comprehensive) - reference method for difficult sites
+Handles extracting chapter URLs from table of contents pages using the universal detector
+with adaptive multi-strategy approach for optimal performance and reliability.
 """
 
 import re
@@ -18,7 +16,6 @@ from ..config import (
     PAGINATION_SUSPICIOUS_COUNTS, PAGINATION_CRITICAL_COUNT,
     PAGINATION_SMALL_COUNT_THRESHOLD, PAGINATION_RANGE_COVERAGE_THRESHOLD
 )
-from .url_extractor_extractors import ChapterUrlExtractors
 from .url_extractor_session import SessionManager
 from ..universal_url_detector import UniversalUrlDetector
 
@@ -27,11 +24,10 @@ logger = get_logger("scraper.extractors.url_extractor")
 
 class UrlExtractor:
     """
-    Fetches chapter URLs from table of contents pages.
+    Fetches chapter URLs from table of contents pages using the universal detector.
 
-    Supports both legacy and universal detection methods:
-    - Legacy: Original multi-method approach
-    - Universal: New adaptive strategy-based system
+    Uses an adaptive multi-strategy approach that runs detection methods in parallel
+    and learns from results to optimize performance over time.
     """
 
     def __init__(
@@ -39,7 +35,7 @@ class UrlExtractor:
         base_url: str,
         timeout: int = REQUEST_TIMEOUT,
         delay: float = REQUEST_DELAY,
-        use_universal_detector: bool = False
+        use_universal_detector: bool = True  # Always use universal detector now
     ):
         """
         Initialize the URL fetcher.
@@ -48,7 +44,7 @@ class UrlExtractor:
             base_url: Base URL of the webnovel site
             timeout: Request timeout in seconds
             delay: Delay between requests in seconds
-            use_universal_detector: Whether to use the new universal detector
+            use_universal_detector: Always True - uses universal detector
         """
         self.base_url = base_url
         self.timeout = timeout
@@ -58,19 +54,8 @@ class UrlExtractor:
         # Use SessionManager for session and rate limiting
         self._session_manager = SessionManager(min_request_delay=delay)
 
-        # Initialize appropriate detector
-        if use_universal_detector:
-            self._universal_detector = UniversalUrlDetector(base_url)
-            self._extractors = None
-        else:
-            # Legacy mode
-            self._universal_detector = None
-            self._extractors = ChapterUrlExtractors(
-                base_url=base_url,
-                session_manager=self._session_manager,
-                timeout=timeout,
-                delay=delay
-            )
+        # Always use universal detector
+        self._universal_detector = UniversalUrlDetector(base_url)
     
     def get_session(self):  # type: ignore[return-type]
         """Get or create a requests session."""
@@ -381,157 +366,12 @@ class UrlExtractor:
             )
         )
 
-    def _fetch_with_legacy_methods(
-        self,
-        toc_url: str,
-        should_stop: Optional[Callable[[], bool]],
-        use_reference: bool,
-        min_chapter_number: Optional[int],
-        max_chapter_number: Optional[int]
-    ) -> Tuple[List[str], Dict[str, Any]]:
-        """Fetch using the legacy detection methods."""
-        metadata: Dict[str, Any] = {
-            "method_used": None,
-            "urls_found": 0,
-            "reference_count": None,
-            "methods_tried": {},
-        }
-
-        # Get reference count if requested
-        if use_reference:
-            metadata["reference_count"] = self.get_reference_count(toc_url, should_stop)
-
-        # Helper function to check if found chapters cover the needed range
-        def covers_range(found_urls: List[str]) -> bool:
-            """Check if found URLs cover the requested chapter range."""
-            if not min_chapter_number or not found_urls:
-                return True  # No specific requirement, or no URLs found
-
-            # Extract all chapter numbers from found URLs
-            found_chapters: Set[int] = set()
-            for url in found_urls:
-                ch_num = extract_chapter_number(url)
-                if ch_num:
-                    found_chapters.add(ch_num)
-
-            if not found_chapters:
-                return False  # No valid chapter numbers found
-
-            max_found: int = max(found_chapters)  # type: ignore[arg-type]
-            min_found: int = min(found_chapters)  # type: ignore[arg-type]
-
-            # Check if we have chapters up to the minimum needed
-            if max_found < min_chapter_number:
-                logger.debug(f"Found max chapter {max_found}, but need at least {min_chapter_number}")
-                return False
-
-            # If max_chapter_number is specified, check if we have all chapters in the range
-            if max_chapter_number:
-                # Check how many chapters in the requested range we actually found
-                requested_range: Set[int] = set(range(min_chapter_number, max_chapter_number + 1))
-                found_in_range: Set[int] = requested_range.intersection(found_chapters)
-                coverage: float = len(found_in_range) / len(requested_range) if requested_range else 0
-
-                # If we're missing more than configured threshold of chapters in the range, it's incomplete
-                if coverage < PAGINATION_RANGE_COVERAGE_THRESHOLD:
-                    logger.info(f"⚠ Range incomplete: Found {len(found_in_range)}/{len(requested_range)} chapters in range {min_chapter_number}-{max_chapter_number} (coverage: {coverage:.1%})")
-                    return False
-
-            return True
-
-        # Helper function to check if result seems incomplete (pagination issue)
-        def seems_incomplete(found_urls: List[str]) -> bool:
-            """Check if the result might be incomplete due to pagination."""
-            if not found_urls:
-                return False
-
-            url_count = len(found_urls)
-
-            # CRITICAL: If we have exactly the critical count, ALWAYS suspect pagination
-            if url_count == PAGINATION_CRITICAL_COUNT:
-                logger.info(f"⚠ Detected pagination: Found exactly {PAGINATION_CRITICAL_COUNT} URLs - this is a common pagination limit")
-                return True
-
-            # Extract all chapter numbers for additional checks
-            chapter_numbers: List[int] = []
-            for url in found_urls:
-                ch_num = extract_chapter_number(url)
-                if ch_num:
-                    chapter_numbers.append(ch_num)
-
-            if chapter_numbers:
-                max_ch: int = max(chapter_numbers)  # type: ignore[arg-type]
-                min_ch: int = min(chapter_numbers)  # type: ignore[arg-type]
-
-                # Round numbers with matching count suggest pagination
-                if url_count in PAGINATION_SUSPICIOUS_COUNTS and max_ch in PAGINATION_SUSPICIOUS_COUNTS and url_count == max_ch:
-                    logger.info(f"⚠ Detected pagination: Found exactly {url_count} URLs ending at round number {max_ch}")
-                    return True
-
-                # Additional pagination checks...
-                if min_chapter_number and min_chapter_number > max_ch and url_count >= PAGINATION_SUSPICIOUS_COUNTS[0]:
-                    logger.info(f"⚠ Detected pagination: Found {url_count} URLs (max chapter {max_ch}) but need {min_chapter_number}")
-                    return True
-
-            return False
-
-        # Try legacy methods in order
-        logger.info("Trying legacy method 1: JavaScript variable extraction")
-        urls = self._extractors.try_js_extraction(toc_url)
-        metadata["methods_tried"]["js"] = len(urls) if urls else 0
-        if urls and len(urls) >= 10:
-            if covers_range(urls) and not seems_incomplete(urls):
-                logger.info(f"✓ Found {len(urls)} chapters via JavaScript extraction")
-                metadata["method_used"] = "js"
-                metadata["urls_found"] = len(urls)
-                return sort_chapters_by_number(urls), metadata
-
-        logger.info("Trying legacy method 2: AJAX endpoint discovery")
-        urls = self._extractors.try_ajax_endpoints(toc_url)
-        metadata["methods_tried"]["ajax"] = len(urls) if urls else 0
-        if urls and len(urls) >= 10:
-            if covers_range(urls) and not seems_incomplete(urls):
-                logger.info(f"✓ Found {len(urls)} chapters via AJAX endpoint")
-                metadata["method_used"] = "ajax"
-                metadata["urls_found"] = len(urls)
-                return sort_chapters_by_number(urls), metadata
-
-        # Try Playwright as fallback
-        try:
-            from .url_extractor_playwright import PlaywrightExtractor
-
-            playwright_extractor = PlaywrightExtractor(
-                base_url=self.base_url,
-                session_manager=self._session_manager,
-                timeout=self.timeout,
-                delay=self.delay
-            )
-
-            logger.info("Trying legacy method 3: Playwright with scrolling")
-            urls = playwright_extractor.extract(
-                toc_url=toc_url,
-                should_stop=should_stop,
-                min_chapter_number=min_chapter_number,
-                max_chapter_number=max_chapter_number
-            )
-            metadata["methods_tried"]["playwright"] = len(urls) if urls else 0
-            if urls:
-                logger.info(f"✓ Found {len(urls)} chapters via Playwright")
-                metadata["method_used"] = "playwright"
-                metadata["urls_found"] = len(urls)
-                return sort_chapters_by_number(urls), metadata
-        except ImportError:
-            logger.warning("⚠ Playwright not available")
-
-        logger.warning("All legacy methods failed to fetch sufficient chapter URLs")
-        return [], metadata
 
     def fetch(self, toc_url: str, should_stop: Optional[Callable[[], bool]] = None, use_reference: bool = False, min_chapter_number: Optional[int] = None, max_chapter_number: Optional[int] = None) -> Tuple[List[str], Dict[str, Any]]:
         """
-        Fetch chapter URLs using the configured detection method.
+        Fetch chapter URLs using the universal detector.
 
-        Uses either the new universal detector (adaptive, multi-strategy) or legacy methods
-        depending on initialization configuration.
+        Uses the universal detector with adaptive, multi-strategy approach for optimal performance.
 
         Args:
             toc_url: URL of the table of contents page
@@ -546,15 +386,8 @@ class UrlExtractor:
         if should_stop and should_stop():
             return [], {}
 
-        logger.info(f"Fetching chapter URLs from {toc_url}")
+        logger.info(f"Fetching chapter URLs from {toc_url} using universal detector")
 
-        if self.use_universal_detector and self._universal_detector:
-            # Use new universal detector
-            return self._fetch_with_universal_detector(
-                toc_url, should_stop, use_reference, min_chapter_number, max_chapter_number
-            )
-        else:
-            # Use legacy detection methods
-            return self._fetch_with_legacy_methods(
-                toc_url, should_stop, use_reference, min_chapter_number, max_chapter_number
-            )
+        return self._fetch_with_universal_detector(
+            toc_url, should_stop, use_reference, min_chapter_number, max_chapter_number
+        )

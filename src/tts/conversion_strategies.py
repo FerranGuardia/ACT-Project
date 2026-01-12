@@ -13,11 +13,13 @@ from pathlib import Path
 from typing import List, Optional, TYPE_CHECKING, Any
 
 from core.logger import get_logger
+from core.constants import PREVIEW_TEXT_LENGTH
 
 from .providers.base_provider import TTSProvider
 from .providers.provider_manager import TTSProviderManager
 from .audio_merger import AudioMerger
 from .resource_manager import TTSResourceManager
+from .error_handling import log_chunked_conversion_error
 
 if TYPE_CHECKING:
     from .voice_resolver import VoiceResolutionResult
@@ -90,10 +92,10 @@ class ConversionStrategy(ABC):
         logger.info(f"Text size: {text_bytes_size} bytes")
 
         # Debug: Check text content
-        if len(text) < 200:
+        if len(text) < PREVIEW_TEXT_LENGTH:
             logger.info(f"Text preview: '{text}'")
         else:
-            logger.info(f"Text preview: '{text[:200]}...'")
+            logger.info(f"Text preview: '{text[:PREVIEW_TEXT_LENGTH]}...'")
 
 
 class DirectConversionStrategy(ConversionStrategy):
@@ -176,8 +178,7 @@ class ChunkedConversionStrategy(ConversionStrategy):
         """Convert text using chunked approach with parallel processing."""
         try:
             # Create temporary directory for chunks
-            temp_dir = Path(tempfile.gettempdir()) / f"tts_chunks_{int(time.time() * 1000)}"
-            temp_dir.mkdir(parents=True, exist_ok=True)
+            temp_dir = self.resource_manager.create_tts_chunks_temp_dir()
             self.resource_manager.register_temp_directory(temp_dir)
 
             # Build final text for conversion
@@ -244,9 +245,7 @@ class ChunkedConversionStrategy(ConversionStrategy):
             return True
 
         except Exception as e:
-            error_msg = str(e)
-            error_type = type(e).__name__
-            logger.error(f"Error in chunked conversion: {error_type}: {error_msg}")
+            log_chunked_conversion_error(e)
             return False
 
     def _convert_chunks_parallel(

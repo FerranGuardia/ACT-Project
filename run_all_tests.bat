@@ -4,8 +4,12 @@ REM Runs both unit and integration tests with clear separation
 
 cd /d "%~dp0"
 
+REM Set test mode to use temp directories instead of user Documents
+set ACT_TEST_MODE=1
+
 echo ========================================
 echo    ACT Project - Running All Tests
+echo    Test Mode: %ACT_TEST_MODE% (Isolated directories)
 echo ========================================
 echo.
 echo Current directory: %CD%
@@ -22,7 +26,7 @@ echo UI tests run separately due to Qt threading constraints.
 echo This may take a few minutes...
 echo.
 
-python -m pytest tests/unit/ -v --tb=short -m "not ui"
+python -m pytest tests/unit/ -v --tb=short -m "not ui" --html=reports/unit_tests.html --self-contained-html
 set UNIT_TEST_EXIT=%ERRORLEVEL%
 
 echo.
@@ -33,7 +37,7 @@ echo.
 echo Running UI tests sequentially (Qt components)...
 echo.
 
-python -m pytest tests/unit/ui/ -v --tb=short -n0
+python -m pytest tests/unit/ui/ -v --tb=short -n0 --html=reports/ui_tests.html --self-contained-html
 set UI_TEST_EXIT=%ERRORLEVEL%
 
 echo.
@@ -55,7 +59,7 @@ echo Running integration tests...
 echo This may take a few minutes...
 echo.
 
-python -m pytest tests/integration/ -v --tb=short
+python -m pytest tests/integration/ -v --tb=short --html=reports/integration_tests.html --self-contained-html
 set INTEGRATION_TEST_EXIT=%ERRORLEVEL%
 
 echo.

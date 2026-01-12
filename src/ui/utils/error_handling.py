@@ -112,7 +112,7 @@ def show_directory_not_found_error(parent: "QWidget", directory_path: str) -> No
     QMessageBox.warning(
         parent,
         DialogMessages.DIRECTORY_NOT_FOUND_TITLE,
-        DialogMessages.DIRECTORY_NOT_FOUND_MSG_FORMAT.format(path=directory_path)
+        f"Directory does not exist:\n{directory_path}"
     )
 
 
@@ -127,7 +127,7 @@ def show_error_opening_folder(parent: "QWidget", error: str) -> None:
     QMessageBox.warning(
         parent,
         DialogMessages.ERROR_OPENING_FOLDER_TITLE,
-        DialogMessages.ERROR_OPENING_FOLDER_MSG_FORMAT.format(error=error)
+        f"Could not open folder:\n{error}"
     )
 
 

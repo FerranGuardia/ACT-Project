@@ -35,12 +35,14 @@ class FileManager:
         """
         self.config = get_config()
         self.project_name = self._sanitize_filename(project_name)
-        self.novel_title = self._sanitize_filename(novel_title or project_name)
+        self.novel_title = self._sanitize_filename(str(novel_title or project_name))
         
         # Get base output directory
         if base_output_dir is None:
             output_dir_str = self.config.get("paths.output_dir")
             base_output_dir = Path(output_dir_str)
+        elif isinstance(base_output_dir, str):
+            base_output_dir = Path(base_output_dir)
         
         self.base_output_dir = base_output_dir
         self.project_dir = base_output_dir / self.project_name
@@ -53,28 +55,32 @@ class FileManager:
         # Create directories
         self._create_directories()
     
-    def _sanitize_filename(self, name: str) -> str:
+    def _sanitize_filename(self, name) -> str:
         """
         Sanitize filename by removing invalid characters.
-        
+
         Args:
-            name: Original name
-            
+            name: Original name (will be converted to string)
+
         Returns:
             Sanitized name safe for filesystem
         """
+        # Ensure name is a string
+        if not isinstance(name, str):
+            name = str(name)
+
         # Replace invalid characters with underscore
         invalid_chars = '<>:"/\\|?*'
         for char in invalid_chars:
             name = name.replace(char, '_')
-        
+
         # Remove leading/trailing spaces and dots
         name = name.strip(' .')
-        
+
         # Limit length
         if len(name) > 200:
             name = name[:200]
-        
+
         return name or "unnamed_project"
     
     def _create_directories(self) -> None:
@@ -162,8 +168,8 @@ class FileManager:
             file_path.write_text(content_to_save, encoding="utf-8")
             logger.debug(f"Saved text file: {file_path}")
             return file_path
-        except Exception as e:
-            logger.error(f"Error saving text file {file_path}: {e}")
+        except (IOError, OSError, UnicodeEncodeError) as e:
+            logger.error(f"Failed to save text file {file_path} - {type(e).__name__}: {e}")
             raise
     
     def save_audio_file(
@@ -201,8 +207,8 @@ class FileManager:
             else:
                 logger.error(f"Source audio file does not exist: {audio_path}")
                 raise FileNotFoundError(f"Audio file not found: {audio_path}")
-        except Exception as e:
-            logger.error(f"Error saving audio file {dest_path}: {e}")
+        except (IOError, OSError, FileNotFoundError) as e:
+            logger.error(f"Failed to save audio file {dest_path} - {type(e).__name__}: {e}")
             raise
     
     def get_text_file_path(self, chapter_num: int) -> Path:
@@ -304,8 +310,8 @@ class FileManager:
             try:
                 temp_file.unlink()
                 logger.debug(f"Removed temp file: {temp_file}")
-            except Exception as e:
-                logger.warning(f"Could not remove temp file {temp_file}: {e}")
+            except (OSError, IOError) as e:
+                logger.warning(f"Could not remove temp file {temp_file} - {type(e).__name__}: {e}")
     
     def delete_project(self) -> None:
         """Delete the entire project directory and all its contents."""
@@ -313,8 +319,8 @@ class FileManager:
             try:
                 shutil.rmtree(self.project_dir)
                 logger.info(f"Deleted project directory: {self.project_dir}")
-            except Exception as e:
-                logger.error(f"Error deleting project directory: {e}")
+            except (OSError, IOError) as e:
+                logger.error(f"Failed to delete project directory - {type(e).__name__}: {e}")
                 raise
 
 

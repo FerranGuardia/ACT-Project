@@ -114,7 +114,7 @@ class EdgeTTSProvider(TTSProvider):
             # Use a fresh event loop to avoid conflicts with existing loops
             self._available = asyncio.run(self._check_availability_async())
         except Exception as e:
-            logger.error(f"Failed to check Edge TTS availability: {e}")
+            logger.error(f"Failed to check Edge TTS availability - {type(e).__name__}: {e}")
             self._available = False
 
     async def _async_check_availability(self) -> List[Dict]:
@@ -126,22 +126,26 @@ class EdgeTTSProvider(TTSProvider):
 
     async def _ensure_session(self) -> aiohttp.ClientSession:
         """Ensure we have an active HTTP session"""
-        if self._session is None or self._session.closed:
-            # Create session with connection pooling
-            self._session = aiohttp.ClientSession(
-                connector=aiohttp.TCPConnector(
-                    limit=10,  # Max connections
-                    limit_per_host=2,  # Max connections per host
-                    ttl_dns_cache=300,  # DNS cache TTL
-                    use_dns_cache=True
-                ),
-                timeout=aiohttp.ClientTimeout(
-                    total=30,  # Total timeout
-                    connect=10,  # Connection timeout
-                    sock_read=20  # Socket read timeout
+        try:
+            if self._session is None or self._session.closed:
+                # Create session with connection pooling
+                self._session = aiohttp.ClientSession(
+                    connector=aiohttp.TCPConnector(
+                        limit=10,  # Max connections
+                        limit_per_host=2,  # Max connections per host
+                        ttl_dns_cache=300,  # DNS cache TTL
+                        use_dns_cache=True
+                    ),
+                    timeout=aiohttp.ClientTimeout(
+                        total=30,  # Total timeout
+                        connect=10,  # Connection timeout
+                        sock_read=20  # Socket read timeout
+                    )
                 )
-            )
-        return self._session
+            return self._session
+        except Exception as e:
+            logger.error(f"Failed to create HTTP session - {type(e).__name__}: {e}")
+            raise
 
     async def _close_session(self) -> None:
         """Close HTTP session if it exists"""
@@ -231,7 +235,7 @@ class EdgeTTSProvider(TTSProvider):
             logger.error("edge-tts not installed")
         except Exception as e:
             classified_error = self._classify_error(e)
-            logger.error(f"Error loading Edge TTS voices: {classified_error}")
+            logger.error(f"Failed to load Edge TTS voices - {type(classified_error).__name__}: {classified_error}")
             # For voice loading errors, we don't raise - just return empty list
             # This allows the provider to still be considered "available" even if voice loading fails
 
@@ -243,10 +247,14 @@ class EdgeTTSProvider(TTSProvider):
 
     async def _async_get_voices(self) -> List[Dict]:
         """Asynchronously get Edge TTS voices"""
-        import edge_tts
-        voices = await edge_tts.list_voices()
-        # Convert Voice objects to dicts for our interface
-        return [dict(voice) for voice in voices]
+        try:
+            import edge_tts
+            voices = await edge_tts.list_voices()
+            # Convert Voice objects to dicts for our interface
+            return [dict(voice) for voice in voices]
+        except Exception as e:
+            logger.warning(f"Failed to get Edge TTS voices: {e}")
+            return []
     
     @circuit(
         failure_threshold=4,  # Fail after 4 consecutive failures so the 5th call falls back
@@ -503,12 +511,12 @@ class EdgeTTSProvider(TTSProvider):
             if output_path.exists() and output_path.stat().st_size > 0:
                 return True
             else:
-                logger.error(f"Edge TTS chunk conversion failed: file not created or empty")
+                logger.error(f"Failed to convert Edge TTS chunk - IOError: file not created or empty")
                 return False
 
         except Exception as e:
             error_msg = str(e)
-            logger.error(f"Error in Edge TTS chunk conversion: {error_msg}")
+            logger.error(f"Failed to convert Edge TTS chunk - {type(e).__name__}: {error_msg}")
             return False
         finally:
             # Clean up session when done

@@ -43,7 +43,8 @@ class NovelScraper(BaseScraper):
         self.url_extractor = UrlExtractor(
             base_url=base_url,
             timeout=self.timeout,
-            delay=self.delay
+            delay=self.delay,
+            use_universal_detector=True  # Enable universal detector
         )
         self.chapter_extractor = ChapterExtractor(
             base_url=base_url,

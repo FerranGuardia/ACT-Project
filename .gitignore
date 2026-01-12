@@ -178,3 +178,5 @@ gui_test/
 # Private documentation - not committed to repository
 docs/private/
 
+# Test metadata directories
+Test Novel for Metadata/

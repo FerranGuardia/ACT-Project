@@ -80,6 +80,13 @@ def mock_external_dependencies():
              "language": "en-US", "quality": "medium", "provider": "pyttsx3"}
         ]
 
+        # Mock provider capability methods (matching real Pyttsx3Provider behavior)
+        mock_py.return_value.supports_rate.return_value = True
+        mock_py.return_value.supports_pitch.return_value = False
+        mock_py.return_value.supports_volume.return_value = True
+        mock_py.return_value.supports_ssml.return_value = False
+        mock_py.return_value.is_available.return_value = False  # Mock as unavailable for tests
+
         # Mock voice loading to return empty list (will be populated by individual tests)
         mock_load.return_value = []
 

@@ -61,25 +61,11 @@ class MainWindow(QMainWindow):
         # Apply global styles AFTER creating widgets
         self._apply_global_style()
 
-        # Build central container with an in-view back button for visibility
+        # Build central container
         central = QWidget()
         central_layout = QVBoxLayout()
         central_layout.setContentsMargins(0, 0, 0, 0)
         central_layout.setSpacing(0)
-
-        back_row = QHBoxLayout()
-        back_row.setContentsMargins(12, 12, 12, 0)
-        back_row.setSpacing(10)
-        self.back_button = QPushButton(ViewConfig.BACK_BUTTON_TEXT)
-        # Connect back button with logging
-        self.back_button.clicked.connect(self._on_back_clicked)
-        self.back_button.setVisible(False)  # Hidden on landing page
-        self.back_button.setMinimumHeight(ViewConfig.BACK_BUTTON_HEIGHT)
-        self.back_button.setMinimumWidth(ViewConfig.BACK_BUTTON_WIDTH)
-        self.back_button.setProperty("class", "primary")
-        back_row.addWidget(self.back_button)
-        back_row.addStretch(1)
-        central_layout.addLayout(back_row)
 
         # Create stacked widget for different views with scroll support
         from PySide6.QtWidgets import QScrollArea
@@ -114,12 +100,6 @@ class MainWindow(QMainWindow):
         # Set landing page as initial view
         self.stacked_widget.setCurrentIndex(self.LANDING_PAGE)
         
-        # Connect stacked widget changes to update back button visibility
-        self.stacked_widget.currentChanged.connect(self._on_view_changed)
-
-        # Keyboard shortcut: Left Arrow to go back when not on landing
-        self.back_shortcut = QShortcut(QKeySequence(Qt.Key_Left), self)
-        self.back_shortcut.activated.connect(self._handle_back_shortcut)
         
         logger.info("Main window initialized")
     
@@ -226,17 +206,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logger.warning(f"Failed to set global font: {e}")
     
-    def _on_back_clicked(self) -> None:
-        """Handle back button click with logging."""
-        UIEventLogger.log_button_click("Back", "pressed")
-        self.show_landing_page()
-    
-    def _on_view_changed(self, index: int) -> None:
-        """Handle view change to update back button visibility."""
-        if index == self.LANDING_PAGE:
-            self.back_button.setVisible(False)
-        else:
-            self.back_button.setVisible(True)
 
     def _reset_scroll_position(self) -> None:
         """Reset the scroll area position to the top."""
@@ -247,10 +216,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logger.warning(f"Failed to reset scroll position: {e}")
 
-    def _handle_back_shortcut(self) -> None:
-        """Handle left-arrow shortcut to return to landing when away."""
-        if self.stacked_widget.currentIndex() != self.LANDING_PAGE:
-            self.show_landing_page()
     
     def navigate_to_mode(self, mode: str) -> None:
         """Navigate to the specified mode."""
@@ -264,7 +229,6 @@ class MainWindow(QMainWindow):
         if mode in mode_map:
             UIEventLogger.log_navigation("Landing Page", mode.replace("_", " ").title(), "user clicked mode card")
             self.stacked_widget.setCurrentIndex(mode_map[mode])
-            self.back_button.setVisible(True)
 
             # Reset scroll position to top when switching views
             self._reset_scroll_position()

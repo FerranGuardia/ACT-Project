@@ -100,10 +100,6 @@ class ACTLogger:
         Returns:
             Configured logger instance
         """
-        # Ensure ACTLogger is initialized
-        if ACTLogger._instance is None:
-            ACTLogger._instance = ACTLogger()
-
         logger_name = f"act.{name}" if not name.startswith("act.") else name
         return logging.getLogger(logger_name)
 
@@ -138,35 +134,29 @@ class ACTLogger:
         Useful for development and debugging UI interactions.
         """
         cls._verbose_mode = True
-        # Ensure logger is initialized
-        if cls._instance is None:
-            cls._instance = cls()
         root_logger = logging.getLogger("act")
-
+        
         # Find and upgrade console handler to DEBUG
         for handler in root_logger.handlers:
             if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
                 handler.setLevel(logging.DEBUG)
-
+        
         logger = get_logger("logger")
-        logger.info("Verbose console logging ENABLED - All DEBUG messages will appear in console")
+        logger.info("🟢 Verbose console logging ENABLED - All DEBUG messages will appear in console")
     
     @classmethod
     def disable_verbose_console(cls) -> None:
         """Disable DEBUG level logging to console."""
         cls._verbose_mode = False
-        # Ensure logger is initialized
-        if cls._instance is None:
-            cls._instance = cls()
         root_logger = logging.getLogger("act")
-
+        
         # Find and downgrade console handler to INFO
         for handler in root_logger.handlers:
             if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
                 handler.setLevel(logging.INFO)
-
+        
         logger = get_logger("logger")
-        logger.info("Verbose console logging DISABLED - Only INFO and above will appear in console")
+        logger.info("🔴 Verbose console logging DISABLED - Only INFO and above will appear in console")
 
     @staticmethod
     def get_log_file_path() -> Path:
