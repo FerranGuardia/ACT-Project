@@ -9,7 +9,7 @@ import asyncio
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List
 
 from core.logger import get_logger
 from core.constants import PREVIEW_TEXT_LENGTH
@@ -19,6 +19,7 @@ from .voice_resolver import VoiceResolver
 from .text_processing_pipeline import TextProcessingPipeline, TTSTextCleaner
 from .resource_manager import TTSResourceManager
 from .providers.provider_manager import TTSProviderManager
+from .error_handling import log_chunked_conversion_error
 from .providers.base_provider import TTSProvider
 from .audio_merger import AudioMerger
 from .voice_manager import VoiceManager  # For backward compatibility
@@ -103,9 +104,9 @@ class TTSEngine:
     This is a compatibility layer that uses the new modular TTS architecture.
     """
 
-    def __init__(self, base_text_cleaner: Optional[Callable[[str], str]] = None,
-                 provider_manager: Optional[TTSProviderManager] = None,
-                 config: Optional[TTSConfig] = None):
+    def __init__(self, base_text_cleaner: Callable[[str], str] | None = None,
+                 provider_manager: TTSProviderManager | None = None,
+                 config: TTSConfig | None = None):
         """
         Initialize TTS engine.
 
@@ -147,7 +148,7 @@ class TTSEngine:
 
         logger.info("TTSEngine initialized with new architecture")
 
-    def get_available_voices(self, locale: Optional[str] = None, provider: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_available_voices(self, locale: str | None = None, provider: str | None = None) -> List[Dict[str, Any]]:
         """Get available voices (delegates to coordinator)."""
         return self.coordinator.get_available_voices(locale=locale, provider=provider)
 
@@ -155,11 +156,11 @@ class TTSEngine:
         self,
         text: str,
         output_path: Path,
-        voice: Optional[str] = None,
-        rate: Optional[float] = None,
-        pitch: Optional[float] = None,
-        volume: Optional[float] = None,
-        provider: Optional[str] = None
+        voice: str | None = None,
+        rate: float | None = None,
+        pitch: float | None = None,
+        volume: float | None = None,
+        provider: str | None = None
     ) -> bool:
         """
         Convert text to speech and save as audio file.
@@ -194,14 +195,14 @@ class TTSEngine:
         voice: str,
         temp_dir: Path,
         output_stem: str,
-        provider: Optional[str | TTSProvider] = None,
-        rate: Optional[float] = None,
-        pitch: Optional[float] = None,
-        volume: Optional[float] = None
+        provider: str | TTSProvider | None = None,
+        rate: float | None = None,
+        pitch: float | None = None,
+        volume: float | None = None
     ) -> List[Path]:
         """Delegate to AudioMerger for parallel chunk conversion."""
         # Handle both string provider names and TTSProvider objects (for backward compatibility with tests)
-        provider_instance: Optional[TTSProvider] = None
+        provider_instance: TTSProvider | None = None
         if provider:
             if isinstance(provider, str):
                 provider_instance = self.provider_manager.get_provider(provider)
@@ -219,10 +220,10 @@ class TTSEngine:
         text: str,
         voice: str,
         output_path: Path,
-        rate: Optional[float],
-        pitch: Optional[float],
-        volume: Optional[float],
-        provider: Optional[str]
+        rate: float | None,
+        pitch: float | None,
+        volume: float | None,
+        provider: str | None
     ) -> bool:
         """Delegate to AudioMerger for chunked conversion with merging."""
         try:
@@ -275,9 +276,7 @@ class TTSEngine:
                     logger.warning(f"Failed to clean up temp directory {temp_dir}: {e}")
         
         except Exception as e:
-            error_msg = str(e)
-            error_type = type(e).__name__
-            logger.error(f"Error in chunked conversion: {error_type}: {error_msg}")
+            log_chunked_conversion_error(e)
             return False
 
     def _chunk_text(self, text: str, max_bytes: int = 3000) -> List[str]:
@@ -296,12 +295,12 @@ class TTSEngine:
     def convert_file_to_speech(
         self,
         input_file: Path,
-        output_path: Optional[Path] = None,
-        voice: Optional[str] = None,
-        rate: Optional[float] = None,
-        pitch: Optional[float] = None,
-        volume: Optional[float] = None,
-        provider: Optional[str] = None
+        output_path: Path | None = None,
+        voice: str | None = None,
+        rate: float | None = None,
+        pitch: float | None = None,
+        volume: float | None = None,
+        provider: str | None = None
     ) -> bool:
         """
         Convert text file to speech.
@@ -336,11 +335,11 @@ class TTSEngine:
         processed_text = self.text_pipeline.process(text)
         return processed_text.enhanced
 
-    def _validate_and_resolve_voice(self, voice: str, provider: Optional[str] = None):
+    def _validate_and_resolve_voice(self, voice: str, provider: str | None = None):
         """Validate and resolve voice (backward compatibility)."""
         return self.voice_resolver.resolve_voice(voice, provider)
 
-    def _determine_conversion_strategy(self, text: str, provider: Optional[TTSProvider] = None) -> str:
+    def _determine_conversion_strategy(self, text: str, provider: TTSProvider | None = None) -> str:
         """Determine conversion strategy (backward compatibility)."""
         if not provider:
             return "direct"
@@ -358,10 +357,10 @@ class TTSEngine:
         text: str,
         output_path: Path,
         voice_id: str,
-        provider_name: Optional[str],
-        rate: Optional[float],
-        pitch: Optional[float],
-        volume: Optional[float]
+        provider_name: str | None,
+        rate: float | None,
+        pitch: float | None,
+        volume: float | None
     ) -> None:
         """Log conversion start (backward compatibility)."""
         text_bytes_size = len(text.encode('utf-8'))
