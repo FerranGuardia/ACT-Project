@@ -4,6 +4,7 @@ Main orchestrator that combines all components.
 """
 
 import os
+from pathlib import Path
 from typing import Optional, TYPE_CHECKING, List, Dict, Any
 
 if TYPE_CHECKING:
@@ -38,6 +39,7 @@ from ui.views.scraper_view.handlers import ScraperViewHandlers
 from ui.views.scraper_view.queue_section import QueueSection
 from ui.views.scraper_view.controls_section import ScraperControlsSection
 from ui.views.scraper_view.queue_item_widget import ScraperQueueItemWidget
+from ui.views.scraper_view.scraper_queue_manager import ScraperQueueManager
 
 logger = get_logger("ui.scraper_view")
 
@@ -52,11 +54,17 @@ class ScraperView(BaseView):
     def __init__(self, parent=None):
         # Initialize data structures first
         self.scraping_thread: Optional[ScrapingThread] = None
-        self.queue_items: List[Dict[str, Any]] = []  # List of queue items
-        
+
+        # Initialize queue manager
+        queue_file = Path("data/queues/scraper_queue.json")
+        self.queue_manager = ScraperQueueManager(queue_file)
+
+        # Load existing queue
+        self.queue_items: List[Dict[str, Any]] = self.queue_manager.load_queue()
+
         # Initialize UI components (BaseView calls setup_ui)
         super().__init__(parent)
-        
+
         # Initialize handlers after UI is set up
         self.handlers = ScraperViewHandlers(self)
         
@@ -283,6 +291,10 @@ class ScraperView(BaseView):
             'progress': 0
         }
         self.queue_items.append(queue_item)
+
+        # Save queue
+        self.queue_manager.save_queue(self.queue_items)
+
         self._update_queue_display()
         
         # Clear input fields
@@ -304,6 +316,7 @@ class ScraperView(BaseView):
             DialogMessages.CLEAR_QUEUE_MESSAGE
         ):
             self.queue_items.clear()
+            self.queue_manager.save_queue(self.queue_items)
             self.queue_section.clear()
             logger.info("Queue cleared")
     

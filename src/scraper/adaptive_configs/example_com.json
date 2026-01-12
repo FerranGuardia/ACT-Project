@@ -1,17 +1,17 @@
 {
   "domain": "example.com",
   "strategy_success_rates": {
-    "javascript": 0.9764493565137687
+    "javascript": 0.9898622202047773
   },
   "optimal_strategy_order": [],
   "known_patterns": {},
   "last_successful_strategy": "javascript",
   "average_response_times": {
-    "javascript": 0.00010734834133386614
+    "javascript": 4.6209940992117035e-05
   },
-  "total_attempts": 29,
-  "successful_attempts": 29,
-  "last_updated": 1768175517.3409605,
+  "total_attempts": 37,
+  "successful_attempts": 37,
+  "last_updated": 1768241658.1920776,
   "custom_selectors": [],
   "pagination_patterns": [],
   "api_endpoints": []

@@ -6,6 +6,7 @@ Main orchestrator that combines all components.
 import os
 import tempfile
 from typing import Optional, List, TYPE_CHECKING, Dict, Any
+from pathlib import Path
 
 if TYPE_CHECKING:
     from ui.main_window import MainWindow  # type: ignore[unused-import]
@@ -36,6 +37,7 @@ from ui.views.tts_view.handlers import TTSViewHandlers
 from ui.views.tts_view.queue_section import QueueSection
 from ui.views.tts_view.controls_section import TTSControlsSection
 from ui.views.tts_view.queue_item_widget import TTSQueueItemWidget
+from ui.views.tts_view.tts_queue_manager import TTSQueueManager
 
 logger = get_logger("ui.tts_view")
 
@@ -50,22 +52,28 @@ class TTSView(BaseView):
     def __init__(self, parent=None):
         self.file_paths: List[str] = []
         self.conversion_thread: Optional[TTSConversionThread] = None
-        self.queue_items: List[Dict[str, Any]] = []  # List of queue items
-        
+
+        # Initialize queue manager
+        queue_file = Path("data/queues/tts_queue.json")
+        self.queue_manager = TTSQueueManager(queue_file)
+
+        # Load existing queue
+        self.queue_items: List[Dict[str, Any]] = self.queue_manager.load_queue()
+
         # Initialize handlers
         self.handlers = TTSViewHandlers(self)
-        
+
         # Initialize UI components (BaseView calls setup_ui)
         super().__init__(parent)
         self._connect_handlers()
-        
+
         # Set preview UI elements for handlers
         self.handlers.set_preview_ui_elements(
             self.progress_section.status_label,
             self.voice_settings.preview_button,
             self.voice_settings.stop_preview_button
         )
-        
+
         self._load_providers()
         self._load_voices()
         logger.info("TTS view initialized")
@@ -388,8 +396,12 @@ class TTSView(BaseView):
             'progress': 0
         }
         self.queue_items.append(queue_item)
+
+        # Save queue
+        self.queue_manager.save_queue(self.queue_items)
+
         self._update_queue_display()
-        
+
         # Clear input fields
         self.file_paths.clear()
         self.input_section.files_list.clear()
@@ -411,6 +423,7 @@ class TTSView(BaseView):
             DialogMessages.CLEAR_QUEUE_MESSAGE
         ):
             self.queue_items.clear()
+            self.queue_manager.save_queue(self.queue_items)
             self.queue_section.clear()
             logger.info("Queue cleared")
     

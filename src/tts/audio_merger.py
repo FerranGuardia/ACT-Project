@@ -531,3 +531,77 @@ class AudioMerger:
         except Exception as e:
             logger.error(f"Fallback copy failed: {e}")
             return False
+
+    def merge_audio_files_with_silence(self, file_paths: List[Path], output_path: Path, silence_duration: float = 0.5) -> bool:
+        """
+        Merge audio files with silence between them.
+
+        This method provides the same functionality as merge_audio_chunks but
+        adds configurable silence between files, making it suitable for merging
+        complete audio files rather than TTS chunks.
+
+        Args:
+            file_paths: List of paths to audio files to merge
+            output_path: Path for merged output file
+            silence_duration: Seconds of silence between files (default: 0.5)
+
+        Returns:
+            True if successful, False otherwise
+
+        Raises:
+            ValueError: If file_paths is empty or contains invalid paths
+        """
+        if not file_paths:
+            raise ValueError("file_paths cannot be empty")
+
+        # Validate input files exist
+        missing_files = [f for f in file_paths if not f.exists()]
+        if missing_files:
+            raise ValueError(f"Files do not exist: {missing_files}")
+
+        # Use pydub for merging with silence (same as merger view)
+        try:
+            from pydub import AudioSegment
+            from pydub.effects import normalize
+        except ImportError:
+            logger.error("pydub not available for audio file merging with silence")
+            return False
+
+        try:
+            combined = None
+
+            for file_path in file_paths:
+                # Load audio file
+                audio = AudioSegment.from_file(file_path)
+                # Normalize audio
+                audio = normalize(audio)
+
+                # Add to combined
+                if combined is None:
+                    combined = audio
+                else:
+                    # Add silence if specified
+                    if silence_duration > 0:
+                        silence = AudioSegment.silent(duration=int(silence_duration * 1000))
+                        combined += silence
+                    combined += audio
+
+            if combined is not None:
+                # Determine format from output path
+                output_format = output_path.suffix[1:]  # Remove dot
+                if not output_format:
+                    output_format = "mp3"
+
+                # Ensure output directory exists
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+
+                combined.export(output_path, format=output_format)
+                logger.info(f"Successfully merged {len(file_paths)} audio files with silence to: {output_path}")
+                return True
+            else:
+                logger.error("No audio data to save")
+                return False
+
+        except Exception as e:
+            logger.error(f"Error merging audio files with silence: {e}")
+            return False
