@@ -137,7 +137,7 @@ class AddQueueDialog(QDialog):
         self.output_group.addButton(self.individual_mp3_radio, 0)
         output_layout.addWidget(self.individual_mp3_radio)
 
-        self.batch_mp3_radio = QRadioButton("Batch merged MP3s:")
+        self.batch_mp3_radio = QRadioButton("Incremental batch MP3s:")
         self.output_group.addButton(self.batch_mp3_radio, 1)
         batch_layout = QHBoxLayout()
         batch_layout.addWidget(self.batch_mp3_radio)
@@ -147,7 +147,7 @@ class AddQueueDialog(QDialog):
         self.batch_size_spin.setValue(50)
         self.batch_size_spin.setEnabled(False)
         batch_layout.addWidget(self.batch_size_spin)
-        batch_layout.addWidget(QLabel("chapters per file"))
+        batch_layout.addWidget(QLabel("chapters per batch (merged during processing)"))
         batch_layout.addStretch()
         output_layout.addLayout(batch_layout)
 
@@ -157,22 +157,6 @@ class AddQueueDialog(QDialog):
 
         # Connect batch radio to enable/disable spin box
         self.batch_mp3_radio.toggled.connect(self.batch_size_spin.setEnabled)
-
-        # Batch merging option
-        batch_layout = QHBoxLayout()
-        self.batch_mp3_radio = QRadioButton("Batched merged MP3s:")
-        self.output_group.addButton(self.batch_mp3_radio, 2)
-        self.batch_size_spin = QSpinBox()
-        self.batch_size_spin.setMinimum(1)
-        self.batch_size_spin.setMaximum(1000)
-        self.batch_size_spin.setValue(50)
-        self.batch_size_spin.setEnabled(False)
-        self.batch_mp3_radio.toggled.connect(self.batch_size_spin.setEnabled)
-        batch_layout.addWidget(self.batch_mp3_radio)
-        batch_layout.addWidget(QLabel("chapters per batch"))
-        batch_layout.addWidget(self.batch_size_spin)
-        batch_layout.addStretch()
-        output_layout.addLayout(batch_layout)
 
         output_group.setLayout(output_layout)
         layout.addWidget(output_group)
@@ -362,7 +346,7 @@ class AddQueueDialog(QDialog):
             output_format = {'type': 'merged_mp3'}
         elif self.batch_mp3_radio.isChecked():
             output_format = {
-                'type': 'batched_mp3',
+                'type': 'incremental_batches',
                 'batch_size': self.batch_size_spin.value()
             }
         else:

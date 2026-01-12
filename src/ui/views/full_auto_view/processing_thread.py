@@ -196,12 +196,10 @@ class ProcessingThread(QThread):
                 start_from=start_from,
                 end_chapter=end_chapter
             )
-
-            # If gaps were detected, process from the beginning (skip_if_exists=False, which is default)
-            # Otherwise, enable resume logic to skip already processed chapters (skip_if_exists=True)
-            skip_if_exists = len(missing_chapters) == 0
-            logger.info(f"Gap detection: {len(missing_chapters)} missing chapters, setting skip_if_exists={skip_if_exists}")
-
+            
+            # If gaps were detected, they will be automatically handled by the pipeline
+            # because process_all_chapters checks for missing files and re-processes them
+            
             # Process the URL (use URL as TOC URL)
             self.status.emit("Starting processing...")
             result = self.pipeline.run_full_pipeline(
@@ -210,8 +208,7 @@ class ProcessingThread(QThread):
                 voice=self.voice,
                 provider=self.provider,
                 start_from=start_from,
-                max_chapters=max_chapters,
-                skip_if_exists=skip_if_exists
+                max_chapters=max_chapters
             )
             
             if result.get('success', False) and not self.should_stop:

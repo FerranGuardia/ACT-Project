@@ -222,12 +222,13 @@ class PipelineOrchestrator:
             )
             return result.get("success", False)
         else:
-            # New API: process_all_chapters(start_from=1, max_chapters=None, skip_if_exists=False, ignore_errors=False)
+            # New API: process_all_chapters(start_from=1, max_chapters=None, skip_if_exists=False, ignore_errors=False, output_format=None)
             start_from = kwargs.get('start_from', 1)
             max_chapters = kwargs.get('max_chapters')
             skip_if_exists = kwargs.get('skip_if_exists', False)
             ignore_errors = kwargs.get('ignore_errors', False)
-            return self._process_all_chapters_impl(start_from, max_chapters, skip_if_exists, ignore_errors)
+            output_format = kwargs.get('output_format')
+            return self._process_all_chapters_impl(start_from, max_chapters, skip_if_exists, ignore_errors, output_format)
 
     def _check_should_stop(self) -> bool:
         """Check if processing should stop (backward compatibility)."""
@@ -271,7 +272,8 @@ class PipelineOrchestrator:
         max_chapters: Optional[int] = None,
         voice: Optional[str] = None,
         provider: Optional[str] = None,
-        skip_if_exists: bool = False
+        skip_if_exists: bool = False,
+        output_format: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Run the complete pipeline from TOC URL to finished audiobook."""
         logger.info("Starting full pipeline...")
@@ -304,7 +306,8 @@ class PipelineOrchestrator:
             ignore_errors=True,  # Continue processing other chapters on failure
             start_from=start_from,
             max_chapters=max_chapters,
-            skip_if_exists=skip_if_exists
+            skip_if_exists=skip_if_exists,
+            output_format=output_format
         )
 
         return result
@@ -314,7 +317,8 @@ class PipelineOrchestrator:
         start_from: int = 1,
         max_chapters: Optional[int] = None,
         skip_if_exists: bool = False,
-        ignore_errors: bool = False
+        ignore_errors: bool = False,
+        output_format: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Process all chapters in the project."""
         logger.debug(f"_process_all_chapters_impl called with skip_if_exists={skip_if_exists}")
@@ -347,6 +351,13 @@ class PipelineOrchestrator:
         logger.info(f"Processing {len(chapters_to_process)} chapters")
         if ignore_errors:
             logger.info("Error isolation enabled: will continue processing even if individual chapters fail")
+
+        # Initialize batch tracking for incremental merging
+        batch_size = 0
+        last_batch_end = 0
+        if output_format and output_format.get('type') == 'incremental_batches':
+            batch_size = output_format.get('batch_size', 50)
+            logger.info(f"Incremental batching enabled: will merge every {batch_size} chapters")
 
         # Process each chapter
         completed = 0
@@ -383,6 +394,17 @@ class PipelineOrchestrator:
             )
             if success:
                 completed += 1
+
+                # Check for incremental batch merging
+                if batch_size > 0 and completed >= batch_size:
+                    # Check if we have a complete batch to merge
+                    batch_start = last_batch_end + 1
+                    batch_end = min(last_batch_end + batch_size, chapter.number)
+
+                    if batch_end - batch_start + 1 >= batch_size:
+                        # We have a complete batch, merge it
+                        self._merge_completed_batch(batch_start, batch_end)
+                        last_batch_end = batch_end
             else:
                 failed += 1
                 if not ignore_errors:
@@ -410,6 +432,49 @@ class PipelineOrchestrator:
         logger.info(f"Processing complete: {completed} completed, {failed} failed")
         return result
 
+    def _merge_completed_batch(self, batch_start: int, batch_end: int) -> None:
+        """Merge a completed batch of chapters into a single file."""
+        try:
+            logger.info(f"Merging incremental batch: chapters {batch_start}-{batch_end}")
+
+            # Get the audio files for this batch
+            batch_files = []
+            for chapter_num in range(batch_start, batch_end + 1):
+                audio_path = self.file_manager.get_audio_file_path(chapter_num)
+                if audio_path.exists():
+                    batch_files.append(audio_path)
+                else:
+                    logger.warning(f"Audio file missing for chapter {chapter_num}, skipping batch merge")
+                    return
+
+            if not batch_files:
+                logger.warning("No audio files found for batch, skipping merge")
+                return
+
+            # Create output path for the merged batch
+            project_name = self.context.novel_title or self.context.project_name
+            safe_name = self.file_manager._sanitize_filename(project_name)
+            batch_filename = "02d"
+
+            # Create merged directory if it doesn't exist
+            merged_dir = self.file_manager.get_audio_dir() / "merged"
+            merged_dir.mkdir(exist_ok=True)
+            batch_path = merged_dir / batch_filename
+
+            # Merge the batch
+            from tts.audio_merger import AudioMerger
+            from tts.providers.provider_manager import TTSProviderManager
+
+            provider_manager = TTSProviderManager()
+            audio_merger = AudioMerger(provider_manager)
+
+            if audio_merger.merge_audio_chunks(batch_files, batch_path):
+                logger.info(f"✓ Successfully merged batch {batch_start}-{batch_end} into: {batch_path}")
+            else:
+                logger.error(f"Failed to merge batch {batch_start}-{batch_end}")
+
+        except Exception as e:
+            logger.error(f"Error merging batch {batch_start}-{batch_end}: {e}")
 
     def merge_audio_files(self, output_format: Optional[Dict[str, Any]] = None) -> bool:
         """Merge processed audio files."""
