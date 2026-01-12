@@ -179,6 +179,15 @@ class MetadataManager:
         """
         return list(self._metadata.values())
 
+    def get_all_novel_urls(self) -> List[str]:
+        """
+        Get a list of all novel URLs.
+
+        Returns:
+            List of novel URLs
+        """
+        return list(self._metadata.keys())
+
     def search_novels(self, query: str) -> List[Dict[str, Any]]:
         """
         Search novels by title or author.
@@ -246,6 +255,25 @@ class MetadataManager:
                 default=None
             )
         }
+
+    def get_metadata_summary(self) -> Dict[str, Any]:
+        """
+        Get a summary of all stored metadata.
+
+        Returns:
+            Dictionary with total novels count and list of novels
+        """
+        return {
+            "total_novels": len(self._metadata),
+            "novels": list(self._metadata.values())
+        }
+
+    def clear_all_metadata(self) -> None:
+        """
+        Clear all stored metadata.
+        """
+        self._metadata.clear()
+        self._save_metadata()
 
 
 # Global instance for easy access
