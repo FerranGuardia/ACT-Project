@@ -6,9 +6,9 @@ for error recovery.
 """
 
 import asyncio
-from pathlib import Path
-from typing import Dict, List, Optional, Callable, Any
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
 
 from core.logger import get_logger
 
@@ -141,7 +141,7 @@ class BatchAudioMerger:
             output_path = self.merged_output_dir / output_filename
 
             # Merge the files
-            success = self.audio_merger.merge_audio_files(
+            success = self.audio_merger.merge_audio_files_with_silence(
                 batch_files,
                 output_path,
                 silence_duration=0.5  # 0.5 second gap between chapters

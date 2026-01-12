@@ -202,7 +202,7 @@ class BatchGapDetector:
                 project_name = self.project_manager.project_name
                 safe_name = self.file_manager._sanitize_filename(project_name)
 
-                batch_filename = "02d"
+                batch_filename = f"{safe_name}_chapters_{batch_start:04d}-{batch_end:04d}.mp3"
                 batch_path = merged_dir / batch_filename
 
                 if not batch_path.exists():
