@@ -169,8 +169,8 @@ class ProjectManager:
             logger.debug(f"Project has {self.chapter_manager.get_total_count()} chapters")
             return True
 
-        except Exception as e:
-            logger.error(f"Error loading project: {e}")
+        except (json.JSONDecodeError, IOError, OSError, UnicodeDecodeError) as e:
+            logger.error(f"Failed to load project - {type(e).__name__}: {e}")
             return False
     
     def save_project(self) -> bool:
@@ -208,8 +208,8 @@ class ProjectManager:
             logger.debug(f"Saved project: {self.metadata_file}")
             return True
             
-        except Exception as e:
-            logger.error(f"Error saving project: {e}")
+        except (IOError, OSError, UnicodeEncodeError) as e:
+            logger.error(f"Failed to save project - {type(e).__name__}: {e}")
             return False
     
     def update_status(self, status: str) -> None:
@@ -311,8 +311,8 @@ class ProjectManager:
             try:
                 self.metadata_file.unlink()
                 logger.info(f"Deleted project file: {self.metadata_file}")
-            except Exception as e:
-                logger.error(f"Error deleting project file: {e}")
+            except (OSError, IOError) as e:
+                logger.error(f"Failed to delete project file - {type(e).__name__}: {e}")
 
         # Reset chapter manager
         self.chapter_manager = ChapterManager()
@@ -366,8 +366,8 @@ class ProjectManager:
                     metadata = data.get("metadata", {})
                     metadata["project_dir"] = str(project_dir)
                     projects.append(metadata)
-            except Exception as e:
-                logger.warning(f"Error reading project {project_dir}: {e}")
+            except (json.JSONDecodeError, IOError, OSError, UnicodeDecodeError) as e:
+                logger.warning(f"Failed to read project {project_dir} - {type(e).__name__}: {e}")
         
         return projects
 
