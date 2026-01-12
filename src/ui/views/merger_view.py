@@ -20,163 +20,23 @@ from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QFont
 
 from core.logger import get_logger
+from core.metadata_manager import get_metadata_manager
 from ui.styles import (
     get_line_edit_style, get_group_box_style, get_list_widget_style,
     get_progress_bar_style, get_spin_box_style, get_status_label_style,
     set_button_primary, COLORS, get_font_family
 )
 from ui.view_config import ViewConfig
+from ui.ui_constants import StatusMessages
+
+# Import the audio merging functionality
+from merger.audio_file_merger import AudioFileMergerThread
+
+# Import queue functionality
+from ui.views.merger_view.merger_queue_manager import MergerQueueManager
+from ui.views.merger_view.merger_queue_item_widget import MergerQueueItemWidget
 
 logger = get_logger("ui.merger_view")
-
-
-class AudioMergerThread(QThread):
-    """Thread for merging audio files without blocking UI."""
-    
-    progress = Signal(int)  # Progress percentage
-    status = Signal(str)  # Status message
-    finished = Signal(bool, str)  # Success, message
-    
-    def __init__(self, file_paths: List[str], output_path: str, silence_duration: float):
-        super().__init__()
-        self.file_paths = file_paths
-        self.output_path = output_path
-        self.silence_duration = silence_duration
-        self.should_stop = False
-        self.is_paused = False
-    
-    def stop(self):
-        """Stop the merging operation."""
-        self.should_stop = True
-    
-    def pause(self):
-        """Pause the merging operation."""
-        self.is_paused = True
-    
-    def resume(self):
-        """Resume the merging operation."""
-        self.is_paused = False
-    
-    def run(self):
-        """Run the audio merging operation."""
-        try:
-            total = len(self.file_paths)
-            if total == 0:
-                self.finished.emit(False, "No files to merge")
-                return
-            
-            # Try to use pydub if available, otherwise show error
-            try:
-                from pydub import AudioSegment
-                from pydub.effects import normalize
-            except ImportError:
-                self.finished.emit(False, "pydub library not installed. Please install it: pip install pydub")
-                return
-            
-            # Check if ffmpeg is available (required by pydub for MP3)
-            try:
-                from pydub.utils import which
-                ffmpeg_path = which("ffmpeg")
-                if not ffmpeg_path:
-                    self.finished.emit(False, "ffmpeg not found. pydub requires ffmpeg to process audio files.\nPlease install ffmpeg: https://ffmpeg.org/download.html")
-                    return
-            except Exception as e:
-                # If we can't check, try anyway - might work
-                logger.warning(f"Could not verify ffmpeg installation: {e}")
-            
-            self.status.emit("Loading audio files...")
-            combined = None
-            
-            for idx, file_path in enumerate(self.file_paths):
-                if self.should_stop:
-                    self.status.emit("Stopped by user")
-                    self.finished.emit(False, "Merging stopped")
-                    return
-                
-                while self.is_paused and not self.should_stop:
-                    self.status.emit("Paused...")
-                    self.msleep(100)
-                
-                if self.should_stop:
-                    break
-                
-                try:
-                    self.status.emit(f"Processing {idx + 1}/{total}: {os.path.basename(file_path)}")
-                    
-                    # Normalize and verify file path exists
-                    # Convert to Path object for better handling of special characters
-                    file_path_obj = Path(file_path)
-                    if not file_path_obj.exists():
-                        # Try resolving as absolute path
-                        abs_path = file_path_obj.resolve()
-                        if not abs_path.exists():
-                            raise FileNotFoundError(f"File not found: {file_path} (resolved: {abs_path})")
-                        file_path_obj = abs_path
-                    
-                    # Use Path object directly - pydub handles Path objects better than strings with special chars
-                    # Load audio file - pydub can handle Path objects or properly encoded strings
-                    audio = AudioSegment.from_file(file_path_obj)
-                    
-                    # Normalize audio
-                    audio = normalize(audio)
-                    
-                    # Add to combined
-                    if combined is None:
-                        combined = audio
-                    else:
-                        # Add silence if specified
-                        if self.silence_duration > 0:
-                            silence = AudioSegment.silent(duration=int(self.silence_duration * 1000))
-                            combined += silence
-                        combined += audio
-                    
-                    progress = int((idx + 1) / total * 100)
-                    self.progress.emit(progress)
-                    
-                except FileNotFoundError as e:
-                    error_msg = str(e)
-                    # Check if this is actually an ffmpeg error (ffmpeg not found)
-                    if "ffmpeg" in error_msg.lower() or "avconv" in error_msg.lower() or "ffprobe" in error_msg.lower():
-                        logger.error(f"ffmpeg not found - cannot process audio files. Error: {e}")
-                        self.finished.emit(False, "ffmpeg not found. pydub requires ffmpeg to process audio files.\nPlease install ffmpeg: https://ffmpeg.org/download.html")
-                        return
-                    logger.error(f"File not found {idx + 1}: {file_path} - {e}")
-                    self.status.emit(f"File {idx + 1} not found: {os.path.basename(file_path)}")
-                    # Continue with next file instead of stopping
-                    continue
-                except Exception as e:
-                    error_msg = str(e)
-                    error_type = type(e).__name__
-                    # Check if this is an ffmpeg error
-                    if "ffmpeg" in error_msg.lower() or "avconv" in error_msg.lower() or "ffprobe" in error_msg.lower() or error_type == "FileNotFoundError":
-                        if "ffmpeg" in error_msg.lower() or "avconv" in error_msg.lower() or "ffprobe" in error_msg.lower():
-                            logger.error(f"ffmpeg not found - cannot process audio files. Error: {e}")
-                            self.finished.emit(False, "ffmpeg not found. pydub requires ffmpeg to process audio files.\nPlease install ffmpeg: https://ffmpeg.org/download.html")
-                            return
-                    logger.error(f"Error processing file {idx + 1}: {file_path} - {e}")
-                    self.status.emit(f"Error in file {idx + 1}: {str(e)}")
-                    # Continue with next file instead of stopping
-                    continue
-            
-            if not self.should_stop and combined is not None:
-                self.status.emit("Saving merged audio...")
-                # Determine format from output path
-                output_format = Path(self.output_path).suffix[1:]  # Remove dot
-                # Ensure output directory exists
-                output_dir = os.path.dirname(self.output_path)
-                if output_dir and not os.path.exists(output_dir):
-                    os.makedirs(output_dir, exist_ok=True)
-                combined.export(self.output_path, format=output_format)
-                self.status.emit("Merging completed!")
-                self.finished.emit(True, f"Successfully merged audio files")
-            elif self.should_stop:
-                self.finished.emit(False, "Merging stopped")
-            else:
-                self.finished.emit(False, "No audio data to save")
-                
-        except Exception as e:
-            logger.error(f"Audio merging error: {e}")
-            self.finished.emit(False, f"Error: {str(e)}")
 
 
 class AudioFileItem(QWidget):
@@ -231,7 +91,17 @@ class MergerView(BaseView):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.file_paths: List[str] = []
-        self.merger_thread: Optional[AudioMergerThread] = None
+        self.merger_thread: Optional[AudioFileMergerThread] = None
+        self.metadata_manager = get_metadata_manager()
+
+        # Initialize queue manager
+        from pathlib import Path
+        queue_file = Path("data/queues/merger_queue.json")
+        self.queue_manager = MergerQueueManager(queue_file)
+
+        # Load existing queue
+        self.queue_items: List[Dict] = self.queue_manager.load_queue()
+
         self._connect_handlers()
         logger.info("Merger view initialized")
     
@@ -477,7 +347,7 @@ class MergerView(BaseView):
         silence_duration = self.silence_spin.value()
         
         # Create and start thread
-        self.merger_thread = AudioMergerThread(
+        self.merger_thread = AudioFileMergerThread(
             self.file_paths.copy(),
             output_path,
             silence_duration
@@ -552,3 +422,61 @@ class MergerView(BaseView):
         if file_path:
             self.output_file_input.setText(file_path)
             logger.info(f"Output file selected: {file_path}")
+
+    # Queue management methods
+    def add_to_queue(self):
+        """Add current merge configuration to queue."""
+        if not self.file_paths:
+            QMessageBox.warning(self, "No Files", "Please add audio files to merge first.")
+            return
+
+        output_path = self.output_file_input.text().strip()
+        if not output_path:
+            QMessageBox.warning(self, "No Output", "Please specify an output file path.")
+            return
+
+        # Create queue item
+        queue_item = {
+            'file_paths': self.file_paths.copy(),
+            'output_path': output_path,
+            'silence_duration': self.silence_spin.value(),
+            'status': StatusMessages.PENDING,
+            'progress': 0
+        }
+
+        # Try to associate with novel metadata if possible
+        # This could be enhanced with a dialog to select novel metadata
+        self.queue_items.append(queue_item)
+
+        # Save queue
+        self.queue_manager.save_queue(self.queue_items)
+
+        # Update UI
+        self._update_queue_display()
+
+        logger.info(f"Added merge job to queue: {len(self.file_paths)} files -> {output_path}")
+
+    def remove_from_queue(self, index: int):
+        """Remove item from queue."""
+        if 0 <= index < len(self.queue_items):
+            removed_item = self.queue_items.pop(index)
+            self.queue_manager.save_queue(self.queue_items)
+            self._update_queue_display()
+            logger.info(f"Removed queue item: {removed_item.get('output_path', 'unknown')}")
+
+    def _update_queue_display(self):
+        """Update the queue display (placeholder - would need UI elements)."""
+        # This would update a queue list widget if we add one to the UI
+        # For now, just log the queue status
+        logger.debug(f"Queue now has {len(self.queue_items)} items")
+
+    def save_queue(self):
+        """Save the current queue state."""
+        self.queue_manager.save_queue(self.queue_items)
+        logger.info("Queue saved")
+
+    def load_queue(self):
+        """Load queue from disk."""
+        self.queue_items = self.queue_manager.load_queue()
+        self._update_queue_display()
+        logger.info(f"Loaded {len(self.queue_items)} queue items")
