@@ -19,6 +19,7 @@ from .providers.base_provider import TTSProvider
 from .providers.provider_manager import TTSProviderManager
 from .audio_merger import AudioMerger
 from .resource_manager import TTSResourceManager
+from .error_handling import log_chunked_conversion_error
 
 if TYPE_CHECKING:
     from .voice_resolver import VoiceResolutionResult
@@ -244,9 +245,7 @@ class ChunkedConversionStrategy(ConversionStrategy):
             return True
 
         except Exception as e:
-            error_msg = str(e)
-            error_type = type(e).__name__
-            logger.error(f"Error in chunked conversion: {error_type}: {error_msg}")
+            log_chunked_conversion_error(e)
             return False
 
     def _convert_chunks_parallel(

@@ -3,8 +3,12 @@ REM ACT Project - Unit Tests Runner
 
 cd /d "%~dp0"
 
+REM Set test mode to use temp directories instead of user Documents
+set ACT_TEST_MODE=1
+
 echo ========================================
 echo    ACT Project - Running Unit Tests
+echo    Test Mode: %ACT_TEST_MODE% (Isolated directories)
 echo ========================================
 echo.
 echo Current directory: %CD%

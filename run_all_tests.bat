@@ -4,8 +4,12 @@ REM Runs both unit and integration tests with clear separation
 
 cd /d "%~dp0"
 
+REM Set test mode to use temp directories instead of user Documents
+set ACT_TEST_MODE=1
+
 echo ========================================
 echo    ACT Project - Running All Tests
+echo    Test Mode: %ACT_TEST_MODE% (Isolated directories)
 echo ========================================
 echo.
 echo Current directory: %CD%

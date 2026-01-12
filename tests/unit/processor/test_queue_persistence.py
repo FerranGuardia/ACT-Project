@@ -32,7 +32,7 @@ with patch('PySide6.QtWidgets'), \
      patch('core.logger.get_logger', return_value=mock_logger):
 
     # Import the real implementations
-    from src.ui.views.full_auto_view.queue_manager import QueueManager
+    from src.ui.views.full_auto_view.full_auto_queue_manager import QueueManager
     from src.ui.ui_constants import StatusMessages
 
 
