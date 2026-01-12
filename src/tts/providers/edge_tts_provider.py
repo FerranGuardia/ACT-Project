@@ -114,7 +114,7 @@ class EdgeTTSProvider(TTSProvider):
             # Use a fresh event loop to avoid conflicts with existing loops
             self._available = asyncio.run(self._check_availability_async())
         except Exception as e:
-            logger.error(f"Failed to check Edge TTS availability: {e}")
+            logger.error(f"Failed to check Edge TTS availability - {type(e).__name__}: {e}")
             self._available = False
 
     async def _async_check_availability(self) -> List[Dict]:
@@ -144,7 +144,7 @@ class EdgeTTSProvider(TTSProvider):
                 )
             return self._session
         except Exception as e:
-            logger.error(f"Failed to create HTTP session: {e}")
+            logger.error(f"Failed to create HTTP session - {type(e).__name__}: {e}")
             raise
 
     async def _close_session(self) -> None:
@@ -235,7 +235,7 @@ class EdgeTTSProvider(TTSProvider):
             logger.error("edge-tts not installed")
         except Exception as e:
             classified_error = self._classify_error(e)
-            logger.error(f"Error loading Edge TTS voices: {classified_error}")
+            logger.error(f"Failed to load Edge TTS voices - {type(classified_error).__name__}: {classified_error}")
             # For voice loading errors, we don't raise - just return empty list
             # This allows the provider to still be considered "available" even if voice loading fails
 
@@ -511,12 +511,12 @@ class EdgeTTSProvider(TTSProvider):
             if output_path.exists() and output_path.stat().st_size > 0:
                 return True
             else:
-                logger.error(f"Edge TTS chunk conversion failed: file not created or empty")
+                logger.error(f"Failed to convert Edge TTS chunk - IOError: file not created or empty")
                 return False
 
         except Exception as e:
             error_msg = str(e)
-            logger.error(f"Error in Edge TTS chunk conversion: {error_msg}")
+            logger.error(f"Failed to convert Edge TTS chunk - {type(e).__name__}: {error_msg}")
             return False
         finally:
             # Clean up session when done

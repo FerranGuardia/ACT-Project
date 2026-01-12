@@ -296,7 +296,7 @@ class AudioMerger:
             for i, result in enumerate(chunk_files):
                 if isinstance(result, Exception):
                     failures.append((i, result))
-                    logger.error(f"Chunk {i+1} conversion failed: {result}")
+                    logger.error(f"Failed to convert chunk {i+1} - {type(result).__name__}: {result}")
                 else:
                     successful_files.append(result)
 
@@ -306,7 +306,7 @@ class AudioMerger:
             return successful_files
 
         except Exception as e:
-            logger.error(f"Parallel conversion failed: {e}")
+            logger.error(f"Failed to convert chunks in parallel - {type(e).__name__}: {e}")
             raise
 
     async def _convert_single_chunk_async(
@@ -482,13 +482,13 @@ class AudioMerger:
                 # Validate output path for security
                 is_valid, safe_output_path = validate_file_path(output_path, allow_create=True)
                 if not is_valid:
-                    logger.error(f"Invalid output path for ffmpeg: {safe_output_path}")
+                    logger.error(f"Failed to validate ffmpeg output path - ValueError: {safe_output_path}")
                     return False
 
                 # Validate temp file list path
                 is_valid, safe_temp_file = validate_file_path(temp_file_list, allow_create=False)
                 if not is_valid:
-                    logger.error(f"Invalid temp file path for ffmpeg: {safe_temp_file}")
+                    logger.error(f"Failed to validate ffmpeg temp file path - ValueError: {safe_temp_file}")
                     return False
 
                 cmd_args = _validate_subprocess_args([
@@ -530,7 +530,7 @@ class AudioMerger:
             logger.info(f"✓ Copied first chunk to output (fallback mode)")
             return True
         except Exception as e:
-            logger.error(f"Fallback copy failed: {e}")
+            logger.error(f"Failed to copy audio file in fallback mode - {type(e).__name__}: {e}")
             return False
 
     def merge_audio_files_with_silence(self, file_paths: List[Path], output_path: Path, silence_duration: float = 0.5) -> bool:
@@ -604,5 +604,5 @@ class AudioMerger:
                 return False
 
         except Exception as e:
-            logger.error(f"Error merging audio files with silence: {e}")
+            logger.error(f"Failed to merge audio files with silence - {type(e).__name__}: {e}")
             return False
