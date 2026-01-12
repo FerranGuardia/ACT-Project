@@ -336,14 +336,11 @@ class ScraperView(BaseView):
         elif selection_type == 'range':
             from_ch = chapter_selection.get('from', 1)
             to_ch = chapter_selection.get('to', 1)
-            return QueueItemText.CHAPTERS_RANGE_FORMAT.format(
-                from_ch=from_ch,
-                to_ch=to_ch
-            )
+            return f"Chapters {from_ch}-{to_ch}"
         else:
             chapters = chapter_selection.get('chapters', [])
             chapters_str = ', '.join(map(str, chapters))
-            return QueueItemText.CHAPTERS_LIST_FORMAT.format(chapters=chapters_str)
+            return f"Chapters: {chapters_str}"
     
     def _update_queue_display(self) -> None:
         """Update the queue list display."""

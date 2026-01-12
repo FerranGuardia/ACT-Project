@@ -93,9 +93,8 @@ class DialogMessages:
     NO_DIRECTORY_TITLE: Final[str] = "No Directory"
     NO_DIRECTORY_MSG: Final[str] = "Please select an output directory first"
     DIRECTORY_NOT_FOUND_TITLE: Final[str] = "Directory Not Found"
-    DIRECTORY_NOT_FOUND_MSG_FORMAT: Final[str] = "Directory does not exist:\n{path}"
+    DIRECTORY_NOT_FOUND_TITLE: Final[str] = "Directory Not Found"
     ERROR_OPENING_FOLDER_TITLE: Final[str] = "Error"
-    ERROR_OPENING_FOLDER_MSG_FORMAT: Final[str] = "Could not open folder:\n{error}"
 
 
 class QueueItemText:
@@ -103,8 +102,6 @@ class QueueItemText:
     
     ALL_CHAPTERS: Final[str] = "All chapters"
     CHAPTERS_PREFIX: Final[str] = "Chapters "
-    CHAPTERS_RANGE_FORMAT: Final[str] = "Chapters {from_ch}-{to_ch}"
-    CHAPTERS_LIST_FORMAT: Final[str] = "Chapters: {chapters}"
     
     # Validation messages
     NO_URL_MSG: Final[str] = "Please enter a novel URL"
