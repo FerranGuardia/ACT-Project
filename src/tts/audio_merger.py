@@ -398,7 +398,7 @@ class AudioMerger:
             return stat.st_size > 0
 
         except (OSError, IOError) as e:
-            logger.debug(f"Audio file verification failed for {file_path}: {e}")
+            logger.warning(f"Audio file verification failed for {file_path}: {e}")
             return False
     
     def merge_audio_chunks(self, chunk_files: List[Path], output_path: Path) -> bool:
