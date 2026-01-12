@@ -6,12 +6,13 @@ and resuming interrupted projects.
 """
 
 import json
-from pathlib import Path
-from typing import Optional, Dict, Any, List
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from core.logger import get_logger
 from core.config_manager import get_config
+from core.logger import get_logger
+from core.metadata_manager import get_metadata_manager
 
 from .chapter_manager import ChapterManager
 
@@ -29,53 +30,55 @@ class ProjectManager:
     def __init__(self, project_name: str, base_projects_dir: Optional[Path] = None):
         """
         Initialize project manager.
-        
+
         Args:
             project_name: Name of the project
             base_projects_dir: Base directory for projects. If None, uses config default
         """
         self.config = get_config()
+        self.metadata_manager = get_metadata_manager()
         self.project_name = project_name
-        
+
         # Get base projects directory
         if base_projects_dir is None:
             projects_dir_str = self.config.get("paths.projects_dir")
             base_projects_dir = Path(projects_dir_str)
-        
+
         self.base_projects_dir = base_projects_dir
         self.base_projects_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Project directory and metadata file
         self.project_dir = base_projects_dir / self._sanitize_filename(project_name)
         self.metadata_file = self.project_dir / "project.json"
-        
-        # Project metadata
+
+        # Project metadata (local project-specific data)
         self.metadata: Dict[str, Any] = {
             "name": project_name,
             "created_at": None,
             "updated_at": None,
-            "novel_url": None,
-            "toc_url": None,
-            "novel_title": None,
-            "novel_author": None,
+            "toc_url": None,  # URL used for this specific project
             "total_chapters": 0,
             "completed_chapters": 0,
             "status": "new"
         }
-        
+
         # Chapter manager
         self.chapter_manager: Optional[ChapterManager] = None
     
-    def _sanitize_filename(self, name: str) -> str:
+    def _sanitize_filename(self, name) -> str:
         """
         Sanitize filename by removing invalid characters.
-        
+
         Args:
-            name: Original name
-            
+            name: Original name (will be converted to string)
+
         Returns:
             Sanitized name safe for filesystem
         """
+        # Ensure name is a string
+        if not isinstance(name, str):
+            name = str(name)
+
         invalid_chars = '<>:"/\\|?*'
         for char in invalid_chars:
             name = name.replace(char, '_')
@@ -93,7 +96,7 @@ class ProjectManager:
     ) -> None:
         """
         Create a new project.
-        
+
         Args:
             novel_url: URL of the novel
             toc_url: URL of the table of contents
@@ -102,50 +105,70 @@ class ProjectManager:
         """
         # Create project directory
         self.project_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Set metadata
+
+        # Store novel metadata centrally if we have a novel URL
+        if novel_url or toc_url:
+            novel_metadata = {}
+            if novel_title:
+                novel_metadata["title"] = novel_title
+            if novel_author:
+                novel_metadata["author"] = novel_author
+            if novel_url:
+                novel_metadata["novel_url"] = novel_url
+
+            # Use the first available URL as the key for metadata storage
+            metadata_url = novel_url or toc_url
+            if metadata_url:
+                self.metadata_manager.set_novel_metadata(metadata_url, novel_metadata)
+
+        # Set project-specific metadata
         now = datetime.now().isoformat()
         self.metadata.update({
             "created_at": now,
             "updated_at": now,
-            "novel_url": novel_url,
             "toc_url": toc_url,
-            "novel_title": novel_title,
-            "novel_author": novel_author,
             "status": "created"
         })
-        
+
+        # Add optional fields to project metadata if provided
+        if novel_url:
+            self.metadata["novel_url"] = novel_url
+        if novel_title:
+            self.metadata["novel_title"] = novel_title
+        if novel_author:
+            self.metadata["novel_author"] = novel_author
+
         # Initialize chapter manager
         self.chapter_manager = ChapterManager()
-        
+
         logger.info(f"Created project: {self.project_name}")
     
     def load_project(self) -> bool:
         """
         Load project from disk.
-        
+
         Returns:
             True if project was loaded successfully
         """
         if not self.metadata_file.exists():
             logger.warning(f"Project file not found: {self.metadata_file}")
             return False
-        
+
         try:
             with open(self.metadata_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            
-            # Load metadata
+
+            # Load project metadata
             self.metadata = data.get("metadata", {})
-            
+
             # Load chapter manager
             chapters_data = data.get("chapters", {})
             self.chapter_manager = ChapterManager.from_dict(chapters_data)
-            
+
             logger.info(f"Loaded project: {self.project_name}")
             logger.debug(f"Project has {self.chapter_manager.get_total_count()} chapters")
             return True
-            
+
         except Exception as e:
             logger.error(f"Error loading project: {e}")
             return False
@@ -202,12 +225,35 @@ class ProjectManager:
     
     def get_metadata(self) -> Dict[str, Any]:
         """
-        Get project metadata.
-        
+        Get project metadata, including centralized novel metadata.
+
         Returns:
-            Dictionary with project metadata
+            Dictionary with combined project and novel metadata
         """
-        return self.metadata.copy()
+        # Start with project metadata
+        combined_metadata = self.metadata.copy()
+
+        # Get novel metadata from centralized manager
+        toc_url = self.metadata.get("toc_url")
+        novel_url = self.metadata.get("novel_url")
+
+        # Try to find novel metadata using available URLs
+        novel_metadata = None
+        if toc_url:
+            novel_metadata = self.metadata_manager.get_novel_metadata(toc_url)
+        if not novel_metadata and novel_url:
+            novel_metadata = self.metadata_manager.get_novel_metadata(novel_url)
+
+        # Merge novel metadata into combined result
+        if novel_metadata:
+            # Add novel-specific metadata, preferring centralized data over project data
+            combined_metadata.update({
+                "novel_title": novel_metadata.get("title", combined_metadata.get("novel_title")),
+                "novel_author": novel_metadata.get("author", combined_metadata.get("novel_author")),
+                "novel_url": novel_metadata.get("novel_url", combined_metadata.get("novel_url")),
+            })
+
+        return combined_metadata
     
     def get_chapter_manager(self) -> Optional[ChapterManager]:
         """
@@ -253,11 +299,12 @@ class ProjectManager:
     def clear_project_data(self) -> None:
         """
         Clear project data (chapters and progress) without deleting files.
-        
+
         This resets the chapter manager and clears progress tracking,
         allowing the project to be re-processed from scratch.
-        
+
         Deletes the project.json file to ensure a completely fresh start.
+        Note: Novel metadata in the centralized store is preserved.
         """
         # Delete the project file to ensure fresh start
         if self.metadata_file.exists():
@@ -266,24 +313,23 @@ class ProjectManager:
                 logger.info(f"Deleted project file: {self.metadata_file}")
             except Exception as e:
                 logger.error(f"Error deleting project file: {e}")
-        
+
         # Reset chapter manager
         self.chapter_manager = ChapterManager()
-        
+
         # Reset progress metadata to initial state
+        # Keep toc_url for potential metadata lookup
+        toc_url = self.metadata.get("toc_url")
         self.metadata = {
             "name": self.project_name,
             "created_at": None,
             "updated_at": None,
-            "novel_url": None,
-            "toc_url": None,
-            "novel_title": None,
-            "novel_author": None,
+            "toc_url": toc_url,  # Preserve for metadata lookup
             "total_chapters": 0,
             "completed_chapters": 0,
             "status": "new"
         }
-        
+
         logger.info(f"Cleared project data for: {self.project_name} (project file deleted)")
     
     @staticmethod
