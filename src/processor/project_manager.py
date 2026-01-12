@@ -8,7 +8,7 @@ and resuming interrupted projects.
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from core.config_manager import get_config
 from core.logger import get_logger
@@ -27,7 +27,7 @@ class ProjectManager:
     resuming interrupted processing.
     """
     
-    def __init__(self, project_name: str, base_projects_dir: Optional[Path] = None):
+    def __init__(self, project_name: str, base_projects_dir: Path | None = None):
         """
         Initialize project manager.
 
@@ -63,7 +63,7 @@ class ProjectManager:
         }
 
         # Chapter manager
-        self.chapter_manager: Optional[ChapterManager] = None
+        self.chapter_manager: ChapterManager | None = None
     
     def _sanitize_filename(self, name) -> str:
         """
@@ -89,10 +89,10 @@ class ProjectManager:
     
     def create_project(
         self,
-        novel_url: Optional[str] = None,
-        toc_url: Optional[str] = None,
-        novel_title: Optional[str] = None,
-        novel_author: Optional[str] = None
+        novel_url: str | None = None,
+        toc_url: str | None = None,
+        novel_title: str | None = None,
+        novel_author: str | None = None
     ) -> None:
         """
         Create a new project.
@@ -255,7 +255,7 @@ class ProjectManager:
 
         return combined_metadata
     
-    def get_chapter_manager(self) -> Optional[ChapterManager]:
+    def get_chapter_manager(self) -> ChapterManager | None:
         """
         Get the chapter manager for this project.
         
@@ -333,7 +333,7 @@ class ProjectManager:
         logger.info(f"Cleared project data for: {self.project_name} (project file deleted)")
     
     @staticmethod
-    def list_projects(base_projects_dir: Optional[Path] = None) -> List[Dict[str, Any]]:
+    def list_projects(base_projects_dir: Path | None = None) -> List[Dict[str, Any]]:
         """
         List all projects in the projects directory.
         
