@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, cast
 
 from .constants import get_version, DEFAULT_AUDIO_BITRATE, DEFAULT_AUDIO_FORMAT
-from .logger import get_logger
+from core.logger import get_logger
 
 logger = get_logger("core.config_manager")
 
