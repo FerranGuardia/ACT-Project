@@ -44,7 +44,11 @@ logger = get_logger("ui.scraper_view")
 
 class ScraperView(BaseView):
     """Scraper mode view for extracting text from webnovels."""
-    
+
+    def get_view_title(self) -> str:
+        """Get the title for this view."""
+        return "Scraper"
+
     def __init__(self, parent=None):
         # Initialize data structures first
         self.scraping_thread: Optional[ScrapingThread] = None

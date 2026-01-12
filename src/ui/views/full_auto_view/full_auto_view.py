@@ -40,7 +40,11 @@ logger = get_logger("ui.full_auto_view")
 
 class FullAutoView(BaseView):
     """Full automation view with queue system."""
-    
+
+    def get_view_title(self) -> str:
+        """Get the title for this view."""
+        return "Full Auto"
+
     def __init__(self, parent=None):
         self.queue_items: List[Dict] = []
         self.current_processing: Optional[ProcessingThread] = None

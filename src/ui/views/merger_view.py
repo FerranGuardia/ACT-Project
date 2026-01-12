@@ -223,7 +223,11 @@ class AudioFileItem(QWidget):
 
 class MergerView(BaseView):
     """Audio merger view for combining audio files."""
-    
+
+    def get_view_title(self) -> str:
+        """Get the title for this view."""
+        return "Audio Merger"
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.file_paths: List[str] = []

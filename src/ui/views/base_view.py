@@ -20,10 +20,11 @@ logger = get_logger("ui.base_view")
 
 class BaseView(QWidget):
     """Base class for all views."""
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._setup_base_ui()
+        self._add_header()
         self.setup_ui()
         # Add stretch BEFORE footer to push content up and footer to bottom
         self.get_main_layout().addStretch()
@@ -49,6 +50,48 @@ class BaseView(QWidget):
 
         # Store layout for subclasses to use
         self._main_layout = main_layout
+
+    def _add_header(self):
+        """Add header with title and back button."""
+        from PySide6.QtWidgets import QLabel, QHBoxLayout, QPushButton
+        from PySide6.QtGui import QFont
+        from ui.view_config import ViewConfig
+        from ui.landing_page_config import LandingPageConfig
+        from ui.styles import get_font_family
+        from ui.utils.event_logger import UIEventLogger
+
+        # Create header layout
+        header_layout = QHBoxLayout()
+        header_layout.setContentsMargins(0, 0, 0, 10)  # Small bottom margin
+
+        # Title label on the left - use same font as card titles
+        self.title_label = QLabel(self.get_view_title())
+        title_font = QFont(
+            get_font_family(),
+            LandingPageConfig.CARD_TITLE_FONT_SIZE,
+            QFont.Weight.Bold
+        )
+        self.title_label.setFont(title_font)
+        # Use same color as card titles (from get_card_title_style)
+        from ui.styles import COLORS
+        self.title_label.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
+        header_layout.addWidget(self.title_label)
+
+        # Add stretch to push back button to the right
+        header_layout.addStretch()
+
+        # Back button on the right
+        self.back_button = QPushButton(ViewConfig.BACK_BUTTON_TEXT)
+        self.back_button.setMinimumHeight(ViewConfig.BACK_BUTTON_HEIGHT)
+        self.back_button.setMinimumWidth(ViewConfig.BACK_BUTTON_WIDTH)
+        self.back_button.setProperty("class", "primary")
+
+        # Connect back button - need to find main window reference
+        self.back_button.clicked.connect(self._on_back_clicked)
+        header_layout.addWidget(self.back_button)
+
+        # Add header to main layout
+        self._main_layout.addLayout(header_layout)
 
     def _add_footer(self):
         """Add footer with version and creator information."""
@@ -97,6 +140,20 @@ class BaseView(QWidget):
         """Set the main layout (if custom layout is needed)."""
         self._main_layout = layout
         self.setLayout(layout)
+
+    def get_view_title(self) -> str:
+        """Get the title for this view. Should be overridden by subclasses."""
+        return "View"
+
+    def _on_back_clicked(self):
+        """Handle back button click."""
+        from ui.utils.event_logger import UIEventLogger
+
+        UIEventLogger.log_button_click("Back", "pressed")
+        # Find main window and navigate back to landing page
+        main_window = self.window()
+        if hasattr(main_window, 'show_landing_page'):
+            main_window.show_landing_page()
 
 
 __all__ = ['BaseView']
