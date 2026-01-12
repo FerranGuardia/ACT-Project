@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from core.logger import get_logger
+from core.constants import PREVIEW_TEXT_LENGTH
 
 from .conversion_coordinator import TTSConversionCoordinator
 from .voice_resolver import VoiceResolver
@@ -372,7 +373,7 @@ class TTSEngine:
         logger.info(f"Text size: {text_bytes_size} bytes")
 
         # Debug: Check text content
-        if len(text) < 200:
+        if len(text) < PREVIEW_TEXT_LENGTH:
             logger.info(f"Text preview: '{text}'")
         else:
-            logger.info(f"Text preview: '{text[:200]}...'")
+            logger.info(f"Text preview: '{text[:PREVIEW_TEXT_LENGTH]}...'")

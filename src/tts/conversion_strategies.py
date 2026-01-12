@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import List, Optional, TYPE_CHECKING, Any
 
 from core.logger import get_logger
+from core.constants import PREVIEW_TEXT_LENGTH
 
 from .providers.base_provider import TTSProvider
 from .providers.provider_manager import TTSProviderManager
@@ -90,10 +91,10 @@ class ConversionStrategy(ABC):
         logger.info(f"Text size: {text_bytes_size} bytes")
 
         # Debug: Check text content
-        if len(text) < 200:
+        if len(text) < PREVIEW_TEXT_LENGTH:
             logger.info(f"Text preview: '{text}'")
         else:
-            logger.info(f"Text preview: '{text[:200]}...'")
+            logger.info(f"Text preview: '{text[:PREVIEW_TEXT_LENGTH]}...'")
 
 
 class DirectConversionStrategy(ConversionStrategy):
