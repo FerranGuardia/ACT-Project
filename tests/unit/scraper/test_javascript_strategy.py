@@ -186,14 +186,14 @@ class TestJavaScriptStrategy:
         """Test that duplicate URLs are removed."""
         html_content = """
         <script>
-        var chapters = ["/chapter-dup.html", "/chapter-unique1.html"];
-        let chapterList = ["/chapter-dup.html", "/chapter-unique2.html"];
+        var chapters = ["/chapter-1-dup.html", "/chapter-2-unique.html"];
+        let chapterList = ["/chapter-1-dup.html", "/chapter-3-unique.html"];
         </script>
         """
 
         urls = strategy._extract_from_javascript(html_content)
         # Should maintain order and remove duplicates
-        assert urls == ["/chapter-dup.html", "/chapter-unique1.html", "/chapter-unique2.html"]
+        assert urls == ["/chapter-1-dup.html", "/chapter-2-unique.html", "/chapter-3-unique.html"]
 
     def test_parse_array_content(self, strategy):
         """Test parsing JavaScript array content."""

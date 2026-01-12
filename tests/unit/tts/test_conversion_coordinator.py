@@ -50,6 +50,13 @@ class TestTTSConversionCoordinator:
 
         mock_strategy = MagicMock()
         mock_strategy.convert.return_value = True
+        # Mock the convert method to actually create the file
+        def mock_convert(**kwargs):
+            output_path = kwargs.get('output_path')
+            if output_path:
+                output_path.write_bytes(b"fake audio content")
+            return True
+        mock_strategy.convert.side_effect = mock_convert
         self.coordinator.strategy_selector.select_strategy.return_value = mock_strategy
 
         # Create test output path

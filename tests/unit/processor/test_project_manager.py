@@ -116,7 +116,8 @@ class TestProjectManager:
             
             assert success is True
             assert new_manager.metadata["novel_title"] == "Test Novel"
-            assert new_manager.get_chapter_manager().get_total_count() == 1
+            assert new_manager.chapter_manager is not None
+            assert new_manager.chapter_manager.get_total_count() == 1
     
     def test_load_project_nonexistent(self, project_manager):
         """Test loading nonexistent project."""

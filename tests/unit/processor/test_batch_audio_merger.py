@@ -115,7 +115,7 @@ class TestBatchAudioMerger:
 
         # Mock the _audio_merger attribute to prevent lazy initialization
         mock_merger = MagicMock()
-        mock_merger.merge_audio_files.return_value = False
+        mock_merger.merge_audio_files_with_silence.return_value = False
         monkeypatch.setattr(merger, '_audio_merger', mock_merger)
 
         batch_files = [temp_project / "audio" / "chapter_01.mp3"]

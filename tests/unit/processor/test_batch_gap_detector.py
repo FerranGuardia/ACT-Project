@@ -222,13 +222,22 @@ class TestBatchGapDetector:
         mock_file_manager.get_audio_dir.return_value = mock_audio_dir
         mock_file_manager._sanitize_filename.return_value = "test_project"
 
-        # Mock that first batch exists, second doesn't
-        def mock_file_exists(batch_file):
-            return "chapters_001-010" in str(batch_file)
+        # Mock batch files - first exists, second doesn't
+        mock_batch_file_1_10 = Mock()
+        mock_batch_file_1_10.exists.return_value = True
 
-        mock_batch_file = Mock()
-        mock_batch_file.exists.side_effect = lambda: mock_file_exists(mock_batch_file)
-        mock_merged_dir.__truediv__ = Mock(return_value=mock_batch_file)
+        mock_batch_file_11_20 = Mock()
+        mock_batch_file_11_20.exists.return_value = False
+
+        # Mock the division operator to return the appropriate mock file
+        def mock_truediv(path, filename):
+            if "test_project_chapters_0001-0010.mp3" in str(filename):
+                return mock_batch_file_1_10
+            elif "test_project_chapters_0011-0020.mp3" in str(filename):
+                return mock_batch_file_11_20
+            return Mock()
+
+        mock_merged_dir.__truediv__ = mock_truediv
 
         result = batch_detector._find_missing_batches(expected_batches)
         assert result == [(11, 20)]
