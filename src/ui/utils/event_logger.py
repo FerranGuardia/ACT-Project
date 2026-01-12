@@ -68,7 +68,17 @@ class UIEventLogger:
             
             if not has_console:
                 import sys
-                console_handler = logging.StreamHandler(sys.stdout)
+                import io
+
+                # Wrap stdout with UTF-8 encoding to handle Unicode characters
+                try:
+                    # Try to create a UTF-8 wrapper for stdout
+                    utf8_stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+                    console_handler = logging.StreamHandler(utf8_stdout)
+                except (AttributeError, OSError):
+                    # Fallback to regular stdout if wrapping fails
+                    console_handler = logging.StreamHandler(sys.stdout)
+
                 console_handler.setLevel(logging.DEBUG)
                 formatter = logging.Formatter(
                     "[UI EVENT] %(levelname)-8s | %(message)s"
@@ -101,8 +111,8 @@ class UIEventLogger:
         
         console = cls._get_console_logger()
         
-        # Build message (using text instead of emojis to avoid Unicode encoding issues)
-        prefix_map = {
+        # Build message
+        emoji_map = {
             cls.CLICK: "[CLICK]",
             cls.INPUT: "[INPUT]",
             cls.NAVIGATION: "[NAV]",
@@ -111,10 +121,10 @@ class UIEventLogger:
             cls.DEBUG: "[DEBUG]",
         }
 
-        prefix = prefix_map.get(category, "[EVENT]")
+        emoji = emoji_map.get(category, "[EVENT]")
         
         # Format main message
-        full_msg = f"{prefix} [{category}] {message}"
+        full_msg = f"{emoji} [{category}] {message}"
         
         if widget_name:
             full_msg += f" | Widget: {widget_name}"
