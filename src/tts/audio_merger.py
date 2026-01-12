@@ -124,7 +124,15 @@ class AudioMerger:
         return self._chunk_characters(text, max_bytes)
 
     def _split_by_sentences(self, text: str) -> List[str]:
-        """Split text by sentence boundaries, preserving punctuation."""
+        """
+        Split text by sentence boundaries, preserving punctuation.
+
+        Args:
+            text: Text to split into sentences
+
+        Returns:
+            List of sentence strings
+        """
         # Split on sentence endings followed by whitespace or end of string
         pattern = r'(?<=[.!?])\s+|(?<=[.!?])$'
         parts = re.split(pattern, text)
@@ -138,7 +146,16 @@ class AudioMerger:
         return sentences
 
     def _chunk_sentences(self, sentences: List[str], max_bytes: int) -> List[str]:
-        """Chunk sentences while respecting byte limits."""
+        """
+        Chunk sentences while respecting byte limits.
+
+        Args:
+            sentences: List of sentence strings to chunk
+            max_bytes: Maximum bytes per chunk
+
+        Returns:
+            List of text chunks
+        """
         chunks = []
         current_chunk = ""
         current_bytes = 0

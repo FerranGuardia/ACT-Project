@@ -269,7 +269,15 @@ class PaginationDetector:
         return []
 
     def _count_chapters_on_page(self, page: Any) -> int:
-        """Count chapter links on the current page."""
+        """
+        Count chapter links on the current page.
+
+        Args:
+            page: Playwright page object
+
+        Returns:
+            Number of chapter links found
+        """
         try:
             links = page.query_selector_all('a[href]')
             chapter_count = 0
