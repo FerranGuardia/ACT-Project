@@ -11,7 +11,7 @@ from ui.views.base_queue_manager import BaseQueueManager
 from ui.ui_constants import StatusMessages
 from utils.validation import get_validator, ValidationError
 
-logger = get_logger("ui.full_auto_view.queue_manager")
+logger = get_logger("ui.full_auto_view.full_auto_queue_manager")
 
 
 class QueueManager(BaseQueueManager):

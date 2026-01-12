@@ -184,6 +184,20 @@ class TTSResourceManager:
         temp_file = temp_dir / f"tts_temp_{timestamp}_{id(self)}{suffix}"
         return temp_file
 
+    def create_tts_chunks_temp_dir(self) -> Path:
+        """
+        Create a temporary directory for TTS audio chunks.
+
+        Returns:
+            Path to the created temporary directory
+        """
+        import tempfile
+        temp_base = Path(tempfile.gettempdir())
+        timestamp = int(time.time() * 1000)
+        temp_dir = temp_base / f"tts_chunks_{timestamp}"
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        return temp_dir
+
     def _create_temp_directory(self) -> Path:
         """Create a unique temporary directory."""
         import tempfile

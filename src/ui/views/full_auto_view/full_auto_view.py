@@ -32,7 +32,7 @@ from ui.views.full_auto_view.processing_thread import ProcessingThread
 from ui.views.full_auto_view.queue_section import QueueSection
 from ui.views.full_auto_view.current_processing_section import CurrentProcessingSection
 from ui.views.full_auto_view.controls_section import ControlsSection
-from ui.views.full_auto_view.queue_manager import QueueManager
+from ui.views.full_auto_view.full_auto_queue_manager import QueueManager
 from ui.views.full_auto_view.handlers import FullAutoViewHandlers
 
 logger = get_logger("ui.full_auto_view")

@@ -177,8 +177,7 @@ class ChunkedConversionStrategy(ConversionStrategy):
         """Convert text using chunked approach with parallel processing."""
         try:
             # Create temporary directory for chunks
-            temp_dir = Path(tempfile.gettempdir()) / f"tts_chunks_{int(time.time() * 1000)}"
-            temp_dir.mkdir(parents=True, exist_ok=True)
+            temp_dir = self.resource_manager.create_tts_chunks_temp_dir()
             self.resource_manager.register_temp_directory(temp_dir)
 
             # Build final text for conversion

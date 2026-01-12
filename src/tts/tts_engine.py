@@ -227,9 +227,7 @@ class TTSEngine:
         """Delegate to AudioMerger for chunked conversion with merging."""
         try:
             # Use temp directory for chunks
-            import time
-            temp_dir = Path(tempfile.gettempdir()) / f"tts_chunks_{int(time.time() * 1000)}"
-            temp_dir.mkdir(parents=True, exist_ok=True)
+            temp_dir = self.resource_manager.create_tts_chunks_temp_dir()
             
             try:
                 # Chunk the text
