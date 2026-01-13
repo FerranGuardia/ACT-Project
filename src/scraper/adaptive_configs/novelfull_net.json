@@ -1,17 +1,17 @@
 {
   "domain": "novelfull.net",
   "strategy_success_rates": {
-    "html_parsing": 0.9999991419231335
+    "html_parsing": 0.9999993049577381
   },
   "optimal_strategy_order": [],
   "known_patterns": {},
   "last_successful_strategy": "html_parsing",
   "average_response_times": {
-    "html_parsing": 0.8111142200434333
+    "html_parsing": 0.8320561886415225
   },
-  "total_attempts": 126,
-  "successful_attempts": 126,
-  "last_updated": 1768309209.9728546,
+  "total_attempts": 128,
+  "successful_attempts": 128,
+  "last_updated": 1768324883.3271282,
   "custom_selectors": [],
   "pagination_patterns": [],
   "api_endpoints": []

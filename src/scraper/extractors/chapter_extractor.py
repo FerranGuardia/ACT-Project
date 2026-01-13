@@ -7,6 +7,7 @@ Handles extracting chapter content and titles from individual chapter pages.
 import re
 import time
 from typing import Any, Callable, Optional, Tuple
+from urllib.parse import urlparse
 
 try:
     from bs4 import BeautifulSoup  # type: ignore[import-untyped]
@@ -39,6 +40,7 @@ except ImportError:
 
 from core.logger import get_logger
 from text_utils import clean_text
+from utils.validation import validate_url
 
 from ..chapter_parser import extract_chapter_number
 from ..config import (CONTENT_SELECTORS, REQUEST_DELAY, REQUEST_TIMEOUT,
@@ -65,6 +67,11 @@ class ChapterExtractor:
             delay: Delay between requests in seconds
         """
         self.base_url = base_url
+        try:
+            parsed = urlparse(base_url)
+            self._base_hostname = (parsed.hostname or parsed.netloc or "").lower().lstrip("www.")
+        except Exception:
+            self._base_hostname = ""
         self.timeout = timeout
         self.delay = delay
         self._session = None
@@ -174,6 +181,27 @@ class ChapterExtractor:
             try:
                 # Make request
                 response = session.get(chapter_url, timeout=self.timeout, allow_redirects=True)  # type: ignore[attr-defined]
+
+                # Validate final URL after redirects (SSRF + cross-site pivot protection).
+                # Only do this if a redirect actually happened; unit tests often mock
+                # `response.url` as a MagicMock.
+                try:
+                    final_url_raw = getattr(response, "url", None)  # type: ignore[attr-defined]
+                    final_url = (
+                        final_url_raw
+                        if isinstance(final_url_raw, str) and final_url_raw.startswith(("http://", "https://"))
+                        else chapter_url
+                    )
+                    redirected = bool(getattr(response, "history", None)) or (final_url != chapter_url)
+                    if redirected:
+                        is_valid_final, final_or_err = validate_url(final_url)
+                        if not is_valid_final:
+                            return None, None, f"Unsafe redirect target: {final_or_err}"
+                        final_host = (urlparse(final_or_err).hostname or "").lower().lstrip("www.")
+                        if self._base_hostname and not (final_host == self._base_hostname or final_host.endswith("." + self._base_hostname)):
+                            return None, None, "Blocked redirect to a different site"
+                except Exception:
+                    return None, None, "Failed to validate redirect target"
                 
                 if response.status_code == 200:  # type: ignore[attr-defined]
                     break  # Success, exit retry loop
@@ -215,41 +243,42 @@ class ChapterExtractor:
         html_content: bytes = response.content  # type: ignore[attr-defined]
 
         content_encoding = response.headers.get('Content-Encoding', '').lower()  # type: ignore[attr-defined]
-        print(f"DEBUG: Content-Encoding header: {content_encoding}")
-        print(f"DEBUG: Raw response content length: {len(html_content)} bytes")
-        print(f"DEBUG: Content starts with: {html_content[:100]}")
+        logger.debug(f"Content-Encoding header: {content_encoding}")
+        logger.debug(f"Raw response content length: {len(html_content)} bytes")
 
         # Check if content looks like HTML
         try:
             text_preview = html_content[:200].decode('utf-8', errors='ignore')
             if '<!DOCTYPE html>' in text_preview or '<html' in text_preview:
-                print("DEBUG: Content appears to be valid HTML")
+                logger.debug("Content appears to be valid HTML")
             else:
-                print("DEBUG: Content does not appear to be HTML - might be compressed or binary")
+                logger.debug("Content does not appear to be HTML - might be compressed or binary")
                 # Try manual brotli decompression as fallback
                 try:
                     import brotli
                     decompressed = brotli.decompress(html_content)
                     html_content = decompressed
-                    print(f"DEBUG: Manual brotli decompression successful: {len(html_content)} bytes")
+                    logger.debug(f"Manual brotli decompression successful: {len(html_content)} bytes")
                 except Exception as e:
-                    print(f"DEBUG: Manual brotli decompression also failed: {e}")
+                    logger.debug(f"Manual brotli decompression failed: {e}")
                     return None, None, f"Response content is not valid HTML and decompression failed"
         except UnicodeDecodeError:
-            print("DEBUG: Content is not valid UTF-8 text")
+            logger.debug("Content is not valid UTF-8 text")
             return None, None, "Response content is not valid text"
 
-        print(f"DEBUG: Final HTML length: {len(html_content)} bytes")
+        logger.debug(f"Final HTML length: {len(html_content)} bytes")
         try:
             html_preview = html_content[:500].decode('utf-8', errors='replace')
-            print(f"DEBUG: HTML preview: {html_preview[:200]}...")
+            logger.debug(f"HTML preview: {html_preview[:200]}...")
         except Exception as e:
-            print(f"DEBUG: Could not decode HTML preview: {e}")
+            logger.debug(f"Could not decode HTML preview: {e}")
 
         soup = BeautifulSoup(html_content, "html.parser")  # type: ignore[arg-type, assignment]
-        print(f"DEBUG: Soup created, title in soup: {soup.find('title')}")
-        if soup.find('title'):
-            print(f"DEBUG: Title text: {soup.find('title').get_text()}")
+        try:
+            title_elem = soup.find('title')
+            logger.debug(f"Soup created, title element present: {bool(title_elem)}")
+        except Exception:
+            pass
         
         # Extract content and title
         content = self._extract_content(soup, should_stop)

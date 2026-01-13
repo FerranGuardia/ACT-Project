@@ -14,7 +14,7 @@ from PySide6.QtWidgets import QFileDialog
 
 from core.logger import get_logger
 from ui.ui_constants import QueueItemText
-from utils.validation import validate_directory_path
+from utils.validation import validate_directory_path, validate_url
 from ui.utils.error_handling import (
     show_no_directory_error,
     show_directory_not_found_error,
@@ -50,17 +50,19 @@ class ScraperViewHandlers:
         url = url_input.get_url()
         if not url:
             return False, QueueItemText.NO_URL_MSG
-        
-        try:
-            parsed = urlparse(url)
-            if not parsed.scheme or not parsed.netloc:
-                return False, QueueItemText.INVALID_URL_MSG
-        except Exception:
-            return False, QueueItemText.INVALID_URL_MSG
+
+        is_valid_url, url_or_err = validate_url(url)
+        if not is_valid_url:
+            return False, f"{QueueItemText.INVALID_URL_MSG} ({url_or_err})"
         
         output_dir = output_settings.get_output_dir()
         if not output_dir:
             return False, QueueItemText.NO_OUTPUT_DIR_MSG
+
+        # Validate directory path early so we don't queue unsafe writes
+        is_valid_dir, dir_or_err = validate_directory_path(output_dir, allow_create=True)
+        if not is_valid_dir:
+            return False, f"Invalid output directory: {dir_or_err}"
         
         # Check chapter selection
         if chapter_selection_section.is_specific_selected():

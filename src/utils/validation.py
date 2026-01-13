@@ -7,6 +7,9 @@ to prevent security vulnerabilities and improve reliability.
 
 import re
 import os
+import ipaddress
+import socket
+import time
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, Union
 from urllib.parse import urlparse
@@ -28,6 +31,7 @@ class InputValidator:
 
     def __init__(self):
         """Initialize validator with schemas"""
+        self._dns_cache: Dict[str, Tuple[float, Tuple[str, ...]]] = {}
         self.url_schema = {
             'url': {
                 'type': 'string',
@@ -106,6 +110,11 @@ class InputValidator:
                 error_msg = "; ".join(self.url_validator.errors.get('url', ['Invalid URL']))
                 return False, f"URL validation failed: {error_msg}"
 
+            # SSRF hardening: ensure parsed URL is safe to fetch
+            is_safe, reason = self._is_safe_fetch_url(clean_url)
+            if not is_safe:
+                return False, reason
+
             # Check for known novel sites
             if not self._is_supported_site(clean_url):
                 logger.warning(f"URL {clean_url} may not be a supported novel site")
@@ -175,6 +184,113 @@ class InputValidator:
         except Exception:
             # If parsing fails, return the cleaned version
             return url
+
+    def _is_safe_fetch_url(self, url: str) -> Tuple[bool, str]:
+        """
+        SSRF-focused URL safety checks.
+
+        This is intentionally stricter than simple URL syntax validation:
+        - blocks credentials in URL (user:pass@host)
+        - blocks localhost / private / link-local / multicast / reserved IPs
+        - resolves hostnames and blocks if any resolved IP is non-public
+        """
+        try:
+            parsed = urlparse(url)
+
+            if parsed.scheme not in ("http", "https"):
+                return False, "Only http/https URLs are allowed"
+
+            # Reject credentials in URL (common SSRF trick + credential leakage risk)
+            if parsed.username or parsed.password:
+                return False, "URLs containing credentials are not allowed"
+
+            hostname = (parsed.hostname or "").strip().lower()
+            if not hostname:
+                return False, "URL must include a hostname"
+
+            if self._is_local_hostname(hostname):
+                return False, "Localhost URLs are not allowed"
+
+            # If hostname is an IP literal, validate directly
+            ip_obj = self._parse_ip_literal(hostname)
+            if ip_obj is not None:
+                if self._is_non_public_ip(ip_obj):
+                    return False, "Private or non-public IP addresses are not allowed"
+                return True, ""
+
+            # Resolve hostname and ensure it does not map to private/non-public IP space
+            ips = self._resolve_host_ips(hostname)
+            if not ips:
+                return False, "Could not resolve hostname"
+
+            for ip_str in ips:
+                try:
+                    ip = ipaddress.ip_address(ip_str)
+                except ValueError:
+                    continue
+                if self._is_non_public_ip(ip):
+                    return False, "Hostname resolves to a private or non-public IP address"
+
+            return True, ""
+
+        except Exception as e:
+            logger.error(f"Error checking URL safety {url}: {e}")
+            return False, "URL failed safety checks"
+
+    def _is_local_hostname(self, hostname: str) -> bool:
+        host = hostname.strip().lower().rstrip(".")
+        if host in {"localhost"}:
+            return True
+        # Common local-only names
+        if host.endswith(".localhost") or host.endswith(".local"):
+            return True
+        return False
+
+    def _parse_ip_literal(self, hostname: str) -> Optional[ipaddress._BaseAddress]:
+        try:
+            return ipaddress.ip_address(hostname)
+        except ValueError:
+            return None
+
+    def _is_non_public_ip(self, ip: ipaddress._BaseAddress) -> bool:
+        # Covers private, loopback, link-local, multicast, unspecified, reserved
+        return bool(
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_multicast
+            or ip.is_unspecified
+            or ip.is_reserved
+        )
+
+    def _resolve_host_ips(self, hostname: str) -> Tuple[str, ...]:
+        # Small cache to avoid repeated DNS lookups during queue validation
+        now = time.time()
+        cache_ttl = 300.0
+        if now is not None and hostname in self._dns_cache:
+            ts, ips = self._dns_cache[hostname]
+            if (now - ts) <= cache_ttl:
+                return ips
+
+        try:
+            infos = socket.getaddrinfo(hostname, None)
+        except Exception as e:
+            logger.debug(f"DNS resolution failed for {hostname}: {e}")
+            return tuple()
+
+        ips_set = set()
+        for family, _type, _proto, _canonname, sockaddr in infos:
+            try:
+                if family == socket.AF_INET:
+                    ips_set.add(sockaddr[0])
+                elif family == socket.AF_INET6:
+                    ips_set.add(sockaddr[0])
+            except Exception:
+                continue
+
+        ips = tuple(sorted(ips_set))
+        self._dns_cache[hostname] = (now, ips)
+        return ips
 
     def _sanitize_text(self, text: str) -> str:
         """
@@ -518,3 +634,12 @@ def validate_directory_path(dir_path: Union[str, Path], allow_create: bool = Tru
         Tuple of (is_valid, error_message_or_clean_path)
     """
     return get_validator().validate_directory_path(dir_path, allow_create)
+
+
+# Compatibility shim:
+# Some parts of the codebase (and older tests) may import this module under
+# different names depending on packaging/layout. Ensure `utils.validation`
+# always refers to this module instance so `unittest.mock.patch('utils.validation...')`
+# works reliably.
+import sys as _sys
+_sys.modules.setdefault("utils.validation", _sys.modules[__name__])

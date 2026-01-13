@@ -112,8 +112,14 @@ class BrowserAutomationStrategy(BaseDetectionStrategy):
                     # Set up request interception for API monitoring
                     api_urls = []
                     def handle_request(request):
-                        if any(keyword in request.url.lower() for keyword in ['chapter', 'api', 'ajax']):
-                            api_urls.append(request.url)
+                        try:
+                            url = request.url
+                            if any(keyword in url.lower() for keyword in ['chapter', 'api', 'ajax']):
+                                # Prevent cross-site pivots from third-party requests
+                                if self._is_same_site(url):
+                                    api_urls.append(url)
+                        except Exception:
+                            pass
 
                     page.on('request', handle_request)
 
@@ -262,6 +268,8 @@ class BrowserAutomationStrategy(BaseDetectionStrategy):
 
         for api_url in api_urls[:5]:  # Limit to first 5 to avoid too many requests
             try:
+                if not self._is_same_site(api_url):
+                    continue
                 # Navigate to the API URL
                 await page.goto(api_url)
 
@@ -424,32 +432,6 @@ class BrowserAutomationStrategy(BaseDetectionStrategy):
                 filtered_urls.append(url)
 
         return filtered_urls
-
-    def _extract_novel_identifier(self) -> Optional[str]:
-        """
-        Extract novel identifier from base URL to filter URLs belonging to the same novel.
-
-        For NovelFull: https://novelfull.net/tensei-shitara-slime-datta-ken-wn.html
-        -> identifier: "tensei-shitara-slime-datta-ken-wn"
-
-        For other sites: Extract the path component that identifies the novel.
-        """
-        try:
-            from urllib.parse import urlparse
-
-            parsed = urlparse(self.base_url)
-            path = parsed.path.strip('/')
-
-            # For NovelFull, remove .html extension if present
-            if path.endswith('.html'):
-                path = path[:-5]  # Remove .html
-
-            # Return the path as identifier (should be the novel slug/name)
-            return path if path else None
-
-        except Exception as e:
-            logger.debug(f"Failed to extract novel identifier from {self.base_url}: {e}")
-            return None
 
     def _extract_novel_identifier(self) -> Optional[str]:
         """

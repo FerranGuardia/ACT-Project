@@ -13,6 +13,7 @@ from typing import Any, Callable, List, Optional, Tuple
 from core.logger import get_logger
 
 from ..universal_url_detector import BaseDetectionStrategy, DetectionResult
+from .. import chapter_number
 
 logger = get_logger("scraper.strategies.javascript")
 
@@ -242,11 +243,9 @@ class JavaScriptStrategy(BaseDetectionStrategy):
 
     def _analyze_coverage(self, urls: List[str]) -> Optional[Tuple[int, int]]:
         """Analyze the chapter number coverage range."""
-        from ..chapter_parser import extract_chapter_number
-
         chapter_nums = []
         for url in urls:
-            num = extract_chapter_number(url)
+            num = chapter_number.extract_chapter_number(url)
             if num:
                 chapter_nums.append(num)
 

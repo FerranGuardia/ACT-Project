@@ -8,9 +8,11 @@ Handles persistence, optimization, and intelligent strategy selection.
 import json
 import os
 import time
+import re
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from urllib.parse import urlparse
+from pathlib import Path
 
 from core.logger import get_logger
 
@@ -140,7 +142,8 @@ class AdaptiveConfigManager:
     """Manages adaptive configurations for all sites."""
 
     def __init__(self, config_dir: str = None):
-        self.config_dir = config_dir or os.path.join(os.path.dirname(__file__), 'adaptive_configs')
+        # Default to a user-writable config directory (avoid writing into src/ at runtime)
+        self.config_dir = config_dir or str(Path.home() / ".act" / "adaptive_configs")
         self.site_profiles: Dict[str, SiteProfile] = {}
         self._ensure_config_dir()
         self._load_all_profiles()
@@ -152,8 +155,11 @@ class AdaptiveConfigManager:
 
     def _get_profile_path(self, domain: str) -> str:
         """Get the file path for a domain's profile."""
-        # Sanitize domain for filename
-        safe_domain = domain.replace('.', '_').replace('/', '_')
+        # Sanitize domain for filename (Windows-safe)
+        # Keep only alphanumerics, underscore, dash, and dot; replace the rest with '_'
+        safe_domain = re.sub(r"[^a-zA-Z0-9._-]+", "_", domain).strip("._-")
+        if not safe_domain:
+            safe_domain = "unknown"
         return os.path.join(self.config_dir, f"{safe_domain}.json")
 
     def _load_all_profiles(self):

@@ -5,11 +5,13 @@ Scraping Thread - Handles background scraping operations.
 import os
 from typing import List, Dict
 from threading import Event
+from urllib.parse import urlparse
 
 from PySide6.QtCore import QThread, Signal
 
 from core.logger import get_logger
 from scraper import GenericScraper
+from utils.validation import validate_url, validate_directory_path
 
 logger = get_logger("ui.scraper_view.scraping_thread")
 
@@ -31,6 +33,16 @@ class ScrapingThread(QThread):
         self.should_stop = Event()  # Thread-safe stop flag
         self.pause_event = Event()  # Thread-safe pause flag
         self.pause_event.set()  # Initially, not paused
+        self._is_paused = False
+
+    @property
+    def is_paused(self) -> bool:
+        """Whether the scraping thread is currently paused (UI-friendly flag)."""
+        # Use the event as source of truth; keep _is_paused as a backup for clarity.
+        try:
+            return not self.pause_event.is_set()
+        except Exception:
+            return self._is_paused
     
     def stop(self):
         """Stop the scraping operation."""
@@ -39,20 +51,48 @@ class ScrapingThread(QThread):
     def pause(self):
         """Pause the scraping operation."""
         self.pause_event.clear()
+        self._is_paused = True
     
     def resume(self):
         """Resume the scraping operation."""
         self.pause_event.set()
+        self._is_paused = False
     
     def run(self):
         """Run the scraping operation."""
         try:
+            # Validate and sanitize URL (SSRF hardening)
+            is_valid, clean_or_err = validate_url(self.url)
+            if not is_valid:
+                self.finished.emit(False, f"Invalid URL: {clean_or_err}")
+                return
+            clean_url = clean_or_err
+
+            # Validate output directory (prevent unsafe paths)
+            is_valid_dir, safe_dir_or_err = validate_directory_path(self.output_dir, allow_create=True)
+            if not is_valid_dir:
+                self.finished.emit(False, f"Invalid output directory: {safe_dir_or_err}")
+                return
+            safe_output_dir = safe_dir_or_err
+
+            # Normalize file format to a safe extension with leading dot
+            fmt = (self.file_format or ".txt").strip().lower()
+            if not fmt.startswith("."):
+                fmt = "." + fmt
+            if fmt not in {".txt", ".md", ".html", ".json"}:
+                fmt = ".txt"
+            self.file_format = fmt
+
+            # Initialize scraper with base URL (not full TOC URL)
+            parsed = urlparse(clean_url)
+            base_url = f"{parsed.scheme}://{parsed.netloc}"
+
             self.status.emit("Initializing scraper...")
-            scraper = GenericScraper(self.url)
+            scraper = GenericScraper(base_url)
             
             # Get chapter URLs
             self.status.emit("Fetching chapter URLs...")
-            chapter_urls = scraper.get_chapter_urls(self.url)
+            chapter_urls = scraper.get_chapter_urls(clean_url)
             
             if not chapter_urls:
                 self.finished.emit(False, "No chapters found")
@@ -69,7 +109,7 @@ class ScrapingThread(QThread):
             self.status.emit(f"Scraping {total} chapters...")
             
             # Create output directory
-            os.makedirs(self.output_dir, exist_ok=True)
+            os.makedirs(safe_output_dir, exist_ok=True)
             
             # Scrape each chapter
             for idx, chapter_url in enumerate(selected_urls):
@@ -93,7 +133,7 @@ class ScrapingThread(QThread):
                         # Save chapter
                         chapter_num = idx + 1
                         filename = f"chapter_{chapter_num:04d}{self.file_format}"
-                        filepath = os.path.join(self.output_dir, filename)
+                        filepath = os.path.join(safe_output_dir, filename)
                         
                         with open(filepath, 'w', encoding='utf-8') as f:
                             f.write(content)
@@ -109,7 +149,7 @@ class ScrapingThread(QThread):
                     logger.error(f"Error scraping chapter {idx + 1}: {e}")
                     self.status.emit(f"Error in chapter {idx + 1}: {str(e)}")
             
-            if not self.should_stop:
+            if not self.should_stop.is_set():
                 self.status.emit("Scraping completed!")
                 self.finished.emit(True, f"Successfully scraped {total} chapters")
             else:
@@ -126,11 +166,14 @@ class ScrapingThread(QThread):
         if selection_type == 'all':
             return chapter_urls
         elif selection_type == 'range':
-            start = self.chapter_selection.get('from', 1) - 1
-            end = self.chapter_selection.get('to', len(chapter_urls))
+            # Support both legacy keys ('from'/'to') and normalized keys ('start'/'end')
+            start_raw = self.chapter_selection.get('from', self.chapter_selection.get('start', 1))
+            end_raw = self.chapter_selection.get('to', self.chapter_selection.get('end', len(chapter_urls)))
+            start = int(start_raw) - 1 if start_raw else 0
+            end = int(end_raw) if end_raw else len(chapter_urls)
             return chapter_urls[start:end]
-        elif selection_type == 'specific':
-            indices = self.chapter_selection.get('chapters', [])
+        elif selection_type in ('specific', 'list'):
+            indices = self.chapter_selection.get('chapters', self.chapter_selection.get('indices', []))
             return [chapter_urls[i - 1] for i in indices if 1 <= i <= len(chapter_urls)]
         
         return chapter_urls

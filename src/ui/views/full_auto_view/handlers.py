@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 from PySide6.QtWidgets import QMessageBox, QPushButton, QListWidgetItem
 
 from core.logger import get_logger
+from utils.validation import validate_url as _validate_url
 
 logger = get_logger("ui.full_auto_view.handlers")
 
@@ -25,14 +26,11 @@ class FullAutoViewHandlers:
         """Validate a URL."""
         if not url:
             return False, "URL cannot be empty"
-        
-        try:
-            parsed = urlparse(url)
-            if not parsed.scheme or not parsed.netloc:
-                return False, "Please enter a valid URL"
-        except Exception:
-            return False, "Please enter a valid URL"
-        
+
+        is_valid, url_or_err = _validate_url(url)
+        if not is_valid:
+            return False, f"Please enter a valid URL ({url_or_err})"
+
         return True, ""
     
     def validate_chapter_selection(self, chapter_selection: Dict[str, Any]) -> Tuple[bool, str]:

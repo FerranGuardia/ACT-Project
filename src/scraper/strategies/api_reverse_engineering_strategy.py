@@ -154,7 +154,9 @@ class ApiReverseEngineeringStrategy(BaseDetectionStrategy):
 
             # Identify potential API endpoints
             if self._is_api_candidate(request.url):
-                network_data['api_candidates'].append(request.url)
+                # Prevent cross-site pivots to third-party domains
+                if self._is_same_site(request.url):
+                    network_data['api_candidates'].append(request.url)
 
         def handle_response(response):
             # Only capture responses that might contain chapter data
@@ -276,14 +278,15 @@ class ApiReverseEngineeringStrategy(BaseDetectionStrategy):
         seen_urls = set()
         for url in network_data['api_candidates']:
             if url not in seen_urls:
-                seen_urls.add(url)
-                endpoints.append(url)
+                if self._is_same_site(url):
+                    seen_urls.add(url)
+                    endpoints.append(url)
 
         # Also check successful API responses
         for response in network_data['responses']:
             if response.get('status') == 200:
                 url = response['url']
-                if url not in seen_urls and self._is_api_candidate(url):
+                if url not in seen_urls and self._is_api_candidate(url) and self._is_same_site(url):
                     seen_urls.add(url)
                     endpoints.append(url)
 
@@ -326,6 +329,8 @@ class ApiReverseEngineeringStrategy(BaseDetectionStrategy):
     async def _fetch_from_endpoint(self, page, endpoint: str) -> List[str]:
         """Fetch and extract chapter URLs from an API endpoint."""
         try:
+            if not self._is_same_site(endpoint):
+                return []
             # Navigate to the endpoint
             await page.goto(endpoint)
 

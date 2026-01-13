@@ -16,6 +16,7 @@ from urllib.parse import urljoin, urlparse, parse_qs
 import hashlib
 
 from core.logger import get_logger
+from utils.validation import validate_url
 from .extractors.url_extractor_session import SessionManager
 from .extractors.url_extractor_validators import is_chapter_url
 from .chapter_parser import extract_chapter_number, normalize_url
@@ -80,7 +81,24 @@ class BaseDetectionStrategy(ABC):
         self.name = name
         self.base_url = base_url
         self.session_manager = session_manager
-        self.domain = urlparse(base_url).netloc.lower()
+        parsed_base = urlparse(base_url)
+        # Hostname without port; strip common leading "www." so subdomains still match
+        self.base_hostname = (parsed_base.hostname or parsed_base.netloc or "").lower().lstrip("www.")
+        self.domain = parsed_base.netloc.lower()
+
+    def _is_same_site(self, url: str) -> bool:
+        """
+        Best-effort same-site check to prevent cross-domain pivots.
+
+        Allows the exact base hostname and its subdomains (e.g., a.b.example.com).
+        """
+        try:
+            host = (urlparse(url).hostname or "").lower().lstrip("www.")
+            if not host or not self.base_hostname:
+                return False
+            return host == self.base_hostname or host.endswith("." + self.base_hostname)
+        except Exception:
+            return False
 
     @abstractmethod
     async def detect(self, toc_url: str, should_stop: Optional[Callable[[], bool]] = None) -> DetectionResult:
@@ -98,13 +116,34 @@ class BaseDetectionStrategy(ABC):
     def _fetch_with_retry(self, url: str, timeout: int = REQUEST_TIMEOUT) -> Optional[Any]:
         """Fetch URL with session management and retry logic."""
         try:
+            # Validate and sanitize URL (SSRF hardening) before any network request
+            is_valid, clean_url_or_err = validate_url(url)
+            if not is_valid:
+                logger.debug(f"Skipping unsafe URL {url}: {clean_url_or_err}")
+                return None
+            clean_url = clean_url_or_err
+
+            # Enforce same-site requests at the strategy layer
+            if not self._is_same_site(clean_url):
+                logger.debug(f"Blocking cross-site request: {clean_url} (base: {self.base_hostname})")
+                return None
+
             session = self.session_manager.get_session()
             if not session:
                 return None
 
             self.session_manager.rate_limit()
-            response = session.get(url, timeout=timeout)
+            response = session.get(clean_url, timeout=timeout, allow_redirects=True)
             if response.status_code == 200:
+                # Validate final URL after redirects as well
+                final_url = getattr(response, "url", clean_url)
+                is_valid_final, final_or_err = validate_url(str(final_url))
+                if not is_valid_final:
+                    logger.debug(f"Blocked unsafe redirect target {final_url}: {final_or_err}")
+                    return None
+                if not self._is_same_site(final_or_err):
+                    logger.debug(f"Blocked cross-site redirect target: {final_or_err}")
+                    return None
                 return response
         except Exception as e:
             logger.debug(f"Failed to fetch {url}: {e}")

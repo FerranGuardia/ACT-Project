@@ -6,7 +6,7 @@ audio file merging operations including single file and batched merging.
 """
 
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 
 from core.logger import get_logger
 
@@ -69,6 +69,15 @@ class AudioPostProcessor:
         batch_size = output_format.get('batch_size', 50)
         logger.info(f"Merging {len(audio_files)} audio files in batches of {batch_size}...")
 
+        # Run batch gap detection before merging to check for missing batch files
+        missing_batches = self._check_batch_gaps_before_merge(batch_size)
+        if missing_batches:
+            logger.warning(
+                f"⚠ Batch gap detection: Found {len(missing_batches)} missing batch files "
+                f"before merge operation: {missing_batches[:3]}{'...' if len(missing_batches) > 3 else ''}"
+            )
+            # Note: We continue with merging, but user should be aware of missing batches
+
         success_count = 0
         total_batches = (len(audio_files) + batch_size - 1) // batch_size
 
@@ -117,6 +126,40 @@ class AudioPostProcessor:
         else:
             logger.error("Failed to merge audio files")
             return False
+
+    def _check_batch_gaps_before_merge(self, batch_size: int) -> List[Tuple[int, int]]:
+        """
+        Check for missing batch files before merge operation.
+
+        Args:
+            batch_size: The batch size being used for merging
+
+        Returns:
+            List of (start_chapter, end_chapter) tuples for missing batches
+        """
+        try:
+            from processor.gap_detection_service import GapDetectionService
+
+            # Create gap detection service
+            gap_service = GapDetectionService(
+                project_manager=self.project_manager,
+                file_manager=self.file_manager
+            )
+
+            # Check for missing batches
+            batch_report = gap_service.check_batch_integrity([batch_size])
+
+            if batch_report['has_gaps']:
+                missing_batches = batch_report['missing_batches']
+                logger.debug(f"Found {len(missing_batches)} missing batch files for batch_size {batch_size}")
+                return missing_batches
+            else:
+                logger.debug(f"No batch gaps found for batch_size {batch_size}")
+                return []
+
+        except Exception as e:
+            logger.error(f"Error during batch gap detection: {e}")
+            return []
 
     def _extract_chapter_num(self, path: Path) -> int:
         """Extract chapter number from filename."""
