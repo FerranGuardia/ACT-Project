@@ -178,9 +178,34 @@ class BatchProcessingCoordinator:
             return False
 
         # Step 2: Convert to audio
-        return self.conversion_coordinator.convert_chapter_to_audio(
+        # Mark chapter as converting
+        if self.scraping_coordinator.progress_tracker:
+            self.scraping_coordinator.progress_tracker.update_chapter(
+                chapter.number,
+                ProcessingStatus.CONVERTING,
+                "Converting to audio"
+            )
+
+        success = self.conversion_coordinator.convert_chapter_to_audio(
             chapter, content, title, skip_if_exists, on_failure
         )
+
+        # Update progress tracker with final status
+        if self.scraping_coordinator.progress_tracker:
+            if success:
+                self.scraping_coordinator.progress_tracker.update_chapter(
+                    chapter.number,
+                    ProcessingStatus.COMPLETED,
+                    "Audio conversion completed"
+                )
+            else:
+                self.scraping_coordinator.progress_tracker.update_chapter(
+                    chapter.number,
+                    ProcessingStatus.FAILED,
+                    "Audio conversion failed"
+                )
+
+        return success
 
     def _merge_completed_batch(self, batch_start: int, batch_end: int) -> None:
         """Merge a completed batch of chapters into a single file."""

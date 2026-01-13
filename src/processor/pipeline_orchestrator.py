@@ -87,6 +87,14 @@ class PipelineOrchestrator:
             return getattr(self._backward_compatibility, name)
         raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
 
+    def __setattr__(self, name, value):
+        """Delegate attribute setting to backward compatibility adapter if it has the attribute."""
+        # Check if _backward_compatibility exists in __dict__ to avoid recursion
+        if '_backward_compatibility' in self.__dict__ and hasattr(self._backward_compatibility, name):
+            setattr(self._backward_compatibility, name, value)
+        else:
+            super().__setattr__(name, value)
+
     def run_full_pipeline(
         self,
         toc_url: str,

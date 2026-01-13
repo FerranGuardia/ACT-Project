@@ -43,7 +43,7 @@ if errorlevel 1 (
 echo.
 echo Launching UI...
 echo.
-python launch_ui.py
+python launch_ui_production.py
 if errorlevel 1 (
     echo.
     echo ERROR: Failed to launch UI

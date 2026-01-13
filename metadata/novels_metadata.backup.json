@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "last_updated": "2026-01-13T13:25:43.312655",
+  "last_updated": "2026-01-13T13:25:41.476234",
   "novels": {
     "https://novelfull.net/in-different-world-with-naruto-system.html": {
       "url": "https://novelfull.net/in-different-world-with-naruto-system.html",
@@ -12,7 +12,7 @@
     "https://example.com/toc": {
       "url": "https://example.com/toc",
       "created_at": "2026-01-13T08:55:05.806700",
-      "updated_at": "2026-01-13T13:25:43.312655",
+      "updated_at": "2026-01-13T13:25:41.476234",
       "title": "Test Novel",
       "author": "Test Author"
     },

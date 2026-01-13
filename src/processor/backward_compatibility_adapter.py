@@ -75,7 +75,7 @@ class BackwardCompatibilityAdapter:
     @property
     def progress_tracker(self):
         """Get progress tracker (backward compatibility)."""
-        return getattr(self.scraping_coordinator, 'progress_tracker', None)
+        return self.scraping_coordinator.progress_tracker
 
     @property
     def scraper(self):

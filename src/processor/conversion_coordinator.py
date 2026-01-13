@@ -36,7 +36,8 @@ class ConversionCoordinator:
         content: str,
         title: Optional[str],
         skip_if_exists: bool = True,
-        on_failure: Optional[Callable[[int, Exception], None]] = None
+        on_failure: Optional[Callable[[int, Exception], None]] = None,
+        on_progress: Optional[Callable[[float], None]] = None
     ) -> bool:
         """Convert a single chapter to audio."""
         if self.context.check_should_stop():
@@ -87,7 +88,8 @@ class ConversionCoordinator:
                 text=formatted_text,
                 output_path=temp_audio_path,
                 voice=voice,
-                provider=self.context.provider
+                provider=self.context.provider,
+                on_progress=on_progress
             )
 
             # Check stop flag after TTS conversion
@@ -152,6 +154,11 @@ class ConversionCoordinator:
 
             # Save project state
             self.project_manager.save_project()
+
+            # Update progress tracker with completion
+            # Note: We can't import ProcessingStatus here due to circular imports,
+            # so we need to use the context or find another way
+            # For now, let the batch processing coordinator handle this
 
             logger.info(f"✓ Completed chapter {chapter_num}")
             return True

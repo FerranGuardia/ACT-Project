@@ -12,7 +12,7 @@ from typing import Any, Dict, List
 
 from core.config_manager import get_config
 from core.logger import get_logger
-from core.metadata_manager import get_metadata_manager
+from core.metadata_coordinator import get_metadata_coordinator
 
 from .chapter_manager import ChapterManager
 
@@ -36,7 +36,7 @@ class ProjectManager:
             base_projects_dir: Base directory for projects. If None, uses config default
         """
         self.config = get_config()
-        self.metadata_manager = get_metadata_manager()
+        self.metadata_manager = get_metadata_coordinator()
         self.project_name = project_name
 
         # Get base projects directory
