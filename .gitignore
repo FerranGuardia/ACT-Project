@@ -180,3 +180,16 @@ docs/private/
 
 # Test metadata directories
 Test Novel for Metadata/
+
+# Debug runs and artifacts
+debug_runs/
+*_debug_*.json
+*debug*.json
+*_results.json
+*_analysis.json
+*_config.json
+*_strategy*.json
+*summary.json
+collected_urls.txt
+*content_preview.txt
+performance_report.md
