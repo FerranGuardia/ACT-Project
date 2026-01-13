@@ -1,0 +1,18 @@
+{
+  "domain": "novelfull.net",
+  "strategy_success_rates": {
+    "html_parsing": 0.999998385376991
+  },
+  "optimal_strategy_order": [],
+  "known_patterns": {},
+  "last_successful_strategy": "html_parsing",
+  "average_response_times": {
+    "html_parsing": 0.5537607670288155
+  },
+  "total_attempts": 120,
+  "successful_attempts": 120,
+  "last_updated": 1768297349.7561996,
+  "custom_selectors": [],
+  "pagination_patterns": [],
+  "api_endpoints": []
+}

@@ -137,18 +137,18 @@ class TestJavaScriptStrategy:
         """Test extraction from various JavaScript array patterns."""
         test_cases = [
             # Direct array assignment
-            ('var chapters = ["/chapter-1.html", "/chapter-2.html"];', ["/chapter-1.html", "/chapter-2.html"]),
-            ('let chapterList = ["/novel/chapter-1", "/novel/chapter-2"];', ["/novel/chapter-1", "/novel/chapter-2"]),
-            ('const chaptersArray = ["chapter-1.html", "chapter-2.html"];', ["/chapter-1.html", "/chapter-2.html"]),
-            ('window.chapters = ["/chapters/1", "/chapters/2"];', ["/chapters/1", "/chapters/2"]),
+            ('var chapters = ["/chapter-1.html", "/chapter-2.html"];', ["https://example.com/chapter-1.html", "https://example.com/chapter-2.html"]),
+            ('let chapterList = ["/novel/chapter-1", "/novel/chapter-2"];', ["https://example.com/novel/chapter-1", "https://example.com/novel/chapter-2"]),
+            ('const chaptersArray = ["chapter-1.html", "chapter-2.html"];', ["https://example.com/chapter-1.html", "https://example.com/chapter-2.html"]),
+            ('window.chapters = ["/chapters/1", "/chapters/2"];', ["https://example.com/chapters/1", "https://example.com/chapters/2"]),
 
             # Object property arrays
-            ('chapters: { urls: ["/chapters/1", "/chapters/2"] }', ["/chapters/1", "/chapters/2"]),
-            ('chapterList: { data: ["/chapters/1", "/chapters/2"] }', ["/chapters/1", "/chapters/2"]),
+            ('chapters: { urls: ["/chapters/1", "/chapters/2"] }', ["https://example.com/chapters/1", "https://example.com/chapters/2"]),
+            ('chapterList: { data: ["/chapters/1", "/chapters/2"] }', ["https://example.com/chapters/1", "https://example.com/chapters/2"]),
 
             # Function calls
-            ('getChapters() = ["/chapters/1", "/chapters/2"];', ["/chapters/1", "/chapters/2"]),
-            ('loadChapters() = ["/chapters/1", "/chapters/2"];', ["/chapters/1", "/chapters/2"]),
+            ('getChapters() = ["/chapters/1", "/chapters/2"];', ["https://example.com/chapters/1", "https://example.com/chapters/2"]),
+            ('loadChapters() = ["/chapters/1", "/chapters/2"];', ["https://example.com/chapters/1", "https://example.com/chapters/2"]),
         ]
 
         for html_content, expected_urls in test_cases:
@@ -179,7 +179,7 @@ class TestJavaScriptStrategy:
         """
 
         urls = strategy._extract_from_javascript(html_content)
-        expected = ["/chapter-1", "/chapter-2", "/chapter-3", "/chapter-4", "/chapter-7", "/chapter-8", "/chapter-5", "/chapter-6"]
+        expected = ["https://example.com/chapter-1", "https://example.com/chapter-2", "https://example.com/chapter-3", "https://example.com/chapter-4", "https://example.com/chapter-7", "https://example.com/chapter-8", "https://example.com/chapter-5", "https://example.com/chapter-6"]
         assert urls == expected
 
     def test_extract_from_javascript_duplicates_removed(self, strategy):
@@ -193,26 +193,26 @@ class TestJavaScriptStrategy:
 
         urls = strategy._extract_from_javascript(html_content)
         # Should maintain order and remove duplicates
-        assert urls == ["/chapter-1-dup.html", "/chapter-2-unique.html", "/chapter-3-unique.html"]
+        assert urls == ["https://example.com/chapter-1-dup.html", "https://example.com/chapter-2-unique.html", "https://example.com/chapter-3-unique.html"]
 
     def test_parse_array_content(self, strategy):
         """Test parsing JavaScript array content."""
         test_cases = [
             # Simple strings
-            ('"/chapter-1.html", "/chapter-2.html"', ["/chapter-1.html", "/chapter-2.html"]),
-            ("'/chapter-1.html', '/chapter-2.html'", ["/chapter-1.html", "/chapter-2.html"]),
+            ('"/chapter-1.html", "/chapter-2.html"', ["https://example.com/chapter-1.html", "https://example.com/chapter-2.html"]),
+            ("'/chapter-1.html', '/chapter-2.html'", ["https://example.com/chapter-1.html", "https://example.com/chapter-2.html"]),
 
             # Mixed quotes
-            ('"/chapter-1.html", \'/chapter-2.html\'', ["/chapter-1.html", "/chapter-2.html"]),
+            ('"/chapter-1.html", \'/chapter-2.html\'', ["https://example.com/chapter-1.html", "https://example.com/chapter-2.html"]),
 
             # With spaces and newlines
-            ('  "/chapter-1.html"  , \n "/chapter-2.html"  ', ["/chapter-1.html", "/chapter-2.html"]),
+            ('  "/chapter-1.html"  , \n "/chapter-2.html"  ', ["https://example.com/chapter-1.html", "https://example.com/chapter-2.html"]),
 
             # Non-chapter URLs filtered out
-            ('"/chapter-1.html", "/about.html", "/contact.html"', ["/chapter-1.html"]),
+            ('"/chapter-1.html", "/about.html", "/contact.html"', ["https://example.com/chapter-1.html"]),
 
-            # Relative URLs normalized
-            ('"chapter-1.html", "chapter-2.html"', ["/chapter-1.html", "/chapter-2.html"]),
+            # Relative URLs normalized to absolute URLs
+            ('"chapter-1.html", "chapter-2.html"', ["https://example.com/chapter-1.html", "https://example.com/chapter-2.html"]),
         ]
 
         for array_content, expected_urls in test_cases:
@@ -229,33 +229,33 @@ class TestJavaScriptStrategy:
         # Test protocol-relative URLs
         content = '"//example.com/chapter-1.html"'
         urls = strategy._parse_array_content(content)
-        assert urls == ["//example.com/chapter-1.html"]
+        assert urls == ["https://example.com/chapter-1.html"]
 
     def test_parse_json_content_valid(self, strategy):
         """Test parsing valid JSON content."""
         # Valid JSON with chapter URLs
         json_str = '{"chapters": ["/chapter-1.html", "/chapter-2.html"], "total": 2}'
         urls = strategy._parse_json_content(json_str)
-        assert urls == ["/chapter-1.html", "/chapter-2.html"]
+        assert urls == ["https://example.com/chapter-1.html", "https://example.com/chapter-2.html"]
 
         # Nested JSON structure
         json_str = '{"data": {"chapters": ["/chapter-1.html", "/chapter-2.html"]}}'
         urls = strategy._parse_json_content(json_str)
-        assert urls == ["/chapter-1.html", "/chapter-2.html"]
+        assert urls == ["https://example.com/chapter-1.html", "https://example.com/chapter-2.html"]
 
         # Multiple URL fields
         json_str = '{"chapter_url": "/chapter-1.html", "url": "/chapter-2.html", "link": "/chapter-3.html"}'
         urls = strategy._parse_json_content(json_str)
-        assert "/chapter-1.html" in urls
-        assert "/chapter-2.html" in urls
-        assert "/chapter-3.html" in urls
+        assert "https://example.com/chapter-1.html" in urls
+        assert "https://example.com/chapter-2.html" in urls
+        assert "https://example.com/chapter-3.html" in urls
 
     def test_parse_json_content_invalid(self, strategy):
         """Test parsing invalid JSON content falls back to regex."""
         # Invalid JSON falls back to array parsing
         json_str = 'not valid json "/chapter-1.html", "/chapter-2.html"'
         urls = strategy._parse_json_content(json_str)
-        assert urls == ["/chapter-1.html", "/chapter-2.html"]
+        assert urls == ["https://example.com/chapter-1.html", "https://example.com/chapter-2.html"]
 
     def test_parse_json_content_malformed(self, strategy):
         """Test parsing malformed JSON."""
@@ -297,7 +297,7 @@ class TestJavaScriptStrategy:
             result = strategy._is_likely_chapter_url(url)
             assert result == expected, f"Failed for URL: {url}"
 
-    @patch('src.scraper.chapter_parser.extract_chapter_number')
+    @patch('src.scraper.chapter_number.extract_chapter_number')
     def test_analyze_coverage(self, mock_extract, strategy):
         """Test chapter coverage analysis."""
         # Mock chapter number extraction
@@ -314,7 +314,7 @@ class TestJavaScriptStrategy:
         assert coverage == (1, 3)
         assert mock_extract.call_count == 4  # Called for each URL
 
-    @patch('src.scraper.chapter_parser.extract_chapter_number')
+    @patch('src.scraper.chapter_number.extract_chapter_number')
     def test_analyze_coverage_no_numbers(self, mock_extract, strategy):
         """Test coverage analysis with no extractable chapter numbers."""
         mock_extract.return_value = None
@@ -324,7 +324,7 @@ class TestJavaScriptStrategy:
 
         assert coverage is None
 
-    @patch('src.scraper.chapter_parser.extract_chapter_number')
+    @patch('src.scraper.chapter_number.extract_chapter_number')
     def test_analyze_coverage_empty_list(self, mock_extract, strategy):
         """Test coverage analysis with empty URL list."""
         urls = []

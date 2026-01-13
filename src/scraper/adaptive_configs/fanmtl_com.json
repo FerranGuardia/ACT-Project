@@ -1,0 +1,18 @@
+{
+  "domain": "fanmtl.com",
+  "strategy_success_rates": {
+    "html_parsing": 0.9249526823515004
+  },
+  "optimal_strategy_order": [],
+  "known_patterns": {},
+  "last_successful_strategy": "html_parsing",
+  "average_response_times": {
+    "html_parsing": 3.783020343206892
+  },
+  "total_attempts": 18,
+  "successful_attempts": 18,
+  "last_updated": 1768295334.4654493,
+  "custom_selectors": [],
+  "pagination_patterns": [],
+  "api_endpoints": []
+}

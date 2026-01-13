@@ -147,14 +147,19 @@ class HtmlParsingStrategy(BaseDetectionStrategy):
     def _extract_url_from_element(self, element) -> Optional[str]:
         """Extract URL from a BeautifulSoup element."""
         try:
+            from urllib.parse import urljoin
+            
             href = element.get('href')
             if not href:
                 return None
 
+            # Normalize URL to absolute
+            full_url = urljoin(self.base_url, href)
+            
             # Check if it's a chapter link
             text = element.get_text().strip()
-            if self._is_chapter_link(href, text):
-                return href
+            if self._is_chapter_link(full_url, text):
+                return full_url
 
         except Exception:
             pass
@@ -163,6 +168,8 @@ class HtmlParsingStrategy(BaseDetectionStrategy):
 
     def _extract_with_patterns(self, html: str) -> List[str]:
         """Extract URLs using regex patterns."""
+        from urllib.parse import urljoin
+        
         urls = []
 
         # Pattern 1: Standard anchor tags with chapter URLs
@@ -178,8 +185,11 @@ class HtmlParsingStrategy(BaseDetectionStrategy):
                 url = match.group(1)
                 text = match.group(2).strip()
 
-                if self._is_chapter_link(url, text):
-                    urls.append(url)
+                # Normalize to absolute URL
+                full_url = urljoin(self.base_url, url)
+                
+                if self._is_chapter_link(full_url, text):
+                    urls.append(full_url)
 
         # Pattern 2: Look for structured chapter listings
         list_patterns = [
@@ -194,8 +204,11 @@ class HtmlParsingStrategy(BaseDetectionStrategy):
                 url = match.group(1)
                 text = match.group(2).strip()
 
-                if self._is_chapter_link(url, text):
-                    urls.append(url)
+                # Normalize to absolute URL
+                full_url = urljoin(self.base_url, url)
+                
+                if self._is_chapter_link(full_url, text):
+                    urls.append(full_url)
 
         return urls
 

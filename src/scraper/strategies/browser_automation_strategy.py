@@ -425,8 +425,59 @@ class BrowserAutomationStrategy(BaseDetectionStrategy):
 
         return filtered_urls
 
+    def _extract_novel_identifier(self) -> Optional[str]:
+        """
+        Extract novel identifier from base URL to filter URLs belonging to the same novel.
+
+        For NovelFull: https://novelfull.net/tensei-shitara-slime-datta-ken-wn.html
+        -> identifier: "tensei-shitara-slime-datta-ken-wn"
+
+        For other sites: Extract the path component that identifies the novel.
+        """
+        try:
+            from urllib.parse import urlparse
+
+            parsed = urlparse(self.base_url)
+            path = parsed.path.strip('/')
+
+            # For NovelFull, remove .html extension if present
+            if path.endswith('.html'):
+                path = path[:-5]  # Remove .html
+
+            # Return the path as identifier (should be the novel slug/name)
+            return path if path else None
+
+        except Exception as e:
+            logger.debug(f"Failed to extract novel identifier from {self.base_url}: {e}")
+            return None
+
+    def _extract_novel_identifier(self) -> Optional[str]:
+        """
+        Extract novel identifier from base URL to filter URLs belonging to the same novel.
+
+        For NovelFull: https://novelfull.net/tensei-shitara-slime-datta-ken-wn.html
+        -> identifier: "tensei-shitara-slime-datta-ken-wn"
+
+        For other sites: Extract the path component that identifies the novel.
+        """
+        try:
+            from urllib.parse import urlparse
+
+            parsed = urlparse(self.base_url)
+            path = parsed.path.strip('/')
+
+            # For NovelFull, remove .html extension if present
+            if path.endswith('.html'):
+                path = path[:-5]  # Remove .html
+
+            # Return the path as identifier (should be the novel slug/name)
+            return path if path else None
+
+        except Exception as e:
+            logger.debug(f"Failed to extract novel identifier from {self.base_url}: {e}")
+            return None
+
     def _analyze_coverage(self, urls: List[str]) -> Optional[Tuple[int, int]]:
-        """Analyze chapter number coverage."""
         from ..chapter_parser import extract_chapter_number
 
         chapter_nums = []

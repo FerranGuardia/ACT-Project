@@ -32,10 +32,10 @@ TITLE_SELECTORS = [
 
 CONTENT_SELECTORS = [
     # NovelFull specific selectors (most specific first)
-    "div.cha-words",  # NovelFull main content container
+    "div.chapter-c",  # NovelFull main content container (verified working)
+    "div#chapter-c",  # NovelFull content by ID
+    "div.cha-words",  # NovelFull main content container (sometimes empty)
     "div.cha-content",  # NovelFull content wrapper
-    "div.chapter-c",
-    "div#chapter-c",
     "div.text-left",
     "div#text-chapter",
     "div.chapter-content-wrapper",

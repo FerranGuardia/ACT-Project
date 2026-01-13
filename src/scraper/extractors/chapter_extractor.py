@@ -6,7 +6,7 @@ Handles extracting chapter content and titles from individual chapter pages.
 
 import re
 import time
-from typing import Optional, Tuple, Callable, Any
+from typing import Any, Callable, Optional, Tuple
 
 try:
     from bs4 import BeautifulSoup  # type: ignore[import-untyped]
@@ -30,21 +30,19 @@ except ImportError:
     cloudscraper = None  # type: ignore[assignment, misc]
 
 try:
-    from playwright.sync_api import sync_playwright  # type: ignore[import-untyped]
+    from playwright.sync_api import \
+        sync_playwright  # type: ignore[import-untyped]
     HAS_PLAYWRIGHT: bool = True
 except ImportError:
     sync_playwright = None  # type: ignore[assignment, misc]
     HAS_PLAYWRIGHT: bool = False  # type: ignore[constant-redefinition]
 
-from ..chapter_parser import extract_chapter_number
-from text_utils import clean_text
 from core.logger import get_logger
-from ..config import (
-    REQUEST_TIMEOUT,
-    REQUEST_DELAY,
-    TITLE_SELECTORS,
-    CONTENT_SELECTORS,
-)
+from text_utils import clean_text
+
+from ..chapter_parser import extract_chapter_number
+from ..config import (CONTENT_SELECTORS, REQUEST_DELAY, REQUEST_TIMEOUT,
+                      TITLE_SELECTORS)
 
 logger = get_logger("scraper.extractors.chapter_extractor")
 
@@ -212,17 +210,54 @@ class ChapterExtractor:
             return None, None, f"HTTP {status_code}"
         
         # Parse HTML
+        # requests should automatically decompress based on Content-Encoding header
         # response.content is bytes, BeautifulSoup accepts bytes
         html_content: bytes = response.content  # type: ignore[attr-defined]
+
+        content_encoding = response.headers.get('Content-Encoding', '').lower()  # type: ignore[attr-defined]
+        print(f"DEBUG: Content-Encoding header: {content_encoding}")
+        print(f"DEBUG: Raw response content length: {len(html_content)} bytes")
+        print(f"DEBUG: Content starts with: {html_content[:100]}")
+
+        # Check if content looks like HTML
+        try:
+            text_preview = html_content[:200].decode('utf-8', errors='ignore')
+            if '<!DOCTYPE html>' in text_preview or '<html' in text_preview:
+                print("DEBUG: Content appears to be valid HTML")
+            else:
+                print("DEBUG: Content does not appear to be HTML - might be compressed or binary")
+                # Try manual brotli decompression as fallback
+                try:
+                    import brotli
+                    decompressed = brotli.decompress(html_content)
+                    html_content = decompressed
+                    print(f"DEBUG: Manual brotli decompression successful: {len(html_content)} bytes")
+                except Exception as e:
+                    print(f"DEBUG: Manual brotli decompression also failed: {e}")
+                    return None, None, f"Response content is not valid HTML and decompression failed"
+        except UnicodeDecodeError:
+            print("DEBUG: Content is not valid UTF-8 text")
+            return None, None, "Response content is not valid text"
+
+        print(f"DEBUG: Final HTML length: {len(html_content)} bytes")
+        try:
+            html_preview = html_content[:500].decode('utf-8', errors='replace')
+            print(f"DEBUG: HTML preview: {html_preview[:200]}...")
+        except Exception as e:
+            print(f"DEBUG: Could not decode HTML preview: {e}")
+
         soup = BeautifulSoup(html_content, "html.parser")  # type: ignore[arg-type, assignment]
+        print(f"DEBUG: Soup created, title in soup: {soup.find('title')}")
+        if soup.find('title'):
+            print(f"DEBUG: Title text: {soup.find('title').get_text()}")
         
         # Extract content and title
         content = self._extract_content(soup, should_stop)
         title = self._extract_title(soup, chapter_url)
-        
+
         if not content:
             return None, None, "No content found"
-        
+
         # Clean content
         cleaned_content = clean_text(content)
         
@@ -262,11 +297,11 @@ class ChapterExtractor:
     def _extract_content(self, soup: Any, should_stop: Optional[Callable[[], bool]] = None) -> Optional[str]:
         """
         Extract chapter content from soup, trying all selectors.
-        
+
         Args:
             soup: BeautifulSoup object
             should_stop: Optional callback that returns True if scraping should stop
-            
+
         Returns:
             Extracted content text, or None if not found
         """
@@ -275,7 +310,6 @@ class ChapterExtractor:
         for selector in CONTENT_SELECTORS:
             content_elem = soup.select_one(selector)  # type: ignore[attr-defined]
             if content_elem:
-                logger.debug(f"Found content element with selector: {selector}")
                 break
         
         if not content_elem:
@@ -293,7 +327,7 @@ class ChapterExtractor:
                 logger.debug("Found content element with last fallback: body tag")
         
         if not content_elem:
-            logger.debug(f"No content element found for chapter {chapter_url}")
+            logger.debug("No content element found for chapter")
             return None
         
         # Extract paragraphs - prefer p tags, avoid nested duplication

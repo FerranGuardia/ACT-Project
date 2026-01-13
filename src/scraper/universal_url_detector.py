@@ -228,6 +228,10 @@ class UniversalUrlDetector:
         # Learn from the result
         self._learn_from_result(result)
 
+        # Note: NovelFull URL filtering was attempted but not needed - all URLs belong to same novel.
+        # The issue is NovelFull provides invalid chapter URLs on their TOC page (e.g., chapter 4092 doesn't exist).
+        # Future improvement: Add URL validation to check if chapters actually exist.
+
         # Final validation and pagination check
         result.urls, result.validation_score = self._validate_urls(result.urls)
         pagination_analysis = self.pagination_detector.analyze(result.urls, min_chapter, max_chapter)
@@ -341,6 +345,30 @@ class UniversalUrlDetector:
         score += result.validation_score * 0.1
 
         return min(score, 1.0)
+
+    def _extract_novel_identifier(self, toc_url: str) -> Optional[str]:
+        """
+        Extract novel identifier from TOC URL to filter URLs belonging to the same novel.
+
+        For NovelFull: https://novelfull.net/tensei-shitara-slime-datta-ken-wn.html
+        -> identifier: "tensei-shitara-slime-datta-ken-wn"
+
+        For other sites: Extract the path component that identifies the novel.
+        """
+        try:
+            parsed = urlparse(toc_url)
+            path = parsed.path.strip('/')
+
+            # For NovelFull, remove .html extension if present
+            if path.endswith('.html'):
+                path = path[:-5]  # Remove .html
+
+            # Return the path as identifier (should be the novel slug/name)
+            return path if path else None
+
+        except Exception as e:
+            logger.debug(f"Failed to extract novel identifier from {toc_url}: {e}")
+            return None
 
     def _result_meets_requirements(
         self,

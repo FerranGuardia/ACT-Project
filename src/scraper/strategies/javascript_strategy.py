@@ -145,6 +145,8 @@ class JavaScriptStrategy(BaseDetectionStrategy):
 
     def _parse_array_content(self, content: str) -> List[str]:
         """Parse JavaScript array content to extract URLs."""
+        from urllib.parse import urljoin
+        
         urls = []
 
         # Find all string literals in the array
@@ -156,19 +158,16 @@ class JavaScriptStrategy(BaseDetectionStrategy):
 
             # Basic URL validation
             if self._is_likely_chapter_url(potential_url):
-                # Normalize relative URLs
-                if not potential_url.startswith(('http://', 'https://', '//')):
-                    if potential_url.startswith('/'):
-                        urls.append(potential_url)  # Already absolute path
-                    else:
-                        urls.append(f"/{potential_url}")  # Make it absolute
-                else:
-                    urls.append(potential_url)
+                # Normalize to absolute URL
+                full_url = urljoin(self.base_url, potential_url)
+                urls.append(full_url)
 
         return urls
 
     def _parse_json_content(self, json_str: str) -> List[str]:
         """Parse JSON string content for chapter URLs."""
+        from urllib.parse import urljoin
+        
         urls = []
 
         # Check if JSON contains chapter-related keywords
@@ -191,7 +190,9 @@ class JavaScriptStrategy(BaseDetectionStrategy):
                     for key, value in obj.items():
                         if key.lower() in ['url', 'href', 'link', 'chapter_url', 'chapters', 'chapterlist', 'urls']:
                             if isinstance(value, str) and self._is_likely_chapter_url(value):
-                                urls.append(value)
+                                # Normalize to absolute URL
+                                full_url = urljoin(self.base_url, value)
+                                urls.append(full_url)
                             else:
                                 extract_urls_from_obj(value)
                         else:
@@ -199,7 +200,9 @@ class JavaScriptStrategy(BaseDetectionStrategy):
                 elif isinstance(obj, list):
                     for item in obj:
                         if isinstance(item, str) and self._is_likely_chapter_url(item):
-                            urls.append(item)
+                            # Normalize to absolute URL
+                            full_url = urljoin(self.base_url, item)
+                            urls.append(full_url)
                         else:
                             extract_urls_from_obj(item)
 
