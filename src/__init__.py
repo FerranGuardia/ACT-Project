@@ -9,4 +9,4 @@ try:
     __version__ = get_version()
 except ImportError:
     # Fallback for direct execution
-    __version__ = "1.1.0"
+    __version__ = "1.1.2"
