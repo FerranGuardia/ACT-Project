@@ -13,7 +13,7 @@ from unittest.mock import patch
 import pytest
 
 # Import the REAL source code for proper testing and coverage
-project_root = Path(__file__).parent.parent.parent.parent
+project_root = Path(__file__).parent.parent.parent
 src_path = project_root / "src"
 import sys
 
@@ -21,18 +21,31 @@ if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
 # Mock UI dependencies to avoid import issues while testing business logic
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 mock_logger = MagicMock()
-with patch('PySide6.QtWidgets'), \
-     patch('PySide6.QtCore'), \
-     patch('PySide6.QtGui'), \
-     patch('core.logger.get_logger', return_value=mock_logger):
 
+# Import PySide6 modules first to ensure they exist for patching
+try:
+    from PySide6 import QtWidgets, QtCore, QtGui
+except ImportError:
+    # If PySide6 is not available, create mock modules
+    QtWidgets = MagicMock()
+    QtCore = MagicMock()
+    QtGui = MagicMock()
+    sys.modules['PySide6.QtWidgets'] = QtWidgets
+    sys.modules['PySide6.QtCore'] = QtCore
+    sys.modules['PySide6.QtGui'] = QtGui
+
+# Import core module first so patching works
+import core.logger
+
+# Patch logger before importing modules that use it
+with patch.object(core.logger, 'get_logger', return_value=mock_logger):
     # Import the real implementations
     from ui.ui_constants import StatusMessages
-    from ui.views.full_auto_view.queue_manager import (QueueManager,
-                                                       ValidationError)
+    from ui.views.full_auto_view.full_auto_queue_manager import (QueueManager,
+                                                                ValidationError)
 
 
 class TestQueueValidation:
@@ -168,17 +181,17 @@ class TestQueueValidation:
             result = queue_manager._validate_queue_item(item)
             assert result['provider'] == valid_provider
 
-        # Invalid provider - should raise ValidationError
+        # Invalid provider - should log warning and use auto-select (None)
         item: Dict[str, Any] = base_item.copy()  # type: ignore
         item['provider'] = 'invalid_provider'
-        with pytest.raises(ValidationError, match="Unknown provider 'invalid_provider'"):
-            queue_manager._validate_queue_item(item)
+        result = queue_manager._validate_queue_item(item)
+        assert result['provider'] is None  # Should use auto-select
 
-        # Wrong type - should raise ValidationError
+        # Wrong type - should log warning and use auto-select
         item: Dict[str, Any] = base_item.copy()  # type: ignore
         item['provider'] = 123
-        with pytest.raises(ValidationError, match="Provider must be a string"):
-            queue_manager._validate_queue_item(item)
+        result = queue_manager._validate_queue_item(item)
+        assert result['provider'] is None  # Should use auto-select
 
         # None provider - should be allowed
         item: Dict[str, Any] = base_item.copy()  # type: ignore
@@ -268,6 +281,10 @@ class TestQueueValidation:
         item: Dict[str, Any] = base_item.copy()  # type: ignore
         item['output_folder'] = 123
         result = queue_manager._validate_queue_item(item)
+        assert result['output_folder'] is None
+
+        # None value (default)
+        result = queue_manager._validate_queue_item(base_item)
         assert result['output_folder'] is None
 
     def test_validate_status(self, queue_manager):

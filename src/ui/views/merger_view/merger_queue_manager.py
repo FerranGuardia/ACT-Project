@@ -78,20 +78,6 @@ class MergerQueueManager(BaseQueueManager):
             logger.warning(f"Invalid silence duration: {silence_duration}, using 0.5")
             return 0.5
 
-    def _update_centralized_metadata(self, item: Dict[str, Any]) -> None:
-        """Update centralized metadata with novel information from queue item."""
-        url = item.get('novel_url')
-        title = item.get('novel_title')
-        author = item.get('novel_author')
-
-        if url and (title or author):
-            metadata = {}
-            if title:
-                metadata['title'] = title
-            if author:
-                metadata['author'] = author
-
-            self.update_centralized_metadata(url, metadata)
 
 
 __all__ = ["MergerQueueManager"]

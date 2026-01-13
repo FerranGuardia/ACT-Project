@@ -26,7 +26,7 @@ class TestFullAutoViewInitialization:
         """Create FullAutoView instance with mocked QWidget."""
         with patch('PySide6.QtWidgets.QWidget.__init__', return_value=None), \
              patch('PySide6.QtWidgets.QWidget.setLayout'), \
-             patch('ui.views.full_auto_view.queue_manager.QueueManager'), \
+             patch('ui.views.full_auto_view.full_auto_queue_manager.QueueManager'), \
              patch('ui.views.full_auto_view.handlers.FullAutoViewHandlers'), \
              patch.object(FullAutoView, '_connect_handlers'), \
              patch.object(FullAutoView, '_load_queue'), \
@@ -66,7 +66,7 @@ class TestFullAutoViewUISetup:
         """Create FullAutoView instance for UI setup tests."""
         with patch('PySide6.QtWidgets.QWidget.__init__', return_value=None), \
              patch('PySide6.QtWidgets.QWidget.setLayout'), \
-             patch('ui.views.full_auto_view.queue_manager.QueueManager'), \
+             patch('ui.views.full_auto_view.full_auto_queue_manager.QueueManager'), \
              patch('ui.views.full_auto_view.handlers.FullAutoViewHandlers'), \
              patch.object(FullAutoView, '_connect_handlers'), \
              patch.object(FullAutoView, '_load_queue'):
@@ -125,7 +125,7 @@ class TestFullAutoViewQueueOperations:
         """Create FullAutoView instance for queue operation tests."""
         with patch('PySide6.QtWidgets.QWidget.__init__', return_value=None), \
              patch('PySide6.QtWidgets.QWidget.setLayout'), \
-             patch('ui.views.full_auto_view.queue_manager.QueueManager'), \
+             patch('ui.views.full_auto_view.full_auto_queue_manager.QueueManager'), \
              patch('ui.views.full_auto_view.handlers.FullAutoViewHandlers'), \
              patch.object(FullAutoView, '_connect_handlers'), \
              patch.object(FullAutoView, '_load_queue'), \
@@ -214,7 +214,7 @@ class TestFullAutoViewProcessingOperations:
         """Create FullAutoView instance for processing tests."""
         with patch('PySide6.QtWidgets.QWidget.__init__', return_value=None), \
              patch('PySide6.QtWidgets.QWidget.setLayout'), \
-             patch('ui.views.full_auto_view.queue_manager.QueueManager'), \
+             patch('ui.views.full_auto_view.full_auto_queue_manager.QueueManager'), \
              patch('ui.views.full_auto_view.handlers.FullAutoViewHandlers'), \
              patch.object(FullAutoView, '_connect_handlers'), \
              patch.object(FullAutoView, '_load_queue'), \
@@ -285,7 +285,7 @@ class TestFullAutoViewGlobalControls:
         """Create FullAutoView instance for global control tests."""
         with patch('PySide6.QtWidgets.QWidget.__init__', return_value=None), \
              patch('PySide6.QtWidgets.QWidget.setLayout'), \
-             patch('ui.views.full_auto_view.queue_manager.QueueManager'), \
+             patch('ui.views.full_auto_view.full_auto_queue_manager.QueueManager'), \
              patch('ui.views.full_auto_view.handlers.FullAutoViewHandlers'), \
              patch.object(FullAutoView, '_connect_handlers'), \
              patch.object(FullAutoView, '_load_queue'), \

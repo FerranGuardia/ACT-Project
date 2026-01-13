@@ -20,7 +20,7 @@ from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QFont
 
 from core.logger import get_logger
-from core.metadata_manager import get_metadata_manager
+from core.metadata_coordinator import get_metadata_coordinator
 from ui.styles import (
     get_line_edit_style, get_group_box_style, get_list_widget_style,
     get_progress_bar_style, get_spin_box_style, get_status_label_style,
@@ -92,7 +92,7 @@ class MergerView(BaseView):
         super().__init__(parent)
         self.file_paths: List[str] = []
         self.merger_thread: Optional[AudioFileMergerThread] = None
-        self.metadata_manager = get_metadata_manager()
+        self.metadata_manager = get_metadata_coordinator()
 
         # Initialize queue manager
         from pathlib import Path

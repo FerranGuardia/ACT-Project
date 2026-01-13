@@ -4,6 +4,7 @@ Scraping Thread - Handles background scraping operations.
 
 import os
 from typing import List, Dict
+from threading import Event
 
 from PySide6.QtCore import QThread, Signal
 
@@ -27,20 +28,21 @@ class ScrapingThread(QThread):
         self.chapter_selection = chapter_selection
         self.output_dir = output_dir
         self.file_format = file_format
-        self.should_stop = False
-        self.is_paused = False
+        self.should_stop = Event()  # Thread-safe stop flag
+        self.pause_event = Event()  # Thread-safe pause flag
+        self.pause_event.set()  # Initially, not paused
     
     def stop(self):
         """Stop the scraping operation."""
-        self.should_stop = True
+        self.should_stop.set()
     
     def pause(self):
         """Pause the scraping operation."""
-        self.is_paused = True
+        self.pause_event.clear()
     
     def resume(self):
         """Resume the scraping operation."""
-        self.is_paused = False
+        self.pause_event.set()
     
     def run(self):
         """Run the scraping operation."""
@@ -71,16 +73,16 @@ class ScrapingThread(QThread):
             
             # Scrape each chapter
             for idx, chapter_url in enumerate(selected_urls):
-                if self.should_stop:
+                if self.should_stop.is_set():
                     self.status.emit("Stopped by user")
                     self.finished.emit(False, "Scraping stopped")
                     return
                 
-                while self.is_paused and not self.should_stop:
-                    self.status.emit("Paused...")
-                    self.msleep(100)
+                # Wait if paused
+                self.pause_event.wait()
                 
-                if self.should_stop:
+                # Check again after waiting
+                if self.should_stop.is_set():
                     break
                 
                 try:

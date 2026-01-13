@@ -51,6 +51,8 @@ class StatusMessages:
     STOPPING: Final[str] = "Stopping..."
     ERROR_OCCURRED: Final[str] = "Error occurred"
     PENDING: Final[str] = "Pending"
+    PARTIAL: Final[str] = "Partial"
+    COMPLETED: Final[str] = "Completed"
     
     # Queue statuses
     STATUS_PREFIX: Final[str] = "Status: "
@@ -99,10 +101,12 @@ class DialogMessages:
 
 class QueueItemText:
     """Queue item display text constants."""
-    
+
     ALL_CHAPTERS: Final[str] = "All chapters"
     CHAPTERS_PREFIX: Final[str] = "Chapters "
-    
+    CHAPTERS_RANGE_FORMAT: Final[str] = "Chapters {from_ch}-{to_ch}"
+    CHAPTERS_LIST_FORMAT: Final[str] = "Chapters {chapters}"
+
     # Validation messages
     NO_URL_MSG: Final[str] = "Please enter a novel URL"
     INVALID_URL_MSG: Final[str] = "Please enter a valid URL"

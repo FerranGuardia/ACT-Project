@@ -5,7 +5,7 @@ Merger Queue Item Widget - Widget for merger queue items.
 from typing import List, Dict, Any
 
 from ui.views.base_queue_item_widget import BaseQueueItemWidget
-from core.metadata_manager import get_metadata_manager
+from core.metadata_coordinator import get_metadata_coordinator
 
 
 class MergerQueueItemWidget(BaseQueueItemWidget):
@@ -13,7 +13,7 @@ class MergerQueueItemWidget(BaseQueueItemWidget):
 
     def __init__(self, queue_item: Dict[str, Any], status: str = "Pending", progress: int = 0, parent=None):
         self.queue_item = queue_item
-        self.metadata_manager = get_metadata_manager()
+        self.metadata_manager = get_metadata_coordinator()
         super().__init__(status, progress, parent)
 
     def get_icon(self) -> str:

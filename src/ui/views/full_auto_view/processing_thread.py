@@ -21,7 +21,7 @@ class ProcessingThread(QThread):
     progress = Signal(int)  # Progress percentage
     status = Signal(str)  # Status message
     chapter_update = Signal(int, str, str)  # Chapter num, status, message
-    finished = Signal(bool, str)  # Success, message
+    finished = Signal(bool, str, dict)  # Success, message, result_details
     
     def __init__(self, url: str, project_name: str, voice: Optional[str] = None,
                  provider: Optional[str] = None, chapter_selection: Optional[Dict[str, Any]] = None,
@@ -178,7 +178,7 @@ class ProcessingThread(QThread):
                 toc_url=self.url,
                 novel_title=self.novel_title
             ):
-                self.finished.emit(False, "Failed to initialize project")
+                self.finished.emit(False, "Failed to initialize project", {})
                 return
             
             # If project exists and was loaded, determine actual end_chapter if needed
@@ -227,14 +227,43 @@ class ProcessingThread(QThread):
                     else:
                         logger.warning("Audio file merging failed, but continuing with success")
 
-                self.finished.emit(True, f"Processing completed successfully{gaps_info}")
+                # Update global metadata with novel information
+                self._update_global_metadata()
+
+                self.finished.emit(True, f"Processing completed successfully{gaps_info}", result)
             elif self.should_stop:
-                self.finished.emit(False, "Processing stopped")
+                self.finished.emit(False, "Processing stopped", result)
             else:
                 error = result.get('error', 'Processing failed')
-                self.finished.emit(False, error)
+                self.finished.emit(False, error, result)
                 
         except Exception as e:
             logger.error(f"Processing error: {e}")
-            self.finished.emit(False, f"Error: {str(e)}")
+            self.finished.emit(False, f"Error: {str(e)}", {})
+
+    def _update_global_metadata(self) -> None:
+        """
+        Update the global novels metadata with information about the processed novel.
+        """
+        try:
+            from core.metadata_manager import get_metadata_manager
+
+            metadata_manager = get_metadata_manager()
+
+            # Get novel information from the project
+            novel_info = {
+                'url': self.url,
+                'title': self.novel_title,
+                'novel_url': self.url,
+                'last_processed': self.pipeline.project_manager.get_project_metadata().get('last_updated'),
+                'output_folder': str(self.output_folder),
+                'total_chapters': len(self.pipeline.project_manager.get_chapter_manager().get_all_chapters()) if self.pipeline.project_manager.get_chapter_manager() else 0
+            }
+
+            # Update the global metadata
+            metadata_manager.update_novel_metadata(self.url, novel_info)
+            logger.info(f"Updated global metadata for novel: {self.novel_title}")
+
+        except Exception as e:
+            logger.warning(f"Failed to update global metadata: {e}")
 

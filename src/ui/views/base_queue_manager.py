@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Optional
 from abc import ABC, abstractmethod
 
 from core.logger import get_logger
-from core.metadata_manager import get_metadata_manager
+from core.queue_metadata_bridge import get_queue_metadata_bridge
 from ui.ui_constants import StatusMessages
 from utils.validation import get_validator, ValidationError
 
@@ -36,7 +36,7 @@ class BaseQueueManager(ABC):
         """
         self.queue_file = queue_file
         self.view_name = view_name
-        self.metadata_manager = get_metadata_manager()
+        self.metadata_bridge = get_queue_metadata_bridge()
         self.validator = get_validator()
 
     def _validate_queue_item(self, item: Dict[str, Any]) -> Dict[str, Any]:
@@ -110,6 +110,8 @@ class BaseQueueManager(ABC):
             StatusMessages.PAUSED,
             StatusMessages.STOPPING,
             StatusMessages.ERROR_OCCURRED,
+            StatusMessages.PARTIAL,
+            StatusMessages.COMPLETED,
         ]
 
         if status in valid_statuses:
@@ -179,7 +181,7 @@ class BaseQueueManager(ABC):
                     item_copy['status'] = item_copy['status']
 
                 # Update centralized metadata if this item has novel information
-                self._update_centralized_metadata(item_copy)
+                self.metadata_bridge.update_metadata_from_queue_item(item_copy, self.view_name)
 
                 queue_to_save.append(item_copy)
 
@@ -197,18 +199,6 @@ class BaseQueueManager(ABC):
             logger.error(f"[{self.view_name}] Error saving queue state: {e}")
             raise  # Re-raise to let caller handle the error
 
-    def _update_centralized_metadata(self, item: Dict[str, Any]) -> None:
-        """
-        Update centralized metadata based on queue item data.
-
-        This method can be overridden by subclasses to extract and store
-        metadata from their specific queue item format.
-
-        Args:
-            item: Validated queue item
-        """
-        # Default implementation does nothing - subclasses should override
-        pass
 
     def validate_queue_items(self, queue_items: List[Dict]) -> List[Dict]:
         """
@@ -314,7 +304,7 @@ class BaseQueueManager(ABC):
         Returns:
             Metadata dictionary or None if not found
         """
-        return self.metadata_manager.get_novel_metadata(url)
+        return self.metadata_bridge.metadata_coordinator.get_novel_metadata(url)
 
     def update_centralized_metadata(self, url: str, metadata: Dict[str, Any]) -> bool:
         """
@@ -327,7 +317,7 @@ class BaseQueueManager(ABC):
         Returns:
             True if successful, False otherwise
         """
-        return self.metadata_manager.set_novel_metadata(url, metadata)
+        return self.metadata_bridge.metadata_coordinator.set_novel_metadata(url, metadata)
 
 
 __all__ = ["BaseQueueManager"]

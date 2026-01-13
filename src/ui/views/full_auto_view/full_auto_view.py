@@ -253,7 +253,7 @@ class FullAutoView(BaseView):
         self.current_processing.progress.connect(self._on_progress)
         self.current_processing.status.connect(self._on_status)
         self.current_processing.chapter_update.connect(self._on_chapter_update)
-        self.current_processing.finished.connect(lambda success, msg: self._on_finished(item, success, msg))
+        self.current_processing.finished.connect(lambda success, msg, result: self._on_finished(item, success, msg, result))
         
         # Update UI state
         self.controls_section.set_processing_state()
@@ -356,21 +356,44 @@ class FullAutoView(BaseView):
         self.current_processing_section.set_status(status_text)
         logger.debug(f"Chapter {chapter_num} update: {status} - {message}")
     
-    def _on_finished(self, item: Dict[str, Any], success: bool, message: str) -> None:
+    def _on_finished(self, item: Dict[str, Any], success: bool, message: str, result: Dict[str, Any]) -> None:
         """
         Handle processing completion.
-        
+
         Args:
             item: The queue item that finished processing
             success: Whether the operation completed successfully
             message: Completion message to display
+            result: Detailed processing results from the pipeline
         """
-        # Update item status
+        # Update item status based on actual processing results
         if success:
-            item['status'] = 'Completed'
-            item['progress'] = 100
+            # Check actual processing results - even if pipeline says success,
+            # we might have failed chapters
+            completed = result.get('completed', 0)
+            failed = result.get('failed', 0)
+            total_attempted = completed + failed
+
+            if total_attempted == 0:
+                # No chapters were processed - likely an error
+                item['status'] = 'Failed'
+                item['progress'] = 0
+            elif failed > 0 and completed == 0:
+                # All chapters failed
+                item['status'] = 'Failed'
+                item['progress'] = 0
+            elif failed > 0:
+                # Partial success - some chapters completed, some failed
+                item['status'] = 'Partial'
+                item['progress'] = int((completed / total_attempted) * 100)
+            else:
+                # All chapters completed successfully
+                item['status'] = 'Completed'
+                item['progress'] = 100
         else:
+            # Pipeline reported failure
             item['status'] = 'Failed'
+            item['progress'] = 0
         
         # Reset UI state
         self.controls_section.set_idle_state()
