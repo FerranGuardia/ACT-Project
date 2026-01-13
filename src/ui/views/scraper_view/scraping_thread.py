@@ -3,15 +3,15 @@ Scraping Thread - Handles background scraping operations.
 """
 
 import os
-from typing import List, Dict
 from threading import Event
+from typing import Dict, List
 from urllib.parse import urlparse
 
 from PySide6.QtCore import QThread, Signal
 
 from core.logger import get_logger
 from scraper import GenericScraper
-from utils.validation import validate_url, validate_directory_path
+from utils.validation import validate_directory_path, validate_url
 
 logger = get_logger("ui.scraper_view.scraping_thread")
 

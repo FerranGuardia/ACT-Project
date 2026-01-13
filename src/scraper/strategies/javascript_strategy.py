@@ -12,8 +12,8 @@ from typing import Any, Callable, List, Optional, Tuple
 
 from core.logger import get_logger
 
-from ..universal_url_detector import BaseDetectionStrategy, DetectionResult
 from .. import chapter_number
+from ..universal_url_detector import BaseDetectionStrategy, DetectionResult
 
 logger = get_logger("scraper.strategies.javascript")
 

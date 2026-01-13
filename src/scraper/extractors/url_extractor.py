@@ -13,13 +13,13 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 from core.logger import get_logger
 
 from ..chapter_parser import extract_chapter_number, sort_chapters_by_number
-from ..config import (
-    REQUEST_DELAY, REQUEST_TIMEOUT,
-    PAGINATION_SUSPICIOUS_COUNTS, PAGINATION_CRITICAL_COUNT,
-    PAGINATION_SMALL_COUNT_THRESHOLD, PAGINATION_RANGE_COVERAGE_THRESHOLD
-)
-from .url_extractor_session import SessionManager
+from ..config import (PAGINATION_CRITICAL_COUNT,
+                      PAGINATION_RANGE_COVERAGE_THRESHOLD,
+                      PAGINATION_SMALL_COUNT_THRESHOLD,
+                      PAGINATION_SUSPICIOUS_COUNTS, REQUEST_DELAY,
+                      REQUEST_TIMEOUT)
 from ..universal_url_detector import UniversalUrlDetector
+from .url_extractor_session import SessionManager
 
 logger = get_logger("scraper.extractors.url_extractor")
 
@@ -197,6 +197,7 @@ class UrlExtractor:
             # Pattern 1: Look for explicit total counts (avoid matching "Chapter 1")
             # These patterns require context like "total", "共", or number before "chapter"
             import re
+
             # Safer regex patterns with limited repetition to prevent ReDoS
             patterns = [
                 r'total[:\s]{0,10}(\d{1,6})\s{0,10}chapters?',  # "Total: 423 chapters"
