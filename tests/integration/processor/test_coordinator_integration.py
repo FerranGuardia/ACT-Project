@@ -15,6 +15,9 @@ from processor.conversion_coordinator import ConversionCoordinator
 from processor.audio_post_processor import AudioPostProcessor
 from processor.pipeline_orchestrator import PipelineOrchestrator
 
+# Pytest markers
+pytestmark = [pytest.mark.integration, pytest.mark.component_interaction]
+
 
 class TestCoordinatorIntegration:
     """Tests for coordinator interactions."""
@@ -47,98 +50,91 @@ class TestCoordinatorIntegration:
         assert scraping.context is conversion.context
         assert conversion.context is audio.context
 
-    @patch('processor.scraping_coordinator.GenericScraper')
-    def test_scraping_to_conversion_workflow(self, mock_scraper_class, context, temp_dir):
-        """Test the workflow from scraping to conversion."""
-        # Setup coordinators
+    @patch('processor.scraping_coordinator.NovelScraper')
+    @patch('processor.project_manager.get_config')
+    @patch('processor.file_manager.get_config')
+    def test_scraping_to_conversion_workflow(self, mock_fm_config, mock_pm_config, mock_scraper_class, context, temp_dir):
+        """Test the workflow from scraping to conversion with minimal mocking."""
+        # Setup configurations to use temp directory
+        config_dict = {
+            "paths.projects_dir": str(temp_dir / "projects"),
+            "paths.output_dir": str(temp_dir / "output"),
+            "tts.voice": "pyttsx3"  # Use pyttsx3 for faster testing
+        }
+        mock_pm_config.return_value.get.side_effect = lambda key, default=None: config_dict.get(key, default)
+        mock_fm_config.return_value.get.side_effect = lambda key, default=None: config_dict.get(key, default)
+
+        # Setup coordinators with real components (sharing the same project manager)
         scraping = ScrapingCoordinator(context)
         conversion = ConversionCoordinator(context)
 
-        # Mock configurations
-        with patch('processor.project_manager.get_config') as mock_pm_config, \
-             patch('processor.file_manager.get_config') as mock_fm_config:
+        # Ensure both coordinators use the same project manager instance
+        conversion.project_manager = scraping.project_manager
 
-            config_dict = {
-                "paths.projects_dir": str(temp_dir / "projects"),
-                "paths.output_dir": str(temp_dir / "output")
-            }
-            mock_pm_config.return_value.get.side_effect = lambda key, default=None: config_dict.get(key, default)
-            mock_fm_config.return_value.get.side_effect = lambda key, default=None: config_dict.get(key, default)
+        # Initialize project
+        success = scraping.initialize_project(
+            toc_url="https://example.com/toc",
+            novel_title="Test Novel"
+        )
+        assert success is True
 
-            # Initialize project
-            success = scraping.initialize_project(
-                toc_url="https://example.com/toc",
-                novel_title="Test Novel"
+        # Mock scraper for URL fetching (only external network calls)
+        mock_scraper = MagicMock()
+        mock_scraper.get_chapter_urls.return_value = [
+            "https://example.com/1",
+            "https://example.com/2"
+        ]
+        mock_scraper_class.return_value = mock_scraper
+
+        # Fetch chapter URLs (uses real scraping coordinator logic)
+        success = scraping.fetch_chapter_urls("https://example.com/toc")
+        assert success is True
+
+        # Get chapters to process (real chapter manager operations)
+        chapters = scraping.get_chapters_to_process()
+        assert len(chapters) == 2
+
+        # Test conversion coordinator with first chapter
+        chapter = chapters[0]
+
+        # Mock scraper for content scraping (only external network calls)
+        mock_scraper.scrape_chapter.return_value = ("Chapter 1 content", "Chapter 1", None)
+        scraping.scraper = mock_scraper
+
+        # Scrape content (uses real scraping coordinator logic)
+        content, title, error = scraping.scrape_chapter_content(chapter)
+        assert content == "Chapter 1 content"
+        assert title == "Chapter 1"
+        assert error is None
+
+        # Use real TTS engine (pyttsx3) for conversion - no mocking
+        # This tests actual TTS integration
+        assert conversion.tts_engine is not None
+
+        # Convert to audio using real components
+        with patch('tts.tts_engine.format_chapter_intro', return_value="Chapter 1: Chapter 1 content"):
+            success = conversion.convert_chapter_to_audio(
+                chapter, content, title
             )
-            assert success is True
 
-            # Mock scraper for URL fetching
-            mock_scraper = MagicMock()
-            mock_scraper.get_chapter_urls.return_value = [
-                "https://example.com/1",
-                "https://example.com/2"
-            ]
-            mock_scraper_class.return_value = mock_scraper
+        # Verify conversion worked (real file operations)
+        assert success is True
 
-            # Fetch chapter URLs
-            success = scraping.fetch_chapter_urls("https://example.com/toc")
-            assert success is True
+        # Verify files were created (real file system operations)
+        chapter_manager = conversion.project_manager.get_chapter_manager()
+        chapter_info = chapter_manager.get_chapter(1)
+        assert chapter_info.text_file_path is not None
+        assert chapter_info.audio_file_path is not None
 
-            # Get chapters to process
-            chapters = scraping.get_chapters_to_process()
-            assert len(chapters) == 2
+        # Verify text file exists and contains correct content
+        text_file = Path(chapter_info.text_file_path)
+        assert text_file.exists()
+        assert "Chapter 1 content" in text_file.read_text()
 
-            # Test conversion coordinator with first chapter
-            chapter = chapters[0]
-
-            # Mock scraper for content scraping
-            mock_scraper.scrape_chapter.return_value = ("Chapter 1 content", "Chapter 1", None)
-            scraping.scraper = mock_scraper
-
-            # Scrape content
-            content, title, error = scraping.scrape_chapter_content(chapter)
-            assert content == "Chapter 1 content"
-            assert title == "Chapter 1"
-            assert error is None
-
-            # Mock TTS conversion to create actual file
-            mock_tts = Mock()
-            def mock_convert(text, output_path, **kwargs):
-                output_path.write_bytes(b"dummy audio content")
-                return True
-            mock_tts.convert_text_to_speech.side_effect = mock_convert
-            conversion.tts_engine = mock_tts
-
-            # Mock file operations
-            text_file_path = temp_dir / "text.txt"
-            audio_file_path = temp_dir / "audio.mp3"
-
-            def mock_save_text_file(chapter_num, content, title=None):
-                text_file_path.write_text(content, encoding="utf-8")
-                return text_file_path
-
-            def mock_save_audio_file(chapter_num, audio_path, title=None):
-                # Copy the temp audio file to the final location
-                import shutil
-                shutil.copy2(audio_path, audio_file_path)
-                return audio_file_path
-
-            conversion.file_manager.save_text_file = Mock(side_effect=mock_save_text_file)
-            conversion.file_manager.save_audio_file = Mock(side_effect=mock_save_audio_file)
-            conversion.file_manager.audio_file_exists = Mock(return_value=False)
-
-            # Mock project manager operations
-            conversion.project_manager.get_chapter_manager = Mock(return_value=Mock())
-            conversion.project_manager.get_chapter_manager().update_chapter_files = Mock()
-            conversion.project_manager.save_project = Mock()
-
-            # Convert to audio
-            with patch('tts.tts_engine.format_chapter_intro', return_value="Formatted text"):
-                success = conversion.convert_chapter_to_audio(
-                    chapter, content, title
-                )
-
-            assert success is True
+        # Verify audio file exists (real TTS output)
+        audio_file = Path(chapter_info.audio_file_path)
+        assert audio_file.exists()
+        assert audio_file.stat().st_size > 0  # Should have actual audio content
 
     def test_pipeline_orchestrator_integration(self, temp_dir):
         """Test that PipelineOrchestrator integrates all coordinators."""
@@ -167,49 +163,61 @@ class TestCoordinatorIntegration:
         assert hasattr(orchestrator, 'stop')
         assert hasattr(orchestrator, 'clear_project_data')
 
-    @patch('processor.scraping_coordinator.GenericScraper')
-    def test_end_to_end_workflow_simulation(self, mock_scraper_class, temp_dir):
-        """Test a simulated end-to-end workflow."""
-        # Create orchestrator
+    @patch('processor.scraping_coordinator.NovelScraper')
+    @patch('processor.pipeline_orchestrator.get_config')
+    def test_end_to_end_workflow_simulation(self, mock_config, mock_scraper_class, temp_dir):
+        """Test a simulated end-to-end workflow with real components."""
+        # Setup config to use temp directory and pyttsx3 for faster testing
+        config_dict = {
+            "paths.output_dir": str(temp_dir / "output"),
+            "tts.voice": "pyttsx3"
+        }
+        mock_config.return_value.get.side_effect = lambda key, default=None: config_dict.get(key, default)
+
+        # Create orchestrator with real components
         orchestrator = PipelineOrchestrator(
             project_name="test_e2e",
             base_output_dir=temp_dir / "output"
         )
 
-        # Mock scraper
+        # Mock only external network calls
         mock_scraper = MagicMock()
         mock_scraper.get_chapter_urls.return_value = ["https://example.com/1"]
         mock_scraper.scrape_chapter.return_value = ("Test content", "Chapter 1", None)
         mock_scraper_class.return_value = mock_scraper
 
-        # Mock TTS
-        orchestrator.conversion_coordinator.tts_engine = Mock()
-        orchestrator.conversion_coordinator.tts_engine.convert_text_to_speech.return_value = True
-
-        # Mock file operations
-        orchestrator.conversion_coordinator.file_manager.save_text_file = Mock(return_value=Path("text.txt"))
-        orchestrator.conversion_coordinator.file_manager.save_audio_file = Mock(return_value=Path("audio.mp3"))
-        orchestrator.conversion_coordinator.file_manager.audio_file_exists = Mock(return_value=False)
-
-        # Mock project operations
-        orchestrator.conversion_coordinator.project_manager.get_chapter_manager = Mock(return_value=Mock())
-        orchestrator.conversion_coordinator.project_manager.get_chapter_manager().update_chapter_files = Mock()
-        orchestrator.conversion_coordinator.project_manager.save_project = Mock()
-
-        # Run workflow
-        with patch('tts.tts_engine.format_chapter_intro', return_value="Formatted text"):
+        # Run workflow with real TTS and file operations
+        with patch('tts.tts_engine.format_chapter_intro', return_value="Chapter 1: Test content"):
             result = orchestrator.run_full_pipeline(
                 toc_url="https://example.com/toc",
                 novel_title="Test Novel",
                 max_chapters=1
             )
 
-        # Verify result structure
+        # Verify result structure and success
         assert isinstance(result, dict)
-        assert 'success' in result
-        assert 'total' in result
-        assert 'completed' in result
-        assert 'failed' in result
+        assert result.get('success') is True
+        assert result.get('total') == 1
+        assert result.get('completed') == 1
+        assert result.get('failed') == 0
+
+        # Verify real files were created
+        project_dir = temp_dir / "output" / "test_e2e"
+        assert project_dir.exists()
+
+        text_files = list(project_dir.glob("**/text/chapter_*.txt"))
+        audio_files = list(project_dir.glob("**/audio/chapter_*.mp3"))
+
+        assert len(text_files) == 1
+        assert len(audio_files) == 1
+
+        # Verify text file content
+        text_file = text_files[0]
+        assert "Test content" in text_file.read_text()
+
+        # Verify audio file has real content (not empty)
+        audio_file = audio_files[0]
+        assert audio_file.stat().st_size > 0
 
     def test_context_sharing_across_coordinators(self):
         """Test that context changes are shared across coordinators."""
@@ -244,9 +252,9 @@ class TestCoordinatorIntegration:
         context.set_pause_check_callback(test_callback)
 
         # Verify all coordinators can access the callback
-        assert scraping.context._check_paused_callback is test_callback
-        assert conversion.context._check_paused_callback is test_callback
-        assert audio.context._check_paused_callback is test_callback
+        assert scraping.context.pause_stop_manager._check_paused_callback is test_callback
+        assert conversion.context.pause_stop_manager._check_paused_callback is test_callback
+        assert audio.context.pause_stop_manager._check_paused_callback is test_callback
 
 
 class TestBackwardCompatibility:

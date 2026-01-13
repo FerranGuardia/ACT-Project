@@ -13,8 +13,8 @@ from unittest.mock import Mock, MagicMock, patch, mock_open
 from pathlib import Path
 from typing import List
 
-from processor.batch_gap_detector import BatchGapDetector
-from processor.chapter_manager import Chapter
+from src.processor.batch_gap_detector import BatchGapDetector
+from src.processor.chapter_manager import Chapter
 
 
 class TestBatchGapDetector:

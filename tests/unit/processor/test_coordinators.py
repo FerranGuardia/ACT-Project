@@ -9,10 +9,10 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
-from processor.context import ProcessingContext
-from processor.scraping_coordinator import ScrapingCoordinator
-from processor.conversion_coordinator import ConversionCoordinator
-from processor.audio_post_processor import AudioPostProcessor
+from src.processor.context import ProcessingContext
+from src.processor.scraping_coordinator import ScrapingCoordinator
+from src.processor.conversion_coordinator import ConversionCoordinator
+from src.processor.audio_post_processor import AudioPostProcessor
 
 
 class TestProcessingContext:
@@ -118,7 +118,7 @@ class TestScrapingCoordinator:
 
         assert base_url == "https://example.com"
 
-    @patch('processor.scraping_coordinator.GenericScraper')
+    @patch('src.processor.scraping_coordinator.NovelScraper')
     def test_fetch_chapter_urls_success(self, mock_scraper_class, coordinator):
         """Test successful chapter URL fetching."""
         # Mock scraper
@@ -142,7 +142,7 @@ class TestScrapingCoordinator:
         assert coordinator.progress_tracker is not None
         assert coordinator.progress_tracker.total_chapters == 2
 
-    @patch('processor.scraping_coordinator.GenericScraper')
+    @patch('src.processor.scraping_coordinator.NovelScraper')
     def test_fetch_chapter_urls_no_urls(self, mock_scraper_class, coordinator):
         """Test chapter URL fetching when no URLs are found."""
         mock_scraper = MagicMock()
@@ -159,7 +159,7 @@ class TestScrapingCoordinator:
 
         assert success is False
 
-    @patch('processor.scraping_coordinator.GenericScraper')
+    @patch('src.processor.scraping_coordinator.NovelScraper')
     def test_scrape_chapter_content_success(self, mock_scraper_class, coordinator):
         """Test successful chapter content scraping."""
         mock_scraper = MagicMock()
@@ -184,7 +184,7 @@ class TestScrapingCoordinator:
         assert error is None
         coordinator.progress_tracker.update_chapter.assert_called()
 
-    @patch('processor.scraping_coordinator.GenericScraper')
+    @patch('src.processor.scraping_coordinator.NovelScraper')
     def test_scrape_chapter_content_error(self, mock_scraper_class, coordinator):
         """Test chapter content scraping with error."""
         mock_scraper = MagicMock()

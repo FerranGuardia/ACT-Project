@@ -11,7 +11,7 @@ Tests progress tracking functionality including:
 from unittest.mock import Mock
 
 # Path setup is handled by conftest.py
-from processor.progress_tracker import ProgressTracker, ProcessingStatus
+from src.processor.progress_tracker import ProgressTracker, ProcessingStatus
 
 
 class TestProcessingStatus:

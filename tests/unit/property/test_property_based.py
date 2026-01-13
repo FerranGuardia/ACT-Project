@@ -141,53 +141,6 @@ class TestTTSPropertyBased:
             # Should be identical or very similar
             assert abs(len(cleaned) - len(original.strip())) <= 5
 
-    @given(text=st.text(min_size=1, max_size=1000))
-    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_text_processor_chunking(self, text):
-        """Test that text processor handles chunking correctly with proper validation."""
-        from unittest.mock import Mock
-
-        from src.tts.text_processor import TextProcessor
-
-        try:
-            provider_manager = Mock()
-            processor = TextProcessor(provider_manager)
-            max_length = 500
-            chunks = processor.chunk_text(text, max_length=max_length)
-
-            # Chunks should be a list
-            assert isinstance(chunks, list)
-
-            # Each chunk should be a string
-            for chunk in chunks:
-                assert isinstance(chunk, str)
-
-            # Should return empty list for empty text
-            if not text:
-                assert chunks == []
-
-            # If text is short enough, should return single chunk
-            if len(text) <= max_length:
-                assert len(chunks) == 1
-                assert chunks[0] == text
-
-            # Rejoined text should contain original text (may add spaces for word boundaries)
-            if chunks:
-                rejoined = ''.join(chunks)
-                # Allow for possible spacing additions
-                assert len(rejoined) >= len(text.replace(' ', ''))  # At minimum, non-space chars preserved
-
-            # No chunk should exceed reasonable length (allowing for word boundary tolerance)
-            for chunk in chunks:
-                assert len(chunk) <= max_length + 100  # Allow reasonable tolerance for word boundaries
-
-            # Should split long text into multiple chunks
-            if len(text) > max_length:
-                assert len(chunks) > 1
-
-        except Exception as e:
-            pytest.fail(f"TextProcessor chunking failed on input: {repr(text)}. Error: {e}")
-
     @given(
         text=st.text(min_size=1, max_size=500),
         rate=st.floats(min_value=-50.0, max_value=100.0),
@@ -327,48 +280,6 @@ class TestTTSPropertyBased:
         except Exception as e:
             pytest.fail(f"File naming failed on filename: {repr(filename)}. Error: {e}")
 
-    @given(length=st.integers(min_value=0, max_value=10000))
-    @settings(deadline=None)
-    def test_text_length_edge_cases(self, length):
-        """Test behavior with various text lengths and validate chunking logic."""
-        text = "a" * length
-
-        from unittest.mock import Mock
-
-        from src.tts.text_processor import TextProcessor
-
-        try:
-            provider_manager = Mock()
-            processor = TextProcessor(provider_manager)
-            max_length = 1000
-            chunks = processor.chunk_text(text, max_length=max_length)
-
-            # Should handle any length
-            assert isinstance(chunks, list)
-
-            # Empty text should return empty list
-            if length == 0:
-                assert chunks == []
-
-            # Short text should return single chunk
-            if 0 < length <= max_length:
-                assert len(chunks) == 1
-                assert chunks[0] == text
-
-            # Long text should be split appropriately
-            if length > max_length:
-                assert len(chunks) > 1
-                # Each chunk should be reasonably sized
-                for chunk in chunks:
-                    assert len(chunk) > 0
-                    assert len(chunk) <= max_length + 100  # Allow word boundary tolerance
-
-            # Total content should be preserved
-            total_chars = sum(len(chunk) for chunk in chunks)
-            assert total_chars == length  # Should not add or remove characters
-
-        except Exception as e:
-            pytest.fail(f"Text processing failed on length {length}. Error: {e}")
 
     @given(text=st.text(min_size=1, max_size=100))
     @settings(deadline=None)

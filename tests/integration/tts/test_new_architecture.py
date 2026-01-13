@@ -53,13 +53,17 @@ class TestNewArchitectureIntegration:
         """Test that TTSResourceManager handles resources properly."""
         manager = TTSResourceManager()
 
-        # Test basic operations
-        assert manager.get_resource_count() == 0
-        assert manager.get_temp_file_count() == 0
-        assert manager.get_temp_directory_count() == 0
+        try:
+            # Test basic operations
+            assert manager.get_resource_count() == 0
+            assert manager.get_temp_file_count() == 0
+            assert manager.get_temp_directory_count() == 0
 
-        # Test cleanup on empty manager
-        manager.cleanup_all()  # Should not raise
+            # Test cleanup on empty manager
+            manager.cleanup_all()  # Should not raise
+        finally:
+            # Ensure cleanup
+            manager.cleanup_all()
 
     @patch('src.tts.providers.provider_manager.TTSProviderManager.convert_with_fallback')
     def test_conversion_coordinator_with_mocked_provider(self, mock_convert):

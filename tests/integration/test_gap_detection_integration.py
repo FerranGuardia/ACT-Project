@@ -31,7 +31,7 @@ from processor.pipeline_orchestrator import ProcessingPipeline
 logger = get_logger("test.gap_detection_integration")
 
 # Pytest markers
-pytestmark = pytest.mark.integration
+pytestmark = [pytest.mark.integration, pytest.mark.component_interaction]
 
 
 # Use centralized temp_dir fixture from conftest.py

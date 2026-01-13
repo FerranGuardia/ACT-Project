@@ -15,8 +15,8 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 # Path setup is handled by conftest.py
-from processor.project_manager import ProjectManager
-from processor.chapter_manager import ChapterManager, Chapter, ChapterStatus
+from src.processor.project_manager import ProjectManager
+from src.processor.chapter_manager import ChapterManager, Chapter, ChapterStatus
 
 
 class TestProjectManager:

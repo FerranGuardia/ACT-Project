@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, MagicMock, patch
 
-from processor.batch_audio_merger import BatchAudioMerger, BatchMergeResult, merge_project_batches
+from src.processor.batch_audio_merger import BatchAudioMerger, BatchMergeResult, merge_project_batches
 
 
 @pytest.fixture

@@ -12,8 +12,8 @@ import pytest
 from unittest.mock import Mock, MagicMock, patch
 from typing import List
 
-from processor.gap_detector import GapDetector
-from processor.chapter_manager import Chapter, ChapterStatus
+from src.processor.gap_detector import GapDetector
+from src.processor.chapter_manager import Chapter, ChapterStatus
 
 
 class TestGapDetector:
