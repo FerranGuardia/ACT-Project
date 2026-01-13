@@ -6,7 +6,7 @@ Replaces the monolithic TTSEngine approach with a clean, modular design.
 """
 
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Callable
 from dataclasses import dataclass
 
 from core.config_manager import get_config
@@ -31,6 +31,7 @@ class ConversionRequest:
     pitch: Optional[float] = None
     volume: Optional[float] = None
     provider: Optional[str] = None
+    on_progress: Optional[Callable[[float], None]] = None
 
 
 @dataclass
@@ -92,7 +93,8 @@ class TTSConversionCoordinator:
         rate: Optional[float] = None,
         pitch: Optional[float] = None,
         volume: Optional[float] = None,
-        provider: Optional[str] = None
+        provider: Optional[str] = None,
+        on_progress: Optional[Callable[[float], None]] = None
     ) -> bool:
         """
         Convert text to speech using the coordinated workflow.
@@ -116,7 +118,8 @@ class TTSConversionCoordinator:
             rate=rate,
             pitch=pitch,
             volume=volume,
-            provider=provider
+            provider=provider,
+            on_progress=on_progress
         )
 
         result = self.convert(request)
@@ -156,7 +159,8 @@ class TTSConversionCoordinator:
                 output_path=request.output_path,
                 rate=request.rate,
                 pitch=request.pitch,
-                volume=request.volume
+                volume=request.volume,
+                on_progress=request.on_progress
             )
 
             if success:

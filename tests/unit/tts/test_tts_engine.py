@@ -179,7 +179,8 @@ class TestTTSEngine:
             rate=10.0,
             pitch=5.0,
             volume=-5.0,
-            provider=None
+            provider=None,
+            on_progress=None
         )
 
     def test_convert_text_to_speech_validation_failure(self, temp_dir):

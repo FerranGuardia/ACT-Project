@@ -9,7 +9,7 @@ import asyncio
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 from core.logger import get_logger
 from core.constants import PREVIEW_TEXT_LENGTH
@@ -148,6 +148,15 @@ class TTSEngine:
 
         logger.info("TTSEngine initialized with new architecture")
 
+    def __del__(self):
+        """Clean up resources when TTSEngine is destroyed."""
+        try:
+            if hasattr(self, 'resource_manager') and self.resource_manager:
+                self.resource_manager.cleanup_all()
+        except Exception:
+            # Ignore cleanup errors during destruction
+            pass
+
     def get_available_voices(self, locale: str | None = None, provider: str | None = None) -> List[Dict[str, Any]]:
         """Get available voices (delegates to coordinator)."""
         return self.coordinator.get_available_voices(locale=locale, provider=provider)
@@ -160,7 +169,8 @@ class TTSEngine:
         rate: float | None = None,
         pitch: float | None = None,
         volume: float | None = None,
-        provider: str | None = None
+        provider: str | None = None,
+        on_progress: Optional[Callable[[float], None]] = None
     ) -> bool:
         """
         Convert text to speech and save as audio file.
@@ -187,7 +197,8 @@ class TTSEngine:
             rate=rate,
             pitch=pitch,
             volume=volume,
-            provider=provider
+            provider=provider,
+            on_progress=on_progress
         )
     async def _convert_chunks_parallel(
         self,

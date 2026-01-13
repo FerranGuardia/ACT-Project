@@ -10,16 +10,14 @@ import tempfile
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING, Any
+from typing import List, Optional, TYPE_CHECKING, Any, Callable
 
 from core.logger import get_logger
-from core.constants import PREVIEW_TEXT_LENGTH
 
 from .providers.base_provider import TTSProvider
 from .providers.provider_manager import TTSProviderManager
 from .audio_merger import AudioMerger
 from .resource_manager import TTSResourceManager
-from .error_handling import log_chunked_conversion_error
 
 if TYPE_CHECKING:
     from .voice_resolver import VoiceResolutionResult
@@ -69,7 +67,8 @@ class ConversionStrategy(ABC):
         output_path: Path,
         rate: Optional[float] = None,
         pitch: Optional[float] = None,
-        volume: Optional[float] = None
+        volume: Optional[float] = None,
+        on_progress: Optional[Callable[[float], None]] = None
     ) -> bool:
         """Convert text to speech using this strategy."""
         pass
@@ -92,10 +91,10 @@ class ConversionStrategy(ABC):
         logger.info(f"Text size: {text_bytes_size} bytes")
 
         # Debug: Check text content
-        if len(text) < PREVIEW_TEXT_LENGTH:
+        if len(text) < 200:
             logger.info(f"Text preview: '{text}'")
         else:
-            logger.info(f"Text preview: '{text[:PREVIEW_TEXT_LENGTH]}...'")
+            logger.info(f"Text preview: '{text[:200]}...'")
 
 
 class DirectConversionStrategy(ConversionStrategy):
@@ -108,7 +107,8 @@ class DirectConversionStrategy(ConversionStrategy):
         output_path: Path,
         rate: Optional[float] = None,
         pitch: Optional[float] = None,
-        volume: Optional[float] = None
+        volume: Optional[float] = None,
+        on_progress: Optional[Callable[[float], None]] = None
     ) -> bool:
         """Convert text directly without chunking."""
         # Ensure output directory exists
@@ -128,6 +128,10 @@ class DirectConversionStrategy(ConversionStrategy):
         logger.info("Using direct conversion strategy")
 
         try:
+            # Emit progress start
+            if on_progress:
+                on_progress(0.0)
+
             success = voice_resolution.provider.convert_text_to_speech(
                 text=final_text,
                 voice=voice_resolution.voice_id,
@@ -136,6 +140,10 @@ class DirectConversionStrategy(ConversionStrategy):
                 pitch=pitch,
                 volume=volume
             )
+
+            # Emit progress completion
+            if on_progress:
+                on_progress(1.0)
 
             if success:
                 # Verify file was actually created
@@ -173,12 +181,14 @@ class ChunkedConversionStrategy(ConversionStrategy):
         output_path: Path,
         rate: Optional[float] = None,
         pitch: Optional[float] = None,
-        volume: Optional[float] = None
+        volume: Optional[float] = None,
+        on_progress: Optional[Callable[[float], None]] = None
     ) -> bool:
         """Convert text using chunked approach with parallel processing."""
         try:
             # Create temporary directory for chunks
-            temp_dir = self.resource_manager.create_tts_chunks_temp_dir()
+            temp_dir = Path(tempfile.gettempdir()) / f"tts_chunks_{int(time.time() * 1000)}"
+            temp_dir.mkdir(parents=True, exist_ok=True)
             self.resource_manager.register_temp_directory(temp_dir)
 
             # Build final text for conversion
@@ -214,7 +224,8 @@ class ChunkedConversionStrategy(ConversionStrategy):
                 provider=voice_resolution.provider,
                 rate=rate,
                 pitch=pitch,
-                volume=volume
+                volume=volume,
+                on_progress=on_progress
             )
 
             if not chunk_files:
@@ -245,7 +256,9 @@ class ChunkedConversionStrategy(ConversionStrategy):
             return True
 
         except Exception as e:
-            log_chunked_conversion_error(e)
+            error_msg = str(e)
+            error_type = type(e).__name__
+            logger.error(f"Error in chunked conversion: {error_type}: {error_msg}")
             return False
 
     def _convert_chunks_parallel(
@@ -257,12 +270,17 @@ class ChunkedConversionStrategy(ConversionStrategy):
         provider: TTSProvider,
         rate: Optional[float] = None,
         pitch: Optional[float] = None,
-        volume: Optional[float] = None
+        volume: Optional[float] = None,
+        on_progress: Optional[Callable[[float], None]] = None
     ) -> List[Path]:
         """Convert text chunks in parallel."""
         # For now, convert sequentially to avoid async complexity
         # TODO: Implement proper parallel conversion
         chunk_files = []
+
+        # Emit initial progress
+        if on_progress:
+            on_progress(0.0)
 
         for i, chunk in enumerate(chunks):
             chunk_filename = f"{output_stem}_chunk_{i:04d}.mp3"
@@ -285,8 +303,17 @@ class ChunkedConversionStrategy(ConversionStrategy):
                 else:
                     logger.warning(f"Failed to convert chunk {i+1}/{len(chunks)}")
 
+                # Update progress after each chunk
+                if on_progress:
+                    progress = (i + 1) / len(chunks)
+                    on_progress(progress)
+
             except Exception as e:
                 logger.warning(f"Error converting chunk {i+1}/{len(chunks)}: {e}")
+                # Still update progress even on error
+                if on_progress:
+                    progress = (i + 1) / len(chunks)
+                    on_progress(progress)
 
         return chunk_files
 
