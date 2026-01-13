@@ -287,7 +287,7 @@ class ConfigManager:
 
     def reset_to_defaults(self) -> None:
         """Reset configuration to default values."""
-        self._config = self._default_config.copy()
+        self._config = self._get_default_config()
         self.save_config()
         logger.info("Configuration reset to defaults")
 
