@@ -49,7 +49,7 @@ class TestMetadataCoordinatorInitialization:
         mock_get_config.return_value = mock_config
 
         # Reset singleton for clean test
-        mc_module._metadata_manager_instance = None
+        mc_module._metadata_coordinator_instance = None
 
         with patch('pathlib.Path.mkdir'), \
              patch.object(MetadataCoordinator, '_load_metadata'):
@@ -65,7 +65,7 @@ class TestMetadataCoordinatorInitialization:
         mock_get_config.return_value = mock_config
 
         # Reset singleton for clean test
-        mc_module._metadata_manager_instance = None
+        mc_module._metadata_coordinator_instance = None
 
         with patch('pathlib.Path.mkdir'), \
              patch.object(MetadataCoordinator, '_load_metadata') as mock_load:
@@ -84,7 +84,7 @@ class TestMetadataCoordinatorFileOperations:
         mock_get_config.return_value = mock_config
 
         # Reset singleton for clean test
-        mc_module._metadata_manager_instance = None
+        mc_module._metadata_coordinator_instance = None
 
         with patch('pathlib.Path.exists', return_value=False), \
              patch('pathlib.Path.mkdir'):
@@ -108,7 +108,7 @@ class TestMetadataCoordinatorFileOperations:
         }
 
         # Reset singleton for clean test
-        mc_module._metadata_manager_instance = None
+        mc_module._metadata_coordinator_instance = None
 
         # Create a temporary directory with metadata file
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -137,7 +137,7 @@ class TestMetadataCoordinatorFileOperations:
         mock_get_config.return_value = mock_config
 
         # Reset singleton for clean test
-        mc_module._metadata_manager_instance = None
+        mc_module._metadata_coordinator_instance = None
 
         with patch('pathlib.Path.exists', return_value=True), \
              patch('pathlib.Path.mkdir'), \
@@ -154,7 +154,7 @@ class TestMetadataCoordinatorFileOperations:
         mock_get_config.return_value = mock_config
 
         # Reset singleton for clean test
-        mc_module._metadata_manager_instance = None
+        mc_module._metadata_coordinator_instance = None
 
         with patch('pathlib.Path.exists', return_value=False), \
              patch('pathlib.Path.mkdir'), \
@@ -165,7 +165,7 @@ class TestMetadataCoordinatorFileOperations:
             manager._metadata = {"test_url": {"title": "Test Novel", "author": "Test Author"}}
 
             # Save
-            manager._save_metadata()
+            manager._save_metadata_atomic()
 
         # Verify file was written
         mock_file.assert_called()
@@ -181,7 +181,7 @@ class TestMetadataCoordinatorCRUD:
         mock_get_config.return_value = mock_config
 
         # Reset singleton for clean test
-        mc_module._metadata_manager_instance = None
+        mc_module._metadata_coordinator_instance = None
 
         with patch('pathlib.Path.exists', return_value=False), \
              patch('pathlib.Path.mkdir'), \
@@ -209,7 +209,7 @@ class TestMetadataCoordinatorCRUD:
         mock_get_config.return_value = mock_config
 
         # Reset singleton for clean test
-        mc_module._metadata_manager_instance = None
+        mc_module._metadata_coordinator_instance = None
 
         with patch('pathlib.Path.exists', return_value=False), \
              patch('pathlib.Path.mkdir'):
@@ -225,7 +225,7 @@ class TestMetadataCoordinatorCRUD:
         mock_get_config.return_value = mock_config
 
         # Reset singleton for clean test
-        mc_module._metadata_manager_instance = None
+        mc_module._metadata_coordinator_instance = None
 
         with patch('pathlib.Path.exists', return_value=False), \
              patch('pathlib.Path.mkdir'), \
@@ -250,7 +250,7 @@ class TestMetadataCoordinatorCRUD:
         mock_get_config.return_value = mock_config
 
         # Reset singleton for clean test
-        mc_module._metadata_manager_instance = None
+        mc_module._metadata_coordinator_instance = None
 
         with patch('pathlib.Path.exists', return_value=False), \
              patch('pathlib.Path.mkdir'), \
@@ -273,7 +273,7 @@ class TestMetadataCoordinatorCRUD:
         mock_get_config.return_value = mock_config
 
         # Reset singleton for clean test
-        mc_module._metadata_manager_instance = None
+        mc_module._metadata_coordinator_instance = None
 
         with patch('pathlib.Path.exists', return_value=False), \
              patch('pathlib.Path.mkdir'), \
@@ -298,7 +298,7 @@ class TestMetadataCoordinatorSearch:
         mock_get_config.return_value = mock_config
 
         # Reset singleton for clean test
-        mc_module._metadata_manager_instance = None
+        mc_module._metadata_coordinator_instance = None
 
         with patch('pathlib.Path.exists', return_value=False), \
              patch('pathlib.Path.mkdir'):
@@ -327,7 +327,7 @@ class TestMetadataCoordinatorSearch:
         mock_get_config.return_value = mock_config
 
         # Reset singleton for clean test
-        mc_module._metadata_manager_instance = None
+        mc_module._metadata_coordinator_instance = None
 
         with patch('pathlib.Path.exists', return_value=False), \
              patch('pathlib.Path.mkdir'):
@@ -351,14 +351,14 @@ class TestMetadataCoordinatorTimestamps:
         mock_get_config.return_value = mock_config
 
         # Reset singleton for clean test
-        mc_module._metadata_manager_instance = None
+        mc_module._metadata_coordinator_instance = None
 
         with patch('pathlib.Path.exists', return_value=False), \
              patch('pathlib.Path.mkdir'):
             manager = MetadataCoordinator()
 
             # Mock datetime to control timestamps
-            with patch('src.core.metadata_manager.datetime') as mock_datetime:
+            with patch('src.core.metadata_coordinator.datetime') as mock_datetime:
                 mock_dt = MagicMock()
                 mock_dt.isoformat.return_value = "2023-01-01T12:00:00"
                 mock_datetime.now.return_value = mock_dt
@@ -377,14 +377,14 @@ class TestMetadataCoordinatorTimestamps:
         mock_get_config.return_value = mock_config
 
         # Reset singleton for clean test
-        mc_module._metadata_manager_instance = None
+        mc_module._metadata_coordinator_instance = None
 
         with patch('pathlib.Path.exists', return_value=False), \
              patch('pathlib.Path.mkdir'):
             manager = MetadataCoordinator()
 
             # Mock datetime
-            with patch('src.core.metadata_manager.datetime') as mock_datetime:
+            with patch('src.core.metadata_coordinator.datetime') as mock_datetime:
                 # Initial set
                 mock_dt1 = MagicMock()
                 mock_dt1.isoformat.return_value = "2023-01-01T10:00:00"
@@ -413,7 +413,7 @@ class TestMetadataCoordinatorValidation:
         mock_get_config.return_value = mock_config
 
         # Reset singleton for clean test
-        mc_module._metadata_manager_instance = None
+        mc_module._metadata_coordinator_instance = None
 
         with patch('pathlib.Path.exists', return_value=False), \
              patch('pathlib.Path.mkdir'):
@@ -430,7 +430,7 @@ class TestMetadataCoordinatorValidation:
         mock_get_config.return_value = mock_config
 
         # Reset singleton for clean test
-        mc_module._metadata_manager_instance = None
+        mc_module._metadata_coordinator_instance = None
 
         # Use actual temp directory for persistence test
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -440,10 +440,10 @@ class TestMetadataCoordinatorValidation:
             # First instance
             manager1 = MetadataCoordinator()
             manager1.set_novel_metadata("url1", {"title": "Test"})
-            manager1._save_metadata()  # Ensure it's saved
+            manager1._save_metadata_atomic()  # Ensure it's saved
 
             # Reset singleton to create new instance
-            mc_module._metadata_manager_instance = None
+            mc_module._metadata_coordinator_instance = None
 
             # Second instance should load the same data
             manager2 = MetadataCoordinator()
@@ -462,7 +462,7 @@ class TestMetadataCoordinatorUtilityMethods:
         mock_get_config.return_value = mock_config
 
         # Reset singleton for clean test
-        mc_module._metadata_manager_instance = None
+        mc_module._metadata_coordinator_instance = None
 
         with patch('pathlib.Path.exists', return_value=False), \
              patch('pathlib.Path.mkdir'):
@@ -482,7 +482,7 @@ class TestMetadataCoordinatorUtilityMethods:
         mock_get_config.return_value = mock_config
 
         # Reset singleton for clean test
-        mc_module._metadata_manager_instance = None
+        mc_module._metadata_coordinator_instance = None
 
         with patch('pathlib.Path.exists', return_value=False), \
              patch('pathlib.Path.mkdir'), \

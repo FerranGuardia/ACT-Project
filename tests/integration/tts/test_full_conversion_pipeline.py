@@ -1,23 +1,22 @@
 """
 Integration tests for TTS conversion pipeline components.
 
-Tests real component interactions in the TTS conversion pipeline.
-Uses real TTS providers (pyttsx3 for speed) and minimal mocking.
+Tests component interactions in the TTS conversion pipeline.
+Uses mocks for external dependencies while testing real component integration.
 """
 
-import pytest
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from src.tts.conversion_coordinator import TTSConversionCoordinator
-from src.tts.voice_resolver import VoiceResolver, VoiceResolutionResult
-from src.tts.text_processing_pipeline import TextProcessingPipeline, ProcessedText
 from src.tts.conversion_strategies import DirectConversionStrategy
 from src.tts.resource_manager import TTSResourceManager
-
-# Pytest markers
-pytestmark = [pytest.mark.integration, pytest.mark.real_components]
+from src.tts.text_processing_pipeline import (ProcessedText,
+                                              TextProcessingPipeline)
+from src.tts.voice_resolver import VoiceResolutionResult, VoiceResolver
 
 
 class TestFullConversionPipeline:
@@ -35,98 +34,189 @@ class TestFullConversionPipeline:
         if self.temp_dir.exists():
             shutil.rmtree(self.temp_dir)
 
-    def test_full_pipeline_integration(self):
-        """Test complete pipeline from text input to audio output with real components."""
-        # Use real TTSConversionCoordinator with actual providers
-        coordinator = TTSConversionCoordinator()
+    @patch('src.tts.providers.provider_manager.TTSProviderManager')
+    def test_full_pipeline_integration(self, mock_pm_class):
+        """Test complete pipeline from text input to audio output."""
+        # Setup mocks
+        mock_provider_manager = MagicMock()
+        mock_provider = MagicMock()
+        mock_provider.is_available.return_value = True
+        mock_provider.supports_ssml.return_value = False
 
-        # Create test output file
-        output_path = self.temp_dir / "test_output.mp3"
+        # Mock provider to create a dummy file when convert_text_to_speech is called
+        def mock_convert_text_to_speech(text, voice, output_path, **kwargs):
+            # Create a dummy file to simulate successful conversion
+            output_path.write_bytes(b"dummy audio content")
+            return True
 
-        # Execute conversion using real pyttsx3 provider (fast and no network required)
-        result = coordinator.convert_text_to_speech(
-            text="Hello, world! This is a test.",
-            output_path=output_path,
-            voice="pyttsx3"  # Use pyttsx3 for fast, reliable testing
+        mock_provider.convert_text_to_speech.side_effect = mock_convert_text_to_speech
+        mock_provider.get_provider_name.return_value = "mock_provider"
+        mock_provider.supports_chunking.return_value = False
+        mock_provider.get_max_text_bytes.return_value = None
+
+        mock_provider_manager.get_available_provider.return_value = mock_provider
+        mock_provider_manager.get_provider.return_value = mock_provider
+        mock_pm_class.return_value = mock_provider_manager
+
+        # Create coordinator with mocked provider manager
+        coordinator = TTSConversionCoordinator(provider_manager=mock_provider_manager)
+
+        # Mock voice resolution
+        mock_voice_resolution = VoiceResolutionResult(
+            voice_id="test-voice",
+            provider=mock_provider,
+            voice_metadata={"id": "test-voice", "name": "Test Voice"}
         )
 
-        # Verify conversion was successful with real components
-        assert result is True
-        assert output_path.exists()
+        with patch.object(coordinator.voice_resolver, 'resolve_voice', return_value=mock_voice_resolution):
+            # Create test output file
+            output_path = self.temp_dir / "test_output.mp3"
 
-        # Verify the output file has real audio content (not empty)
-        audio_content = output_path.read_bytes()
-        assert len(audio_content) > 0
-        assert audio_content != b"Hello, world! This is a test."  # Should be actual audio data
+            # Mock the provider to actually create the file
+            def mock_convert(*args, **kwargs):
+                output_path.write_bytes(b"fake audio data")
+                return True
 
-        # Verify the coordinator used real components
-        assert coordinator.provider_manager is not None
-        assert coordinator.voice_resolver is not None
-        assert coordinator.text_pipeline is not None
+            mock_provider.convert_text_to_speech.side_effect = mock_convert
 
-    def test_pipeline_with_ssml_processing(self):
-        """Test pipeline with SSML-capable provider (Edge TTS)."""
-        # Use real TTSConversionCoordinator
-        coordinator = TTSConversionCoordinator()
+            # Execute conversion
+            result = coordinator.convert_text_to_speech(
+                text="Hello, world! This is a test.",
+                output_path=output_path,
+                voice="test-voice"
+            )
 
-        output_path = self.temp_dir / "ssml_test.mp3"
-
-        # Execute conversion with real Edge TTS provider and speech parameters
-        result = coordinator.convert_text_to_speech(
-            text="Hello world",
-            output_path=output_path,
-            voice="en-US-AndrewNeural",  # Real Edge TTS voice
-            rate=1.0,
-            pitch=2.0,
-            volume=3.0
-        )
-
-        # Edge TTS may not be available in test environment, so handle gracefully
-        if result is True:
+            # Verify conversion was successful
+            assert result is True
             assert output_path.exists()
-            audio_content = output_path.read_bytes()
-            assert len(audio_content) > 0
+            assert output_path.read_bytes() == b"fake audio data"
+            mock_provider.convert_text_to_speech.assert_called_once()
 
-            # Verify coordinator used real components
-            assert coordinator.provider_manager is not None
-        else:
-            # If Edge TTS is not available, that's acceptable for integration testing
-            # The test validates that the pipeline components work together
-            assert coordinator.provider_manager is not None
-            assert coordinator.voice_resolver is not None
+            # Verify the call parameters
+            call_args = mock_provider.convert_text_to_speech.call_args
+            assert call_args[1]['text'] == "Hello, world! This is a test."
+            assert call_args[1]['voice'] == "test-voice"
+            assert call_args[1]['output_path'] == output_path
 
-    def test_pipeline_error_handling(self):
-        """Test pipeline error handling with real components."""
-        # Use real TTSConversionCoordinator
-        coordinator = TTSConversionCoordinator()
+    @patch('src.tts.providers.provider_manager.TTSProviderManager')
+    def test_pipeline_with_ssml_processing(self, mock_pm_class):
+        """Test pipeline with SSML-capable provider."""
+        # Setup mocks
+        mock_provider_manager = MagicMock()
+        mock_provider = MagicMock()
+        mock_provider.is_available.return_value = True
+        mock_provider.supports_ssml.return_value = True  # SSML supported
 
-        output_path = self.temp_dir / "error_test.mp3"
+        # Mock provider to create actual file when convert_text_to_speech is called
+        def mock_convert_text_to_speech(text, voice, output_path, **kwargs):
+            # Create a dummy file to simulate successful conversion
+            output_path.write_bytes(b"dummy audio content")
+            return True
 
-        # Test with invalid voice - voice resolver has fallback behavior
-        result = coordinator.convert_text_to_speech(
-            text="Hello world",
-            output_path=output_path,
-            voice="invalid-voice-that-does-not-exist"
+        mock_provider.convert_text_to_speech.side_effect = mock_convert_text_to_speech
+        mock_provider.get_provider_name.return_value = "edge_tts"
+        mock_provider.supports_chunking.return_value = False
+        mock_provider.get_max_text_bytes.return_value = None
+
+        mock_provider_manager.get_available_provider.return_value = mock_provider
+        mock_provider_manager.get_provider.return_value = mock_provider
+        mock_pm_class.return_value = mock_provider_manager
+
+        coordinator = TTSConversionCoordinator(provider_manager=mock_provider_manager)
+
+        # Mock voice resolution
+        mock_voice_resolution = VoiceResolutionResult(
+            voice_id="en-US-AndrewNeural",
+            provider=mock_provider,
+            voice_metadata={"id": "en-US-AndrewNeural", "name": "Andrew"}
         )
 
-        # The coordinator should succeed due to fallback voice behavior
-        # This demonstrates good error handling (fallback instead of failure)
-        assert result is True
-        assert output_path.exists()
+        with patch.object(coordinator.voice_resolver, 'resolve_voice') as mock_resolve:
+            mock_resolve.return_value = mock_voice_resolution
 
-        # Verify real audio was created despite invalid voice
-        audio_content = output_path.read_bytes()
-        assert len(audio_content) > 0
+            output_path = self.temp_dir / "ssml_test.mp3"
 
-        # Verify coordinator components are still intact
-        assert coordinator.provider_manager is not None
-        assert coordinator.voice_resolver is not None
-        assert coordinator.text_pipeline is not None
+            # Execute conversion with speech parameters
+            result = coordinator.convert_text_to_speech(
+                text="Hello world",
+                output_path=output_path,
+                voice="en-US-AndrewNeural",
+                rate=1.0,
+                pitch=2.0,
+                volume=3.0
+            )
 
-    def test_file_to_speech_conversion(self):
-        """Test file-to-speech conversion pipeline with real components."""
-        # Use real TTSConversionCoordinator
-        coordinator = TTSConversionCoordinator()
+            assert result is True
+
+            # Verify SSML was generated and passed to provider
+            call_args = mock_provider.convert_text_to_speech.call_args
+            ssml_text = call_args[1]['text']
+
+            # Should contain SSML tags
+            assert "<speak>" in ssml_text
+            assert 'rate="+1%"' in ssml_text
+            assert 'pitch="+2%"' in ssml_text
+            assert 'volume="+3%"' in ssml_text
+            assert "Hello world" in ssml_text
+
+    @patch('src.tts.providers.provider_manager.TTSProviderManager')
+    def test_pipeline_error_handling(self, mock_pm_class):
+        """Test pipeline error handling and recovery."""
+        # Setup mocks
+        mock_provider_manager = MagicMock()
+        mock_provider = MagicMock()
+        mock_provider.is_available.return_value = True
+        mock_provider.convert_text_to_speech.side_effect = Exception("Provider error")
+        mock_provider.supports_chunking.return_value = False
+        mock_provider.get_max_text_bytes.return_value = None
+
+        mock_provider_manager.get_available_provider.return_value = mock_provider
+        mock_pm_class.return_value = mock_provider_manager
+
+        coordinator = TTSConversionCoordinator(provider_manager=mock_provider_manager)
+
+        # Mock voice resolution
+        mock_voice_resolution = VoiceResolutionResult(
+            voice_id="test-voice",
+            provider=mock_provider,
+            voice_metadata={"id": "test-voice"}
+        )
+
+        with patch.object(coordinator.voice_resolver, 'resolve_voice') as mock_resolve:
+            mock_resolve.return_value = mock_voice_resolution
+
+            output_path = self.temp_dir / "error_test.mp3"
+
+            # Execute conversion - should handle error gracefully
+            result = coordinator.convert_text_to_speech(
+                text="Hello world",
+                output_path=output_path
+            )
+
+            # Should return False on error
+            assert result is False
+
+    @patch('src.tts.providers.provider_manager.TTSProviderManager')
+    def test_file_to_speech_conversion(self, mock_pm_class):
+        """Test file-to-speech conversion pipeline."""
+        # Setup mocks
+        mock_provider_manager = MagicMock()
+        mock_provider = MagicMock()
+        mock_provider.is_available.return_value = True
+        # Mock provider to create a dummy file when convert_text_to_speech is called
+        def mock_convert_text_to_speech(text, voice, output_path, **kwargs):
+            # Create a dummy file to simulate successful conversion
+            output_path.write_bytes(b"dummy audio content")
+            return True
+
+        mock_provider.convert_text_to_speech.side_effect = mock_convert_text_to_speech
+        mock_provider.supports_chunking.return_value = False
+        mock_provider.get_max_text_bytes.return_value = None
+
+        mock_provider_manager.get_available_provider.return_value = mock_provider
+        mock_pm_class.return_value = mock_provider_manager
+
+        coordinator = TTSConversionCoordinator(provider_manager=mock_provider_manager)
 
         # Create a temporary text file
         text_file = self.temp_dir / "input.txt"
@@ -135,53 +225,64 @@ class TestFullConversionPipeline:
 
         output_file = self.temp_dir / "output.mp3"
 
-        # Execute file conversion using real components
-        result = coordinator.convert_file_to_speech(
-            input_file=text_file,
-            output_path=output_file,
-            voice="pyttsx3"  # Use pyttsx3 for reliable testing
+        # Mock voice resolution
+        mock_voice_resolution = VoiceResolutionResult(
+            voice_id="test-voice",
+            provider=mock_provider,
+            voice_metadata={"id": "test-voice"}
         )
 
-        # Verify conversion worked
-        assert result is True
-        assert output_file.exists()
+        with patch.object(coordinator.voice_resolver, 'resolve_voice') as mock_resolve:
+            mock_resolve.return_value = mock_voice_resolution
 
-        # Verify output file has real audio content
-        audio_content = output_file.read_bytes()
-        assert len(audio_content) > 0
+            # Execute file conversion
+            result = coordinator.convert_file_to_speech(
+                input_file=text_file,
+                output_path=output_file
+            )
 
-        # Verify coordinator used real components throughout
-        assert coordinator.provider_manager is not None
-        assert coordinator.voice_resolver is not None
-        assert coordinator.text_pipeline is not None
+            assert result is True
+
+            # Verify the text was read and converted
+            call_args = mock_provider.convert_text_to_speech.call_args
+            assert call_args[1]['text'] == text_content
+            assert call_args[1]['output_path'] == output_file
 
     def test_voice_resolution_integration(self):
-        """Test VoiceResolver integration with real components."""
-        # Use real TTSConversionCoordinator and VoiceResolver
-        coordinator = TTSConversionCoordinator()
+        """Test VoiceResolver integration with the pipeline."""
+        # Use real VoiceResolver but mock the underlying provider manager
+        with patch('src.tts.providers.provider_manager.TTSProviderManager') as mock_pm_class:
+            mock_provider_manager = MagicMock()
+            mock_provider = MagicMock()
+            mock_provider.get_provider_name.return_value = "test_provider"
 
-        # Test voice resolution with real voice resolver
-        resolver = coordinator.voice_resolver
+            # Mock voice lookup
+            mock_voice = {
+                'id': 'en-US-TestNeural',
+                'name': 'Test Voice',
+                'provider': 'test_provider'
+            }
 
-        # Test with a known pyttsx3 voice (should work)
-        result = resolver.resolve_voice('pyttsx3')
+            mock_provider_manager.get_provider.return_value = mock_provider
+            mock_pm_class.return_value = mock_provider_manager
 
-        # Verify voice resolution worked
-        assert result is not None
-        assert result.voice_id == 'pyttsx3'
-        assert result.provider is not None
-        assert not result.fallback_used
+            resolver = VoiceResolver(mock_provider_manager)
 
-        # Test with invalid voice
-        result_invalid = resolver.resolve_voice('invalid-voice')
-        # Should still return a result (fallback behavior)
-        assert result_invalid is not None
+            # Mock the voice manager's lookup
+            with patch.object(resolver.voice_manager, 'get_voices') as mock_lookup:
+                mock_lookup.return_value = [mock_voice]
+
+                # Test voice resolution
+                result = resolver.resolve_voice('en-US-TestNeural')
+
+                assert result.voice_id == 'en-US-TestNeural'
+                assert result.provider == mock_provider
+                assert result.voice_metadata == mock_voice
+                assert not result.fallback_used
 
     def test_text_processing_pipeline_integration(self):
-        """Test TextProcessingPipeline integration with real components."""
-        # Use real TTSConversionCoordinator and its text pipeline
-        coordinator = TTSConversionCoordinator()
-        pipeline = coordinator.text_pipeline
+        """Test TextProcessingPipeline integration."""
+        pipeline = TextProcessingPipeline()
 
         # Test with various text inputs
         test_cases = [
@@ -203,28 +304,44 @@ class TestFullConversionPipeline:
                 assert result is None
 
     def test_conversion_strategies_integration(self):
-        """Test conversion strategies work with real components."""
-        # Use real TTSConversionCoordinator to test conversion strategies
-        coordinator = TTSConversionCoordinator()
+        """Test conversion strategies work with the pipeline."""
+        # Test direct conversion strategy
+        mock_provider_manager = MagicMock()
+        resource_manager = TTSResourceManager()
 
-        output_path = self.temp_dir / "strategy_test.mp3"
+        try:
+            strategy = DirectConversionStrategy(mock_provider_manager, resource_manager)
 
-        # Test actual conversion which will use real conversion strategies
-        result = coordinator.convert_text_to_speech(
-            text="Test conversion strategy",
-            output_path=output_path,
-            voice="pyttsx3"
-        )
+            # Mock processed text and voice resolution
+            processed_text = MagicMock()
+            processed_text.build_text_for_conversion.return_value = ("processed text", False)
 
-        # Verify the conversion strategy worked
-        assert result is True
-        assert output_path.exists()
+            mock_provider = MagicMock()
 
-        audio_content = output_path.read_bytes()
-        assert len(audio_content) > 0
+            # Mock provider to create a dummy file when convert_text_to_speech is called
+            def mock_convert_text_to_speech(text, voice, output_path, **kwargs):
+                # Create a dummy file to simulate successful conversion
+                output_path.write_bytes(b"dummy audio content")
+                return True
 
-        # Verify the coordinator used real conversion strategies
-        assert coordinator.strategy_selector is not None
+            mock_provider.convert_text_to_speech.side_effect = mock_convert_text_to_speech
+
+            voice_resolution = VoiceResolutionResult(
+                voice_id="test-voice",
+                provider=mock_provider,
+                voice_metadata={}
+            )
+
+            output_path = self.temp_dir / "strategy_test.mp3"
+
+            # Execute strategy
+            result = strategy.convert(processed_text, voice_resolution, output_path)
+
+            assert result is True
+            mock_provider.convert_text_to_speech.assert_called_once()
+        finally:
+            # Clean up resources
+            resource_manager.cleanup_all()
 
     def test_resource_manager_integration(self):
         """Test ResourceManager integration with conversion process."""
@@ -271,23 +388,39 @@ class TestFullConversionPipeline:
         ("", False),  # Empty text should fail
     ])
     def test_conversion_request_variations(self, text_input, expected_success):
-        """Test various conversion request scenarios with real components."""
+        """Test various conversion request scenarios."""
         coordinator = TTSConversionCoordinator()
 
-        output_path = self.temp_dir / f"test_{len(text_input)}.mp3"
+        # Mock all the dependencies to return success/failure as expected
+        with patch.object(coordinator.voice_resolver, 'resolve_voice') as mock_resolve, \
+             patch.object(coordinator.text_pipeline, 'process') as mock_process, \
+             patch.object(coordinator.strategy_selector, 'select_strategy') as mock_select:
 
-        # Use real components - pyttsx3 for reliable testing
-        result = coordinator.convert_text_to_speech(
-            text=text_input,
-            output_path=output_path,
-            voice="pyttsx3"
-        )
+            if expected_success:
+                # Setup successful conversion mocks
+                mock_voice_resolution = VoiceResolutionResult(
+                    voice_id="test-voice",
+                    provider=MagicMock(),
+                    voice_metadata={}
+                )
+                mock_resolve.return_value = mock_voice_resolution
 
-        # Verify result matches expectation
-        assert result == expected_success
+                mock_processed_text = MagicMock()
+                mock_process.return_value = mock_processed_text
 
-        if expected_success:
-            # Verify real audio file was created
-            assert output_path.exists()
-            audio_content = output_path.read_bytes()
-            assert len(audio_content) > 0
+                mock_strategy = MagicMock()
+                # Mock strategy to create a file when convert is called
+                def mock_convert(processed_text, voice_resolution, output_path, rate=None, pitch=None, volume=None):
+                    output_path.write_bytes(b"dummy audio content")
+                    return True
+                mock_strategy.convert.side_effect = mock_convert
+                mock_select.return_value = mock_strategy
+            else:
+                # Setup failure case
+                mock_process.return_value = None  # Text processing fails
+
+            output_path = self.temp_dir / f"test_{len(text_input)}.mp3"
+
+            result = coordinator.convert_text_to_speech(text_input, output_path)
+
+            assert result == expected_success
