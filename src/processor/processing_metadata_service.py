@@ -34,15 +34,10 @@ class ProcessingMetadataService:
             import json
             from datetime import datetime
 
-            # Get metadata directory from file manager
-            from .file_manager import FileManager
-            file_manager = FileManager(
-                self.context.project_name,
-                base_output_dir=self.context.base_output_dir,
-                novel_title=self.context.novel_title
-            )
-            metadata_dir = file_manager.get_metadata_dir()
-            metadata_dir.mkdir(parents=True, exist_ok=True)
+            # Get centralized metadata directory
+            from core.metadata_coordinator import get_metadata_coordinator
+            metadata_coordinator = get_metadata_coordinator()
+            metadata_dir = metadata_coordinator._get_metadata_file_path().parent
 
             # Create processing metadata
             processing_metadata = {
@@ -82,8 +77,9 @@ class ProcessingMetadataService:
                 # Add total counts
                 processing_metadata["processing_summary"]["total_completed_in_project"] = len(completed_chapters)
 
-            # Save to file
-            metadata_file = metadata_dir / "processing_summary.json"
+            # Save to file with project-specific name
+            project_name = self.context.project_name.replace('/', '_').replace('\\', '_')
+            metadata_file = metadata_dir / f"processing_summary_{project_name}.json"
             with open(metadata_file, 'w', encoding='utf-8') as f:
                 json.dump(processing_metadata, f, indent=2, ensure_ascii=False)
 

@@ -6,7 +6,10 @@ consistent UI components across the application.
 """
 
 from ui.widgets.base_controls_section import BaseControlsSection
+from ui.widgets.activity_console_widget import ActivityConsoleWidget, ActivityConsoleUpdater
 
 __all__ = [
     'BaseControlsSection',
+    'ActivityConsoleWidget',
+    'ActivityConsoleUpdater',
 ]

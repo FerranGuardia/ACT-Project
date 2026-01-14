@@ -130,6 +130,11 @@ class PipelineOrchestrator:
         if not self._ensure_chapter_urls_available(toc_url):
             return {"success": False, "error": "Failed to fetch chapter URLs"}
 
+        # Step 2.5: Initialize merged directory if batch merging is enabled
+        if output_format and output_format.get('type') == 'incremental_batches':
+            logger.info("Batch merging enabled - ensuring merged directory exists")
+            self.file_manager.get_merged_dir()
+
         # Step 3: Ensure scraper is initialized
         if not self.scraping_coordinator.ensure_scraper_initialized(toc_url):
             return {"success": False, "error": "Cannot initialize scraper"}

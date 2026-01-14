@@ -9,6 +9,7 @@ from typing import Optional, Dict, Any
 from PySide6.QtCore import QThread, Signal
 
 from core.logger import get_logger
+from core.activity_console import get_activity_console, ActivityCategory
 from processor.pipeline_orchestrator import ProcessingPipeline
 from processor.gap_detector import GapDetector
 
@@ -96,16 +97,24 @@ class ProcessingThread(QThread):
             # Run gap detection
             self.status.emit("Checking for missing chapters...")
             logger.info(f"Running gap detection for range {start_from}-{end_chapter or 'all'}")
-            
+
+            # Log gap detection start
+            operation_id = f"gap_check_processing_{start_from}_{end_chapter or 'all'}"
+            activity_console = get_activity_console()
+            activity_console.log_gap_detection_start(start_from, end_chapter, operation_id)
+
+            # The gap detector will now use activity console internally
             gap_report = gap_detector.detect_and_report_gaps(
                 start_from=start_from,
                 end_chapter=end_chapter,
                 check_audio=True,  # Check for audio files
                 check_text=False   # Only check audio for now
             )
-            
+
             missing_chapters = gap_report['missing_chapters']
-            
+
+            activity_console = get_activity_console()
+
             if missing_chapters:
                 logger.info(
                     f"⚠ Failsafe: Detected {len(missing_chapters)} missing chapters "
@@ -114,6 +123,9 @@ class ProcessingThread(QThread):
                 self.status.emit(
                     f"Found {len(missing_chapters)} missing chapters - will re-scrape"
                 )
+
+                # Log gap resolution start
+                activity_console.log_gap_resolution_start(len(missing_chapters), "processing_pipeline")
             else:
                 logger.info("✓ Gap detection: No missing chapters found")
                 self.status.emit("No gaps detected - proceeding normally")
@@ -133,10 +145,14 @@ class ProcessingThread(QThread):
             max_chapters = None
             specific_chapters = None
             end_chapter = None
-            
+
+            logger.info(f"Processing chapter_selection: {self.chapter_selection}")
+            logger.info(f"Chapter selection type: {self.chapter_selection.get('type')}")
+            logger.info(f"Available keys in chapter_selection: {list(self.chapter_selection.keys())}")
+
             if self.chapter_selection.get('type') == 'range':
-                start_from = self.chapter_selection.get('from', 1)
-                end = self.chapter_selection.get('to', 10000)
+                start_from = self.chapter_selection.get('start', 1)
+                end = self.chapter_selection.get('end', 10000)
                 max_chapters = end - start_from + 1
                 end_chapter = end
             elif self.chapter_selection.get('type') == 'specific':
@@ -208,7 +224,9 @@ class ProcessingThread(QThread):
                 voice=self.voice,
                 provider=self.provider,
                 start_from=start_from,
-                max_chapters=max_chapters
+                max_chapters=max_chapters,
+                skip_if_exists=True,  # Skip existing audio files
+                output_format=self.output_format  # Enable incremental batch merging
             )
             
             if result.get('success', False) and not self.should_stop:

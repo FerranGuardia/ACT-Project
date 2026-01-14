@@ -9,6 +9,7 @@ from typing import List, Optional, Tuple
 from urllib.parse import urlparse
 
 from core.logger import get_logger
+from core.activity_console import get_activity_console, ActivityCategory
 from scraper import NovelScraper
 
 from .context import ProcessingContext
@@ -125,6 +126,20 @@ class ScrapingCoordinator:
                         ProcessingStatus.SCRAPED,
                         "Chapter scraped successfully"
                     )
+
+                # Log to activity console
+                activity_console = get_activity_console()
+                activity_console.log_activity(
+                    ActivityCategory.SCRAPE_CONTENT_SIZE,
+                    "Retrieved {size} characters from chapter {chapter}",
+                    details={'size': len(content), 'chapter': chapter_num}
+                )
+                activity_console.log_activity(
+                    ActivityCategory.SCRAPE_COMPLETE,
+                    "Chapter {chapter} scraped successfully",
+                    details={'chapter': chapter_num}
+                )
+
                 return content, title, None
             else:
                 error_msg = error or "Failed to scrape chapter"

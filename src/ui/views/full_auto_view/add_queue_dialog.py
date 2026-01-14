@@ -103,10 +103,12 @@ class AddQueueDialog(QDialog):
         self.from_spin.setMinimum(1)
         self.from_spin.setMaximum(10000)
         self.from_spin.setValue(1)
+        self.from_spin.setEnabled(False)  # Disabled by default
         self.to_spin = QSpinBox()
         self.to_spin.setMinimum(1)
         self.to_spin.setMaximum(10000)
         self.to_spin.setValue(50)
+        self.to_spin.setEnabled(False)  # Disabled by default
         range_layout.addWidget(self.range_radio)
         range_layout.addWidget(QLabel("from"))
         range_layout.addWidget(self.from_spin)
@@ -121,6 +123,10 @@ class AddQueueDialog(QDialog):
         self.specific_input.setPlaceholderText("1, 5, 10, 15")
         self.specific_input.setEnabled(False)
         self.specific_radio.toggled.connect(self.specific_input.setEnabled)
+
+        # Connect range radio to enable/disable spinboxes
+        self.range_radio.toggled.connect(lambda enabled: self.from_spin.setEnabled(enabled))
+        self.range_radio.toggled.connect(lambda enabled: self.to_spin.setEnabled(enabled))
         chapter_layout.addWidget(self.specific_radio)
         chapter_layout.addWidget(self.specific_input)
         
@@ -312,8 +318,13 @@ class AddQueueDialog(QDialog):
     
     def get_data(self) -> Tuple[str, str, str, Optional[str], Dict[str, Any], Dict[str, Any], Optional[str]]:
         """Get the entered URL, title, voice, provider, chapter selection, output format, and output folder."""
+        logger.debug("AddQueueDialog.get_data() called")
+
         url = self.url_input.text().strip()
         title = self.title_input.text().strip()
+
+        logger.debug(f"URL: '{url}'")
+        logger.debug(f"Title: '{title}'")
         # Extract voice name from formatted string
         voice_display = self.voice_combo.currentText()
         voice = voice_display.split(" - ")[0] if " - " in voice_display else voice_display
@@ -323,14 +334,23 @@ class AddQueueDialog(QDialog):
         output_folder = self.folder_input.text().strip() or None
         
         # Get chapter selection
+        logger.debug(f"all_chapters_radio checked: {self.all_chapters_radio.isChecked()}")
+        logger.debug(f"range_radio checked: {self.range_radio.isChecked()}")
+        logger.debug(f"specific_radio checked: {self.specific_radio.isChecked()}")
+        logger.debug(f"from_spin value: {self.from_spin.value()}, enabled: {self.from_spin.isEnabled()}")
+        logger.debug(f"to_spin value: {self.to_spin.value()}, enabled: {self.to_spin.isEnabled()}")
+
         if self.all_chapters_radio.isChecked():
             chapter_selection: Dict[str, Any] = {'type': 'all'}
+            logger.debug("Selected chapter type: ALL")
         elif self.range_radio.isChecked():
             chapter_selection = {
                 'type': 'range',
                 'from': self.from_spin.value(),
                 'to': self.to_spin.value()
             }
+            logger.debug(f"Selected chapter type: RANGE, from={chapter_selection['from']}, to={chapter_selection['to']}")
+        else:
         else:  # specific
             try:
                 chapters = [int(x.strip()) for x in self.specific_input.text().split(',')]
@@ -342,15 +362,23 @@ class AddQueueDialog(QDialog):
                 chapter_selection = {'type': 'all'}  # Default to all if invalid
 
         # Get output format selection
+        logger.debug(f"merged_mp3_radio checked: {self.merged_mp3_radio.isChecked()}")
+        logger.debug(f"batch_mp3_radio checked: {self.batch_mp3_radio.isChecked()}")
+        logger.debug(f"individual_mp3_radio checked: {self.individual_mp3_radio.isChecked()}")
+        logger.debug(f"batch_size_spin value: {self.batch_size_spin.value()}")
+
         if self.merged_mp3_radio.isChecked():
             output_format = {'type': 'merged_mp3'}
+            logger.debug("Selected output format: MERGED_MP3")
         elif self.batch_mp3_radio.isChecked():
             output_format = {
                 'type': 'incremental_batches',
                 'batch_size': self.batch_size_spin.value()
             }
+            logger.debug(f"Selected output format: INCREMENTAL_BATCHES, batch_size={output_format['batch_size']}")
         else:
             output_format = {'type': 'individual_mp3s'}
+            logger.debug("Selected output format: INDIVIDUAL_MP3S")
 
         return url, title, voice, provider, chapter_selection, output_format, output_folder
 

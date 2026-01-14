@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "last_updated": "2026-01-13T14:24:07.614877",
+  "last_updated": "2026-01-14T06:51:22.414743",
   "novels": {
     "https://novelfull.net/in-different-world-with-naruto-system.html": {
       "url": "https://novelfull.net/in-different-world-with-naruto-system.html",
@@ -220,9 +220,16 @@
     "https://novelfull.net/versatile-mage.html": {
       "url": "https://novelfull.net/versatile-mage.html",
       "created_at": "2026-01-13T14:24:01.692335",
-      "updated_at": "2026-01-13T14:24:07.614877",
+      "updated_at": "2026-01-13T14:24:07.616682",
       "title": "versatile-mage.html",
       "novel_url": "https://novelfull.net/versatile-mage.html"
+    },
+    "https://novelfull.net/dungeon-defense.html": {
+      "url": "https://novelfull.net/dungeon-defense.html",
+      "created_at": "2026-01-14T06:51:15.421738",
+      "updated_at": "2026-01-14T06:51:22.414743",
+      "title": "Dungeon defense",
+      "novel_url": "https://novelfull.net/dungeon-defense.html"
     }
   }
 }

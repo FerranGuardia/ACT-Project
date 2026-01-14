@@ -34,6 +34,7 @@ from ui.views.full_auto_view.current_processing_section import CurrentProcessing
 from ui.views.full_auto_view.controls_section import ControlsSection
 from ui.views.full_auto_view.full_auto_queue_manager import QueueManager
 from ui.views.full_auto_view.handlers import FullAutoViewHandlers
+from ui.widgets.activity_console_widget import ActivityConsoleWidget
 
 logger = get_logger("ui.full_auto_view")
 
@@ -75,7 +76,11 @@ class FullAutoView(BaseView):
         # Current processing section
         self.current_processing_section = CurrentProcessingSection()
         main_layout.addWidget(self.current_processing_section)
-        
+
+        # Activity console
+        self.activity_console_widget = ActivityConsoleWidget()
+        main_layout.addWidget(self.activity_console_widget)
+
         # Global controls
         global_controls_layout = QHBoxLayout()
         self.pause_all_button = QPushButton("⏸️ Pause All")

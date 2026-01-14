@@ -192,10 +192,8 @@ class BatchGapDetector:
         missing_batches = []
 
         try:
-            # Get the merged directory
-            audio_dir = self.file_manager.get_audio_dir()
-            merged_dir = audio_dir / "merged"
-            merged_dir.mkdir(exist_ok=True)
+            # Get the merged directory (creates it if it doesn't exist)
+            merged_dir = self.file_manager.get_merged_dir()
 
             for batch_start, batch_end in expected_batches:
                 # Create expected batch filename

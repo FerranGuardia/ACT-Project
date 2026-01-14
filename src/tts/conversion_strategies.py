@@ -357,14 +357,22 @@ class ConversionStrategySelector:
 
         # Check text size limits
         max_bytes = provider.get_max_text_bytes()
+        logger.debug(f"Provider max bytes: {max_bytes}")
+
         if not max_bytes:
             logger.debug("Provider has no byte limit, using direct conversion")
             return DirectConversionStrategy(self.provider_manager, TTSResourceManager())
 
         text_bytes_size = len(processed_text.enhanced.encode('utf-8'))
+        logger.info(f"Text size: {text_bytes_size} bytes, limit: {max_bytes} bytes")
 
-        if text_bytes_size > max_bytes:
-            logger.info(f"Text exceeds {max_bytes} bytes ({text_bytes_size} bytes), using chunking...")
+        # Force chunking for extremely large texts (> 50KB) to prevent timeouts
+        FORCE_CHUNKING_THRESHOLD = 50000  # 50KB
+        should_chunk = text_bytes_size > max_bytes or text_bytes_size > FORCE_CHUNKING_THRESHOLD
+
+        if should_chunk:
+            reason = "exceeds provider limit" if text_bytes_size > max_bytes else "exceeds safety threshold"
+            logger.info(f"Text {reason} ({text_bytes_size} bytes), using chunking...")
             return ChunkedConversionStrategy(self.provider_manager, TTSResourceManager())
         else:
             logger.debug(f"Text within limits ({text_bytes_size} bytes), using direct conversion")

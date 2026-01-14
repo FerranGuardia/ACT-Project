@@ -7,6 +7,7 @@ Handles both individual chapter gaps and batch file gaps with comprehensive repo
 
 from typing import Dict, Any, List, Optional, Tuple
 from core.logger import get_logger
+from core.activity_console import get_activity_console, ActivityCategory
 from .gap_detector import GapDetector
 from .batch_gap_detector import BatchGapDetector
 
@@ -56,13 +57,41 @@ class GapDetectionService:
         Returns:
             Dictionary with gap detection results
         """
+        operation_id = f"gap_check_{start_from}_{end_chapter or 'all'}"
+        activity_console = get_activity_console()
+
+        # Log start of gap detection
+        activity_console.log_gap_detection_start(start_from, end_chapter, operation_id)
+
         logger.debug(f"Running data integrity check for range {start_from}-{end_chapter or 'all'}")
-        return self.gap_detector.detect_and_report_gaps(
+
+        gap_report = self.gap_detector.detect_and_report_gaps(
             start_from=start_from,
             end_chapter=end_chapter,
             check_audio=check_audio,
             check_text=check_text
         )
+
+        # Log results
+        missing_chapters = gap_report.get('missing_chapters', [])
+        if missing_chapters:
+            activity_console.log_gap_found(missing_chapters, operation_id)
+
+            # Alert user if significant gaps found
+            if len(missing_chapters) > 3:
+                activity_console.log_activity(
+                    ActivityCategory.GAP_USER_ALERT,
+                    "Multiple missing chapters detected - system will handle automatically",
+                    operation_id=operation_id
+                )
+        else:
+            activity_console.log_activity(
+                ActivityCategory.GAP_DETECTION_COMPLETE,
+                "No gaps detected in chapter files",
+                operation_id=operation_id
+            )
+
+        return gap_report
 
     def check_batch_integrity(self, batch_sizes: List[int] = None) -> Dict[str, Any]:
         """

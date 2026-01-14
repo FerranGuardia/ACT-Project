@@ -107,11 +107,11 @@ class QueueManager(BaseQueueManager):
             if selection_type == 'all':
                 return {'type': 'all'}
             elif selection_type == 'range':
-                # Validate range selection
-                start = chapter_selection.get('start')
-                end = chapter_selection.get('end')
+                # Validate range selection - handle both 'from'/'to' and 'start'/'end' formats
+                start = chapter_selection.get('start') or chapter_selection.get('from')
+                end = chapter_selection.get('end') or chapter_selection.get('to')
                 if start is None or end is None:
-                    logger.warning("Range selection missing start or end, using 'all'")
+                    logger.warning("Range selection missing start/end or from/to, using 'all'")
                     return {'type': 'all'}
                 try:
                     start_int = int(start)

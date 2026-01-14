@@ -17,6 +17,7 @@ from .constants import (
     get_version,
 )
 from .error_handling import handle_errors, safe_operation, ErrorContext
+from .activity_console import ActivityConsole, get_activity_console, ActivityCategory, ActivityEntry
 
 __all__ = [
     # Constants
@@ -37,4 +38,9 @@ __all__ = [
     "handle_errors",
     "safe_operation",
     "ErrorContext",
+    # Activity Console
+    "ActivityConsole",
+    "get_activity_console",
+    "ActivityCategory",
+    "ActivityEntry",
 ]

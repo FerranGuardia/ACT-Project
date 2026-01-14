@@ -50,7 +50,6 @@ class FileManager:
         # Subdirectories with title prefix: "novel_title_scraps" and "novel_title_audio"
         self.text_dir = self.project_dir / f"{self.novel_title}_scraps"
         self.audio_dir = self.project_dir / f"{self.novel_title}_audio"
-        self.metadata_dir = self.project_dir / "metadata"
         
         # Create directories
         self._create_directories()
@@ -88,8 +87,7 @@ class FileManager:
         directories = [
             self.project_dir,
             self.text_dir,
-            self.audio_dir,
-            self.metadata_dir
+            self.audio_dir
         ]
         
         for directory in directories:
@@ -123,14 +121,6 @@ class FileManager:
         """
         return self.audio_dir
     
-    def get_metadata_dir(self) -> Path:
-        """
-        Get the metadata directory.
-        
-        Returns:
-            Path to metadata directory
-        """
-        return self.metadata_dir
     
     def save_text_file(
         self,
@@ -312,7 +302,18 @@ class FileManager:
                 logger.debug(f"Removed temp file: {temp_file}")
             except (OSError, IOError) as e:
                 logger.warning(f"Could not remove temp file {temp_file} - {type(e).__name__}: {e}")
-    
+
+    def get_merged_dir(self) -> Path:
+        """
+        Get the merged audio directory, creating it if it doesn't exist.
+
+        Returns:
+            Path to the merged audio directory
+        """
+        merged_dir = self.audio_dir / "merged"
+        merged_dir.mkdir(exist_ok=True)
+        return merged_dir
+
     def delete_project(self) -> None:
         """Delete the entire project directory and all its contents."""
         if self.project_dir.exists():

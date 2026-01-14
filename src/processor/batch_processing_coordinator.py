@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Callable
 
 from core.logger import get_logger
+from core.activity_console import get_activity_console, ActivityCategory
 
 from .context import ProcessingContext
 from .conversion_coordinator import ConversionCoordinator
@@ -77,6 +78,9 @@ class BatchProcessingCoordinator:
         if output_format and output_format.get('type') == 'incremental_batches':
             batch_size = output_format.get('batch_size', 50)
             logger.info(f"Incremental batching enabled: will merge every {batch_size} chapters")
+
+            # Check for and merge any missing batches before processing new chapters
+            self._merge_missing_batches(batch_size)
 
         # Process each chapter
         completed = 0
@@ -158,12 +162,28 @@ class BatchProcessingCoordinator:
         on_failure: Optional[Callable] = None
     ) -> bool:
         """Process a single chapter: scrape → convert → save."""
+        activity_console = get_activity_console()
+
         # Check if we should skip due to existing audio file
         if skip_if_exists and self.conversion_coordinator.file_manager.audio_file_exists(chapter.number):
             logger.info(f"Chapter {chapter.number} already exists, skipping")
             return True
 
+        # Log if this is a gap reprocessing (chapter being reprocessed)
+        if skip_if_exists:
+            activity_console.log_activity(
+                ActivityCategory.GAP_REPROCESS_CHAPTER,
+                "Reprocessing missing chapter {chapter}",
+                details={'chapter': chapter.number}
+            )
+
         # Step 1: Scrape chapter content
+        activity_console.log_activity(
+            ActivityCategory.SCRAPE_START,
+            "Starting to scrape chapter {chapter}",
+            details={'chapter': chapter.number}
+        )
+
         content, title, error = self.scraping_coordinator.scrape_chapter_content(chapter)
 
         if error or content is None:
@@ -185,6 +205,13 @@ class BatchProcessingCoordinator:
                 ProcessingStatus.CONVERTING,
                 "Converting to audio"
             )
+
+        # Log conversion start to activity console
+        activity_console.log_activity(
+            ActivityCategory.TTS_STRATEGY_SELECTED,
+            "🎯 Using {strategy} for chapter {chapter}",
+            details={'strategy': 'DirectConversion', 'chapter': chapter.number}
+        )
 
         success = self.conversion_coordinator.convert_chapter_to_audio(
             chapter, content, title, skip_if_exists, on_failure
@@ -215,12 +242,22 @@ class BatchProcessingCoordinator:
             # Get the audio files for this batch
             batch_files = []
             for chapter_num in range(batch_start, batch_end + 1):
+                # First try the standard path
                 audio_path = self.conversion_coordinator.file_manager.get_audio_file_path(chapter_num)
                 if audio_path.exists():
                     batch_files.append(audio_path)
                 else:
-                    logger.warning(f"Audio file missing for chapter {chapter_num}, skipping batch merge")
-                    return
+                    # Check for files with titles (chapter_XXXX_*.mp3 pattern)
+                    audio_dir = self.conversion_coordinator.file_manager.get_audio_dir()
+                    pattern = f"chapter_{chapter_num:04d}_*.mp3"
+                    matching_files = list(audio_dir.glob(pattern))
+                    if matching_files:
+                        # Use the first matching file (should only be one)
+                        batch_files.append(matching_files[0])
+                        logger.debug(f"Found titled audio file for chapter {chapter_num}: {matching_files[0].name}")
+                    else:
+                        logger.warning(f"Audio file missing for chapter {chapter_num}, skipping batch merge")
+                        return
 
             if not batch_files:
                 logger.warning("No audio files found for batch, skipping merge")
@@ -231,9 +268,8 @@ class BatchProcessingCoordinator:
             safe_name = self.conversion_coordinator.file_manager._sanitize_filename(project_name)
             batch_filename = f"{safe_name}_chapters_{batch_start:04d}-{batch_end:04d}.mp3"
 
-            # Create merged directory if it doesn't exist
-            merged_dir = self.conversion_coordinator.file_manager.get_audio_dir() / "merged"
-            merged_dir.mkdir(exist_ok=True)
+            # Get merged directory (creates it if it doesn't exist)
+            merged_dir = self.conversion_coordinator.file_manager.get_merged_dir()
             batch_path = merged_dir / batch_filename
 
             # Merge the batch
@@ -250,6 +286,36 @@ class BatchProcessingCoordinator:
 
         except Exception as e:
             logger.error(f"Error merging batch {batch_start}-{batch_end}: {e}")
+
+
+    def _merge_missing_batches(self, batch_size: int) -> None:
+        """
+        Check for and merge any missing batch files before processing new chapters.
+
+        Args:
+            batch_size: The batch size to check for
+        """
+        try:
+            logger.info(f"Checking for missing batch files (batch_size: {batch_size})...")
+
+            # Use gap detection service to find missing batches
+            from processor.gap_detection_service import GapDetectionService
+            gap_service = GapDetectionService(self.project_manager, self.conversion_coordinator.file_manager)
+
+            batch_report = gap_service.check_batch_integrity([batch_size])
+
+            if batch_report['has_gaps']:
+                missing_batches = batch_report['missing_batches']
+                logger.info(f"Found {len(missing_batches)} missing batch files, merging them now...")
+
+                for batch_start, batch_end in missing_batches:
+                    logger.info(f"Merging missing batch: chapters {batch_start}-{batch_end}")
+                    self._merge_completed_batch(batch_start, batch_end)
+            else:
+                logger.info("No missing batch files found")
+
+        except Exception as e:
+            logger.error(f"Error checking/merging missing batches: {e}")
 
 
 __all__ = ["BatchProcessingCoordinator"]

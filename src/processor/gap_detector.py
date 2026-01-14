@@ -78,13 +78,13 @@ class GapDetector:
             # Check all chapters from start_from onwards
             end_chapter = max_chapter_in_manager
         else:
-            # Use provided end_chapter, but don't exceed what's in manager
-            end_chapter = min(end_chapter, max_chapter_in_manager)
+            # Use the provided end_chapter exactly as specified
+            # Don't limit it based on what's in the manager - respect the caller's range
+            pass
         
         if start_from > end_chapter:
-            logger.debug(f"Invalid range: start_from ({start_from}) > end_chapter ({end_chapter})")
-            return []
-        
+            logger.info(f"Gap detection: checking range {start_from}-{end_chapter} (end_chapter was: {end_chapter})")
+
         # Get all chapter numbers that should exist in this range
         expected_chapters = set(range(start_from, end_chapter + 1))
         
