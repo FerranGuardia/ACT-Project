@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "last_updated": "2026-01-13T14:07:26.450537",
+  "last_updated": "2026-01-13T14:24:07.616682",
   "novels": {
     "https://novelfull.net/in-different-world-with-naruto-system.html": {
       "url": "https://novelfull.net/in-different-world-with-naruto-system.html",
@@ -12,7 +12,7 @@
     "https://example.com/toc": {
       "url": "https://example.com/toc",
       "created_at": "2026-01-13T08:55:05.806700",
-      "updated_at": "2026-01-13T14:07:14.047804",
+      "updated_at": "2026-01-13T14:10:18.655385",
       "title": "Test Novel",
       "author": "Test Author"
     },
@@ -27,7 +27,7 @@
     "https://example.com/novel1": {
       "url": "https://example.com/novel1",
       "created_at": "2026-01-13T08:55:06.507190",
-      "updated_at": "2026-01-13T14:07:26.443920",
+      "updated_at": "2026-01-13T14:07:34.276168",
       "title": "Novel One",
       "author": "Test Author",
       "chapters": 42
@@ -35,7 +35,7 @@
     "https://example.com/novel2": {
       "url": "https://example.com/novel2",
       "created_at": "2026-01-13T08:55:06.510106",
-      "updated_at": "2026-01-13T14:07:26.449260",
+      "updated_at": "2026-01-13T14:07:34.282546",
       "title": "Novel Two"
     },
     "https://example.com/minimal": {
@@ -47,7 +47,7 @@
     "https://example.com/test-novel": {
       "url": "https://example.com/test-novel",
       "created_at": "2026-01-13T12:05:34.120401",
-      "updated_at": "2026-01-13T13:25:35.568096",
+      "updated_at": "2026-01-13T14:10:10.986705",
       "title": "Test Novel",
       "author": "Test Author",
       "chapters": 50,
@@ -145,7 +145,7 @@
     "https://test-queue-load.example.com/novel1": {
       "url": "https://test-queue-load.example.com/novel1",
       "created_at": "2026-01-13T12:19:30.225952",
-      "updated_at": "2026-01-13T13:24:43.394382",
+      "updated_at": "2026-01-13T14:09:27.305890",
       "title": "Test Novel",
       "author": "Test Author",
       "chapters": 42,
@@ -154,68 +154,75 @@
     "https://test-cross-queue.example.com/novel": {
       "url": "https://test-cross-queue.example.com/novel",
       "created_at": "2026-01-13T12:19:31.965807",
-      "updated_at": "2026-01-13T13:24:45.489324",
+      "updated_at": "2026-01-13T14:09:28.367741",
       "title": "Cross Queue Novel",
       "author": "Cross Author"
     },
     "https://test-concurrent-0.example.com/novel": {
       "url": "https://test-concurrent-0.example.com/novel",
       "created_at": "2026-01-13T13:04:40.587241",
-      "updated_at": "2026-01-13T13:24:49.062692",
+      "updated_at": "2026-01-13T14:09:30.652586",
       "title": "Concurrent Novel 0"
     },
     "https://test-concurrent-1.example.com/novel": {
       "url": "https://test-concurrent-1.example.com/novel",
       "created_at": "2026-01-13T13:04:40.602872",
-      "updated_at": "2026-01-13T13:24:49.079755",
+      "updated_at": "2026-01-13T14:09:30.659819",
       "title": "Concurrent Novel 1"
     },
     "https://test-concurrent-2.example.com/novel": {
       "url": "https://test-concurrent-2.example.com/novel",
       "created_at": "2026-01-13T13:04:40.602872",
-      "updated_at": "2026-01-13T13:24:49.098004",
+      "updated_at": "2026-01-13T14:09:30.661266",
       "title": "Concurrent Novel 2"
     },
     "https://test-concurrent-4.example.com/novel": {
       "url": "https://test-concurrent-4.example.com/novel",
       "created_at": "2026-01-13T13:04:40.607305",
-      "updated_at": "2026-01-13T13:24:49.104873",
+      "updated_at": "2026-01-13T14:09:30.665814",
       "title": "Concurrent Novel 4"
     },
     "https://test-concurrent-3.example.com/novel": {
       "url": "https://test-concurrent-3.example.com/novel",
       "created_at": "2026-01-13T13:04:40.614160",
-      "updated_at": "2026-01-13T13:24:49.086635",
+      "updated_at": "2026-01-13T14:09:30.664523",
       "title": "Concurrent Novel 3"
     },
     "https://test-search1.example.com/novel": {
       "url": "https://test-search1.example.com/novel",
       "created_at": "2026-01-13T13:04:43.987700",
-      "updated_at": "2026-01-13T13:24:52.762658",
+      "updated_at": "2026-01-13T14:09:32.916364",
       "title": "Fantasy Adventure",
       "author": "John Smith"
     },
     "https://test-search2.example.com/novel": {
       "url": "https://test-search2.example.com/novel",
       "created_at": "2026-01-13T13:04:43.987700",
-      "updated_at": "2026-01-13T13:24:52.778015",
+      "updated_at": "2026-01-13T14:09:32.919843",
       "title": "Sci-Fi Journey",
       "author": "Jane Doe"
     },
     "https://test-search3.example.com/novel": {
       "url": "https://test-search3.example.com/novel",
       "created_at": "2026-01-13T13:04:43.993212",
-      "updated_at": "2026-01-13T13:24:52.781424",
+      "updated_at": "2026-01-13T14:09:32.920909",
       "title": "Mystery Novel",
       "author": "John Smith"
     },
     "https://test-persistence.example.com/novel": {
       "url": "https://test-persistence.example.com/novel",
       "created_at": "2026-01-13T13:04:45.832247",
-      "updated_at": "2026-01-13T13:24:54.961251",
+      "updated_at": "2026-01-13T14:09:34.074781",
       "title": "Persistence Novel",
       "author": "Persistence Author",
       "chapters": 20
+    },
+    "https://novelfull.net/versatile-mage.html": {
+      "url": "https://novelfull.net/versatile-mage.html",
+      "created_at": "2026-01-13T14:24:01.692335",
+      "updated_at": "2026-01-13T14:24:07.616682",
+      "title": "versatile-mage.html",
+      "novel_url": "https://novelfull.net/versatile-mage.html"
     }
   }
 }
