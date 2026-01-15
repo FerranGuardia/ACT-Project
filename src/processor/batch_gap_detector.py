@@ -6,11 +6,12 @@ that should exist based on existing individual chapter files but are missing.
 """
 
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 
 from core.logger import get_logger
-from .project_manager import ProjectManager
+
 from .file_manager import FileManager
+from .project_manager import ProjectManager
 
 logger = get_logger("processor.batch_gap_detector")
 
@@ -123,61 +124,43 @@ class BatchGapDetector:
         """
         Calculate which batches should exist based on existing chapters.
 
+        This method finds complete, non-overlapping batches of exactly batch_size consecutive chapters
+        where all chapters in the batch exist as individual files. Batches are created greedily
+        starting from the lowest chapter numbers.
+
         Args:
-            existing_chapters: Sorted list of chapter numbers with audio files
+            existing_chapters: List of chapter numbers with audio files
             batch_size: Number of chapters per batch
 
         Returns:
-            List of (start, end) tuples for batches that could be created
+            List of (start, end) tuples for complete batches that could be created
         """
+        if not existing_chapters or batch_size <= 0:
+            return []
+
+        # Sort and deduplicate chapters, convert to set for fast lookup
+        existing_chapters = sorted(set(existing_chapters))
+        existing_set = set(existing_chapters)
+
         expected_batches = []
+        used_chapters = set()  # Track chapters already assigned to batches
 
-        if not existing_chapters:
-            return expected_batches
+        # Greedily create non-overlapping batches starting from lowest chapters
+        for chapter in existing_chapters:
+            if chapter in used_chapters:
+                continue
 
-        # Find consecutive ranges of chapters
-        ranges = self._find_consecutive_ranges(existing_chapters)
+            batch_start = chapter
+            batch_end = batch_start + batch_size - 1
 
-        # For each range, calculate possible complete batches
-        for range_start, range_end in ranges:
-            # Calculate how many complete batches we can make from this range
-            range_length = range_end - range_start + 1
-
-            if range_length >= batch_size:
-                # Calculate batch starts within this range
-                for batch_start in range(range_start, range_end - batch_size + 2, batch_size):
-                    batch_end = min(batch_start + batch_size - 1, range_end)
-                    if batch_end - batch_start + 1 == batch_size:
-                        expected_batches.append((batch_start, batch_end))
+            # Check if all chapters in this batch exist and aren't used
+            batch_chapters = set(range(batch_start, batch_end + 1))
+            if batch_chapters.issubset(existing_set) and batch_chapters.isdisjoint(used_chapters):
+                expected_batches.append((batch_start, batch_end))
+                used_chapters.update(batch_chapters)
 
         return expected_batches
 
-    def _find_consecutive_ranges(self, chapters: List[int]) -> List[Tuple[int, int]]:
-        """
-        Find consecutive ranges in a sorted list of chapter numbers.
-
-        Args:
-            chapters: Sorted list of chapter numbers
-
-        Returns:
-            List of (start, end) tuples for consecutive ranges
-        """
-        if not chapters:
-            return []
-
-        ranges = []
-        range_start = chapters[0]
-
-        for i in range(1, len(chapters)):
-            if chapters[i] != chapters[i-1] + 1:
-                # Gap found, end current range
-                ranges.append((range_start, chapters[i-1]))
-                range_start = chapters[i]
-
-        # Add final range
-        ranges.append((range_start, chapters[-1]))
-
-        return ranges
 
     def _find_missing_batches(self, expected_batches: List[Tuple[int, int]]) -> List[Tuple[int, int]]:
         """

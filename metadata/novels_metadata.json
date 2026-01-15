@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "last_updated": "2026-01-14T06:51:22.418782",
+  "last_updated": "2026-01-15T07:24:43.642000",
   "novels": {
     "https://novelfull.net/in-different-world-with-naruto-system.html": {
       "url": "https://novelfull.net/in-different-world-with-naruto-system.html",
@@ -12,14 +12,14 @@
     "https://example.com/toc": {
       "url": "https://example.com/toc",
       "created_at": "2026-01-13T08:55:05.806700",
-      "updated_at": "2026-01-13T14:10:18.655385",
+      "updated_at": "2026-01-15T07:24:12.203829",
       "title": "Test Novel",
       "author": "Test Author"
     },
     "https://example.com/novel": {
       "url": "https://example.com/novel",
       "created_at": "2026-01-13T08:55:06.254403",
-      "updated_at": "2026-01-13T14:06:56.796069",
+      "updated_at": "2026-01-15T07:23:48.606629",
       "title": "Test Novel",
       "author": "Test Author",
       "novel_url": "https://example.com/novel"
@@ -27,7 +27,7 @@
     "https://example.com/novel1": {
       "url": "https://example.com/novel1",
       "created_at": "2026-01-13T08:55:06.507190",
-      "updated_at": "2026-01-13T14:07:34.276168",
+      "updated_at": "2026-01-15T07:24:43.632329",
       "title": "Novel One",
       "author": "Test Author",
       "chapters": 42
@@ -35,19 +35,19 @@
     "https://example.com/novel2": {
       "url": "https://example.com/novel2",
       "created_at": "2026-01-13T08:55:06.510106",
-      "updated_at": "2026-01-13T14:07:34.282546",
+      "updated_at": "2026-01-15T07:24:43.640938",
       "title": "Novel Two"
     },
     "https://example.com/minimal": {
       "url": "https://example.com/minimal",
       "created_at": "2026-01-13T08:55:06.581124",
-      "updated_at": "2026-01-13T14:07:22.888252",
+      "updated_at": "2026-01-15T07:24:33.352891",
       "title": "Minimal Item"
     },
     "https://example.com/test-novel": {
       "url": "https://example.com/test-novel",
       "created_at": "2026-01-13T12:05:34.120401",
-      "updated_at": "2026-01-13T14:10:10.986705",
+      "updated_at": "2026-01-15T06:46:10.761419",
       "title": "Test Novel",
       "author": "Test Author",
       "chapters": 50,
@@ -145,7 +145,7 @@
     "https://test-queue-load.example.com/novel1": {
       "url": "https://test-queue-load.example.com/novel1",
       "created_at": "2026-01-13T12:19:30.225952",
-      "updated_at": "2026-01-13T14:09:27.305890",
+      "updated_at": "2026-01-15T06:42:41.709076",
       "title": "Test Novel",
       "author": "Test Author",
       "chapters": 42,
@@ -154,7 +154,7 @@
     "https://test-cross-queue.example.com/novel": {
       "url": "https://test-cross-queue.example.com/novel",
       "created_at": "2026-01-13T12:19:31.965807",
-      "updated_at": "2026-01-13T14:09:28.367741",
+      "updated_at": "2026-01-15T06:42:43.723176",
       "title": "Cross Queue Novel",
       "author": "Cross Author"
     },
@@ -191,21 +191,21 @@
     "https://test-search1.example.com/novel": {
       "url": "https://test-search1.example.com/novel",
       "created_at": "2026-01-13T13:04:43.987700",
-      "updated_at": "2026-01-13T14:09:32.916364",
+      "updated_at": "2026-01-15T06:42:50.191869",
       "title": "Fantasy Adventure",
       "author": "John Smith"
     },
     "https://test-search2.example.com/novel": {
       "url": "https://test-search2.example.com/novel",
       "created_at": "2026-01-13T13:04:43.987700",
-      "updated_at": "2026-01-13T14:09:32.919843",
+      "updated_at": "2026-01-15T06:42:50.193970",
       "title": "Sci-Fi Journey",
       "author": "Jane Doe"
     },
     "https://test-search3.example.com/novel": {
       "url": "https://test-search3.example.com/novel",
       "created_at": "2026-01-13T13:04:43.993212",
-      "updated_at": "2026-01-13T14:09:32.920909",
+      "updated_at": "2026-01-15T06:42:50.193970",
       "title": "Mystery Novel",
       "author": "John Smith"
     },
@@ -230,6 +230,79 @@
       "updated_at": "2026-01-14T06:51:22.417745",
       "title": "Dungeon defense",
       "novel_url": "https://novelfull.net/dungeon-defense.html"
+    },
+    "https://invalid-url-that-does-not-exist-12345.com/novel": {
+      "url": "https://invalid-url-that-does-not-exist-12345.com/novel",
+      "created_at": "2026-01-14T19:02:06.600461",
+      "updated_at": "2026-01-14T19:02:06.600461",
+      "novel_url": "https://invalid-url-that-does-not-exist-12345.com/novel"
+    },
+    "https://example.com/batch-test": {
+      "url": "https://example.com/batch-test",
+      "created_at": "2026-01-14T22:33:54.782768",
+      "updated_at": "2026-01-14T22:34:07.927353",
+      "title": "Batch Test Novel"
+    },
+    "https://example.com/multi-batch": {
+      "url": "https://example.com/multi-batch",
+      "created_at": "2026-01-14T22:33:56.703932",
+      "updated_at": "2026-01-14T22:33:56.703932",
+      "title": "Multi Batch Size Test"
+    },
+    "https://example.com/empty-batch": {
+      "url": "https://example.com/empty-batch",
+      "created_at": "2026-01-14T22:33:58.444408",
+      "updated_at": "2026-01-14T22:33:58.444408",
+      "title": "Empty Batch Directory Test"
+    },
+    "https://example.com/edge-cases": {
+      "url": "https://example.com/edge-cases",
+      "created_at": "2026-01-14T22:34:00.180806",
+      "updated_at": "2026-01-14T22:34:00.180806",
+      "title": "Batch Edge Cases Test"
+    },
+    "https://example.com/audio-processor-integration": {
+      "url": "https://example.com/audio-processor-integration",
+      "created_at": "2026-01-14T22:34:02.129332",
+      "updated_at": "2026-01-14T22:34:02.129332",
+      "title": "Audio Processor Integration Test"
+    },
+    "https://example.com/mock": {
+      "url": "https://example.com/mock",
+      "created_at": "2026-01-14T22:34:04.196460",
+      "updated_at": "2026-01-14T22:34:25.459532",
+      "title": "Mock Novel for Gap Detection Testing"
+    },
+    "https://example.com/test": {
+      "url": "https://example.com/test",
+      "created_at": "2026-01-14T22:34:06.052979",
+      "updated_at": "2026-01-14T22:34:27.523965",
+      "title": "Test Novel"
+    },
+    "https://example.com/empty": {
+      "url": "https://example.com/empty",
+      "created_at": "2026-01-14T22:34:29.264480",
+      "updated_at": "2026-01-15T06:47:09.109328",
+      "title": "Empty Test Novel"
+    },
+    "https://example.com/mock-toc": {
+      "url": "https://example.com/mock-toc",
+      "created_at": "2026-01-14T23:46:28.070065",
+      "updated_at": "2026-01-15T06:46:12.180301",
+      "title": "Mock Novel for No Gaps Testing"
+    },
+    "https://novelfull.net/the-second-coming-of-gluttony.html": {
+      "url": "https://novelfull.net/the-second-coming-of-gluttony.html",
+      "created_at": "2026-01-14T23:51:00.729050",
+      "updated_at": "2026-01-14T23:56:07.718904",
+      "novel_url": "https://novelfull.net/the-second-coming-of-gluttony.html"
+    },
+    "https://novelfull.net/warlock-apprentice.html": {
+      "url": "https://novelfull.net/warlock-apprentice.html",
+      "created_at": "2026-01-14T23:56:04.909178",
+      "updated_at": "2026-01-15T00:00:02.914053",
+      "novel_url": "https://novelfull.net/warlock-apprentice.html",
+      "title": "Warlock Apprentice Debug Test"
     }
   }
 }

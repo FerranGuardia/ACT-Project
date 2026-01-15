@@ -300,7 +300,7 @@ class BatchProcessingCoordinator:
 
             # Use gap detection service to find missing batches
             from processor.gap_detection_service import GapDetectionService
-            gap_service = GapDetectionService(self.project_manager, self.conversion_coordinator.file_manager)
+            gap_service = GapDetectionService(self.scraping_coordinator.project_manager, self.conversion_coordinator.file_manager)
 
             batch_report = gap_service.check_batch_integrity([batch_size])
 
