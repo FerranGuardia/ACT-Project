@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QTextEdit, QVBoxLayout, QWidget, QHBoxLayout, QPushButton,
     QComboBox, QLabel, QFrame, QScrollBar
 )
-from PySide6.QtCore import Qt, QTimer, Signal, QThread
+from PySide6.QtCore import Qt, QTimer, Signal, QThread, QObject
 from PySide6.QtGui import QFont, QTextCursor, QTextCharFormat, QColor
 
 from core.activity_console import (
@@ -28,6 +28,9 @@ class ActivityConsoleWidget(QFrame):
 
     # Signal emitted when important alerts are shown
     alert_triggered = Signal(str)  # Alert message
+
+    # Signal for thread-safe activity updates
+    _activity_received = Signal(object)  # ActivityEntry
 
     def __init__(self, parent=None, max_lines: int = 100):
         super().__init__(parent)
@@ -121,10 +124,12 @@ class ActivityConsoleWidget(QFrame):
     def connect_signals(self):
         """Connect to activity console signals."""
         self.activity_console.add_listener(self.on_new_activity)
+        self._activity_received.connect(self._safe_append_activity)
 
     def disconnect_signals(self):
         """Disconnect from activity console signals."""
         self.activity_console.remove_listener(self.on_new_activity)
+        self._activity_received.disconnect(self._safe_append_activity)
 
     def load_existing_activities(self):
         """Load recent activities on startup."""
@@ -139,6 +144,15 @@ class ActivityConsoleWidget(QFrame):
         """Handle new activity from the console."""
         # Only show activities meant for UI
         if not activity.show_in_ui:
+            return
+
+        # Emit signal to ensure UI update happens in main thread
+        self._activity_received.emit(activity)
+
+    def _safe_append_activity(self, activity):
+        """Safely append activity from main thread."""
+        # activity is passed as object from signal, ensure it's ActivityEntry
+        if not isinstance(activity, ActivityEntry):
             return
 
         self.append_activity(activity)
