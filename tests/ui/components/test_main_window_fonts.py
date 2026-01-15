@@ -18,6 +18,7 @@ with patch('PySide6.QtWidgets'), \
     from src.ui.main_window import MainWindow
 
 
+@pytest.mark.ui
 class TestMainWindowFontLoading:
     """Test MainWindow font loading functionality."""
 
@@ -142,6 +143,7 @@ class TestMainWindowFontLoading:
                 assert any(expected_font in checked for checked in font_files_checked)
 
 
+@pytest.mark.ui
 class TestMainWindowGlobalFont:
     """Test MainWindow global font setting functionality."""
 
@@ -242,6 +244,7 @@ class TestMainWindowGlobalFont:
             main_window._set_global_font()
 
 
+@pytest.mark.ui
 class TestMainWindowFontIntegration:
     """Test integration between font loading and global font setting."""
 

@@ -16,6 +16,7 @@ with patch('PySide6.QtWidgets'), \
     from src.ui.views.base_view import BaseView
 
 
+@pytest.mark.ui
 class TestBaseViewInitialization:
     """Test BaseView initialization and setup."""
 
@@ -78,6 +79,7 @@ class TestBaseViewInitialization:
                 view.setup_ui()
 
 
+@pytest.mark.ui
 class TestBaseViewLayoutManagement:
     """Test BaseView layout management functionality."""
 
@@ -124,6 +126,7 @@ class TestBaseViewLayoutManagement:
         base_view.setLayout.assert_called_once_with(mock_layout)
 
 
+@pytest.mark.ui
 class TestBaseViewIntegration:
     """Test BaseView integration and inheritance behavior."""
 

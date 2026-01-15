@@ -166,7 +166,7 @@ class TestProcessingPipeline:
             assert new_pipeline.progress_tracker.total_chapters == 2
     
     
-    @patch('processor.scraping_coordinator.GenericScraper')
+    @patch('processor.scraping_coordinator.NovelScraper')
     def test_fetch_chapter_urls(self, mock_scraper_class, pipeline):
         """Test fetching chapter URLs."""
         # Mock scraper
@@ -188,7 +188,7 @@ class TestProcessingPipeline:
         assert chapter_manager.get_total_count() == 3
         assert pipeline.progress_tracker.total_chapters == 3
     
-    @patch('processor.scraping_coordinator.GenericScraper')
+    @patch('processor.scraping_coordinator.NovelScraper')
     def test_fetch_chapter_urls_no_urls(self, mock_scraper_class, pipeline):
         """Test fetching chapter URLs when none are found."""
         mock_scraper = MagicMock()
@@ -250,7 +250,7 @@ class TestProcessingPipeline:
         # Verify project file is deleted
         assert not pipeline.project_manager.project_exists()
     
-    @patch('processor.scraping_coordinator.GenericScraper')
+    @patch('processor.scraping_coordinator.NovelScraper')
     def test_process_all_chapters_error_isolation(self, mock_scraper_class, pipeline, temp_dir):
         """Test error isolation - continue processing when ignore_errors=True (Phase 1 - yt-dlp pattern)."""
         # Mock scraper
@@ -318,7 +318,7 @@ class TestProcessingPipeline:
             assert result["failed"] >= 1  # Chapter 2 should fail
             assert result["completed"] >= 1  # Other chapters should succeed
     
-    @patch('processor.scraping_coordinator.GenericScraper')
+    @patch('processor.scraping_coordinator.NovelScraper')
     def test_process_all_chapters_error_isolation_disabled(self, mock_scraper_class, pipeline, temp_dir):
         """Test error isolation disabled - stops on first error when ignore_errors=False."""
         # Mock scraper

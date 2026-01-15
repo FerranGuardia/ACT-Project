@@ -410,7 +410,7 @@ class TestFullConversionPipeline:
 
                 mock_strategy = MagicMock()
                 # Mock strategy to create a file when convert is called
-                def mock_convert(processed_text, voice_resolution, output_path, rate=None, pitch=None, volume=None):
+                def mock_convert(processed_text, voice_resolution, output_path, rate=None, pitch=None, volume=None, on_progress=None):
                     output_path.write_bytes(b"dummy audio content")
                     return True
                 mock_strategy.convert.side_effect = mock_convert

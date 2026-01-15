@@ -48,6 +48,7 @@ with patch.object(core.logger, 'get_logger', return_value=mock_logger):
                                                                 ValidationError)
 
 
+@pytest.mark.ui
 class TestQueueValidation:
     """Test cases for queue item validation."""
 

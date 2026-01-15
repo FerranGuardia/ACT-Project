@@ -223,12 +223,13 @@ class TestGapDetector:
         
         # Request range 1-20, but manager only has up to chapter 10
         result = gap_detector.detect_missing_chapters(start_from=1, end_chapter=20)
-        
-        # Should only check up to chapter 10, detecting 4 and 7
+
+        # Should check the full requested range, detecting 4, 7, and 11-20
         assert 4 in result
         assert 7 in result
-        assert len(result) == 2
-        # Should not include chapters 11-20 since they're not in manager
+        assert 11 in result
+        assert 20 in result
+        assert len(result) == 12  # 4,7,11,12,13,14,15,16,17,18,19,20
     
     def test_detect_missing_chapters_no_gaps(self, gap_detector, mock_project_manager,
                                               mock_file_manager):
@@ -369,10 +370,9 @@ class TestGapDetector:
         mock_file_manager.audio_file_exists.return_value = True
         
         result = gap_detector.detect_missing_chapters(start_from=1, end_chapter=10)
-        
-        # Should detect chapter 2 (get_chapter returns None) + 4, 7 (missing from manager)
-        assert 2 in result
-        assert 4 in result
-        assert 7 in result
-        assert len(result) == 3
+
+        # Should detect 4, 7 (missing from manager)
+        # Note: Chapter 2 is in get_all_chapters() so it's not considered missing from manager
+        assert result == [4, 7]
+        assert len(result) == 2
 

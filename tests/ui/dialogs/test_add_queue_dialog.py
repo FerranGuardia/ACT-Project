@@ -7,6 +7,7 @@ import pytest
 from unittest.mock import MagicMock, patch, Mock
 
 
+@pytest.mark.ui
 class TestAddQueueDialog:
     """Test cases for AddQueueDialog"""
 
@@ -188,6 +189,346 @@ class TestAddQueueDialog:
             # Now providers should be loaded and a default selected
             assert dialog._providers_loaded
             assert provider == "edge_tts"  # First provider in the list
+
+        except ImportError:
+            pytest.skip("UI module not available")
+
+    def test_spinboxes_disabled_by_default(self, qt_application):
+        """Test that range spinboxes are disabled by default."""
+        try:
+            from ui.views.full_auto_view.add_queue_dialog import AddQueueDialog
+
+            dialog = AddQueueDialog()
+
+            assert not dialog.from_spin.isEnabled()
+            assert not dialog.to_spin.isEnabled()
+
+        except ImportError:
+            pytest.skip("UI module not available")
+
+    def test_spinboxes_enabled_when_range_selected(self, qt_application):
+        """Test that spinboxes are enabled when range radio is selected."""
+        try:
+            from ui.views.full_auto_view.add_queue_dialog import AddQueueDialog
+
+            dialog = AddQueueDialog()
+
+            # Initially disabled
+            assert not dialog.from_spin.isEnabled()
+            assert not dialog.to_spin.isEnabled()
+
+            # Simulate clicking range radio
+            dialog.range_radio.setChecked(True)
+            dialog.range_radio.toggled.emit(True)
+
+            assert dialog.from_spin.isEnabled()
+            assert dialog.to_spin.isEnabled()
+
+        except ImportError:
+            pytest.skip("UI module not available")
+
+    def test_spinboxes_disabled_when_range_deselected(self, qt_application):
+        """Test that spinboxes are disabled when range radio is deselected."""
+        try:
+            from ui.views.full_auto_view.add_queue_dialog import AddQueueDialog
+
+            dialog = AddQueueDialog()
+
+            # Enable spinboxes first
+            dialog.range_radio.setChecked(True)
+            dialog.range_radio.toggled.emit(True)
+            assert dialog.from_spin.isEnabled()
+            assert dialog.to_spin.isEnabled()
+
+            # Disable spinboxes
+            dialog.range_radio.setChecked(False)
+            dialog.range_radio.toggled.emit(False)
+            assert not dialog.from_spin.isEnabled()
+            assert not dialog.to_spin.isEnabled()
+
+        except ImportError:
+            pytest.skip("UI module not available")
+
+    def test_specific_input_enabled_when_specific_selected(self, qt_application):
+        """Test that specific input is enabled when specific radio is selected."""
+        try:
+            from ui.views.full_auto_view.add_queue_dialog import AddQueueDialog
+
+            dialog = AddQueueDialog()
+
+            # Initially disabled
+            assert not dialog.specific_input.isEnabled()
+
+            # Enable specific input
+            dialog.specific_radio.setChecked(True)
+            dialog.specific_radio.toggled.emit(True)
+
+            assert dialog.specific_input.isEnabled()
+
+        except ImportError:
+            pytest.skip("UI module not available")
+
+    def test_get_data_all_chapters_selected(self, qt_application):
+        """Test get_data returns 'all' when all chapters radio is selected."""
+        try:
+            from ui.views.full_auto_view.add_queue_dialog import AddQueueDialog
+
+            dialog = AddQueueDialog()
+
+            # Setup
+            dialog.url_input.setText("https://example.com")
+            dialog.title_input.setText("Test Novel")
+            dialog.voice_combo.addItem("Test Voice")
+            dialog.voice_combo.setCurrentIndex(0)
+            dialog.selected_provider = "edge_tts"
+            dialog.folder_input.setText("/test/path")
+
+            dialog.all_chapters_radio.setChecked(True)
+            dialog.range_radio.setChecked(False)
+            dialog.specific_radio.setChecked(False)
+
+            dialog.merged_mp3_radio.setChecked(False)
+            dialog.batch_mp3_radio.setChecked(False)
+            dialog.individual_mp3_radio.setChecked(True)
+
+            # Execute
+            url, title, voice, provider, chapter_selection, output_format, output_folder = dialog.get_data()
+
+            # Verify
+            assert chapter_selection == {'type': 'all'}
+            assert output_format == {'type': 'individual_mp3s'}
+
+        except ImportError:
+            pytest.skip("UI module not available")
+
+    def test_get_data_range_selected(self, qt_application):
+        """Test get_data returns range selection when range radio is selected."""
+        try:
+            from ui.views.full_auto_view.add_queue_dialog import AddQueueDialog
+
+            dialog = AddQueueDialog()
+
+            # Setup
+            dialog.url_input.setText("https://example.com")
+            dialog.title_input.setText("Test Novel")
+            dialog.voice_combo.addItem("Test Voice")
+            dialog.voice_combo.setCurrentIndex(0)
+            dialog.selected_provider = "edge_tts"
+            dialog.folder_input.setText("/test/path")
+
+            dialog.all_chapters_radio.setChecked(False)
+            dialog.range_radio.setChecked(True)
+            dialog.specific_radio.setChecked(False)
+
+            dialog.from_spin.setValue(1)
+            dialog.to_spin.setValue(100)
+
+            dialog.merged_mp3_radio.setChecked(False)
+            dialog.batch_mp3_radio.setChecked(False)
+            dialog.individual_mp3_radio.setChecked(True)
+
+            # Execute
+            url, title, voice, provider, chapter_selection, output_format, output_folder = dialog.get_data()
+
+            # Verify
+            assert chapter_selection == {'type': 'range', 'from': 1, 'to': 100}
+            assert output_format == {'type': 'individual_mp3s'}
+
+        except ImportError:
+            pytest.skip("UI module not available")
+
+    def test_get_data_batch_output_selected(self, qt_application):
+        """Test get_data returns batch output format when batch radio is selected."""
+        try:
+            from ui.views.full_auto_view.add_queue_dialog import AddQueueDialog
+
+            dialog = AddQueueDialog()
+
+            # Setup
+            dialog.url_input.setText("https://example.com")
+            dialog.title_input.setText("Test Novel")
+            dialog.voice_combo.addItem("Test Voice")
+            dialog.voice_combo.setCurrentIndex(0)
+            dialog.selected_provider = "edge_tts"
+            dialog.folder_input.setText("/test/path")
+
+            dialog.all_chapters_radio.setChecked(True)
+
+            dialog.merged_mp3_radio.setChecked(False)
+            dialog.batch_mp3_radio.setChecked(True)
+            dialog.individual_mp3_radio.setChecked(False)
+
+            dialog.batch_size_spin.setValue(5)
+
+            # Execute
+            url, title, voice, provider, chapter_selection, output_format, output_folder = dialog.get_data()
+
+            # Verify
+            assert chapter_selection == {'type': 'all'}
+            assert output_format == {'type': 'incremental_batches', 'batch_size': 5}
+
+        except ImportError:
+            pytest.skip("UI module not available")
+
+    def test_get_data_specific_chapters_selected(self, qt_application):
+        """Test get_data returns specific chapters when specific radio is selected."""
+        try:
+            from ui.views.full_auto_view.add_queue_dialog import AddQueueDialog
+
+            dialog = AddQueueDialog()
+
+            # Setup
+            dialog.url_input.setText("https://example.com")
+            dialog.title_input.setText("Test Novel")
+            dialog.voice_combo.addItem("Test Voice")
+            dialog.voice_combo.setCurrentIndex(0)
+            dialog.selected_provider = "edge_tts"
+            dialog.folder_input.setText("/test/path")
+
+            dialog.all_chapters_radio.setChecked(False)
+            dialog.range_radio.setChecked(False)
+            dialog.specific_radio.setChecked(True)
+
+            dialog.specific_input.setText("1, 5, 10, 15")
+
+            dialog.merged_mp3_radio.setChecked(False)
+            dialog.batch_mp3_radio.setChecked(False)
+            dialog.individual_mp3_radio.setChecked(True)
+
+            # Execute
+            url, title, voice, provider, chapter_selection, output_format, output_folder = dialog.get_data()
+
+            # Verify
+            assert chapter_selection == {'type': 'specific', 'chapters': [1, 5, 10, 15]}
+            assert output_format == {'type': 'individual_mp3s'}
+
+        except ImportError:
+            pytest.skip("UI module not available")
+
+    def test_get_data_specific_chapters_invalid(self, qt_application):
+        """Test get_data falls back to 'all' when specific chapters input is invalid."""
+        try:
+            from ui.views.full_auto_view.add_queue_dialog import AddQueueDialog
+
+            dialog = AddQueueDialog()
+
+            # Setup
+            dialog.url_input.setText("https://example.com")
+            dialog.title_input.setText("Test Novel")
+            dialog.voice_combo.addItem("Test Voice")
+            dialog.voice_combo.setCurrentIndex(0)
+            dialog.selected_provider = "edge_tts"
+            dialog.folder_input.setText("/test/path")
+
+            dialog.all_chapters_radio.setChecked(False)
+            dialog.range_radio.setChecked(False)
+            dialog.specific_radio.setChecked(True)
+
+            dialog.specific_input.setText("invalid, text, here")
+
+            dialog.merged_mp3_radio.setChecked(False)
+            dialog.batch_mp3_radio.setChecked(False)
+            dialog.individual_mp3_radio.setChecked(True)
+
+            # Execute
+            url, title, voice, provider, chapter_selection, output_format, output_folder = dialog.get_data()
+
+            # Verify - should fall back to 'all'
+            assert chapter_selection == {'type': 'all'}
+            assert output_format == {'type': 'individual_mp3s'}
+
+        except ImportError:
+            pytest.skip("UI module not available")
+
+    def test_radio_button_exclusivity(self, qt_application):
+        """Test that radio buttons are mutually exclusive."""
+        try:
+            from ui.views.full_auto_view.add_queue_dialog import AddQueueDialog
+
+            dialog = AddQueueDialog()
+
+            # Test chapter selection radio buttons
+            dialog.all_chapters_radio.setChecked(True)
+            assert dialog.all_chapters_radio.isChecked()
+            assert not dialog.range_radio.isChecked()
+            assert not dialog.specific_radio.isChecked()
+
+            dialog.range_radio.setChecked(True)
+            assert not dialog.all_chapters_radio.isChecked()
+            assert dialog.range_radio.isChecked()
+            assert not dialog.specific_radio.isChecked()
+
+            dialog.specific_radio.setChecked(True)
+            assert not dialog.all_chapters_radio.isChecked()
+            assert not dialog.range_radio.isChecked()
+            assert dialog.specific_radio.isChecked()
+
+        except ImportError:
+            pytest.skip("UI module not available")
+
+    def test_output_format_radio_exclusivity(self, qt_application):
+        """Test that output format radio buttons are mutually exclusive."""
+        try:
+            from ui.views.full_auto_view.add_queue_dialog import AddQueueDialog
+
+            dialog = AddQueueDialog()
+
+            dialog.individual_mp3_radio.setChecked(True)
+            assert dialog.individual_mp3_radio.isChecked()
+            assert not dialog.merged_mp3_radio.isChecked()
+            assert not dialog.batch_mp3_radio.isChecked()
+
+            dialog.merged_mp3_radio.setChecked(True)
+            assert not dialog.individual_mp3_radio.isChecked()
+            assert dialog.merged_mp3_radio.isChecked()
+            assert not dialog.batch_mp3_radio.isChecked()
+
+            dialog.batch_mp3_radio.setChecked(True)
+            assert not dialog.individual_mp3_radio.isChecked()
+            assert not dialog.merged_mp3_radio.isChecked()
+            assert dialog.batch_mp3_radio.isChecked()
+
+        except ImportError:
+            pytest.skip("UI module not available")
+
+    def test_spinbox_value_constraints(self, qt_application):
+        """Test that spinboxes have proper min/max values."""
+        try:
+            from ui.views.full_auto_view.add_queue_dialog import AddQueueDialog
+
+            dialog = AddQueueDialog()
+
+            # Range spinboxes
+            assert dialog.from_spin.minimum() == 1
+            assert dialog.from_spin.maximum() == 10000
+            assert dialog.to_spin.minimum() == 1
+            assert dialog.to_spin.maximum() == 10000
+
+            # Batch size spinbox
+            assert dialog.batch_size_spin.minimum() == 1
+            assert dialog.batch_size_spin.maximum() == 1000
+
+        except ImportError:
+            pytest.skip("UI module not available")
+
+    def test_default_values(self, qt_application):
+        """Test that widgets have sensible default values."""
+        try:
+            from ui.views.full_auto_view.add_queue_dialog import AddQueueDialog
+
+            dialog = AddQueueDialog()
+
+            assert dialog.from_spin.value() == 1
+            assert dialog.to_spin.value() == 50
+            assert dialog.batch_size_spin.value() == 50
+
+            assert dialog.all_chapters_radio.isChecked()
+            assert not dialog.range_radio.isChecked()
+            assert not dialog.specific_radio.isChecked()
+
+            assert not dialog.merged_mp3_radio.isChecked()
+            assert not dialog.batch_mp3_radio.isChecked()
+            assert dialog.individual_mp3_radio.isChecked()
 
         except ImportError:
             pytest.skip("UI module not available")

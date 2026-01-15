@@ -53,14 +53,12 @@ class TestFileManager:
         assert file_manager.project_dir == temp_dir / "test_project"
         assert file_manager.text_dir == temp_dir / "test_project" / "test_project_scraps"
         assert file_manager.audio_dir == temp_dir / "test_project" / "test_project_audio"
-        assert file_manager.metadata_dir == temp_dir / "test_project" / "metadata"
     
     def test_directory_creation(self, file_manager):
         """Test that directories are created on initialization."""
         assert file_manager.project_dir.exists()
         assert file_manager.text_dir.exists()
         assert file_manager.audio_dir.exists()
-        assert file_manager.metadata_dir.exists()
     
     def test_sanitize_filename(self, file_manager):
         """Test filename sanitization."""
@@ -225,5 +223,4 @@ class TestFileManager:
         assert file_manager.get_project_dir() == file_manager.project_dir
         assert file_manager.get_text_dir() == file_manager.text_dir
         assert file_manager.get_audio_dir() == file_manager.audio_dir
-        assert file_manager.get_metadata_dir() == file_manager.metadata_dir
 

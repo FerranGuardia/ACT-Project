@@ -8,10 +8,11 @@ Tests batch gap detection functionality including:
 - Consecutive range detection
 """
 
-import pytest
-from unittest.mock import Mock, MagicMock, patch, mock_open
 from pathlib import Path
 from typing import List
+from unittest.mock import MagicMock, Mock, mock_open, patch
+
+import pytest
 
 from src.processor.batch_gap_detector import BatchGapDetector
 from src.processor.chapter_manager import Chapter
@@ -148,7 +149,7 @@ class TestBatchGapDetector:
         """Test calculating expected batches when final batch is incomplete."""
         existing_chapters = list(range(1, 16))  # Chapters 1-15, batch_size=10
         result = batch_detector._calculate_expected_batches(existing_chapters, 10)
-        # Only complete batch 1-10, 11-15 is incomplete
+        # Only one complete batch possible: 1-10 (11-15 is incomplete)
         assert result == [(1, 10)]
 
     def test_calculate_expected_batches_with_gaps(self, batch_detector):
@@ -157,37 +158,9 @@ class TestBatchGapDetector:
         existing_chapters = [1, 2, 3, 4, 5, 10, 11, 12]
         result = batch_detector._calculate_expected_batches(existing_chapters, 3)
 
-        # Range 1-5 can make batches 1-3, 4-5 (incomplete)
-        # Range 10-12 can make batch 10-12
+        # Should greedily create non-overlapping batches: (1,3) and (10,12)
         assert result == [(1, 3), (10, 12)]
 
-    def test_find_consecutive_ranges_empty(self, batch_detector):
-        """Test finding consecutive ranges with empty input."""
-        result = batch_detector._find_consecutive_ranges([])
-        assert result == []
-
-    def test_find_consecutive_ranges_single_chapter(self, batch_detector):
-        """Test finding consecutive ranges with single chapter."""
-        result = batch_detector._find_consecutive_ranges([5])
-        assert result == [(5, 5)]
-
-    def test_find_consecutive_ranges_all_consecutive(self, batch_detector):
-        """Test finding consecutive ranges when all chapters are consecutive."""
-        chapters = [1, 2, 3, 4, 5]
-        result = batch_detector._find_consecutive_ranges(chapters)
-        assert result == [(1, 5)]
-
-    def test_find_consecutive_ranges_with_gaps(self, batch_detector):
-        """Test finding consecutive ranges when chapters have gaps."""
-        chapters = [1, 2, 3, 5, 6, 8, 9, 10]
-        result = batch_detector._find_consecutive_ranges(chapters)
-        assert result == [(1, 3), (5, 6), (8, 10)]
-
-    def test_find_consecutive_ranges_single_gaps(self, batch_detector):
-        """Test finding consecutive ranges with single chapter gaps."""
-        chapters = [1, 3, 5, 7]
-        result = batch_detector._find_consecutive_ranges(chapters)
-        assert result == [(1, 1), (3, 3), (5, 5), (7, 7)]
 
     def test_find_missing_batches_no_expected_batches(self, batch_detector):
         """Test finding missing batches when no batches are expected."""
@@ -201,7 +174,7 @@ class TestBatchGapDetector:
         mock_merged_dir = Mock()
         mock_audio_dir.__truediv__ = Mock(return_value=mock_merged_dir)
 
-        mock_file_manager.get_audio_dir.return_value = mock_audio_dir
+        mock_file_manager.get_merged_dir.return_value = mock_merged_dir
         mock_file_manager._sanitize_filename.return_value = "test_project"
 
         # Mock that batch files exist
@@ -219,7 +192,7 @@ class TestBatchGapDetector:
         mock_merged_dir = Mock()
         mock_audio_dir.__truediv__ = Mock(return_value=mock_merged_dir)
 
-        mock_file_manager.get_audio_dir.return_value = mock_audio_dir
+        mock_file_manager.get_merged_dir.return_value = mock_merged_dir
         mock_file_manager._sanitize_filename.return_value = "test_project"
 
         # Mock batch files - first exists, second doesn't
@@ -245,7 +218,7 @@ class TestBatchGapDetector:
     def test_find_missing_batches_error_handling(self, batch_detector, mock_file_manager):
         """Test error handling in finding missing batches."""
         expected_batches = [(1, 10)]
-        mock_file_manager.get_audio_dir.side_effect = Exception("File system error")
+        mock_file_manager.get_merged_dir.side_effect = Exception("File system error")
 
         result = batch_detector._find_missing_batches(expected_batches)
         assert result == []

@@ -17,6 +17,7 @@ with patch('PySide6.QtWidgets'), \
     from ui.landing_page import LandingPage
 
 
+@pytest.mark.ui
 class TestLandingPageInitialization:
     """Test LandingPage initialization and setup."""
 
@@ -77,6 +78,7 @@ class TestLandingPageInitialization:
             mock_set_layout.assert_called_once_with(mock_layout)
 
 
+@pytest.mark.ui
 class TestLandingPageNavigation:
     """Test LandingPage navigation functionality."""
 
@@ -119,6 +121,7 @@ class TestLandingPageNavigation:
         assert landing_page.navigation_callback is None
 
 
+@pytest.mark.ui
 class TestLandingPageStyling:
     """Test LandingPage styling and theming functionality."""
 
@@ -192,6 +195,7 @@ class TestLandingPageStyling:
             mock_update_bg.assert_called_once()
 
 
+@pytest.mark.ui
 class TestLandingPageIntegration:
     """Test LandingPage integration with components."""
 
@@ -267,6 +271,7 @@ class TestLandingPageIntegration:
             mock_cards.refresh_styles.assert_called_once()
 
 
+@pytest.mark.ui
 class TestLandingPageIntegration:
     """Integration tests for LandingPage with real Qt widgets."""
 

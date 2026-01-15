@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 from src.ui.landing_page_utils import LayoutHelper
 
 
+@pytest.mark.ui
 class TestLayoutHelperCreateVertical:
     """Test LayoutHelper.create_vertical method."""
 
@@ -71,6 +72,7 @@ class TestLayoutHelperCreateVertical:
             mock_layout.setContentsMargins.assert_called_once_with(1, 2, 3, 4)
 
 
+@pytest.mark.ui
 class TestLayoutHelperCreateHorizontal:
     """Test LayoutHelper.create_horizontal method."""
 
@@ -131,6 +133,7 @@ class TestLayoutHelperCreateHorizontal:
             mock_layout.setContentsMargins.assert_called_once_with(2, 4, 6, 8)
 
 
+@pytest.mark.ui
 class TestLayoutHelperIntegration:
     """Test LayoutHelper integration and return types."""
 

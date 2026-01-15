@@ -18,6 +18,7 @@ with patch('PySide6.QtWidgets'), \
     from src.ui.views.full_auto_view.full_auto_view import FullAutoView
 
 
+@pytest.mark.ui
 class TestFullAutoViewInitialization:
     """Test FullAutoView initialization and setup."""
 
@@ -58,6 +59,7 @@ class TestFullAutoViewInitialization:
         # This is verified by the mock patches in the fixture
 
 
+@pytest.mark.ui
 class TestFullAutoViewUISetup:
     """Test FullAutoView UI setup functionality."""
 
@@ -117,6 +119,7 @@ class TestFullAutoViewUISetup:
         full_auto_view.stop_all_button.clicked.connect.assert_called_once()
 
 
+@pytest.mark.ui
 class TestFullAutoViewQueueOperations:
     """Test FullAutoView queue operations."""
 
@@ -206,6 +209,7 @@ class TestFullAutoViewQueueOperations:
             mock_clear.assert_not_called()
 
 
+@pytest.mark.ui
 class TestFullAutoViewProcessingOperations:
     """Test FullAutoView processing operations."""
 
@@ -277,6 +281,7 @@ class TestFullAutoViewProcessingOperations:
         full_auto_view.stop_processing()
 
 
+@pytest.mark.ui
 class TestFullAutoViewGlobalControls:
     """Test FullAutoView global control operations."""
 
@@ -341,6 +346,7 @@ class TestFullAutoViewGlobalControls:
         full_auto_view.stop_all()
 
 
+@pytest.mark.ui
 class TestFullAutoViewIntegration:
     """Integration tests for FullAutoView with real Qt widgets and external dependencies."""
 

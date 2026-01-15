@@ -18,6 +18,7 @@ with patch('PySide6.QtWidgets'), \
     from src.ui.dialogs.provider_selection_dialog import ProviderStatusThread
 
 
+@pytest.mark.ui
 class TestProviderStatusThreadInitialization:
     """Test ProviderStatusThread initialization."""
 
@@ -42,6 +43,7 @@ class TestProviderStatusThreadInitialization:
         assert status_thread.status_checked is not None
 
 
+@pytest.mark.ui
 class TestProviderStatusThreadRunMethod:
     """Test the main run method of ProviderStatusThread."""
 
@@ -149,6 +151,7 @@ class TestProviderStatusThreadRunMethod:
             )
 
 
+@pytest.mark.ui
 class TestProviderStatusThreadVoiceSelection:
     """Test voice selection logic in ProviderStatusThread."""
 
@@ -215,6 +218,7 @@ class TestProviderStatusThreadVoiceSelection:
             assert call_args[1]['voice'] == "en-US-AndrewNeural"
 
 
+@pytest.mark.ui
 class TestProviderStatusThreadCleanup:
     """Test temporary file cleanup in ProviderStatusThread."""
 

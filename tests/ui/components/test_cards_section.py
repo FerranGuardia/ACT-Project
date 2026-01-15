@@ -16,6 +16,7 @@ with patch('PySide6.QtWidgets'), \
     from ui.landing_page_cards import CardsSection
 
 
+@pytest.mark.ui
 class TestCardsSectionInitialization:
     """Test CardsSection initialization and setup."""
 
@@ -50,6 +51,7 @@ class TestCardsSectionInitialization:
         # This is verified by the mock patch in the fixture
 
 
+@pytest.mark.ui
 class TestCardsSectionSetup:
     """Test CardsSection setup functionality."""
 
@@ -122,6 +124,7 @@ class TestCardsSectionSetup:
             assert len(cards_section.cards) == 0
 
 
+@pytest.mark.ui
 class TestCardsSectionStyling:
     """Test CardsSection styling functionality."""
 
@@ -195,6 +198,7 @@ class TestCardsSectionStyling:
         mock_card.update_style.assert_called_once()
 
 
+@pytest.mark.ui
 class TestCardsSectionIntegration:
     """Test CardsSection integration behavior."""
 

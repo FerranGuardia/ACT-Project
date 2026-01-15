@@ -18,6 +18,7 @@ with patch('PySide6.QtWidgets'), \
     from src.ui.dialogs.provider_selection_dialog import ProviderSelectionDialog
 
 
+@pytest.mark.ui
 class TestProviderSelectionDialogInitialization:
     """Test ProviderSelectionDialog initialization and setup."""
 
@@ -70,6 +71,7 @@ class TestProviderSelectionDialogInitialization:
         assert provider_dialog.provider_manager is not None
 
 
+@pytest.mark.ui
 class TestProviderSelectionDialogUI:
     """Test ProviderSelectionDialog UI setup."""
 
@@ -133,6 +135,7 @@ class TestProviderSelectionDialogUI:
             mock_hbox_class.assert_called()
 
 
+@pytest.mark.ui
 class TestProviderSelectionDialogFunctionality:
     """Test ProviderSelectionDialog core functionality."""
 
@@ -212,6 +215,7 @@ class TestProviderSelectionDialogFunctionality:
             mock_thread.start.assert_called_once()
 
 
+@pytest.mark.ui
 class TestProviderSelectionDialogDialogFlow:
     """Test ProviderSelectionDialog dialog accept/reject flow."""
 

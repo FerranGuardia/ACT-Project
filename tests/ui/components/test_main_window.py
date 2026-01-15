@@ -19,6 +19,7 @@ with patch('PySide6.QtWidgets'), \
     from src.ui.main_window import MainWindow
 
 
+@pytest.mark.ui
 class TestMainWindowInitialization:
     """Test MainWindow initialization and setup."""
 
@@ -112,6 +113,7 @@ class TestMainWindowInitialization:
         assert MainWindow.FULL_AUTO_VIEW == 4
 
 
+@pytest.mark.ui
 class TestMainWindowNavigation:
     """Test MainWindow navigation functionality."""
 
@@ -183,6 +185,7 @@ class TestMainWindowNavigation:
         main_window.back_button.setVisible.assert_called_with(False)
 
 
+@pytest.mark.ui
 class TestMainWindowViewChanges:
     """Test MainWindow view change handling."""
 
@@ -243,6 +246,7 @@ class TestMainWindowViewChanges:
             mock_show_landing.assert_called_once()
 
 
+@pytest.mark.ui
 class TestMainWindowStyling:
     """Test MainWindow styling and font functionality."""
 
@@ -310,6 +314,7 @@ class TestMainWindowStyling:
         mock_add_font.assert_not_called()
 
 
+@pytest.mark.ui
 class TestMainWindowLifecycle:
     """Test MainWindow lifecycle events."""
 
@@ -344,6 +349,7 @@ class TestMainWindowLifecycle:
         mock_event.accept.assert_called_once()
 
 
+@pytest.mark.ui
 class TestMainWindowIntegration:
     """Integration tests for MainWindow with real Qt widgets."""
 

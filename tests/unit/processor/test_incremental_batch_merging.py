@@ -24,6 +24,7 @@ if str(project_root / "src") not in sys.path:
 
 from processor.batch_processing_coordinator import BatchProcessingCoordinator
 from processor.file_manager import FileManager
+from tts.audio_merger import AudioMerger
 from core.logger import get_logger
 
 logger = get_logger("test_incremental_batch_merging")
@@ -100,7 +101,6 @@ class TestIncrementalBatchMerging:
             # Create coordinator
             coordinator = BatchProcessingCoordinator(
                 context=mock_context,
-                project_manager=mock_project_manager,
                 scraping_coordinator=Mock(),
                 conversion_coordinator=Mock()
             )
@@ -134,7 +134,6 @@ class TestIncrementalBatchMerging:
             # Create coordinator
             coordinator = BatchProcessingCoordinator(
                 context=mock_context,
-                project_manager=mock_project_manager,
                 scraping_coordinator=Mock(),
                 conversion_coordinator=Mock()
             )
@@ -169,8 +168,8 @@ class TestIncrementalBatchMerging:
     def test_merge_completed_batch_success(self, temp_dir, mock_context, mock_file_manager):
         """Test successful batch merging."""
         # Setup mocks
-        with patch('processor.batch_processing_coordinator.AudioMerger') as mock_audio_merger_class, \
-             patch('processor.batch_processing_coordinator.TTSProviderManager'):
+        with patch('tts.audio_merger.AudioMerger') as mock_audio_merger_class, \
+             patch('tts.providers.provider_manager.TTSProviderManager'):
 
             mock_merger = Mock()
             mock_merger.merge_audio_chunks.return_value = True
@@ -198,7 +197,6 @@ class TestIncrementalBatchMerging:
             # Create coordinator
             coordinator = BatchProcessingCoordinator(
                 context=mock_context,
-                project_manager=Mock(),
                 scraping_coordinator=Mock(),
                 conversion_coordinator=mock_conversion_coordinator
             )
@@ -215,7 +213,7 @@ class TestIncrementalBatchMerging:
             merged_files, output_path = call_args[0]
 
             assert len(merged_files) == 10
-            assert str(output_path).endswith("Test Novel_chapters_0001-0010.mp3")
+            assert str(output_path).endswith("test_novel_chapters_0001-0010.mp3")
 
     def test_processing_thread_passes_output_format(self):
         """Test that processing thread passes output_format to pipeline."""
@@ -228,23 +226,21 @@ class TestIncrementalBatchMerging:
         from processor.pipeline_orchestrator import PipelineOrchestrator
         from processor.context import ProcessingContext
 
-        # Create a real file manager to test directory creation
-        file_manager = FileManager("test_project", base_output_dir=temp_dir, novel_title="Test Novel")
+        # Create orchestrator with the proper setup
+        orchestrator = PipelineOrchestrator(
+            project_name="test_project",
+            novel_title="Test Novel",
+            base_output_dir=temp_dir
+        )
 
-        # Create orchestrator with mocked dependencies
-        context = ProcessingContext()
-        context.project_name = "test_project"
-        context.novel_title = "Test Novel"
-
-        orchestrator = PipelineOrchestrator(context)
-        orchestrator.file_manager = file_manager
+        # Get the file manager from the orchestrator (it should be created automatically)
+        file_manager = orchestrator.file_manager
 
         # Mock other dependencies
-        orchestrator.scraping_coordinator = Mock()
-        orchestrator.scraping_coordinator.initialize_project.return_value = True
-        orchestrator._ensure_chapter_urls_available = Mock(return_value=True)
-        orchestrator.batch_processing_coordinator = Mock()
-        orchestrator.batch_processing_coordinator.process_all_chapters.return_value = {"success": True}
+        with patch.object(orchestrator, '_ensure_chapter_urls_available', return_value=True), \
+             patch.object(orchestrator, 'batch_processing_coordinator') as mock_batch_coordinator:
+
+            mock_batch_coordinator.process_all_chapters.return_value = {"success": True}
 
         # Call with batch merging enabled
         output_format = {'type': 'incremental_batches', 'batch_size': 10}

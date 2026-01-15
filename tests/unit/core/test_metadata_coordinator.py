@@ -101,6 +101,7 @@ class TestMetadataCoordinatorFileOperations:
 
         test_metadata = {
             "https://example.com/novel1": {
+                "url": "https://example.com/novel1",
                 "title": "Test Novel",
                 "author": "Test Author",
                 "last_updated": "2023-01-01"
@@ -114,21 +115,30 @@ class TestMetadataCoordinatorFileOperations:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             metadata_file = temp_path / "novels_metadata.json"
-            
+
             # Write test metadata to file
             with open(metadata_file, 'w') as f:
                 json.dump(test_metadata, f)
-            
-            # Mock config.get to return our temp directory for metadata_dir
+
+            # Mock config.get to return our temp directory for metadata_dir BEFORE creating coordinator
             def config_get(key, default=None):
                 if key == "paths.metadata_dir":
                     return str(temp_path)
                 return default
             mock_config.get.side_effect = config_get
-            
+
             manager = MetadataCoordinator()
             # The metadata should be loaded from the file
-            assert manager._metadata == test_metadata, f"Expected {test_metadata}, got {manager._metadata}"
+            loaded_metadata = manager._metadata
+            assert "https://example.com/novel1" in loaded_metadata
+            novel_data = loaded_metadata["https://example.com/novel1"]
+            assert novel_data["url"] == "https://example.com/novel1"
+            assert novel_data["title"] == "Test Novel"
+            assert novel_data["author"] == "Test Author"
+            assert novel_data["last_updated"] == "2023-01-01"
+            # Check that timestamps were added
+            assert "created_at" in novel_data
+            assert "updated_at" in novel_data
 
     @patch('src.core.metadata_coordinator.get_config')
     def test_load_metadata_invalid_json(self, mock_get_config):
@@ -156,9 +166,17 @@ class TestMetadataCoordinatorFileOperations:
         # Reset singleton for clean test
         mc_module._metadata_coordinator_instance = None
 
-        with patch('pathlib.Path.exists', return_value=False), \
-             patch('pathlib.Path.mkdir'), \
-             patch('builtins.open', mock_open()) as mock_file:
+        # Create a temporary directory for the test
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            # Mock config to return our temp directory
+            def config_get(key, default=None):
+                if key == "paths.metadata_dir":
+                    return str(temp_path)
+                return default
+            mock_config.get.side_effect = config_get
+
             manager = MetadataCoordinator()
 
             # Add some metadata
@@ -167,8 +185,15 @@ class TestMetadataCoordinatorFileOperations:
             # Save
             manager._save_metadata_atomic()
 
-        # Verify file was written
-        mock_file.assert_called()
+            # Verify file was actually created
+            metadata_file = temp_path / "novels_metadata.json"
+            assert metadata_file.exists()
+
+            # Verify content
+            with open(metadata_file, 'r') as f:
+                data = json.load(f)
+                assert "novels" in data
+                assert data["novels"] == manager._metadata
 
 
 class TestMetadataCoordinatorCRUD:
