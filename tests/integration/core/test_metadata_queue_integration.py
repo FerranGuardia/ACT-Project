@@ -68,7 +68,7 @@ class TestMetadataQueueIntegration:
     def test_queue_save_updates_metadata_automatically(self, temp_queue_file, metadata_coordinator):
         """Test that saving a queue automatically updates centralized metadata."""
         # Use unique URLs for this test to avoid conflicts
-        test_urls = ['https://test-queue-auto-1.example.com/novel1', 'https://test-queue-auto-2.example.com/novel2']
+        test_urls = ['https://example.com/test-queue-auto-1/novel1', 'https://example.com/test-queue-auto-2/novel2']
 
         # Clear any existing metadata for these URLs
         for url in test_urls:
@@ -76,37 +76,42 @@ class TestMetadataQueueIntegration:
 
         # Create queue with items
         queue_manager = FullAutoQueueManager(temp_queue_file)
-        test_items = [
-            {
-                'url': test_urls[0],
-                'title': 'Test Novel by Test Author',
-                'status': StatusMessages.PENDING,
-                'progress': 0,
-                'chapters': 42
-            },
-            {
-                'url': test_urls[1],
-                'title': 'Another Novel',
-                'status': StatusMessages.PROCESSING,
-                'progress': 25
-            }
-        ]
 
-        # Save queue - should automatically update metadata
-        result = queue_manager.save_queue(test_items)
-        assert result is True
+        # Mock URL validation to avoid DNS resolution
+        with patch.object(queue_manager.validator, 'validate_url') as mock_validate:
+            mock_validate.side_effect = lambda url: (True, url)  # Return (True, url)
 
-        # Verify specific metadata was created
-        meta1 = metadata_coordinator.get_novel_metadata(test_urls[0])
-        assert meta1 is not None
-        assert meta1['title'] == 'Test Novel'
-        assert meta1['author'] == 'Test Author'
-        assert meta1['chapters'] == 42
+            test_items = [
+                {
+                    'url': test_urls[0],
+                    'title': 'Test Novel by Test Author',
+                    'status': StatusMessages.PENDING,
+                    'progress': 0,
+                    'chapters': 42
+                },
+                {
+                    'url': test_urls[1],
+                    'title': 'Another Novel',
+                    'status': StatusMessages.PROCESSING,
+                    'progress': 25
+                }
+            ]
 
-        meta2 = metadata_coordinator.get_novel_metadata(test_urls[1])
-        assert meta2 is not None
-        assert meta2['title'] == 'Another Novel'
-        assert meta2.get('author') is None  # No author in title
+            # Save queue - should automatically update metadata
+            result = queue_manager.save_queue(test_items)
+            assert result is True
+
+            # Verify specific metadata was created
+            meta1 = metadata_coordinator.get_novel_metadata(test_urls[0])
+            assert meta1 is not None
+            assert meta1['title'] == 'Test Novel'
+            assert meta1['author'] == 'Test Author'
+            assert meta1['chapters'] == 42
+
+            meta2 = metadata_coordinator.get_novel_metadata(test_urls[1])
+            assert meta2 is not None
+            assert meta2['title'] == 'Another Novel'
+            assert meta2.get('author') is None  # No author in title
 
         # Cleanup test metadata
         for url in test_urls:
@@ -114,7 +119,7 @@ class TestMetadataQueueIntegration:
 
     def test_queue_load_preserves_metadata_consistency(self, temp_queue_file, metadata_coordinator):
         """Test that loading a queue preserves metadata consistency."""
-        test_url = 'https://test-queue-load.example.com/novel1'
+        test_url = 'https://example.com/test-queue-load/novel1'
 
         # Setup initial metadata
         metadata_coordinator.set_novel_metadata(test_url, {
@@ -126,39 +131,44 @@ class TestMetadataQueueIntegration:
 
         # Create and save queue
         queue_manager = FullAutoQueueManager(temp_queue_file)
-        test_items = [{
-            'url': test_url,
-            'title': 'Test Novel by Test Author',
-            'status': StatusMessages.PROCESSING,
-            'progress': 50,
-            'chapters': 42
-        }]
 
-        queue_manager.save_queue(test_items)
+        # Mock URL validation to avoid DNS resolution
+        with patch.object(queue_manager.validator, 'validate_url') as mock_validate:
+            mock_validate.side_effect = lambda url: (True, url)  # Return (True, url)
 
-        # Create new queue manager and load
-        new_queue_manager = FullAutoQueueManager(temp_queue_file)
-        loaded_items = new_queue_manager.load_queue()
+            test_items = [{
+                'url': test_url,
+                'title': 'Test Novel by Test Author',
+                'status': StatusMessages.PROCESSING,
+                'progress': 50,
+                'chapters': 42
+            }]
 
-        # Verify queue was loaded
-        assert len(loaded_items) == 1
-        loaded_item = loaded_items[0]
+            queue_manager.save_queue(test_items)
 
-        # Verify metadata consistency
-        assert loaded_item['url'] == test_url
-        assert loaded_item['title'] == 'Test Novel by Test Author'
-        assert loaded_item['status'] == StatusMessages.PENDING  # Processing -> Pending on load
-        assert loaded_item['progress'] == 50
+            # Create new queue manager and load
+            new_queue_manager = FullAutoQueueManager(temp_queue_file)
+            loaded_items = new_queue_manager.load_queue()
 
-        # Verify centralized metadata still exists and is correct
-        meta = metadata_coordinator.get_novel_metadata(test_url)
-        assert meta is not None
-        assert meta['title'] == 'Test Novel'
-        assert meta['author'] == 'Test Author'
+            # Verify queue was loaded
+            assert len(loaded_items) == 1
+            loaded_item = loaded_items[0]
+
+            # Verify metadata consistency
+            assert loaded_item['url'] == test_url
+            assert loaded_item['title'] == 'Test Novel by Test Author'
+            assert loaded_item['status'] == StatusMessages.PENDING  # Processing -> Pending on load
+            assert loaded_item['progress'] == 50
+
+            # Verify centralized metadata still exists and is correct
+            meta = metadata_coordinator.get_novel_metadata(test_url)
+            assert meta is not None
+            assert meta['title'] == 'Test Novel'
+            assert meta['author'] == 'Test Author'
 
     def test_cross_queue_metadata_consistency(self, metadata_coordinator):
         """Test that metadata remains consistent across different queue types."""
-        novel_url = 'https://test-cross-queue.example.com/novel'
+        novel_url = 'https://example.com/test-cross-queue/novel'
 
         # Create temp files for different queue types
         with tempfile.NamedTemporaryFile(suffix='_fullauto.json', delete=False) as f1, \
@@ -170,44 +180,49 @@ class TestMetadataQueueIntegration:
         try:
             # Add to FullAuto queue first
             fullauto_manager = FullAutoQueueManager(fullauto_file)
-            fullauto_items = [{
-                'url': novel_url,
-                'title': 'Cross Queue Novel by Cross Author',
-                'status': StatusMessages.PENDING,
-                'progress': 0,
-                'voice': 'en-US-AndrewNeural'
-            }]
 
-            fullauto_manager.save_queue(fullauto_items)
+            # Mock URL validation to avoid DNS resolution
+            with patch.object(fullauto_manager.validator, 'validate_url') as mock_validate:
+                mock_validate.side_effect = lambda url: (True, url)  # Return (True, url)
 
-            # Verify metadata was created
-            meta = metadata_coordinator.get_novel_metadata(novel_url)
-            assert meta is not None
-            assert meta['title'] == 'Cross Queue Novel'
-            assert meta['author'] == 'Cross Author'
+                fullauto_items = [{
+                    'url': novel_url,
+                    'title': 'Cross Queue Novel by Cross Author',
+                    'status': StatusMessages.PENDING,
+                    'progress': 0,
+                    'voice': 'en-US-AndrewNeural'
+                }]
 
-            # Add to Merger queue
-            merger_manager = MergerQueueManager(merger_file)
-            merger_items = [{
-                'novel_url': novel_url,
-                'novel_title': 'Cross Queue Novel',
-                'novel_author': 'Cross Author',
-                'file_paths': ['/path/to/file1.mp3', '/path/to/file2.mp3'],
-                'output_path': '/path/to/output.mp3'
-            }]
+                fullauto_manager.save_queue(fullauto_items)
 
-            merger_manager.save_queue(merger_items)
+                # Verify metadata was created
+                meta = metadata_coordinator.get_novel_metadata(novel_url)
+                assert meta is not None
+                assert meta['title'] == 'Cross Queue Novel'
+                assert meta['author'] == 'Cross Author'
 
-            # Verify metadata is still consistent (not overwritten)
-            meta_after = metadata_coordinator.get_novel_metadata(novel_url)
-            assert meta_after is not None
-            assert meta_after['title'] == 'Cross Queue Novel'
-            assert meta_after['author'] == 'Cross Author'
+                # Add to Merger queue
+                merger_manager = MergerQueueManager(merger_file)
+                merger_items = [{
+                    'novel_url': novel_url,
+                    'novel_title': 'Cross Queue Novel',
+                    'novel_author': 'Cross Author',
+                    'file_paths': ['/path/to/file1.mp3', '/path/to/file2.mp3'],
+                    'output_path': '/path/to/output.mp3'
+                }]
 
-            # Load merger queue and verify it works
-            loaded_merger_items = merger_manager.load_queue()
-            assert len(loaded_merger_items) == 1
-            assert loaded_merger_items[0]['novel_url'] == novel_url
+                merger_manager.save_queue(merger_items)
+
+                # Verify metadata is still consistent (not overwritten)
+                meta_after = metadata_coordinator.get_novel_metadata(novel_url)
+                assert meta_after is not None
+                assert meta_after['title'] == 'Cross Queue Novel'
+                assert meta_after['author'] == 'Cross Author'
+
+                # Load merger queue and verify it works
+                loaded_merger_items = merger_manager.load_queue()
+                assert len(loaded_merger_items) == 1
+                assert loaded_merger_items[0]['novel_url'] == novel_url
 
         finally:
             # Cleanup
@@ -221,28 +236,32 @@ class TestMetadataQueueIntegration:
         # Create queue manager
         queue_manager = FullAutoQueueManager(temp_queue_file)
 
-        # Mock the metadata coordinator to fail on save
-        with patch.object(metadata_coordinator, '_save_metadata_atomic', side_effect=Exception("Simulated failure")):
-            test_items = [{
-                'url': 'https://test-fail.example.com/novel',
-                'title': 'Fail Test Novel',
-                'status': StatusMessages.PENDING,
-                'progress': 0
-            }]
+        # Mock URL validation to avoid DNS resolution
+        with patch.object(queue_manager.validator, 'validate_url') as mock_validate:
+            mock_validate.side_effect = lambda url: (True, url)  # Return (True, url)
 
-            # This should fail due to mocked exception
-            result = queue_manager.save_queue(test_items)
-            # The queue save may succeed even if metadata update fails (it logs warnings but continues)
-            # So we check that metadata was not actually updated
-            assert metadata_coordinator.get_novel_metadata('https://test-fail.example.com/novel') is None
+            # Mock the metadata coordinator to fail on save
+            with patch.object(metadata_coordinator, '_save_metadata_atomic', side_effect=Exception("Simulated failure")):
+                test_items = [{
+                    'url': 'https://example.com/test-fail/novel',
+                    'title': 'Fail Test Novel',
+                    'status': StatusMessages.PENDING,
+                    'progress': 0
+                }]
 
-            # Verify the novel metadata doesn't exist (rolled back)
-            meta = metadata_coordinator.get_novel_metadata('https://test-fail.example.com/novel')
-            assert meta is None
+                # This should fail due to mocked exception
+                result = queue_manager.save_queue(test_items)
+                # The queue save may succeed even if metadata update fails (it logs warnings but continues)
+                # So we check that metadata was not actually updated
+                assert metadata_coordinator.get_novel_metadata('https://example.com/test-fail/novel') is None
+
+                # Verify the novel metadata doesn't exist (rolled back)
+                meta = metadata_coordinator.get_novel_metadata('https://example.com/test-fail/novel')
+                assert meta is None
 
     def test_concurrent_queue_operations_dont_corrupt_metadata(self, metadata_coordinator):
         """Test that concurrent queue operations don't corrupt metadata."""
-        novel_urls = [f'https://test-concurrent-{i}.example.com/novel' for i in range(5)]
+        novel_urls = [f'https://example.com/test-concurrent-{i}/novel' for i in range(5)]
 
         results = []
         errors = []
@@ -256,17 +275,21 @@ class TestMetadataQueueIntegration:
 
                 queue_manager = FullAutoQueueManager(queue_file)
 
-                # Create queue items
-                items = [{
-                    'url': novel_urls[queue_index],
-                    'title': f'Concurrent Novel {queue_index}',
-                    'status': StatusMessages.PENDING,
-                    'progress': queue_index * 10
-                }]
+                # Mock URL validation to avoid DNS resolution
+                with patch.object(queue_manager.validator, 'validate_url') as mock_validate:
+                    mock_validate.side_effect = lambda url: (True, url)  # Return (True, url)
 
-                # Save queue
-                result = queue_manager.save_queue(items)
-                results.append(result)
+                    # Create queue items
+                    items = [{
+                        'url': novel_urls[queue_index],
+                        'title': f'Concurrent Novel {queue_index}',
+                        'status': StatusMessages.PENDING,
+                        'progress': queue_index * 10
+                    }]
+
+                    # Save queue
+                    result = queue_manager.save_queue(items)
+                    results.append(result)
 
                 # Cleanup
                 queue_file.unlink(missing_ok=True)
@@ -339,11 +362,17 @@ class TestMetadataQueueIntegration:
 
     def test_metadata_search_and_filtering(self, metadata_coordinator):
         """Test that metadata search works correctly across queue operations."""
+        # Clear any existing test metadata first (clear all URLs containing test-search)
+        all_novels = metadata_coordinator.list_novels()
+        for novel in all_novels:
+            if 'test-search' in novel['url']:
+                metadata_coordinator.remove_novel_metadata(novel['url'])
+
         # Add test metadata
         test_novels = [
-            {'url': 'https://test-search1.example.com/novel', 'title': 'Fantasy Adventure', 'author': 'John Smith'},
-            {'url': 'https://test-search2.example.com/novel', 'title': 'Sci-Fi Journey', 'author': 'Jane Doe'},
-            {'url': 'https://test-search3.example.com/novel', 'title': 'Mystery Novel', 'author': 'John Smith'},
+            {'url': 'https://example.com/test-search1/novel', 'title': 'Fantasy Adventure', 'author': 'John Smith'},
+            {'url': 'https://example.com/test-search2/novel', 'title': 'Sci-Fi Journey', 'author': 'Jane Doe'},
+            {'url': 'https://example.com/test-search3/novel', 'title': 'Mystery Novel', 'author': 'John Smith'},
         ]
 
         for novel in test_novels:
@@ -361,50 +390,55 @@ class TestMetadataQueueIntegration:
         assert authors == {'John Smith'}
 
         # Test search by URL
-        url_results = metadata_coordinator.search_novels('search2')
+        url_results = metadata_coordinator.search_novels('test-search2')
         assert len(url_results) == 1
-        assert 'search2' in url_results[0]['url']
+        assert 'test-search2' in url_results[0]['url']
 
     def test_queue_state_persistence_across_restarts(self, temp_queue_file, metadata_coordinator):
         """Test that queue state and metadata persist correctly across simulated restarts."""
         # Phase 1: Create and save queue
         queue_manager1 = FullAutoQueueManager(temp_queue_file)
 
-        persistence_url = 'https://test-persistence.example.com/novel'
-        items_phase1 = [{
-            'url': persistence_url,
-            'title': 'Persistence Novel by Persistence Author',
-            'status': StatusMessages.PROCESSING,
-            'progress': 30,
-            'chapters': 20
-        }]
+        persistence_url = 'https://example.com/test-persistence/novel'
 
-        queue_manager1.save_queue(items_phase1)
+        # Mock URL validation to avoid DNS resolution
+        with patch.object(queue_manager1.validator, 'validate_url') as mock_validate:
+            mock_validate.side_effect = lambda url: (True, url)  # Return (True, url)
 
-        # Verify initial state
-        meta1 = metadata_coordinator.get_novel_metadata(persistence_url)
-        assert meta1 is not None
-        assert meta1['title'] == 'Persistence Novel'
-        assert meta1['author'] == 'Persistence Author'
-        assert meta1['chapters'] == 20
+            items_phase1 = [{
+                'url': persistence_url,
+                'title': 'Persistence Novel by Persistence Author',
+                'status': StatusMessages.PROCESSING,
+                'progress': 30,
+                'chapters': 20
+            }]
 
-        # Phase 2: "Restart" - create new queue manager and load
-        queue_manager2 = FullAutoQueueManager(temp_queue_file)
-        loaded_items = queue_manager2.load_queue()
+            queue_manager1.save_queue(items_phase1)
 
-        # Verify queue state was restored correctly
-        assert len(loaded_items) == 1
-        loaded_item = loaded_items[0]
-        assert loaded_item['status'] == StatusMessages.PENDING  # Processing -> Pending
-        assert loaded_item['progress'] == 30
-        assert 'was_interrupted_at' in loaded_item  # Should have interruption marker
+            # Verify initial state
+            meta1 = metadata_coordinator.get_novel_metadata(persistence_url)
+            assert meta1 is not None
+            assert meta1['title'] == 'Persistence Novel'
+            assert meta1['author'] == 'Persistence Author'
+            assert meta1['chapters'] == 20
 
-        # Verify metadata is still correct
-        meta2 = metadata_coordinator.get_novel_metadata(persistence_url)
-        assert meta2 is not None
-        assert meta2['title'] == 'Persistence Novel'
-        assert meta2['author'] == 'Persistence Author'
-        assert meta2['chapters'] == 20
+            # Phase 2: "Restart" - create new queue manager and load
+            queue_manager2 = FullAutoQueueManager(temp_queue_file)
+            loaded_items = queue_manager2.load_queue()
+
+            # Verify queue state was restored correctly
+            assert len(loaded_items) == 1
+            loaded_item = loaded_items[0]
+            assert loaded_item['status'] == StatusMessages.PENDING  # Processing -> Pending
+            assert loaded_item['progress'] == 30
+            assert 'was_interrupted_at' in loaded_item  # Should have interruption marker
+
+            # Verify metadata is still correct
+            meta2 = metadata_coordinator.get_novel_metadata(persistence_url)
+            assert meta2 is not None
+            assert meta2['title'] == 'Persistence Novel'
+            assert meta2['author'] == 'Persistence Author'
+            assert meta2['chapters'] == 20
 
 
 if __name__ == "__main__":

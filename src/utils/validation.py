@@ -10,8 +10,9 @@ import os
 import ipaddress
 import socket
 import time
+import json
 from pathlib import Path
-from typing import Dict, Any, Optional, Tuple, Union
+from typing import Dict, Any, Optional, Tuple, Union, List
 from urllib.parse import urlparse
 from cerberus import Validator
 import bleach
@@ -371,25 +372,24 @@ class InputValidator:
         """
         Check if URL is from a known supported novel site
 
+        Dynamically scans adaptive_configs directory for supported sites.
+
         Args:
             url: URL to check
 
         Returns:
             True if from supported site
         """
-        supported_domains = [
-            'novelfull.com',
-            'novelbin.com',
-            'novelbin.net',
-            'novelfull.net',
-            'lightnovelworld.com',
-            'readlightnovel.org',
-            # Add more as needed
-        ]
-
         try:
             parsed = urlparse(url)
             domain = parsed.netloc.lower()
+
+            # Remove www. prefix for comparison
+            if domain.startswith('www.'):
+                domain = domain[4:]
+
+            # Get all supported domains from adaptive configs
+            supported_domains = self._get_supported_domains_from_configs()
 
             # Check exact matches and subdomain matches
             for supported in supported_domains:
@@ -400,6 +400,48 @@ class InputValidator:
 
         except Exception:
             return False
+
+    def _get_supported_domains_from_configs(self) -> List[str]:
+        """
+        Get all supported domains by scanning adaptive config directories.
+
+        Returns:
+            List of supported domain names
+        """
+        supported_domains = set()
+
+        try:
+            # Scan built-in configs in src/scraper/adaptive_configs/
+            # Use inspect to get the current file path since __file__ is not in method scope
+            import inspect
+            current_file = inspect.getfile(self.__class__)
+            builtin_config_dir = Path(current_file).parent.parent / "scraper" / "adaptive_configs"
+            if builtin_config_dir.exists():
+                for config_file in builtin_config_dir.glob("*.json"):
+                    try:
+                        with open(config_file, 'r', encoding='utf-8') as f:
+                            config = json.load(f)
+                            if 'domain' in config:
+                                supported_domains.add(config['domain'])
+                    except (json.JSONDecodeError, IOError):
+                        continue
+
+            # Scan runtime configs in ~/.act/adaptive_configs/
+            runtime_config_dir = Path.home() / ".act" / "adaptive_configs"
+            if runtime_config_dir.exists():
+                for config_file in runtime_config_dir.glob("*.json"):
+                    try:
+                        with open(config_file, 'r', encoding='utf-8') as f:
+                            config = json.load(f)
+                            if 'domain' in config:
+                                supported_domains.add(config['domain'])
+                    except (json.JSONDecodeError, IOError):
+                        continue
+
+        except Exception as e:
+            logger.debug(f"Error scanning adaptive configs: {e}")
+
+        return list(supported_domains)
 
     def _is_suspicious_content(self, text: str) -> bool:
         """

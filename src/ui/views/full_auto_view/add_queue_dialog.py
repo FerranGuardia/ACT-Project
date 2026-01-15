@@ -350,7 +350,6 @@ class AddQueueDialog(QDialog):
                 'to': self.to_spin.value()
             }
             logger.debug(f"Selected chapter type: RANGE, from={chapter_selection['from']}, to={chapter_selection['to']}")
-        else:
         else:  # specific
             try:
                 chapters = [int(x.strip()) for x in self.specific_input.text().split(',')]

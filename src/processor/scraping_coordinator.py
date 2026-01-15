@@ -8,8 +8,8 @@ web scraping operations including URL discovery and chapter content extraction.
 from typing import List, Optional, Tuple
 from urllib.parse import urlparse
 
+from core.activity_console import ActivityCategory, get_activity_console
 from core.logger import get_logger
-from core.activity_console import get_activity_console, ActivityCategory
 from scraper import NovelScraper
 
 from .context import ProcessingContext

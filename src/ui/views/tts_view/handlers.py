@@ -17,7 +17,7 @@ from PySide6.QtCore import QUrl, QTimer
 
 from core.constants import PREVIEW_TEXT_LENGTH, TEMP_FILE_CLEANUP_DELAY_MS
 from core.logger import get_logger
-from tts import TTSEngine, VoiceManager
+from services import TTSService
 from utils.validation import validate_file_path
 
 @contextmanager
@@ -61,8 +61,7 @@ class TTSViewHandlers:
     
     def __init__(self, view: 'QWidget'):
         self.view = view
-        self.tts_engine = TTSEngine()
-        self.voice_manager = VoiceManager()
+        self.tts_service = TTSService()
         self.preview_player: Optional[Any] = None
         self.preview_audio_output: Optional[Any] = None
         self.preview_temp_file: Optional[str] = None
@@ -109,7 +108,7 @@ class TTSViewHandlers:
     def load_providers(self, provider_combo):
         """Load available providers into the combo box."""
         try:
-            providers = self.voice_manager.get_providers()
+            providers = self.tts_service.get_providers()
             if not providers:
                 logger.warning("No TTS providers available")
                 provider_combo.addItems(["No providers available"])
@@ -151,7 +150,7 @@ class TTSViewHandlers:
             
             # Load voices for the selected provider (filtered to English voices)
             logger.info(f"Loading voices for provider: {provider}")
-            voices = self.voice_manager.get_voice_list(locale="en-US", provider=provider)
+            voices = self.tts_service.get_voice_list(locale="en-US", provider=provider)
 
             if not voices:
                 logger.warning(f"No voices available for provider: {provider}")
@@ -276,7 +275,7 @@ class TTSViewHandlers:
             volume = ((volume_slider.value() - 100) / 100) * 50
             
             # Convert preview with provider
-            success = self.tts_engine.convert_text_to_speech(
+            success = self.tts_service.convert_text(
                 text=sample_text,
                 output_path=Path(temp_path),
                 voice=voice,

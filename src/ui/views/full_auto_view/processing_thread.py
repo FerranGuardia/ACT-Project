@@ -11,7 +11,7 @@ from PySide6.QtCore import QThread, Signal
 from core.logger import get_logger
 from core.activity_console import get_activity_console, ActivityCategory
 from processor.pipeline_orchestrator import ProcessingPipeline
-from processor.gap_detector import GapDetector
+from processor.gap_services import FullAutoGapService
 
 logger = get_logger("ui.full_auto_view.processing_thread")
 
@@ -88,40 +88,54 @@ class ProcessingThread(QThread):
                 logger.debug("Could not load project, skipping gap detection")
                 return []
             
-            # Create gap detector
-            gap_detector = GapDetector(
+            # Create full auto gap service
+            gap_service = FullAutoGapService(
                 project_manager=pipeline.project_manager,
                 file_manager=pipeline.file_manager
             )
-            
-            # Run gap detection
-            self.status.emit("Checking for missing chapters...")
-            logger.info(f"Running gap detection for range {start_from}-{end_chapter or 'all'}")
+
+            # Run comprehensive gap detection
+            self.status.emit("Checking for missing chapters and files...")
+            logger.info(f"Running comprehensive gap detection for range {start_from}-{end_chapter or 'all'}")
 
             # Log gap detection start
             operation_id = f"gap_check_processing_{start_from}_{end_chapter or 'all'}"
             activity_console = get_activity_console()
             activity_console.log_gap_detection_start(start_from, end_chapter, operation_id)
 
-            # The gap detector will now use activity console internally
-            gap_report = gap_detector.detect_and_report_gaps(
+            # Get comprehensive gap report (checks both text and audio files)
+            gap_report = gap_service.detect_comprehensive_gaps(
                 start_from=start_from,
-                end_chapter=end_chapter,
-                check_audio=True,  # Check for audio files
-                check_text=False   # Only check audio for now
+                end_chapter=end_chapter
             )
 
-            missing_chapters = gap_report['missing_chapters']
+            # Combine all types of gaps (text-only, audio-only, both missing)
+            missing_chapters = []
+            missing_chapters.extend(gap_report['text_only_gaps'])
+            missing_chapters.extend(gap_report['audio_only_gaps'])
+            missing_chapters.extend(gap_report['both_missing_gaps'])
+            missing_chapters = sorted(list(set(missing_chapters)))  # Remove duplicates and sort
 
             activity_console = get_activity_console()
 
             if missing_chapters:
+                gap_types = []
+                if gap_report['text_only_gaps']:
+                    gap_types.append(f"{len(gap_report['text_only_gaps'])} text-only")
+                if gap_report['audio_only_gaps']:
+                    gap_types.append(f"{len(gap_report['audio_only_gaps'])} audio-only")
+                if gap_report['both_missing_gaps']:
+                    gap_types.append(f"{len(gap_report['both_missing_gaps'])} complete")
+
+                gap_summary = ", ".join(gap_types)
+
                 logger.info(
                     f"⚠ Failsafe: Detected {len(missing_chapters)} missing chapters "
-                    f"that will be re-scraped: {missing_chapters[:10]}{'...' if len(missing_chapters) > 10 else ''}"
+                    f"({gap_summary}) that will be re-processed: "
+                    f"{missing_chapters[:10]}{'...' if len(missing_chapters) > 10 else ''}"
                 )
                 self.status.emit(
-                    f"Found {len(missing_chapters)} missing chapters - will re-scrape"
+                    f"Found {len(missing_chapters)} missing chapters - will re-process"
                 )
 
                 # Log gap resolution start

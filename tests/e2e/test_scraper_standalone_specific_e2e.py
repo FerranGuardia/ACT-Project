@@ -73,7 +73,7 @@ def test_scraper_specific_chapters_1_60_75_fanmtl_e2e(tmp_path):
 
             # Create filename
             chapter_num = chapter_selection['chapters'][i]
-            filename = f"Chapter_{chapter_num:03d}.txt"
+            filename = f"chapter_{chapter_num:04d}.txt"
             file_path = output_dir / filename
 
             # Write content to file
@@ -151,7 +151,7 @@ def test_scraper_specific_chapters_validation(tmp_path):
             assert content, f"No content returned for chapter {i+1}"
 
             chapter_num = chapter_selection['chapters'][i]
-            filename = f"Chapter_{chapter_num:03d}.txt"
+            filename = f"chapter_{chapter_num:04d}.txt"
             file_path = output_dir / filename
             file_path.write_text(content, encoding='utf-8')
             text_files.append(file_path)
@@ -219,7 +219,7 @@ def test_scraper_specific_chapters_edge_cases(tmp_path):
                 continue  # Skip chapters that can't be scraped
 
             chapter_num = chapter_selection['chapters'][i]
-            filename = f"Chapter_{chapter_num:03d}.txt"
+            filename = f"chapter_{chapter_num:04d}.txt"
             file_path = output_dir / filename
             file_path.write_text(content, encoding='utf-8')
             text_files.append(file_path)

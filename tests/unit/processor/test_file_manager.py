@@ -79,29 +79,29 @@ class TestFileManager:
         """Test saving text file."""
         content = "This is test chapter content."
         file_path = file_manager.save_text_file(1, content, "Chapter 1")
-        
+
         assert file_path.exists()
         # FileManager adds "Chapter X" prefix automatically
         saved_content = file_path.read_text(encoding="utf-8")
         assert saved_content.startswith("Chapter 1")
         assert content in saved_content
-        assert file_path.name.startswith("chapter_0001")
-        assert file_path.suffix == ".txt"
+        # Always use simple filename format: chapter_XXXX.txt
+        assert file_path.name == "chapter_0001.txt"
     
     def test_save_text_file_with_title(self, file_manager):
         """Test saving text file with chapter title."""
         content = "Test content"
         title = "Chapter Title"
         file_path = file_manager.save_text_file(1, content, title)
-        
+
         # Verify file was saved with content
         assert file_path.exists()
         saved_content = file_path.read_text(encoding="utf-8")
         # FileManager adds "Chapter X" prefix automatically
         assert saved_content.startswith("Chapter 1")
         assert content in saved_content
-        assert file_path.name.startswith("chapter_0001")
-        # Title is included in filename (exact format may vary)
+        # Always use simple filename format: chapter_XXXX.txt
+        assert file_path.name == "chapter_0001.txt"
     
     def test_save_text_file_multiple_chapters(self, file_manager):
         """Test saving multiple text files."""

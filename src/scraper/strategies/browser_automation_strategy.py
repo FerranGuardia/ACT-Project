@@ -129,15 +129,20 @@ class BrowserAutomationStrategy(BaseDetectionStrategy):
                     # Wait for dynamic content to load
                     await page.wait_for_timeout(2000)
 
-                    # Try to trigger lazy loading by scrolling
+                    # Try to trigger lazy loading by scrolling OR handle pagination
                     await self._scroll_and_wait(page, should_stop)
 
-                    # Extract URLs using multiple methods
-                    urls = []
+                    # Handle traditional pagination if present
+                    paginated_urls = await self._handle_pagination(page, should_stop)
+                    if paginated_urls:
+                        urls = paginated_urls
+                    else:
+                        # Extract URLs using multiple methods from current page
+                        urls = []
 
-                    # Method 1: Extract from page content
-                    content_urls = await self._extract_from_page_content(page)
-                    urls.extend(content_urls)
+                        # Method 1: Extract from page content
+                        content_urls = await self._extract_from_page_content(page)
+                        urls.extend(content_urls)
 
                     # Method 2: Try common selectors for chapter lists
                     selector_urls = await self._extract_with_selectors(page)
@@ -337,6 +342,94 @@ class BrowserAutomationStrategy(BaseDetectionStrategy):
 
         except Exception as e:
             logger.debug(f"JavaScript extraction failed: {e}")
+
+        return []
+
+    async def _handle_pagination(self, page, should_stop: Optional[Callable[[], bool]]) -> List[str]:
+        """Handle traditional pagination by following page links."""
+        try:
+            urls = []
+
+            # Check for pagination links
+            pagination_selectors = [
+                'a[href*="page="]',  # Common pagination pattern
+                '.pagination a',     # Bootstrap-style pagination
+                'ul.pagination a',   # Bootstrap pagination
+                'nav.pagination a',  # Modern pagination
+                '.pager a',          # Alternative pagination
+                '.page-links a',     # WordPress pagination
+                'a.next',            # Next button
+                'a[rel="next"]',     # Next link
+            ]
+
+            page_links = []
+            for selector in pagination_selectors:
+                try:
+                    links = await page.query_selector_all(selector)
+                    for link in links:
+                        href = await link.get_attribute('href')
+                        text = await link.inner_text()
+                        if href and text.strip():
+                            page_links.append((href, text.strip()))
+                except Exception:
+                    continue
+
+            # Remove duplicates
+            seen_hrefs = set()
+            unique_page_links = []
+            for href, text in page_links:
+                if href not in seen_hrefs:
+                    seen_hrefs.add(href)
+                    unique_page_links.append((href, text))
+
+            logger.debug(f"Found {len(unique_page_links)} pagination links")
+
+            # If we found pagination links, visit each page
+            if unique_page_links:
+                # Extract from current page first
+                current_urls = await self._extract_from_page_content(page)
+                urls.extend(current_urls)
+
+                # Visit each pagination page
+                for href, text in unique_page_links:
+                    if should_stop and should_stop():
+                        break
+
+                    try:
+                        # Skip non-numeric page links (like "Next", "Prev", etc.)
+                        if not any(char.isdigit() for char in text):
+                            continue
+
+                        full_url = self._normalize_url(href)
+                        if not self._is_same_site(full_url):
+                            continue
+
+                        logger.debug(f"Visiting pagination page: {text} -> {full_url}")
+
+                        # Navigate to the page
+                        await page.goto(full_url, wait_until='networkidle')
+                        await page.wait_for_timeout(1000)
+
+                        # Extract URLs from this page
+                        page_urls = await self._extract_from_page_content(page)
+                        urls.extend(page_urls)
+
+                        # Limit to prevent excessive requests
+                        if len(urls) > 1000:  # Reasonable limit
+                            break
+
+                    except Exception as e:
+                        logger.debug(f"Failed to visit pagination page {href}: {e}")
+                        continue
+
+                # Remove duplicates
+                urls = self._deduplicate_urls(urls)
+                logger.debug(f"Collected {len(urls)} URLs from {len(unique_page_links) + 1} pages")
+
+                return urls
+
+        except Exception as e:
+            logger.debug(f"Pagination handling failed: {e}")
 
         return []
 

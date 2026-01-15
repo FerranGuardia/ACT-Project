@@ -6,26 +6,27 @@ through adaptive learning and parallel strategy execution.
 """
 
 import asyncio
+import hashlib
 import json
 import re
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set, Tuple, Any, Callable
-from urllib.parse import urljoin, urlparse, parse_qs
-import hashlib
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from urllib.parse import parse_qs, urljoin, urlparse
 
 from core.logger import get_logger
 from utils.validation import validate_url
+
+from .adaptive_config import get_adaptive_config_manager
+from .chapter_parser import extract_chapter_number, normalize_url
+from .config import (PAGINATION_CRITICAL_COUNT,
+                     PAGINATION_RANGE_COVERAGE_THRESHOLD,
+                     PAGINATION_SMALL_COUNT_THRESHOLD,
+                     PAGINATION_SUSPICIOUS_COUNTS, REQUEST_DELAY,
+                     REQUEST_TIMEOUT)
 from .extractors.url_extractor_session import SessionManager
 from .extractors.url_extractor_validators import is_chapter_url
-from .chapter_parser import extract_chapter_number, normalize_url
-from .config import (
-    REQUEST_TIMEOUT, REQUEST_DELAY,
-    PAGINATION_SUSPICIOUS_COUNTS, PAGINATION_CRITICAL_COUNT,
-    PAGINATION_SMALL_COUNT_THRESHOLD, PAGINATION_RANGE_COVERAGE_THRESHOLD
-)
-from .adaptive_config import get_adaptive_config_manager
 
 logger = get_logger("scraper.universal_detector")
 
@@ -273,10 +274,22 @@ class UniversalUrlDetector:
 
         # Final validation and pagination check
         result.urls, result.validation_score = self._validate_urls(result.urls)
-        pagination_analysis = self.pagination_detector.analyze(result.urls, min_chapter, max_chapter)
-        result.pagination_detected = pagination_analysis.is_paginated
 
-        if pagination_analysis.is_paginated:
+        # Special handling for browser automation - if it found significantly more URLs
+        # than HTML parsing would typically find, mark pagination as handled
+        is_browser_method = result.method == "browser_automation"
+        found_many_urls = len(result.urls) > 150  # More than typical single page
+
+        if is_browser_method and found_many_urls:
+            # Browser automation successfully handled pagination, so don't mark as paginated
+            result.pagination_detected = False
+            result.metadata["pagination_handled_by_browser"] = True
+            pagination_analysis = None
+        else:
+            pagination_analysis = self.pagination_detector.analyze(result.urls, min_chapter, max_chapter)
+            result.pagination_detected = pagination_analysis.is_paginated
+
+        if pagination_analysis and pagination_analysis.is_paginated:
             result.metadata["pagination_suggestion"] = pagination_analysis.suggested_action
 
         return result
@@ -355,11 +368,12 @@ class UniversalUrlDetector:
         scored_results = []
         for result in results:
             score = self._score_result(result, min_chapter, max_chapter)
-            scored_results.append((score, result))
+            url_count = len(result.urls)
+            scored_results.append((score, url_count, result))
 
-        # Return highest scoring result
-        scored_results.sort(key=lambda x: x[0], reverse=True)
-        return scored_results[0][1]
+        # Sort by score (descending), then by URL count (descending) for tie-breaking
+        scored_results.sort(key=lambda x: (x[0], x[1]), reverse=True)
+        return scored_results[0][2]
 
     def _score_result(
         self,
@@ -382,6 +396,13 @@ class UniversalUrlDetector:
 
         # Bonus for validation score
         score += result.validation_score * 0.1
+
+        # Bonus for finding more URLs (helps prefer strategies that handle pagination)
+        url_count = len(result.urls)
+        if url_count > 200:
+            score += 0.1  # Significant bonus for finding many URLs
+        elif url_count > 100:
+            score += 0.05  # Smaller bonus for moderate number of URLs
 
         return min(score, 1.0)
 
@@ -506,10 +527,11 @@ class UniversalUrlDetector:
 
 
 
+from .pagination_detector import PaginationDetector
+from .strategies.ajax_strategy import AjaxStrategy
+from .strategies.api_reverse_engineering_strategy import \
+    ApiReverseEngineeringStrategy
+from .strategies.browser_automation_strategy import BrowserAutomationStrategy
+from .strategies.html_parsing_strategy import HtmlParsingStrategy
 # Import strategies at the end to avoid circular imports
 from .strategies.javascript_strategy import JavaScriptStrategy
-from .strategies.ajax_strategy import AjaxStrategy
-from .strategies.html_parsing_strategy import HtmlParsingStrategy
-from .strategies.browser_automation_strategy import BrowserAutomationStrategy
-from .strategies.api_reverse_engineering_strategy import ApiReverseEngineeringStrategy
-from .pagination_detector import PaginationDetector

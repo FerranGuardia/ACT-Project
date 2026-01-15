@@ -6,7 +6,7 @@ saving processing summaries, metadata, and file location information.
 """
 
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 from core.logger import get_logger
 

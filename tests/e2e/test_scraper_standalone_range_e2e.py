@@ -77,7 +77,7 @@ def test_scraper_range_50_to_1000_fanmtl_e2e(tmp_path):
             from scraper.chapter_parser import extract_chapter_number
             chapter_num = extract_chapter_number(chapter_url) or (50 + i)
 
-            filename = f"Chapter_{chapter_num:03d}.txt"
+            filename = f"chapter_{chapter_num:04d}.txt"
             file_path = output_dir / filename
 
             # Write content to file
@@ -153,7 +153,7 @@ def test_scraper_range_boundary_conditions(tmp_path):
             from scraper.chapter_parser import extract_chapter_number
             chapter_num = extract_chapter_number(chapter_url) or (200 + i)
 
-            filename = f"Chapter_{chapter_num:03d}.txt"
+            filename = f"chapter_{chapter_num:04d}.txt"
             file_path = output_dir / filename
             file_path.write_text(content, encoding='utf-8')
             text_files.append(file_path)
@@ -215,7 +215,7 @@ def test_scraper_range_small_window(tmp_path):
             from scraper.chapter_parser import extract_chapter_number
             chapter_num = extract_chapter_number(chapter_url) or (10 + i)
 
-            filename = f"Chapter_{chapter_num:03d}.txt"
+            filename = f"chapter_{chapter_num:04d}.txt"
             file_path = output_dir / filename
             file_path.write_text(content, encoding='utf-8')
             text_files.append(file_path)

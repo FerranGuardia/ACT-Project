@@ -95,7 +95,7 @@ def test_scraper_all_chapters_fanmtl_e2e(tmp_path):
         from scraper.chapter_parser import extract_chapter_number
         chapter_num = extract_chapter_number(chapter_url) or (i + 1)
 
-        filename = f"Chapter_{chapter_num:03d}.txt"
+        filename = f"chapter_{chapter_num:04d}.txt"
         file_path = output_dir / filename
 
         # Write content to file
@@ -185,7 +185,7 @@ def test_scraper_all_chapters_structure_validation(tmp_path):
             from scraper.chapter_parser import extract_chapter_number
             chapter_num = extract_chapter_number(chapter_url) or (i + 1)
 
-            filename = f"Chapter_{chapter_num:03d}.txt"
+            filename = f"chapter_{chapter_num:04d}.txt"
             file_path = output_dir / filename
             file_path.write_text(content, encoding='utf-8')
             text_files.append(file_path)

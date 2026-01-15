@@ -135,9 +135,9 @@ class BaseScraper(ABC):
         """
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Generate filename
+        # Generate filename - use simple format for consistency
         if chapter_num is not None:
-            filename = f"Chapter_{chapter_num:04d}_{title}.txt"
+            filename = f"chapter_{chapter_num:04d}.txt"
         else:
             filename = f"{title}.txt"
 

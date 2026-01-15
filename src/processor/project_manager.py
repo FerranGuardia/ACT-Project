@@ -161,9 +161,14 @@ class ProjectManager:
             # Load project metadata
             self.metadata = data.get("metadata", {})
 
-            # Load chapter manager
+            # Load chapter manager with error handling
             chapters_data = data.get("chapters", {})
-            self.chapter_manager = ChapterManager.from_dict(chapters_data)
+            try:
+                self.chapter_manager = ChapterManager.from_dict(chapters_data)
+            except Exception as e:
+                logger.error(f"Failed to load chapter manager: {e}")
+                logger.warning("Creating empty chapter manager due to corrupted data")
+                self.chapter_manager = ChapterManager()
 
             logger.info(f"Loaded project: {self.project_name}")
             logger.debug(f"Project has {self.chapter_manager.get_total_count()} chapters")

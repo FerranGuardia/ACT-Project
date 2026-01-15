@@ -139,12 +139,8 @@ class FileManager:
         Returns:
             Path to saved file
         """
-        # Create filename
-        if title:
-            safe_title = self._sanitize_filename(title)
-            filename = f"chapter_{chapter_num:04d}_{safe_title}.txt"
-        else:
-            filename = f"chapter_{chapter_num:04d}.txt"
+        # Create filename - always use simple format for consistency
+        filename = f"chapter_{chapter_num:04d}.txt"
         
         file_path = self.text_dir / filename
         

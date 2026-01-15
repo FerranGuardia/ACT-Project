@@ -5,12 +5,11 @@ Scraping Thread - Handles background scraping operations.
 import os
 from threading import Event
 from typing import Dict, List
-from urllib.parse import urlparse
 
 from PySide6.QtCore import QThread, Signal
 
 from core.logger import get_logger
-from scraper import GenericScraper
+from services import ScrapeService
 from utils.validation import validate_directory_path, validate_url
 
 logger = get_logger("ui.scraper_view.scraping_thread")
@@ -24,16 +23,33 @@ class ScrapingThread(QThread):
     finished = Signal(bool, str)  # Success, message
     file_created = Signal(str)  # File path
     
-    def __init__(self, url: str, chapter_selection: dict, output_dir: str, file_format: str):
+    def __init__(self, url: str, chapter_selection: dict, output_dir: str, file_format: str, novel_title: str = None):
         super().__init__()
         self.url = url
         self.chapter_selection = chapter_selection
         self.output_dir = output_dir
         self.file_format = file_format
+        self.novel_title = novel_title or self._extract_novel_title_from_url(url)
         self.should_stop = Event()  # Thread-safe stop flag
         self.pause_event = Event()  # Thread-safe pause flag
         self.pause_event.set()  # Initially, not paused
         self._is_paused = False
+
+    def _extract_novel_title_from_url(self, url: str) -> str:
+        """Extract a reasonable novel title from the URL."""
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        # Extract domain and path to create a title
+        domain = parsed.netloc.replace('www.', '').replace('.com', '').replace('.net', '')
+        path_parts = [p for p in parsed.path.split('/') if p and not p.isdigit()]
+        if path_parts:
+            title = f"{domain}_{path_parts[0]}"
+        else:
+            title = domain
+        # Sanitize for filesystem
+        import re
+        title = re.sub(r'[^\w\-_]', '_', title)
+        return title[:50]  # Limit length
 
     @property
     def is_paused(self) -> bool:
@@ -83,23 +99,19 @@ class ScrapingThread(QThread):
                 fmt = ".txt"
             self.file_format = fmt
 
-            # Initialize scraper with base URL (not full TOC URL)
-            parsed = urlparse(clean_url)
-            base_url = f"{parsed.scheme}://{parsed.netloc}"
-
             self.status.emit("Initializing scraper...")
-            scraper = GenericScraper(base_url)
+            scrape_service = ScrapeService()
             
             # Get chapter URLs
             self.status.emit("Fetching chapter URLs...")
-            chapter_urls = scraper.get_chapter_urls(clean_url)
+            chapter_urls = scrape_service.get_chapter_urls(clean_url)
             
             if not chapter_urls:
                 self.finished.emit(False, "No chapters found")
                 return
             
             # Filter chapters based on selection
-            selected_urls = self._filter_chapters(chapter_urls)
+            selected_urls = scrape_service.filter_chapter_urls(chapter_urls, self.chapter_selection)
             total = len(selected_urls)
             
             if total == 0:
@@ -107,9 +119,13 @@ class ScrapingThread(QThread):
                 return
             
             self.status.emit(f"Scraping {total} chapters...")
-            
-            # Create output directory
-            os.makedirs(safe_output_dir, exist_ok=True)
+
+            # Create project folder structure (same as full auto view)
+            project_dir = os.path.join(safe_output_dir, self.novel_title)
+            scraps_dir = os.path.join(project_dir, f"{self.novel_title}_scraps")
+
+            os.makedirs(scraps_dir, exist_ok=True)
+            self.status.emit(f"Created project folder: {self.novel_title}")
             
             # Scrape each chapter
             for idx, chapter_url in enumerate(selected_urls):
@@ -127,14 +143,14 @@ class ScrapingThread(QThread):
                 
                 try:
                     self.status.emit(f"Scraping chapter {idx + 1}/{total}...")
-                    content, _, error_msg = scraper.scrape_chapter(chapter_url)
+                    content, _, error_msg = scrape_service.scrape_chapter(chapter_url)
                     
                     if content:
-                        # Save chapter
+                        # Save chapter to scraps directory (same as full auto view)
                         chapter_num = idx + 1
                         filename = f"chapter_{chapter_num:04d}{self.file_format}"
-                        filepath = os.path.join(safe_output_dir, filename)
-                        
+                        filepath = os.path.join(scraps_dir, filename)
+
                         with open(filepath, 'w', encoding='utf-8') as f:
                             f.write(content)
                         
@@ -159,22 +175,5 @@ class ScrapingThread(QThread):
             logger.error(f"Scraping error: {e}")
             self.finished.emit(False, f"Error: {str(e)}")
     
-    def _filter_chapters(self, chapter_urls: List[str]) -> List[str]:
-        """Filter chapters based on selection criteria."""
-        selection_type = self.chapter_selection.get('type')
-        
-        if selection_type == 'all':
-            return chapter_urls
-        elif selection_type == 'range':
-            # Support both legacy keys ('from'/'to') and normalized keys ('start'/'end')
-            start_raw = self.chapter_selection.get('from', self.chapter_selection.get('start', 1))
-            end_raw = self.chapter_selection.get('to', self.chapter_selection.get('end', len(chapter_urls)))
-            start = int(start_raw) - 1 if start_raw else 0
-            end = int(end_raw) if end_raw else len(chapter_urls)
-            return chapter_urls[start:end]
-        elif selection_type in ('specific', 'list'):
-            indices = self.chapter_selection.get('chapters', self.chapter_selection.get('indices', []))
-            return [chapter_urls[i - 1] for i in indices if 1 <= i <= len(chapter_urls)]
-        
-        return chapter_urls
+    # Filtering logic is now owned by ScrapeService for consistency.
 
