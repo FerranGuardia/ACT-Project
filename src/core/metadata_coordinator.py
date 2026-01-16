@@ -191,6 +191,35 @@ class MetadataCoordinator:
         # Convert to lowercase for case-insensitive matching
         return normalized.lower()
 
+    def _is_likely_test_url(self, url: str) -> bool:
+        """Check if URL appears to be test/example data."""
+        if not url or not isinstance(url, str):
+            return False
+
+        url_lower = url.lower()
+
+        # Common test URL patterns
+        test_indicators = [
+            'example.com',
+            'test.com',
+            'localhost',
+            '127.0.0.1',
+            'test-debug',
+            'test-single',
+            'test-fix',
+            'test-queue',
+            'test-cross',
+            'test-concurrent',
+            'test-persistence',
+            'test-search',
+            'invalid-url',
+            'mock',
+            'fake',
+            'dummy'
+        ]
+
+        return any(indicator in url_lower for indicator in test_indicators)
+
     @contextmanager
     def _transaction_context(self):
         """Context manager for atomic metadata operations."""
@@ -303,6 +332,20 @@ class MetadataCoordinator:
         Returns:
             True if successful, False otherwise
         """
+        # Warn about potential test data contamination in production
+        if self._is_likely_test_url(url):
+            # Check if we're in a test environment by looking at the metadata directory
+            import os
+            is_test_env = (
+                "pytest" in os.environ.get("_", "").lower() or
+                "test" in str(self._metadata_file).lower() or
+                "tmp" in str(self._metadata_file).lower() or
+                "temp" in str(self._metadata_file).lower()
+            )
+            if not is_test_env:
+                logger.warning(f"Potential test data contamination detected. "
+                              f"Test/example URL '{url}' being saved to production metadata at {self._metadata_file}")
+
         try:
             with self._transaction_context():
                 normalized_url = self._normalize_url(url)

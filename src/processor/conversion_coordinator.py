@@ -5,18 +5,17 @@ This module contains the ConversionCoordinator class that handles all
 TTS conversion operations and file management tasks.
 """
 
-from pathlib import Path
-from typing import Optional, Callable
-
 import os
+from pathlib import Path
+from typing import Callable, Optional
 
 from core.logger import get_logger
 from tts import TTSEngine
 
-from .project_manager import ProjectManager
+from .context import ProcessingContext
 from .file_manager import FileManager
 from .progress_tracker import ProcessingStatus
-from .context import ProcessingContext
+from .project_manager import ProjectManager
 
 logger = get_logger("processor.conversion_coordinator")
 

@@ -11,8 +11,8 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from .constants import MAX_LOG_FILE_SIZE_MB, ERROR_LOG_FILE_SIZE_MB, LOG_BACKUP_COUNT, ERROR_LOG_BACKUP_COUNT
-
+from .constants import (ERROR_LOG_BACKUP_COUNT, ERROR_LOG_FILE_SIZE_MB,
+                        LOG_BACKUP_COUNT, MAX_LOG_FILE_SIZE_MB)
 
 __all__ = ["ACTLogger", "get_logger"]
 
@@ -52,9 +52,9 @@ class ACTLogger:
         root_logger.setLevel(logging.DEBUG)
         root_logger.handlers.clear()  # Remove any existing handlers
 
-        # Console handler - DEBUG level and above by default for detailed pipeline logging
+        # Console handler - INFO level and above (will be upgraded to DEBUG if verbose mode)
         console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(logging.DEBUG)
+        console_handler.setLevel(logging.DEBUG if self._verbose_mode else logging.INFO)
         console_format = logging.Formatter(
             "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",

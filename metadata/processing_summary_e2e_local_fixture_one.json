@@ -1,0 +1,5 @@
+{
+  "processing_summary": "ProcessingSummary(timestamp='2026-01-16T12:40:46.836187', novel_title='e2e_local_fixture_one', novel_url=None, total_chapters=1, completed_chapters=1, failed_chapters=0, success_rate='100.0%', processing_time=None, output_format=None, total_completed_in_project=0)",
+  "file_locations": "FileLocations(project_metadata='C:\\\\Users\\\\Nitropc\\\\Documents\\\\ACT\\\\projects\\\\e2e_local_fixture_one\\\\project.json', scraped_text_dir='C:\\\\Users\\\\Nitropc\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-Nitropc\\\\pytest-772\\\\test_local_fixture_full_pipeli0\\\\e2e_local_fixture_one\\\\e2e_local_fixture_one_scraps', audio_output_dir='C:\\\\Users\\\\Nitropc\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-Nitropc\\\\pytest-772\\\\test_local_fixture_full_pipeli0\\\\e2e_local_fixture_one\\\\e2e_local_fixture_one_audio', metadata_dir='metadata')",
+  "chapters_processed": []
+}

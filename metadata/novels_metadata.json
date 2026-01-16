@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "last_updated": "2026-01-16T07:56:40.211095",
+  "last_updated": "2026-01-16T12:40:50.325326",
   "novels": {
     "https://novelfull.net/in-different-world-with-naruto-system.html": {
       "url": "https://novelfull.net/in-different-world-with-naruto-system.html",
@@ -8,76 +8,6 @@
       "updated_at": "2026-01-13T02:11:13.429127",
       "title": "in-different-world-with-naruto-system.html",
       "novel_url": "https://novelfull.net/in-different-world-with-naruto-system.html"
-    },
-    "https://example.com/toc": {
-      "url": "https://example.com/toc",
-      "created_at": "2026-01-13T08:55:05.806700",
-      "updated_at": "2026-01-15T22:19:33.531671",
-      "title": "Test Novel",
-      "author": "Test Author"
-    },
-    "https://example.com/novel": {
-      "url": "https://example.com/novel",
-      "created_at": "2026-01-13T08:55:06.254403",
-      "updated_at": "2026-01-15T22:10:33.752714",
-      "title": "Test Novel",
-      "author": "Test Author",
-      "novel_url": "https://example.com/novel"
-    },
-    "https://example.com/novel1": {
-      "url": "https://example.com/novel1",
-      "created_at": "2026-01-13T08:55:06.507190",
-      "updated_at": "2026-01-15T22:11:22.711988",
-      "title": "Novel One",
-      "author": "Test Author",
-      "chapters": 42
-    },
-    "https://example.com/novel2": {
-      "url": "https://example.com/novel2",
-      "created_at": "2026-01-13T08:55:06.510106",
-      "updated_at": "2026-01-15T22:11:22.723563",
-      "title": "Novel Two"
-    },
-    "https://example.com/minimal": {
-      "url": "https://example.com/minimal",
-      "created_at": "2026-01-13T08:55:06.581124",
-      "updated_at": "2026-01-15T16:50:32.135768",
-      "title": "Minimal Item"
-    },
-    "https://example.com/test-novel": {
-      "url": "https://example.com/test-novel",
-      "created_at": "2026-01-13T12:05:34.120401",
-      "updated_at": "2026-01-15T22:19:20.703235",
-      "title": "Test Novel",
-      "author": "Test Author",
-      "chapters": 50,
-      "novel_url": "https://example.com/test-novel"
-    },
-    "https://example.com/another-test": {
-      "url": "https://example.com/another-test",
-      "created_at": "2026-01-13T12:05:49.074917",
-      "updated_at": "2026-01-13T12:05:49.074917",
-      "title": "Test"
-    },
-    "https://test.com/novel": {
-      "url": "https://test.com/novel",
-      "created_at": "2026-01-13T12:08:06.887913",
-      "updated_at": "2026-01-13T12:08:06.887913",
-      "title": "Test Novel",
-      "author": "Test Author"
-    },
-    "https://test.com/novel1": {
-      "url": "https://test.com/novel1",
-      "created_at": "2026-01-13T12:08:39.442845",
-      "updated_at": "2026-01-13T12:08:39.442845",
-      "title": "Test Novel",
-      "author": "Test Author"
-    },
-    "https://test.com/novel2": {
-      "url": "https://test.com/novel2",
-      "created_at": "2026-01-13T12:08:39.453729",
-      "updated_at": "2026-01-13T12:08:39.453729",
-      "title": "Another Novel"
     },
     "https://novelfull.net/i-alone-level-up.html": {
       "url": "https://novelfull.net/i-alone-level-up.html",
@@ -88,113 +18,6 @@
       "last_processed": "2024-01-01T00:00:00",
       "output_folder": "C:/Test/Output",
       "total_chapters": 50
-    },
-    "https://test-debug.example.com/novel": {
-      "url": "https://test-debug.example.com/novel",
-      "created_at": "2026-01-13T12:14:28.201700",
-      "updated_at": "2026-01-13T12:14:37.730582",
-      "title": "Test Novel",
-      "author": "Test Author",
-      "chapters": 42
-    },
-    "https://test-debug2.example.com/novel": {
-      "url": "https://test-debug2.example.com/novel",
-      "created_at": "2026-01-13T12:14:54.744016",
-      "updated_at": "2026-01-13T12:14:54.744016",
-      "title": "Test Novel",
-      "author": "Test Author",
-      "chapters": 42
-    },
-    "https://test-debug-final.example.com/novel": {
-      "url": "https://test-debug-final.example.com/novel",
-      "created_at": "2026-01-13T12:16:06.523472",
-      "updated_at": "2026-01-13T12:16:06.523472",
-      "title": "Test Novel",
-      "author": "Test Author"
-    },
-    "https://test-debug-final2.example.com/novel": {
-      "url": "https://test-debug-final2.example.com/novel",
-      "created_at": "2026-01-13T12:17:10.143959",
-      "updated_at": "2026-01-13T12:17:10.143959",
-      "title": "Test Novel",
-      "author": "Test Author",
-      "chapters": 42
-    },
-    "https://test-single.example.com/novel": {
-      "url": "https://test-single.example.com/novel",
-      "created_at": "2026-01-13T12:18:43.796358",
-      "updated_at": "2026-01-13T12:18:43.796358",
-      "title": "Test Novel",
-      "author": "Test Author",
-      "chapters": 42
-    },
-    "https://test-fix1.example.com/novel1": {
-      "url": "https://test-fix1.example.com/novel1",
-      "created_at": "2026-01-13T12:19:11.482884",
-      "updated_at": "2026-01-13T12:19:11.482884",
-      "title": "Test Novel",
-      "author": "Test Author",
-      "chapters": 42
-    },
-    "https://test-fix2.example.com/novel2": {
-      "url": "https://test-fix2.example.com/novel2",
-      "created_at": "2026-01-13T12:19:11.492935",
-      "updated_at": "2026-01-13T12:19:11.492935",
-      "title": "Another Novel"
-    },
-    "https://test-queue-load.example.com/novel1": {
-      "url": "https://test-queue-load.example.com/novel1",
-      "created_at": "2026-01-13T12:19:30.225952",
-      "updated_at": "2026-01-15T10:00:35.856151",
-      "title": "Test Novel",
-      "author": "Test Author",
-      "chapters": 42,
-      "total_chapters": 50
-    },
-    "https://test-cross-queue.example.com/novel": {
-      "url": "https://test-cross-queue.example.com/novel",
-      "created_at": "2026-01-13T12:19:31.965807",
-      "updated_at": "2026-01-15T10:00:37.337234",
-      "title": "Cross Queue Novel",
-      "author": "Cross Author"
-    },
-    "https://test-concurrent-0.example.com/novel": {
-      "url": "https://test-concurrent-0.example.com/novel",
-      "created_at": "2026-01-13T13:04:40.587241",
-      "updated_at": "2026-01-13T14:09:30.652586",
-      "title": "Concurrent Novel 0"
-    },
-    "https://test-concurrent-1.example.com/novel": {
-      "url": "https://test-concurrent-1.example.com/novel",
-      "created_at": "2026-01-13T13:04:40.602872",
-      "updated_at": "2026-01-13T14:09:30.659819",
-      "title": "Concurrent Novel 1"
-    },
-    "https://test-concurrent-2.example.com/novel": {
-      "url": "https://test-concurrent-2.example.com/novel",
-      "created_at": "2026-01-13T13:04:40.602872",
-      "updated_at": "2026-01-13T14:09:30.661266",
-      "title": "Concurrent Novel 2"
-    },
-    "https://test-concurrent-4.example.com/novel": {
-      "url": "https://test-concurrent-4.example.com/novel",
-      "created_at": "2026-01-13T13:04:40.607305",
-      "updated_at": "2026-01-13T14:09:30.665814",
-      "title": "Concurrent Novel 4"
-    },
-    "https://test-concurrent-3.example.com/novel": {
-      "url": "https://test-concurrent-3.example.com/novel",
-      "created_at": "2026-01-13T13:04:40.614160",
-      "updated_at": "2026-01-13T14:09:30.664523",
-      "title": "Concurrent Novel 3"
-    },
-    "https://test-persistence.example.com/novel": {
-      "url": "https://test-persistence.example.com/novel",
-      "created_at": "2026-01-13T13:04:45.832247",
-      "updated_at": "2026-01-13T14:09:34.074781",
-      "title": "Persistence Novel",
-      "author": "Persistence Author",
-      "chapters": 20
     },
     "https://novelfull.net/versatile-mage.html": {
       "url": "https://novelfull.net/versatile-mage.html",
@@ -210,66 +33,6 @@
       "title": "Dungeon defense",
       "novel_url": "https://novelfull.net/dungeon-defense.html"
     },
-    "https://invalid-url-that-does-not-exist-12345.com/novel": {
-      "url": "https://invalid-url-that-does-not-exist-12345.com/novel",
-      "created_at": "2026-01-14T19:02:06.600461",
-      "updated_at": "2026-01-14T19:02:06.600461",
-      "novel_url": "https://invalid-url-that-does-not-exist-12345.com/novel"
-    },
-    "https://example.com/batch-test": {
-      "url": "https://example.com/batch-test",
-      "created_at": "2026-01-14T22:33:54.782768",
-      "updated_at": "2026-01-14T22:34:07.927353",
-      "title": "Batch Test Novel"
-    },
-    "https://example.com/multi-batch": {
-      "url": "https://example.com/multi-batch",
-      "created_at": "2026-01-14T22:33:56.703932",
-      "updated_at": "2026-01-14T22:33:56.703932",
-      "title": "Multi Batch Size Test"
-    },
-    "https://example.com/empty-batch": {
-      "url": "https://example.com/empty-batch",
-      "created_at": "2026-01-14T22:33:58.444408",
-      "updated_at": "2026-01-14T22:33:58.444408",
-      "title": "Empty Batch Directory Test"
-    },
-    "https://example.com/edge-cases": {
-      "url": "https://example.com/edge-cases",
-      "created_at": "2026-01-14T22:34:00.180806",
-      "updated_at": "2026-01-14T22:34:00.180806",
-      "title": "Batch Edge Cases Test"
-    },
-    "https://example.com/audio-processor-integration": {
-      "url": "https://example.com/audio-processor-integration",
-      "created_at": "2026-01-14T22:34:02.129332",
-      "updated_at": "2026-01-14T22:34:02.129332",
-      "title": "Audio Processor Integration Test"
-    },
-    "https://example.com/mock": {
-      "url": "https://example.com/mock",
-      "created_at": "2026-01-14T22:34:04.196460",
-      "updated_at": "2026-01-14T22:34:25.459532",
-      "title": "Mock Novel for Gap Detection Testing"
-    },
-    "https://example.com/test": {
-      "url": "https://example.com/test",
-      "created_at": "2026-01-14T22:34:06.052979",
-      "updated_at": "2026-01-14T22:34:27.523965",
-      "title": "Test Novel"
-    },
-    "https://example.com/empty": {
-      "url": "https://example.com/empty",
-      "created_at": "2026-01-14T22:34:29.264480",
-      "updated_at": "2026-01-15T06:47:09.109328",
-      "title": "Empty Test Novel"
-    },
-    "https://example.com/mock-toc": {
-      "url": "https://example.com/mock-toc",
-      "created_at": "2026-01-14T23:46:28.070065",
-      "updated_at": "2026-01-15T22:19:22.018039",
-      "title": "Mock Novel for No Gaps Testing"
-    },
     "https://novelfull.net/the-second-coming-of-gluttony.html": {
       "url": "https://novelfull.net/the-second-coming-of-gluttony.html",
       "created_at": "2026-01-14T23:51:00.729050",
@@ -283,93 +46,12 @@
       "novel_url": "https://novelfull.net/warlock-apprentice.html",
       "title": "Warlock Apprentice Debug Test"
     },
-    "https://novelfull.com/novel1.html": {
-      "url": "https://novelfull.com/novel1.html",
-      "created_at": "2026-01-15T07:23:46.732060",
-      "updated_at": "2026-01-15T07:23:50.412357",
-      "title": "Test Novel"
-    },
     "https://www.fanmtl.com/novel/6952926.html": {
       "url": "https://www.fanmtl.com/novel/6952926.html",
       "created_at": "2026-01-15T07:55:59.236837",
       "updated_at": "2026-01-15T12:23:10.906782",
       "title": "prosperous sand village",
       "novel_url": "https://www.fanmtl.com/novel/6952926.html"
-    },
-    "https://example.com/test-queue-load/novel1": {
-      "url": "https://example.com/test-queue-load/novel1",
-      "created_at": "2026-01-15T10:22:48.766924",
-      "updated_at": "2026-01-15T22:17:14.090992",
-      "title": "Test Novel",
-      "author": "Test Author",
-      "chapters": 42,
-      "total_chapters": 50
-    },
-    "https://example.com/test-persistence/novel": {
-      "url": "https://example.com/test-persistence/novel",
-      "created_at": "2026-01-15T10:23:27.976740",
-      "updated_at": "2026-01-15T22:17:29.240572",
-      "title": "Persistence Novel",
-      "author": "Persistence Author",
-      "chapters": 20
-    },
-    "https://example.com/test-cross-queue/novel": {
-      "url": "https://example.com/test-cross-queue/novel",
-      "created_at": "2026-01-15T10:23:58.904158",
-      "updated_at": "2026-01-15T22:17:16.198587",
-      "title": "Cross Queue Novel",
-      "author": "Cross Author"
-    },
-    "https://example.com/test-concurrent-1/novel": {
-      "url": "https://example.com/test-concurrent-1/novel",
-      "created_at": "2026-01-15T10:24:01.883475",
-      "updated_at": "2026-01-15T22:17:22.450636",
-      "title": "Concurrent Novel 1"
-    },
-    "https://example.com/test-concurrent-0/novel": {
-      "url": "https://example.com/test-concurrent-0/novel",
-      "created_at": "2026-01-15T10:24:01.887554",
-      "updated_at": "2026-01-15T22:17:22.445363",
-      "title": "Concurrent Novel 0"
-    },
-    "https://example.com/test-concurrent-2/novel": {
-      "url": "https://example.com/test-concurrent-2/novel",
-      "created_at": "2026-01-15T10:24:01.890108",
-      "updated_at": "2026-01-15T22:17:22.457858",
-      "title": "Concurrent Novel 2"
-    },
-    "https://example.com/test-concurrent-3/novel": {
-      "url": "https://example.com/test-concurrent-3/novel",
-      "created_at": "2026-01-15T10:24:01.895489",
-      "updated_at": "2026-01-15T22:17:22.454357",
-      "title": "Concurrent Novel 3"
-    },
-    "https://example.com/test-concurrent-4/novel": {
-      "url": "https://example.com/test-concurrent-4/novel",
-      "created_at": "2026-01-15T10:24:01.898185",
-      "updated_at": "2026-01-15T22:17:22.462626",
-      "title": "Concurrent Novel 4"
-    },
-    "https://example.com/test-search1/novel": {
-      "url": "https://example.com/test-search1/novel",
-      "created_at": "2026-01-15T22:17:27.469191",
-      "updated_at": "2026-01-15T22:17:27.469191",
-      "title": "Fantasy Adventure",
-      "author": "John Smith"
-    },
-    "https://example.com/test-search2/novel": {
-      "url": "https://example.com/test-search2/novel",
-      "created_at": "2026-01-15T22:17:27.471459",
-      "updated_at": "2026-01-15T22:17:27.471459",
-      "title": "Sci-Fi Journey",
-      "author": "Jane Doe"
-    },
-    "https://example.com/test-search3/novel": {
-      "url": "https://example.com/test-search3/novel",
-      "created_at": "2026-01-15T22:17:27.474548",
-      "updated_at": "2026-01-15T22:17:27.474548",
-      "title": "Mystery Novel",
-      "author": "John Smith"
     },
     "https://novelbin.me/novel-book/black-tech-internet-cafe-system": {
       "url": "https://novelbin.me/novel-book/black-tech-internet-cafe-system",
@@ -381,9 +63,64 @@
     "https://novelfull.net/black-tech-internet-cafe-system/chapter-1-super-internet-cafe-system.html": {
       "url": "https://novelfull.net/black-tech-internet-cafe-system/chapter-1-super-internet-cafe-system.html",
       "created_at": "2026-01-16T07:56:34.909386",
-      "updated_at": "2026-01-16T07:56:40.208548",
+      "updated_at": "2026-01-16T08:14:48.518434",
       "title": "Black tech internet cafe",
       "novel_url": "https://novelfull.net/black-tech-internet-cafe-system/chapter-1-super-internet-cafe-system.html"
+    },
+    "https://novelfull.net/black-tech-internet-cafe-system.html": {
+      "url": "https://novelfull.net/black-tech-internet-cafe-system.html",
+      "created_at": "2026-01-16T08:18:38.142210",
+      "updated_at": "2026-01-16T08:18:38.142210",
+      "title": "Black tech internet cafe system"
+    },
+    "http://example.com": {
+      "url": "http://example.com",
+      "created_at": "2026-01-16T10:29:13.796984",
+      "updated_at": "2026-01-16T10:29:13.796984"
+    },
+    "https://example.com/toc": {
+      "url": "https://example.com/toc",
+      "created_at": "2026-01-16T10:29:35.235806",
+      "updated_at": "2026-01-16T11:07:39.356904",
+      "title": "Test Novel"
+    },
+    "https://example.com/novel": {
+      "url": "https://example.com/novel",
+      "created_at": "2026-01-16T10:31:29.658446",
+      "updated_at": "2026-01-16T11:07:07.886716",
+      "title": "Test Novel",
+      "author": "Test Author",
+      "novel_url": "https://example.com/novel"
+    },
+    "https://example.com/novel1": {
+      "url": "https://example.com/novel1",
+      "created_at": "2026-01-16T10:32:11.192666",
+      "updated_at": "2026-01-16T11:08:10.683998",
+      "title": "Novel One"
+    },
+    "https://example.com/novel2": {
+      "url": "https://example.com/novel2",
+      "created_at": "2026-01-16T10:32:11.200078",
+      "updated_at": "2026-01-16T11:08:10.690761",
+      "title": "Novel Two"
+    },
+    "https://example.com/minimal": {
+      "url": "https://example.com/minimal",
+      "created_at": "2026-01-16T10:32:21.578360",
+      "updated_at": "2026-01-16T11:07:55.590646",
+      "title": "Minimal Item"
+    },
+    "http://127.0.0.1:49278/index.html": {
+      "url": "http://127.0.0.1:49278/index.html",
+      "created_at": "2026-01-16T12:40:27.871497",
+      "updated_at": "2026-01-16T12:40:27.871497",
+      "novel_url": "http://127.0.0.1:49278/index.html"
+    },
+    "http://127.0.0.1:60230/index.html": {
+      "url": "http://127.0.0.1:60230/index.html",
+      "created_at": "2026-01-16T12:40:50.325326",
+      "updated_at": "2026-01-16T12:40:50.325326",
+      "novel_url": "http://127.0.0.1:60230/index.html"
     }
   }
 }

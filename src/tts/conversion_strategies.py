@@ -10,18 +10,18 @@ import tempfile
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, List, Optional
 
 from core.logger import get_logger
 
+from .audio_merger import AudioMerger
 from .providers.base_provider import TTSProvider
 from .providers.provider_manager import TTSProviderManager
-from .audio_merger import AudioMerger
 from .resource_manager import TTSResourceManager
 
 if TYPE_CHECKING:
-    from .voice_resolver import VoiceResolutionResult
     from .text_processing_pipeline import ProcessedText
+    from .voice_resolver import VoiceResolutionResult
 
 logger = get_logger("tts.conversion_strategies")
 
@@ -330,9 +330,14 @@ class ChunkedConversionStrategy(ConversionStrategy):
 class ConversionStrategySelector:
     """Selects the appropriate conversion strategy based on text and provider capabilities."""
 
-    def __init__(self, provider_manager: TTSProviderManager, resource_manager: Optional[TTSResourceManager] = None):
+    def __init__(
+        self,
+        provider_manager: TTSProviderManager,
+        resource_manager: TTSResourceManager | None = None,
+    ):
         self.provider_manager = provider_manager
-        self.resource_manager = resource_manager
+        # Keep backward compatible default while allowing coordinator to pass a shared manager.
+        self.resource_manager = resource_manager or TTSResourceManager()
 
     def select_strategy(
         self,
@@ -351,33 +356,22 @@ class ConversionStrategySelector:
         """
         provider = voice_resolution.provider
 
-        # Use shared resource manager or create new one
-        resource_manager = self.resource_manager or TTSResourceManager()
-
         # Check if provider supports chunking
         if not provider.supports_chunking():
             logger.debug("Provider does not support chunking, using direct conversion")
-            return DirectConversionStrategy(self.provider_manager, resource_manager)
+            return DirectConversionStrategy(self.provider_manager, self.resource_manager)
 
         # Check text size limits
         max_bytes = provider.get_max_text_bytes()
-        logger.debug(f"Provider max bytes: {max_bytes}")
-
         if not max_bytes:
             logger.debug("Provider has no byte limit, using direct conversion")
-            return DirectConversionStrategy(self.provider_manager, resource_manager)
+            return DirectConversionStrategy(self.provider_manager, self.resource_manager)
 
         text_bytes_size = len(processed_text.enhanced.encode('utf-8'))
-        logger.info(f"Text size: {text_bytes_size} bytes, limit: {max_bytes} bytes")
 
-        # Force chunking for extremely large texts (> 50KB) to prevent timeouts
-        FORCE_CHUNKING_THRESHOLD = 50000  # 50KB
-        should_chunk = text_bytes_size > max_bytes or text_bytes_size > FORCE_CHUNKING_THRESHOLD
-
-        if should_chunk:
-            reason = "exceeds provider limit" if text_bytes_size > max_bytes else "exceeds safety threshold"
-            logger.info(f"Text {reason} ({text_bytes_size} bytes), using chunking...")
-            return ChunkedConversionStrategy(self.provider_manager, resource_manager)
+        if text_bytes_size > max_bytes:
+            logger.info(f"Text exceeds {max_bytes} bytes ({text_bytes_size} bytes), using chunking...")
+            return ChunkedConversionStrategy(self.provider_manager, self.resource_manager)
         else:
             logger.debug(f"Text within limits ({text_bytes_size} bytes), using direct conversion")
-            return DirectConversionStrategy(self.provider_manager, resource_manager)
+            return DirectConversionStrategy(self.provider_manager, self.resource_manager)

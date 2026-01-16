@@ -7,10 +7,11 @@ Manages application settings, user preferences, and project configurations.
 
 import json
 from pathlib import Path
-from typing import Any, Dict, Optional, cast, List, Callable
+from typing import Any, Dict, Optional, cast
 
-from .constants import get_version, DEFAULT_AUDIO_BITRATE, DEFAULT_AUDIO_FORMAT
 from core.logger import get_logger
+
+from .constants import DEFAULT_AUDIO_BITRATE, DEFAULT_AUDIO_FORMAT, get_version
 
 logger = get_logger("core.config_manager")
 
@@ -39,7 +40,6 @@ class ConfigManager:
         self.config_file = self.config_dir / "config.json"
         self._config: Dict[str, Any] = {}
         self._default_config = self._get_default_config()
-        self._change_listeners: List[Callable[[str, Any], None]] = []
 
         self.load_config()
 
@@ -77,13 +77,6 @@ class ConfigManager:
         if is_test_env:
             temp_base = Path(tempfile.gettempdir()) / "act_test"
             temp_base.mkdir(exist_ok=True)
-            output_dir = str(temp_base / "output")
-            scraped_dir = str(temp_base / "scraped")
-            projects_dir = str(temp_base / "projects")
-        else:
-            output_dir = str(Path.home() / "Documents" / "ACT" / "output")
-            scraped_dir = str(Path.home() / "Documents" / "ACT" / "scraped")
-            projects_dir = str(Path.home() / "Documents" / "ACT" / "projects")
 
         return {
             "app": {
@@ -91,9 +84,9 @@ class ConfigManager:
                 "language": "en",
             },
             "paths": {
-                "output_dir": output_dir,
-                "scraped_dir": scraped_dir,
-                "projects_dir": projects_dir,
+                "output_dir": str(temp_base / "output") if is_test_env else str(Path.home() / "Documents" / "ACT" / "output"),
+                "scraped_dir": str(temp_base / "scraped") if is_test_env else str(Path.home() / "Documents" / "ACT" / "scraped"),
+                "projects_dir": str(temp_base / "projects") if is_test_env else str(Path.home() / "Documents" / "ACT" / "projects"),
             },
             "tts": {
                 "voice": "en-US-AndrewNeural",
@@ -254,27 +247,19 @@ class ConfigManager:
         }
         return defaults.get(key, str(Path.home() / "Documents" / "ACT"))
 
-    def set(self, key: str, value: Any, save: bool = True) -> bool:
+    def set(self, key: str, value: Any, save: bool = True) -> None:
         """
-        Set a configuration value using dot notation with validation.
+        Set a configuration value using dot notation.
 
         Args:
             key: Configuration key (e.g., 'tts.voice')
             value: Value to set
             save: Whether to save to file immediately
 
-        Returns:
-            True if the value was set successfully, False if validation failed
-
         Example:
             >>> config = ConfigManager()
             >>> config.set('tts.voice', 'en-US-AndrewNeural')
         """
-        # Validate the value
-        if not self._validate_config_value(key, value):
-            logger.warning(f"Config validation failed for key '{key}' with value '{value}'")
-            return False
-
         keys = key.split(".")
         config = self._config
 
@@ -287,133 +272,10 @@ class ConfigManager:
         # Set the value
         config[keys[-1]] = value
 
-        # Notify change listeners
-        self._notify_change_listeners(key, value)
-
         if save:
             self.save_config()
 
         logger.debug(f"Config key '{key}' set to {value}")
-        return True
-
-    def _validate_config_value(self, key: str, value: Any) -> bool:
-        """
-        Validate a configuration value.
-
-        Args:
-            key: Configuration key
-            value: Value to validate
-
-        Returns:
-            True if valid, False otherwise
-        """
-        # TTS voice validation
-        if key == 'tts.voice':
-            if not isinstance(value, str) or not value.strip():
-                return False
-            # Validate voice format - should match Azure TTS voice format (e.g., en-US-AriaNeural)
-            import re
-            if not re.match(r'^[a-z]{2}-[A-Z]{2}-[A-Za-z]+Neural$', value):
-                return False
-
-        # Processing validations
-        elif key == 'processing.max_retries':
-            if not isinstance(value, (int, str)):
-                return False
-            try:
-                int_val = int(value)
-                if int_val < 0 or int_val > 20:  # Reasonable limits
-                    return False
-            except ValueError:
-                return False
-
-        elif key == 'processing.circuit_breaker_threshold':
-            if not isinstance(value, (int, str)):
-                return False
-            try:
-                int_val = int(value)
-                if int_val < 1 or int_val > 100:  # Reasonable limits
-                    return False
-            except ValueError:
-                return False
-
-        elif key == 'processing.max_concurrent_downloads':
-            if not isinstance(value, (int, str)):
-                return False
-            try:
-                int_val = int(value)
-                if int_val < 1 or int_val > 10:  # Reasonable limits
-                    return False
-            except ValueError:
-                return False
-
-        # UI validations
-        elif key == 'ui.theme':
-            if not isinstance(value, str) or value.lower() not in ['light', 'dark', 'system']:
-                return False
-
-        elif key == 'ui.font_scale':
-            if not isinstance(value, (int, float)):
-                return False
-            if not 0.5 <= float(value) <= 3.0:  # Reasonable scale range
-                return False
-
-        elif key == 'ui.window_width' or key == 'ui.window_height':
-            if not isinstance(value, (int, str)):
-                return False
-            try:
-                int_val = int(value)
-                if int_val < 200 or int_val > 3000:  # Reasonable pixel limits
-                    return False
-            except ValueError:
-                return False
-
-        # File configuration validations
-        elif key == 'files.max_file_size_mb':
-            if not isinstance(value, (int, str)):
-                return False
-            try:
-                int_val = int(value)
-                if int_val < 1 or int_val > 1000:  # Reasonable MB limits
-                    return False
-            except ValueError:
-                return False
-
-        # Network validations
-        elif key == 'network.request_timeout':
-            if not isinstance(value, (int, str)):
-                return False
-            try:
-                int_val = int(value)
-                if int_val < 1 or int_val > 300:  # Reasonable timeout seconds
-                    return False
-            except ValueError:
-                return False
-
-        elif key == 'network.max_redirects':
-            if not isinstance(value, (int, str)):
-                return False
-            try:
-                int_val = int(value)
-                if int_val < 0 or int_val > 20:  # Reasonable redirect limits
-                    return False
-            except ValueError:
-                return False
-
-        # TTS bitrate validation
-        elif key == 'tts.bitrate':
-            allowed_bitrates = ['64k', '96k', '128k', '160k', '192k', '256k', '320k']
-            if not isinstance(value, str) or value not in allowed_bitrates:
-                return False
-
-        # Path validations
-        elif key in ['paths.output_dir', 'paths.scraped_dir', 'paths.projects_dir']:
-            if not isinstance(value, str):
-                return False
-            # Additional path validation is done in get() method
-
-        # For other keys, allow any value for now
-        return True
 
     def get_all(self) -> Dict[str, Any]:
         """
@@ -447,72 +309,6 @@ class ConfigManager:
             Path to config directory
         """
         return self.config_dir
-
-    def get_int(self, key: str, default: int = 0) -> int:
-        """
-        Get a configuration value as an integer.
-
-        Args:
-            key: Configuration key
-            default: Default value if key not found or conversion fails
-
-        Returns:
-            Integer value
-        """
-        value = self.get(key, default)
-        try:
-            return int(value)
-        except (ValueError, TypeError):
-            return default
-
-    def get_str(self, key: str, default: str = "") -> str:
-        """
-        Get a configuration value as a string.
-
-        Args:
-            key: Configuration key
-            default: Default value if key not found
-
-        Returns:
-            String value
-        """
-        value = self.get(key, default)
-        return str(value) if value is not None else default
-
-    def get_bool(self, key: str, default: bool = False) -> bool:
-        """
-        Get a configuration value as a boolean.
-
-        Args:
-            key: Configuration key
-            default: Default value if key not found
-
-        Returns:
-            Boolean value
-        """
-        value = self.get(key, default)
-        if isinstance(value, bool):
-            return value
-        if isinstance(value, str):
-            return value.lower() in ('true', '1', 'yes', 'on')
-        return bool(value) if value is not None else default
-
-    def add_change_listener(self, listener: Callable[[str, Any], None]) -> None:
-        """
-        Add a change listener that gets called when configuration values change.
-
-        Args:
-            listener: A callable that takes (key, value) arguments
-        """
-        self._change_listeners.append(listener)
-
-    def _notify_change_listeners(self, key: str, value: Any) -> None:
-        """Notify all change listeners of a configuration change."""
-        for listener in self._change_listeners:
-            try:
-                listener(key, value)
-            except Exception as e:
-                logger.warning(f"Error in config change listener: {e}")
 
 
 # Convenience function
