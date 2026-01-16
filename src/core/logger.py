@@ -52,9 +52,9 @@ class ACTLogger:
         root_logger.setLevel(logging.DEBUG)
         root_logger.handlers.clear()  # Remove any existing handlers
 
-        # Console handler - INFO level and above (will be upgraded to DEBUG if verbose mode)
+        # Console handler - DEBUG level and above by default for detailed pipeline logging
         console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(logging.DEBUG if self._verbose_mode else logging.INFO)
+        console_handler.setLevel(logging.DEBUG)
         console_format = logging.Formatter(
             "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",

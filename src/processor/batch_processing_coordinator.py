@@ -7,6 +7,7 @@ all batch processing operations including incremental merging and error isolatio
 
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Callable
+import tempfile
 
 from core.logger import get_logger
 from core.activity_console import get_activity_console, ActivityCategory
@@ -15,6 +16,7 @@ from .context import ProcessingContext
 from .conversion_coordinator import ConversionCoordinator
 from .progress_tracker import ProcessingStatus
 from .scraping_coordinator import ScrapingCoordinator
+from .chapter_manager import Chapter
 
 logger = get_logger("processor.batch_processing_coordinator")
 
@@ -41,16 +43,58 @@ class BatchProcessingCoordinator:
         output_format: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Process all chapters in the project."""
-        print(f"DEBUG: BatchProcessingCoordinator.process_all_chapters called with start_from={start_from}, skip_if_exists={skip_if_exists}, output_format={output_format}")
-        logger.debug(f"BatchProcessingCoordinator.process_all_chapters called with skip_if_exists={skip_if_exists}")
+        logger.debug(f"BatchProcessingCoordinator.process_all_chapters called with start_from={start_from}, skip_if_exists={skip_if_exists}, output_format={output_format}")
+        
+        # Validate state
+        validation_result = self._validate_state()
+        if not validation_result["success"]:
+            return validation_result
+
+        logger.info("Starting chapter processing...")
+        if self.scraping_coordinator.progress_tracker:
+            self.scraping_coordinator.progress_tracker.update_status("processing", "Processing chapters")
+
+        # Prepare chapters to process
+        chapters_to_process = self._prepare_chapters_to_process(
+            start_from, max_chapters, skip_if_exists
+        )
+
+        logger.info(f"Processing {len(chapters_to_process)} chapters")
+        if ignore_errors:
+            logger.info("Error isolation enabled: will continue processing even if individual chapters fail")
+
+        # Setup batching state
+        batch_size = self._setup_batching_state(output_format)
+
+        # Execute processing loop
+        processing_result = self._execute_processing_loop(
+            chapters_to_process,
+            start_from,
+            skip_if_exists,
+            ignore_errors,
+            batch_size
+        )
+
+        # Finalize and return results
+        return self._finalize_and_report(
+            chapters_to_process,
+            processing_result
+        )
+
+    def _validate_state(self) -> Dict[str, Any]:
+        """Validate that coordinators are properly initialized."""
         if not self.scraping_coordinator.progress_tracker:
             logger.error("Progress tracker not initialized")
             return {"success": False, "error": "Progress tracker not initialized"}
+        return {"success": True}
 
-        logger.info("Starting chapter processing...")
-        self.scraping_coordinator.progress_tracker.update_status("processing", "Processing chapters")
-
-        # Get chapters to process
+    def _prepare_chapters_to_process(
+        self,
+        start_from: int,
+        max_chapters: Optional[int],
+        skip_if_exists: bool
+    ) -> List[Chapter]:
+        """Get and filter chapters to process based on skip_if_exists logic."""
         chapters_to_process = self.scraping_coordinator.get_chapters_to_process(start_from, max_chapters)
 
         # If skip_if_exists is True, find the first missing chapter and adjust
@@ -69,37 +113,42 @@ class BatchProcessingCoordinator:
                 logger.info("All chapters already processed, nothing to do")
                 chapters_to_process = []
 
-        logger.info(f"Processing {len(chapters_to_process)} chapters")
-        if ignore_errors:
-            logger.info("Error isolation enabled: will continue processing even if individual chapters fail")
+        return chapters_to_process
 
-        # Initialize batch tracking for incremental merging
+    def _setup_batching_state(
+        self,
+        output_format: Optional[Dict[str, Any]]
+    ) -> int:
+        """Initialize batch tracking state and merge any missing batches.
+        
+        Returns:
+            The batch size (0 if batching is disabled).
+        """
         batch_size = 0
-        last_batch_end = 0
+
         if output_format and output_format.get('type') == 'incremental_batches':
             batch_size = output_format.get('batch_size', 50)
             logger.info(f"Incremental batching enabled: will merge every {batch_size} chapters")
-            print(f"DEBUG: BatchProcessingCoordinator batch_size = {batch_size}")
+            logger.debug(f"BatchProcessingCoordinator batch_size = {batch_size}")
 
             # Check for and merge any missing batches before processing new chapters
             self._merge_missing_batches(batch_size)
 
-        # Process each chapter
-        completed = 0
-        failed = 0
+        return batch_size
 
-        # Default failure callback for cleanup
-        def default_failure_callback(chapter_num: int, exception: Exception):
-            """Default cleanup callback - removes temp files on failure."""
-            import tempfile
-            temp_dir = Path(tempfile.gettempdir())
-            temp_audio_path = temp_dir / f"chapter_{chapter_num}_temp.mp3"
-            if temp_audio_path.exists():
-                try:
-                    temp_audio_path.unlink()
-                    logger.debug(f"Failure callback: Cleaned up temp file for chapter {chapter_num}")
-                except Exception as cleanup_error:
-                    logger.warning(f"Failure callback: Failed to cleanup temp file: {cleanup_error}")
+    def _execute_processing_loop(
+        self,
+        chapters_to_process: List[Chapter],
+        start_from: int,
+        skip_if_exists: bool,
+        ignore_errors: bool,
+        batch_size: int
+    ) -> Dict[str, Any]:
+        """Execute the main processing loop for all chapters."""
+        processed_chapters: List[int] = []
+        failed_chapters: List[int] = []
+        skipped_chapters: List[int] = []
+        batch_results: List[Dict[str, Any]] = []
 
         for chapter in chapters_to_process:
             if self.context.check_should_stop():
@@ -112,34 +161,56 @@ class BatchProcessingCoordinator:
                 logger.info("Processing stopped by user")
                 break
 
+            # Check if chapter should be skipped
+            if self._should_skip_chapter(chapter, skip_if_exists):
+                skipped_chapters.append(chapter.number)
+                logger.debug(f"Chapter {chapter.number} skipped (already exists)")
+                continue
+
             success = self._process_single_chapter(
                 chapter,
                 skip_if_exists=skip_if_exists,
-                on_failure=default_failure_callback
+                on_failure=self._default_failure_callback
             )
+
             if success:
-                completed += 1
-                print(f"DEBUG: Chapter {chapter.number} processed successfully. completed = {completed}, batch_size = {batch_size}")
+                processed_chapters.append(chapter.number)
+                logger.debug(f"Chapter {chapter.number} processed successfully. Processed: {len(processed_chapters)}, batch_size: {batch_size}")
 
-                # Check for incremental batch merging
-                if batch_size > 0 and completed >= batch_size:
-                    # Check if we have a complete batch to merge
-                    batch_start = last_batch_end + 1
-                    batch_end = min(last_batch_end + batch_size, chapter.number)
-
-                    if batch_end - batch_start + 1 >= batch_size:
-                        # We have a complete batch, merge it
-                        print(f"DEBUG: About to merge batch {batch_start}-{batch_end}")
-                        self._merge_completed_batch(batch_start, batch_end)
-                        last_batch_end = batch_end
+                # Check for incremental batch merging using chapter number boundaries
+                if batch_size > 0:
+                    chapters_since_start = chapter.number - start_from + 1
+                    if chapters_since_start > 0 and chapters_since_start % batch_size == 0:
+                        batch_end = chapter.number
+                        batch_start = batch_end - batch_size + 1
+                        logger.debug(f"About to merge batch {batch_start}-{batch_end}")
+                        merge_success = self._merge_completed_batch(batch_start, batch_end)
+                        batch_results.append({
+                            "batch_start": batch_start,
+                            "batch_end": batch_end,
+                            "success": merge_success
+                        })
             else:
-                failed += 1
+                failed_chapters.append(chapter.number)
                 if not ignore_errors:
                     logger.warning(f"Chapter {chapter.number} failed and ignore_errors=False - stopping processing")
                     break
                 else:
                     logger.warning(f"Chapter {chapter.number} failed but continuing (ignore_errors=True)")
 
+        return {
+            "processed_chapters": processed_chapters,
+            "failed_chapters": failed_chapters,
+            "skipped_chapters": skipped_chapters,
+            "batch_results": batch_results
+        }
+
+    def _finalize_and_report(
+        self,
+        chapters_to_process: List[Chapter],
+        processing_result: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Finalize processing status and return comprehensive results."""
         # Final status
         if self.scraping_coordinator.progress_tracker:
             self.scraping_coordinator.progress_tracker.update_status("completed", "Processing completed")
@@ -148,43 +219,69 @@ class BatchProcessingCoordinator:
         if self.scraping_coordinator.progress_tracker:
             progress_percentage = self.scraping_coordinator.progress_tracker.get_progress_percentage()
 
+        processed_chapters = processing_result.get("processed_chapters", [])
+        failed_chapters = processing_result.get("failed_chapters", [])
+        skipped_chapters = processing_result.get("skipped_chapters", [])
+        batch_results = processing_result.get("batch_results", [])
+
         result: Dict[str, Any] = {
             "success": True,
             "total": len(chapters_to_process),
-            "completed": completed,
-            "failed": failed,
+            "completed": len(processed_chapters),
+            "failed": len(failed_chapters),
+            "skipped": len(skipped_chapters),
+            "processed_chapters": processed_chapters,
+            "failed_chapters": failed_chapters,
+            "skipped_chapters": skipped_chapters,
+            "batch_results": batch_results,
             "progress": progress_percentage
         }
 
-        logger.info(f"Processing complete: {completed} completed, {failed} failed")
+        logger.info(f"Processing complete: {len(processed_chapters)} completed, {len(failed_chapters)} failed, {len(skipped_chapters)} skipped")
         return result
+
+    def _should_skip_chapter(self, chapter: Chapter, skip_if_exists: bool) -> bool:
+        """Centralized logic to determine if a chapter should be skipped."""
+        if not skip_if_exists:
+            return False
+
+        if self.conversion_coordinator.file_manager.audio_file_exists(chapter.number):
+            logger.info(f"Chapter {chapter.number} already exists, skipping")
+            return True
+
+        # Log gap reprocessing
+        activity_console = get_activity_console()
+        activity_console.log_activity(
+            ActivityCategory.GAP_REPROCESS_CHAPTER,
+            f"Reprocessing missing chapter {chapter.number}",
+            details={'chapter': chapter.number}
+        )
+        return False
+
+    def _default_failure_callback(self, chapter_num: int, exception: Exception) -> None:
+        """Default cleanup callback - removes temp files on failure."""
+        temp_dir = Path(tempfile.gettempdir())
+        temp_audio_path = temp_dir / f"chapter_{chapter_num}_temp.mp3"
+        if temp_audio_path.exists():
+            try:
+                temp_audio_path.unlink()
+                logger.debug(f"Failure callback: Cleaned up temp file for chapter {chapter_num}")
+            except Exception as cleanup_error:
+                logger.warning(f"Failure callback: Failed to cleanup temp file: {cleanup_error}")
 
     def _process_single_chapter(
         self,
-        chapter,
+        chapter: Chapter,
         skip_if_exists: bool = False,
-        on_failure: Optional[Callable] = None
+        on_failure: Optional[Callable[[int, Exception], None]] = None
     ) -> bool:
         """Process a single chapter: scrape → convert → save."""
         activity_console = get_activity_console()
 
-        # Check if we should skip due to existing audio file
-        if skip_if_exists and self.conversion_coordinator.file_manager.audio_file_exists(chapter.number):
-            logger.info(f"Chapter {chapter.number} already exists, skipping")
-            return True
-
-        # Log if this is a gap reprocessing (chapter being reprocessed)
-        if skip_if_exists:
-            activity_console.log_activity(
-                ActivityCategory.GAP_REPROCESS_CHAPTER,
-                "Reprocessing missing chapter {chapter}",
-                details={'chapter': chapter.number}
-            )
-
         # Step 1: Scrape chapter content
         activity_console.log_activity(
             ActivityCategory.SCRAPE_START,
-            "Starting to scrape chapter {chapter}",
+            f"Starting to scrape chapter {chapter.number}",
             details={'chapter': chapter.number}
         )
 
@@ -213,7 +310,7 @@ class BatchProcessingCoordinator:
         # Log conversion start to activity console
         activity_console.log_activity(
             ActivityCategory.TTS_STRATEGY_SELECTED,
-            "🎯 Using {strategy} for chapter {chapter}",
+            f"🎯 Using DirectConversion for chapter {chapter.number}",
             details={'strategy': 'DirectConversion', 'chapter': chapter.number}
         )
 
@@ -238,8 +335,12 @@ class BatchProcessingCoordinator:
 
         return success
 
-    def _merge_completed_batch(self, batch_start: int, batch_end: int) -> None:
-        """Merge a completed batch of chapters into a single file."""
+    def _merge_completed_batch(self, batch_start: int, batch_end: int) -> bool:
+        """Merge a completed batch of chapters into a single file.
+        
+        Returns:
+            True if merge was successful, False otherwise.
+        """
         try:
             logger.info(f"Merging incremental batch: chapters {batch_start}-{batch_end}")
 
@@ -261,11 +362,11 @@ class BatchProcessingCoordinator:
                         logger.debug(f"Found titled audio file for chapter {chapter_num}: {matching_files[0].name}")
                     else:
                         logger.warning(f"Audio file missing for chapter {chapter_num}, skipping batch merge")
-                        return
+                        return False
 
             if not batch_files:
                 logger.warning("No audio files found for batch, skipping merge")
-                return
+                return False
 
             # Create output path for the merged batch
             project_name = self.context.novel_title or self.context.project_name
@@ -285,11 +386,14 @@ class BatchProcessingCoordinator:
 
             if audio_merger.merge_audio_chunks(batch_files, batch_path):
                 logger.info(f"✓ Successfully merged batch {batch_start}-{batch_end} into: {batch_path}")
+                return True
             else:
                 logger.error(f"Failed to merge batch {batch_start}-{batch_end}")
+                return False
 
         except Exception as e:
             logger.error(f"Error merging batch {batch_start}-{batch_end}: {e}")
+            return False
 
 
     def _merge_missing_batches(self, batch_size: int) -> None:
@@ -307,20 +411,20 @@ class BatchProcessingCoordinator:
             gap_service = GapDetectionService(self.scraping_coordinator.project_manager, self.conversion_coordinator.file_manager)
 
             batch_report = gap_service.check_batch_integrity([batch_size])
-            print(f"DEBUG: Batch report for size {batch_size}: {batch_report}")
+            logger.debug(f"Batch report for size {batch_size}: {batch_report}")
 
             if batch_report['has_gaps']:
                 missing_batches = batch_report['missing_batches']
                 logger.info(f"Found {len(missing_batches)} missing batch files, merging them now...")
-                print(f"DEBUG: Missing batches = {missing_batches}")
+                logger.debug(f"Missing batches = {missing_batches}")
 
                 for batch_start, batch_end in missing_batches:
                     logger.info(f"Merging missing batch: chapters {batch_start}-{batch_end}")
-                    print(f"DEBUG: Merging missing batch {batch_start}-{batch_end}")
+                    logger.debug(f"Merging missing batch {batch_start}-{batch_end}")
                     self._merge_completed_batch(batch_start, batch_end)
             else:
                 logger.info("No missing batch files found")
-                print("DEBUG: No missing batches found")
+                logger.debug("No missing batches found")
 
         except Exception as e:
             logger.error(f"Error checking/merging missing batches: {e}")

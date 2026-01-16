@@ -8,7 +8,7 @@ Provides proper resource management for temp files and directories.
 import shutil
 import time
 from pathlib import Path
-from typing import List, Set
+from typing import List, Set, Optional
 from contextlib import contextmanager
 
 from core.logger import get_logger
@@ -71,7 +71,7 @@ class TTSResourceManager:
         self.managed_resources.discard(resource_path)
         logger.debug(f"Unregistered resource: {resource_path}")
 
-    def cleanup_temp_files(self, file_paths: List[Path] = None) -> None:
+    def cleanup_temp_files(self, file_paths: Optional[List[Path]] = None) -> None:
         """
         Clean up temporary files.
 
@@ -90,7 +90,7 @@ class TTSResourceManager:
             except Exception as e:
                 logger.warning(f"Failed to cleanup temp file {file_path}: {e}")
 
-    def cleanup_temp_directories(self, dir_paths: List[Path] = None) -> None:
+    def cleanup_temp_directories(self, dir_paths: Optional[List[Path]] = None) -> None:
         """
         Clean up temporary directories.
 

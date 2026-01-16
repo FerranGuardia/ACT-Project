@@ -6,7 +6,7 @@ Checks both text and audio files and provides integrated gap filling
 across the entire processing pipeline.
 """
 
-from typing import List, Optional, Dict, Any, Tuple
+from typing import List, Optional, Dict, Any, Tuple, Callable
 from core.logger import get_logger
 from core.activity_console import get_activity_console, ActivityCategory
 from ..gap_detector import GapDetector
@@ -102,7 +102,7 @@ class FullAutoGapService:
 
         return gap_summary
 
-    def detect_batch_gaps(self, batch_sizes: List[int] = None) -> Dict[str, Any]:
+    def detect_batch_gaps(self, batch_sizes: Optional[List[int]] = None) -> Dict[str, Any]:
         """
         Detect missing batch files for merged audio.
 
@@ -141,7 +141,7 @@ class FullAutoGapService:
         self,
         start_from: int = 1,
         end_chapter: Optional[int] = None,
-        batch_sizes: List[int] = None
+        batch_sizes: Optional[List[int]] = None
     ) -> Dict[str, Any]:
         """
         Get comprehensive integrity report including chapter and batch gaps.
@@ -207,7 +207,7 @@ class FullAutoGapService:
         toc_url: str,
         voice: Optional[str] = None,
         provider: Optional[str] = None,
-        progress_callback: Optional[callable] = None
+        progress_callback: Optional[Callable[..., Any]] = None
     ) -> Dict[str, Any]:
         """
         Attempt to fill all detected gaps using the full pipeline.
@@ -248,6 +248,7 @@ class FullAutoGapService:
             chapters_to_process = sorted(list(set(chapters_to_process)))
 
             # Run pipeline for missing chapters
+            assert self.pipeline_service is not None, "Pipeline service should be available for gap filling"
             result = self.pipeline_service.run_full_pipeline(
                 project_name=self.project_manager.project_name,
                 toc_url=toc_url,

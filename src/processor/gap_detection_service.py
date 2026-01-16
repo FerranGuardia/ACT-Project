@@ -93,7 +93,7 @@ class GapDetectionService:
 
         return gap_report
 
-    def check_batch_integrity(self, batch_sizes: List[int] = None) -> Dict[str, Any]:
+    def check_batch_integrity(self, batch_sizes: Optional[List[int]] = None) -> Dict[str, Any]:
         """
         Check for missing batch files across multiple batch sizes.
 
@@ -126,7 +126,7 @@ class GapDetectionService:
         self,
         start_from: int = 1,
         end_chapter: Optional[int] = None,
-        batch_sizes: List[int] = None,
+        batch_sizes: Optional[List[int]] = None,
         check_audio: bool = True,
         check_text: bool = False
     ) -> Dict[str, Any]:

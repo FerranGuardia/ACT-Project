@@ -231,8 +231,8 @@ class BackwardCompatibilityAdapter:
             if progress_callback:
                 progress_callback(current, total)
             # Also update internal progress tracker if available
-            if self.progress_tracker:
-                self.progress_tracker.update_progress(current / total * 100)
+            if self.progress_tracker and self.progress_tracker.on_progress:
+                self.progress_tracker.on_progress(current / total)
 
         results = merger.merge_pending_batches(wrapped_progress, self._check_should_stop)
 

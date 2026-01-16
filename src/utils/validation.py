@@ -373,6 +373,7 @@ class InputValidator:
         Check if URL is from a known supported novel site
 
         Dynamically scans adaptive_configs directory for supported sites.
+        Uses flexible domain matching to support related domains.
 
         Args:
             url: URL to check
@@ -395,6 +396,23 @@ class InputValidator:
             for supported in supported_domains:
                 if domain == supported or domain.endswith('.' + supported):
                     return True
+
+            # Check for domain family matches (same main domain, different TLD)
+            # This allows novelbin.com if novelbin.me is configured, but not unrelated domains
+            domain_parts = domain.split('.')
+            if len(domain_parts) >= 2:
+                # Get the main domain name (e.g., 'novelbin' from 'novelbin.com')
+                main_domain_name = domain_parts[-2] if len(domain_parts) >= 2 else domain_parts[0]
+
+                for supported in supported_domains:
+                    supported_parts = supported.split('.')
+                    if len(supported_parts) >= 2:
+                        supported_main_name = supported_parts[-2] if len(supported_parts) >= 2 else supported_parts[0]
+                        # Only allow if the main domain name matches exactly
+                        if main_domain_name == supported_main_name:
+                            logger.info(f"Allowing related domain {domain} (family: {main_domain_name}) "
+                                       f"because {supported} is in the same family")
+                            return True
 
             return False
 
@@ -442,6 +460,49 @@ class InputValidator:
             logger.debug(f"Error scanning adaptive configs: {e}")
 
         return list(supported_domains)
+
+    def add_supported_domain(self, domain: str) -> None:
+        """
+        Add a domain to the supported list by creating a basic config file.
+
+        This allows the system to automatically support new domains that
+        prove successful during scraping.
+
+        Args:
+            domain: Domain name to add
+        """
+        try:
+            runtime_config_dir = Path.home() / ".act" / "adaptive_configs"
+            runtime_config_dir.mkdir(parents=True, exist_ok=True)
+
+            config_file = runtime_config_dir / f"{domain}.json"
+
+            # Create basic config if it doesn't exist
+            if not config_file.exists():
+                basic_config = {
+                    "domain": domain,
+                    "strategy_success_rates": {},
+                    "optimal_strategy_order": [],
+                    "known_patterns": {},
+                    "last_successful_strategy": None,
+                    "average_response_times": {},
+                    "total_attempts": 0,
+                    "successful_attempts": 0,
+                    "last_updated": time.time(),
+                    "custom_selectors": [],
+                    "pagination_patterns": [],
+                    "api_endpoints": []
+                }
+
+                with open(config_file, 'w', encoding='utf-8') as f:
+                    json.dump(basic_config, f, indent=2)
+
+                logger.info(f"Created basic config for new domain: {domain}")
+            else:
+                logger.debug(f"Config already exists for domain: {domain}")
+
+        except Exception as e:
+            logger.error(f"Failed to add supported domain {domain}: {e}")
 
     def _is_suspicious_content(self, text: str) -> bool:
         """

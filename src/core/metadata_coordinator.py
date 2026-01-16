@@ -438,7 +438,7 @@ class MetadataCoordinator:
                 "metadata_file": str(self._metadata_file),
                 "backup_file": str(self._backup_file),
                 "last_updated": max(
-                    (m.get("updated_at") for m in self._metadata.values() if m.get("updated_at")),
+                    [str(m.get("updated_at")) for m in self._metadata.values() if m.get("updated_at") is not None],
                     default=None
                 )
             }
