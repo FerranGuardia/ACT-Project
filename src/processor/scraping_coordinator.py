@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 
 from core.activity_console import ActivityCategory, get_activity_console
 from core.logger import get_logger
-from scraper import NovelScraper
+from scraper import GenericScraper, NovelScraper
 
 from .context import ProcessingContext
 from .progress_tracker import ProcessingStatus, ProgressTracker
@@ -187,7 +187,7 @@ class ScrapingCoordinator:
 
         if url_to_use:
             base_url = self._extract_base_url(url_to_use)
-            self.scraper = NovelScraper(base_url=base_url)
+            self.scraper = GenericScraper(base_url=base_url)
             logger.info(f"Initialized scraper with base URL: {base_url}")
             return True
         else:
@@ -212,7 +212,7 @@ class ScrapingCoordinator:
         """Initialize the scraper for the given TOC URL."""
         try:
             base_url = self._extract_base_url(toc_url)
-            self.scraper = NovelScraper(base_url=base_url)
+            self.scraper = GenericScraper(base_url=base_url)
             return True
         except Exception as e:
             logger.error(f"Failed to initialize scraper: {e}")

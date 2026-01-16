@@ -10,7 +10,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 
-from core.config_manager import get_config
+import core.config_manager as config_manager
+
+
+def get_config():
+    return config_manager.get_config()
 from core.logger import get_logger
 from core.metadata_coordinator import get_metadata_coordinator
 

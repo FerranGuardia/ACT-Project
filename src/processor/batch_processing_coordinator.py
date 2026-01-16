@@ -170,7 +170,8 @@ class BatchProcessingCoordinator:
             success = self._process_single_chapter(
                 chapter,
                 skip_if_exists=skip_if_exists,
-                on_failure=self._default_failure_callback
+                on_failure=self._default_failure_callback,
+                log_gap_reprocess=False
             )
 
             if success:
@@ -273,10 +274,23 @@ class BatchProcessingCoordinator:
         self,
         chapter: Chapter,
         skip_if_exists: bool = False,
-        on_failure: Optional[Callable[[int, Exception], None]] = None
+        on_failure: Optional[Callable[[int, Exception], None]] = None,
+        log_gap_reprocess: bool = True
     ) -> bool:
         """Process a single chapter: scrape → convert → save."""
         activity_console = get_activity_console()
+
+        # Handle skip/reprocess logic for direct calls
+        if skip_if_exists and self.conversion_coordinator.file_manager.audio_file_exists(chapter.number):
+            logger.info(f"Chapter {chapter.number} already exists, skipping")
+            return True
+
+        if skip_if_exists and log_gap_reprocess:
+            activity_console.log_activity(
+                ActivityCategory.GAP_REPROCESS_CHAPTER,
+                f"Reprocessing missing chapter {chapter.number}",
+                details={'chapter': chapter.number}
+            )
 
         # Step 1: Scrape chapter content
         activity_console.log_activity(

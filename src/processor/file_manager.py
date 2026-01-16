@@ -11,7 +11,11 @@ from typing import Optional, List
 import shutil
 
 from core.logger import get_logger
-from core.config_manager import get_config
+import core.config_manager as config_manager
+
+
+def get_config():
+    return config_manager.get_config()
 
 logger = get_logger("processor.file_manager")
 

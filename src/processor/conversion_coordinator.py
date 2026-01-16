@@ -8,8 +8,9 @@ TTS conversion operations and file management tasks.
 from pathlib import Path
 from typing import Optional, Callable
 
+import os
+
 from core.logger import get_logger
-from core.activity_console import get_activity_console, ActivityCategory
 from tts import TTSEngine
 
 from .project_manager import ProjectManager
@@ -71,20 +72,31 @@ class ConversionCoordinator:
                 return False
 
             # Step 2: Convert to audio
-            logger.info(f"Converting chapter {chapter_num} to audio (text length: {len(content)} characters)")
+            tts_content = content
+            max_chars_raw = os.environ.get("ACT_TTS_MAX_CHARS")
+            if max_chars_raw:
+                try:
+                    max_chars = int(max_chars_raw)
+                except ValueError:
+                    max_chars = 0
 
-            # Log TTS conversion start to activity console
-            activity_console = get_activity_console()
-            activity_console.log_activity(
-                ActivityCategory.TTS_STRATEGY_SELECTED,
-                "Using {strategy} for chapter {chapter}",
-                details={'strategy': 'DirectConversion', 'chapter': chapter_num}
-            )
+                if max_chars > 0 and len(tts_content) > max_chars:
+                    # Truncate on a word boundary when possible to avoid awkward cutoffs.
+                    truncated = tts_content[:max_chars]
+                    last_space = truncated.rfind(" ")
+                    if last_space > int(max_chars * 0.6):
+                        truncated = truncated[:last_space]
+                    tts_content = truncated
+                    logger.info(
+                        f"TTS text truncated for chapter {chapter_num}: {len(content)} -> {len(tts_content)} characters (ACT_TTS_MAX_CHARS={max_chars})"
+                    )
+
+            logger.info(f"Converting chapter {chapter_num} to audio (text length: {len(tts_content)} characters)")
 
             # Format text with chapter title and pauses for TTS
             from tts.tts_engine import format_chapter_intro
             chapter_title = f"Chapter {chapter_num}"
-            formatted_text = format_chapter_intro(chapter_title, content)
+            formatted_text = format_chapter_intro(chapter_title, tts_content)
 
             # Create temporary audio file path
             import tempfile
@@ -93,14 +105,6 @@ class ConversionCoordinator:
 
             # Convert to speech
             voice = self.context.voice if self.context.voice else None
-
-            # Log conversion start
-            activity_console.log_activity(
-                ActivityCategory.TTS_CONVERTING_CHUNK,
-                "Converting chapter {chapter} to audio ({chars} characters)",
-                details={'chapter': chapter_num, 'chars': len(formatted_text)}
-            )
-
             success = self.tts_engine.convert_text_to_speech(
                 text=formatted_text,
                 output_path=temp_audio_path,
@@ -108,13 +112,6 @@ class ConversionCoordinator:
                 provider=self.context.provider,
                 on_progress=on_progress
             )
-
-            if success:
-                activity_console.log_activity(
-                    ActivityCategory.TTS_COMPLETE,
-                    "Chapter {chapter} audio conversion completed",
-                    details={'chapter': chapter_num}
-                )
 
             # Check stop flag after TTS conversion
             if self.context.check_should_stop():
@@ -148,12 +145,6 @@ class ConversionCoordinator:
             logger.debug(f"Temp audio file created successfully: {temp_audio_path} ({temp_audio_path.stat().st_size} bytes)")
 
             # Step 3: Save audio file
-            activity_console.log_activity(
-                ActivityCategory.FILE_SAVING,
-                "Saving chapter {chapter} audio file",
-                details={'chapter': chapter_num}
-            )
-
             audio_file_path = self.file_manager.save_audio_file(
                 chapter_num,
                 temp_audio_path,
@@ -164,22 +155,9 @@ class ConversionCoordinator:
             if not audio_file_path.exists() or audio_file_path.stat().st_size == 0:
                 error_msg = f"Audio file not saved correctly: {audio_file_path}"
                 logger.error(error_msg)
-                activity_console.log_activity(
-                    ActivityCategory.PROCESSING_ERROR,
-                    "Failed to save audio file for chapter {chapter}",
-                    details={'chapter': chapter_num}
-                )
                 return False
 
-            file_size = audio_file_path.stat().st_size
-            logger.debug(f"Audio file saved: {audio_file_path} ({file_size} bytes)")
-
-            # Log validation success
-            activity_console.log_activity(
-                ActivityCategory.FILE_VALIDATION,
-                "Audio file validated ({size} bytes)",
-                details={'size': file_size}
-            )
+            logger.debug(f"Audio file saved: {audio_file_path} ({audio_file_path.stat().st_size} bytes)")
             chapter.audio_file_path = str(audio_file_path)
 
             # Clean up temp file

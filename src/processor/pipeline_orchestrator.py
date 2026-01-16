@@ -8,7 +8,11 @@ between specialized coordinators and maintains backward compatibility.
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from core.config_manager import get_config
+import core.config_manager as config_manager
+
+
+def get_config():
+    return config_manager.get_config()
 from core.logger import get_logger
 
 from .audio_post_processor import AudioPostProcessor

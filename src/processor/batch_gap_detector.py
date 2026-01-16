@@ -185,7 +185,11 @@ class BatchGapDetector:
 
             for batch_start, batch_end in expected_batches:
                 # Create expected batch filename
-                safe_name = self.file_manager.novel_title
+                raw_name = getattr(self.file_manager, "novel_title", None) or getattr(self.project_manager, "project_name", "project")
+                if hasattr(self.file_manager, "_sanitize_filename"):
+                    safe_name = self.file_manager._sanitize_filename(raw_name)
+                else:
+                    safe_name = str(raw_name)
 
                 batch_filename = f"{safe_name}_chapters_{batch_start:04d}-{batch_end:04d}.mp3"
                 batch_path = merged_dir / batch_filename
