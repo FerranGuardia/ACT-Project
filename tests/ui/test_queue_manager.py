@@ -30,7 +30,6 @@ with patch('PySide6.QtWidgets'), \
     from ui.ui_constants import StatusMessages
 
 
-@pytest.mark.ui
 class TestQueueManager:
     """Test cases for QueueManager functionality."""
 

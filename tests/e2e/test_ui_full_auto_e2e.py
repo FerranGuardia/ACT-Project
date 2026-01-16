@@ -5,11 +5,15 @@ Tests complete workflows from UI triggers to final audio output.
 These tests validate the full user journey through the UI components.
 """
 
+import os
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+if os.environ.get("ACT_RUN_NETWORK_E2E") != "1":
+    pytest.skip("Network E2E tests are opt-in. Set ACT_RUN_NETWORK_E2E=1 to run.", allow_module_level=True)
 
 # Add project root to path for E2E tests
 project_root = Path(__file__).parent.parent.parent

@@ -1,12 +1,16 @@
-"""
-Unit tests for NovelScraper class - input validation and error handling.
+"""Deprecated duplicate test module.
 
-Tests focus on comprehensive validation coverage including:
-- URL validation and sanitization
-- Parameter validation
-- Error handling and edge cases
-- Extractor initialization and delegation
+This file duplicated `test_novel_scraper.py` and provided no additional
+signal while increasing maintenance and runtime cost.
 """
+
+import pytest
+
+pytest.skip(
+    "Duplicate of test_novel_scraper.py; kept for history but skipped.",
+    allow_module_level=True,
+)
+
 
 from unittest.mock import MagicMock, Mock, patch
 

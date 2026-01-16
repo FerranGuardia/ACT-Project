@@ -8,12 +8,16 @@ Run from ACT project root:
     pytest tests/integration/test_full_pipeline_e2e.py -v
 """
 
+import os
 import sys
 import tempfile
 import time
 from pathlib import Path
 
 import pytest
+
+if os.environ.get("ACT_RUN_NETWORK_E2E") != "1":
+    pytest.skip("Network E2E tests are opt-in. Set ACT_RUN_NETWORK_E2E=1 to run.", allow_module_level=True)
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent

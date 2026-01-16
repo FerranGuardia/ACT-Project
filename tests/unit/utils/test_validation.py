@@ -278,7 +278,7 @@ class TestValidationIntegration:
             is_valid, result = validator.validate_url(url)
             assert is_valid, f"Real URL should be valid: {url}"
 
-    @patch('utils.validation.logger')
+    @patch('src.utils.validation.logger')
     def test_validation_logging(self, mock_logger):
         """Test that validation properly logs warnings for unsupported sites"""
         validator = get_validator()

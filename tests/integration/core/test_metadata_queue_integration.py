@@ -11,7 +11,7 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -56,9 +56,23 @@ class TestMetadataQueueIntegration:
             temp_file.unlink()
 
     @pytest.fixture
-    def metadata_coordinator(self):
-        """Get a fresh metadata coordinator instance."""
-        return get_metadata_coordinator()
+    def metadata_coordinator(self, tmp_path):
+        """Get a fresh metadata coordinator instance with temporary directory."""
+        # Mock config to use temporary directory for metadata
+        with patch('src.core.metadata_coordinator.get_config') as mock_get_config:
+            mock_config = MagicMock()
+            def config_get(key, default=None):
+                if key == "paths.metadata_dir":
+                    return str(tmp_path / "metadata")
+                return default
+            mock_config.get.side_effect = config_get
+            mock_get_config.return_value = mock_config
+
+            # Reset singleton to force new instance with temp config
+            import core.metadata_coordinator
+            core.metadata_coordinator._metadata_coordinator_instance = None
+
+            return get_metadata_coordinator()
 
     @pytest.fixture
     def queue_bridge(self):

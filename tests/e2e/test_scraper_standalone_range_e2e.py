@@ -8,12 +8,16 @@ Run from ACT project root:
     pytest tests/e2e/test_scraper_standalone_range_e2e.py -v
 """
 
+import os
 import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+if os.environ.get("ACT_RUN_NETWORK_E2E") != "1":
+    pytest.skip("Network E2E tests are opt-in. Set ACT_RUN_NETWORK_E2E=1 to run.", allow_module_level=True)
 
 # Add project root to path for E2E tests
 project_root = Path(__file__).parent.parent.parent

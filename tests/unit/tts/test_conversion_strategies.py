@@ -4,15 +4,14 @@ Unit tests for ConversionStrategies components.
 Tests DirectConversionStrategy, ChunkedConversionStrategy, and ConversionStrategySelector.
 """
 
-import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from src.tts.conversion_strategies import (
-    DirectConversionStrategy,
-    ChunkedConversionStrategy,
-    ConversionStrategySelector
-)
+import pytest
+
+from src.tts.conversion_strategies import (ChunkedConversionStrategy,
+                                           ConversionStrategySelector,
+                                           DirectConversionStrategy)
 from src.tts.providers.provider_manager import TTSProviderManager
 from src.tts.resource_manager import TTSResourceManager
 
@@ -191,6 +190,25 @@ class TestConversionStrategySelector:
         """Set up test fixtures."""
         self.provider_manager = MagicMock(spec=TTSProviderManager)
         self.selector = ConversionStrategySelector(self.provider_manager)
+
+    def test_uses_shared_resource_manager_when_provided(self):
+        """Selector should reuse the provided resource manager rather than creating new ones."""
+        shared_resource_manager = MagicMock()
+        selector = ConversionStrategySelector(self.provider_manager, shared_resource_manager)
+
+        mock_provider = MagicMock()
+        mock_provider.supports_chunking.return_value = False
+
+        processed_text = MagicMock()
+        processed_text.enhanced = "short text"
+
+        voice_resolution = MagicMock()
+        voice_resolution.provider = mock_provider
+
+        strategy = selector.select_strategy(processed_text, voice_resolution)
+
+        assert isinstance(strategy, DirectConversionStrategy)
+        assert strategy.resource_manager is shared_resource_manager
 
     def test_select_direct_for_small_text(self):
         """Test selecting direct strategy for small text."""

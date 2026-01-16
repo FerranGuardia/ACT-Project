@@ -6,7 +6,14 @@ Covers all scraping methods, fallbacks, and error handling.
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock, patch, call
+
+pytest.skip(
+    "Replaced by real-HTML scraper tests (see test_chapter_extractor_real_html.py) to better match real failure modes.",
+    allow_module_level=True,
+)
+
+from unittest.mock import MagicMock, Mock, call, patch
+
 from bs4 import BeautifulSoup
 
 from src.scraper.extractors.chapter_extractor import ChapterExtractor

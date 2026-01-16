@@ -8,11 +8,17 @@ Tests focus on:
 - Performance and reliability features
 """
 
-from unittest.mock import Mock, patch, AsyncMock
-
 import pytest
 
-from src.scraper.universal_url_detector import UniversalUrlDetector, DetectionResult
+pytest.skip(
+    "Replaced by fixture-based TOC extraction tests (test_toc_url_extraction_real_html.py) to focus on real parsing behavior.",
+    allow_module_level=True,
+)
+
+from unittest.mock import AsyncMock, Mock, patch
+
+from src.scraper.universal_url_detector import (DetectionResult,
+                                                UniversalUrlDetector)
 
 
 class TestUniversalUrlDetector:
