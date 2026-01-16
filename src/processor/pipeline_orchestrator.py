@@ -80,6 +80,18 @@ class PipelineOrchestrator:
         if not self.context.voice:
             self.context.voice = self.config.get("tts.voice", "en-US-AndrewNeural")
 
+    def cleanup_resources(self) -> None:
+        """Clean up all resources used by coordinators."""
+        try:
+            # Clean up conversion coordinator resources (TTS resource manager)
+            if hasattr(self.conversion_coordinator, 'resource_manager'):
+                logger.debug("Cleaning up TTS resource manager")
+                self.conversion_coordinator.resource_manager.cleanup_all()
+
+            logger.info("Pipeline resources cleaned up successfully")
+        except Exception as e:
+            logger.warning(f"Error during pipeline resource cleanup: {e}")
+
     # Delegate backward compatibility to adapter
     def __getattr__(self, name):
         """Delegate attribute access to backward compatibility adapter."""
@@ -133,6 +145,7 @@ class PipelineOrchestrator:
         # Step 2.5: Initialize merged directory if batch merging is enabled
         if output_format and output_format.get('type') == 'incremental_batches':
             logger.info("Batch merging enabled - ensuring merged directory exists")
+            print(f"DEBUG: PipelineOrchestrator received output_format = {output_format}")
             self.file_manager.get_merged_dir()
 
         # Step 3: Ensure scraper is initialized

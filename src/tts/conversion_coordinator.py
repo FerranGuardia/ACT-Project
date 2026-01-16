@@ -79,7 +79,8 @@ class TTSConversionCoordinator:
         self.voice_resolver = voice_resolver or VoiceResolver(self.provider_manager)
         self.text_pipeline = text_pipeline or TextProcessingPipeline()
         self.strategy_selector = strategy_selector or ConversionStrategySelector(
-            self.provider_manager
+            self.provider_manager,
+            self.resource_manager
         )
         self.resource_manager = resource_manager or TTSResourceManager()
 

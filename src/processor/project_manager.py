@@ -181,13 +181,16 @@ class ProjectManager:
     def save_project(self) -> bool:
         """
         Save project to disk.
-        
+
         Returns:
             True if project was saved successfully
         """
         if not self.chapter_manager:
-            logger.warning("Cannot save project: chapter manager not initialized")
-            return False
+            logger.warning("Chapter manager not initialized, initializing empty chapter manager")
+            # Initialize empty chapter manager as fallback
+            from .chapter_manager import ChapterManager
+            self.chapter_manager = ChapterManager()
+            logger.info("Initialized empty chapter manager for project save")
         
         try:
             # Update metadata

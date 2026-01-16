@@ -74,6 +74,8 @@ class BatchGapDetector:
 
             # Check which batches are missing
             missing_batches = self._find_missing_batches(expected_batches)
+            print(f"DEBUG: Expected batches: {expected_batches}")
+            print(f"DEBUG: Missing batches: {missing_batches}")
 
             if missing_batches:
                 logger.info(
@@ -103,9 +105,11 @@ class BatchGapDetector:
             chapter_manager = self.project_manager.get_chapter_manager()
             if not chapter_manager:
                 logger.warning("Chapter manager not initialized, cannot detect existing files")
+                print("DEBUG: Chapter manager not initialized")
                 return []
 
             all_chapters = chapter_manager.get_all_chapters()
+            print(f"DEBUG: Found {len(all_chapters)} total chapters in project")
             if not all_chapters:
                 return []
 
@@ -118,6 +122,7 @@ class BatchGapDetector:
             logger.error(f"Error getting existing audio files: {e}")
             return []
 
+        print(f"DEBUG: Found {len(existing_chapters)} existing audio files: {existing_chapters[:10]}{'...' if len(existing_chapters) > 10 else ''}")
         return sorted(existing_chapters)
 
     def _calculate_expected_batches(self, existing_chapters: List[int], batch_size: int) -> List[Tuple[int, int]]:

@@ -1,0 +1,5 @@
+{
+  "processing_summary": "ProcessingSummary(timestamp='2026-01-15T16:48:17.729526', novel_title='test_e2e', novel_url=None, total_chapters=1, completed_chapters=1, failed_chapters=0, success_rate='100.0%', processing_time=None, output_format=None, total_completed_in_project=0)",
+  "file_locations": "FileLocations(project_metadata='C:\\\\Users\\\\Nitropc\\\\Documents\\\\ACT\\\\projects\\\\test_e2e\\\\project.json', scraped_text_dir='C:\\\\Users\\\\Nitropc\\\\AppData\\\\Local\\\\Temp\\\\tmp85745l8u\\\\output\\\\test_e2e\\\\test_e2e_scraps', audio_output_dir='C:\\\\Users\\\\Nitropc\\\\AppData\\\\Local\\\\Temp\\\\tmp85745l8u\\\\output\\\\test_e2e\\\\test_e2e_audio', metadata_dir='metadata')",
+  "chapters_processed": []
+}

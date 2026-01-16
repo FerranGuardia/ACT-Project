@@ -41,6 +41,7 @@ class BatchProcessingCoordinator:
         output_format: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Process all chapters in the project."""
+        print(f"DEBUG: BatchProcessingCoordinator.process_all_chapters called with start_from={start_from}, skip_if_exists={skip_if_exists}, output_format={output_format}")
         logger.debug(f"BatchProcessingCoordinator.process_all_chapters called with skip_if_exists={skip_if_exists}")
         if not self.scraping_coordinator.progress_tracker:
             logger.error("Progress tracker not initialized")
@@ -78,6 +79,7 @@ class BatchProcessingCoordinator:
         if output_format and output_format.get('type') == 'incremental_batches':
             batch_size = output_format.get('batch_size', 50)
             logger.info(f"Incremental batching enabled: will merge every {batch_size} chapters")
+            print(f"DEBUG: BatchProcessingCoordinator batch_size = {batch_size}")
 
             # Check for and merge any missing batches before processing new chapters
             self._merge_missing_batches(batch_size)
@@ -117,6 +119,7 @@ class BatchProcessingCoordinator:
             )
             if success:
                 completed += 1
+                print(f"DEBUG: Chapter {chapter.number} processed successfully. completed = {completed}, batch_size = {batch_size}")
 
                 # Check for incremental batch merging
                 if batch_size > 0 and completed >= batch_size:
@@ -126,6 +129,7 @@ class BatchProcessingCoordinator:
 
                     if batch_end - batch_start + 1 >= batch_size:
                         # We have a complete batch, merge it
+                        print(f"DEBUG: About to merge batch {batch_start}-{batch_end}")
                         self._merge_completed_batch(batch_start, batch_end)
                         last_batch_end = batch_end
             else:
@@ -303,16 +307,20 @@ class BatchProcessingCoordinator:
             gap_service = GapDetectionService(self.scraping_coordinator.project_manager, self.conversion_coordinator.file_manager)
 
             batch_report = gap_service.check_batch_integrity([batch_size])
+            print(f"DEBUG: Batch report for size {batch_size}: {batch_report}")
 
             if batch_report['has_gaps']:
                 missing_batches = batch_report['missing_batches']
                 logger.info(f"Found {len(missing_batches)} missing batch files, merging them now...")
+                print(f"DEBUG: Missing batches = {missing_batches}")
 
                 for batch_start, batch_end in missing_batches:
                     logger.info(f"Merging missing batch: chapters {batch_start}-{batch_end}")
+                    print(f"DEBUG: Merging missing batch {batch_start}-{batch_end}")
                     self._merge_completed_batch(batch_start, batch_end)
             else:
                 logger.info("No missing batch files found")
+                print("DEBUG: No missing batches found")
 
         except Exception as e:
             logger.error(f"Error checking/merging missing batches: {e}")

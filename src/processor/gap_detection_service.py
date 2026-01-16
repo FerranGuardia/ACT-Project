@@ -107,9 +107,11 @@ class GapDetectionService:
             batch_sizes = [10, 20, 50, 100]
 
         logger.debug(f"Running batch integrity check for batch sizes: {batch_sizes}")
+        print(f"DEBUG: Checking batch integrity for sizes: {batch_sizes}")
 
         all_missing = []
         for batch_size in batch_sizes:
+            print(f"DEBUG: Checking batch size {batch_size}")
             missing = self.batch_gap_detector.detect_missing_batches(batch_size)
             all_missing.extend([(batch_size, start, end) for start, end in missing])
 

@@ -375,6 +375,7 @@ class AddQueueDialog(QDialog):
                 'batch_size': self.batch_size_spin.value()
             }
             logger.debug(f"Selected output format: INCREMENTAL_BATCHES, batch_size={output_format['batch_size']}")
+            print(f"DEBUG: AddQueueDialog returning output_format = {output_format}")
         else:
             output_format = {'type': 'individual_mp3s'}
             logger.debug("Selected output format: INDIVIDUAL_MP3S")

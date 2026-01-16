@@ -330,8 +330,9 @@ class ChunkedConversionStrategy(ConversionStrategy):
 class ConversionStrategySelector:
     """Selects the appropriate conversion strategy based on text and provider capabilities."""
 
-    def __init__(self, provider_manager: TTSProviderManager):
+    def __init__(self, provider_manager: TTSProviderManager, resource_manager: Optional[TTSResourceManager] = None):
         self.provider_manager = provider_manager
+        self.resource_manager = resource_manager
 
     def select_strategy(
         self,
@@ -350,10 +351,13 @@ class ConversionStrategySelector:
         """
         provider = voice_resolution.provider
 
+        # Use shared resource manager or create new one
+        resource_manager = self.resource_manager or TTSResourceManager()
+
         # Check if provider supports chunking
         if not provider.supports_chunking():
             logger.debug("Provider does not support chunking, using direct conversion")
-            return DirectConversionStrategy(self.provider_manager, TTSResourceManager())
+            return DirectConversionStrategy(self.provider_manager, resource_manager)
 
         # Check text size limits
         max_bytes = provider.get_max_text_bytes()
@@ -361,7 +365,7 @@ class ConversionStrategySelector:
 
         if not max_bytes:
             logger.debug("Provider has no byte limit, using direct conversion")
-            return DirectConversionStrategy(self.provider_manager, TTSResourceManager())
+            return DirectConversionStrategy(self.provider_manager, resource_manager)
 
         text_bytes_size = len(processed_text.enhanced.encode('utf-8'))
         logger.info(f"Text size: {text_bytes_size} bytes, limit: {max_bytes} bytes")
@@ -373,7 +377,7 @@ class ConversionStrategySelector:
         if should_chunk:
             reason = "exceeds provider limit" if text_bytes_size > max_bytes else "exceeds safety threshold"
             logger.info(f"Text {reason} ({text_bytes_size} bytes), using chunking...")
-            return ChunkedConversionStrategy(self.provider_manager, TTSResourceManager())
+            return ChunkedConversionStrategy(self.provider_manager, resource_manager)
         else:
             logger.debug(f"Text within limits ({text_bytes_size} bytes), using direct conversion")
-            return DirectConversionStrategy(self.provider_manager, TTSResourceManager())
+            return DirectConversionStrategy(self.provider_manager, resource_manager)

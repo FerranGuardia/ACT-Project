@@ -205,8 +205,8 @@ class TestCoordinatorIntegration:
         project_dir = temp_dir / "output" / "test_e2e"
         assert project_dir.exists()
 
-        text_files = list(project_dir.glob("**/text/chapter_*.txt"))
-        audio_files = list(project_dir.glob("**/audio/chapter_*.mp3"))
+        text_files = list(project_dir.glob("**/test_e2e_scraps/chapter_*.txt"))
+        audio_files = list(project_dir.glob("**/test_e2e_audio/chapter_*.mp3"))
 
         assert len(text_files) == 1
         assert len(audio_files) == 1

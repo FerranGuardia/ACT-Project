@@ -80,8 +80,9 @@ class UIEventLogger:
                     console_handler = logging.StreamHandler(sys.stdout)
 
                 console_handler.setLevel(logging.DEBUG)
+                # Use ANSI white color for better readability in dark terminals/widgets
                 formatter = logging.Formatter(
-                    "[UI EVENT] %(levelname)-8s | %(message)s"
+                    "\033[97m[UI EVENT] %(levelname)-8s | %(message)s\033[0m"
                 )
                 console_handler.setFormatter(formatter)
                 cls._console_logger.addHandler(console_handler)

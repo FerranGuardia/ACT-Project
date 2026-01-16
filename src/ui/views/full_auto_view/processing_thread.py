@@ -48,6 +48,9 @@ class ProcessingThread(QThread):
         self.should_stop = True
         if self.pipeline:
             self.pipeline.stop()
+            # Clean up resources immediately when stopped
+            logger.debug("Cleaning up pipeline resources due to stop request")
+            self.pipeline.cleanup_resources()
     
     def pause(self):
         """Pause the processing operation."""
@@ -227,11 +230,22 @@ class ProcessingThread(QThread):
                 end_chapter=end_chapter
             )
             
+            # If gaps were detected and batch merging is enabled, merge existing chapters into batches first
+            if missing_chapters and self.output_format.get('type') == 'incremental_batches':
+                batch_size = self.output_format.get('batch_size', 50)
+                self.status.emit(f"Merging existing chapters into batches of {batch_size}...")
+                logger.info(f"Pre-processing: Merging existing chapters into batches before gap resolution")
+                print(f"DEBUG: Pre-processing batch merging with batch_size={batch_size}")
+
+                # Call batch merging on the pipeline's batch processing coordinator
+                self.pipeline.batch_processing_coordinator._merge_missing_batches(batch_size)
+
             # If gaps were detected, they will be automatically handled by the pipeline
             # because process_all_chapters checks for missing files and re-processes them
-            
+
             # Process the URL (use URL as TOC URL)
             self.status.emit("Starting processing...")
+            print(f"DEBUG: ProcessingThread starting pipeline for URL: {self.url}")
             result = self.pipeline.run_full_pipeline(
                 toc_url=self.url,
                 novel_url=self.url,
@@ -268,10 +282,16 @@ class ProcessingThread(QThread):
             else:
                 error = result.get('error', 'Processing failed')
                 self.finished.emit(False, error, result)
-                
+
         except Exception as e:
             logger.error(f"Processing error: {e}")
             self.finished.emit(False, f"Error: {str(e)}", {})
+
+        finally:
+            # Clean up resources
+            if self.pipeline:
+                logger.debug("Cleaning up pipeline resources")
+                self.pipeline.cleanup_resources()
 
     def _update_global_metadata(self) -> None:
         """
