@@ -144,7 +144,7 @@ class ProcessingThread(QThread):
                 # Log gap resolution start
                 activity_console.log_gap_resolution_start(len(missing_chapters), "processing_pipeline")
             else:
-                logger.info("✓ Gap detection: No missing chapters found")
+                logger.info("Gap detection: No missing chapters found")
                 self.status.emit("No gaps detected - proceeding normally")
             
             return missing_chapters
@@ -157,35 +157,55 @@ class ProcessingThread(QThread):
     def run(self):
         """Run the processing pipeline."""
         try:
+            logger.info("=" * 60)
+            logger.info("STARTING FULL AUTO PROCESSING PIPELINE")
+            logger.info("=" * 60)
+            logger.info(f"Input URL: {self.url}")
+            logger.info(f"Project Name: {self.project_name}")
+            logger.info(f"Novel Title: {self.novel_title}")
+            logger.info(f"Voice: {self.voice}")
+            logger.info(f"Provider: {self.provider}")
+            logger.info(f"Chapter Selection: {self.chapter_selection}")
+            logger.info(f"Output Format: {self.output_format}")
+            logger.info(f"Output Folder: {self.output_folder}")
+            logger.info("-" * 60)
+
             # Determine chapter selection parameters
             start_from = 1
             max_chapters = None
             specific_chapters = None
             end_chapter = None
 
-            logger.info(f"Processing chapter_selection: {self.chapter_selection}")
-            logger.info(f"Chapter selection type: {self.chapter_selection.get('type')}")
-            logger.info(f"Available keys in chapter_selection: {list(self.chapter_selection.keys())}")
+            logger.debug(f"Processing chapter selection configuration: {self.chapter_selection}")
+            selection_type = self.chapter_selection.get('type')
+            logger.info(f"Selection Type: {selection_type}")
 
-            if self.chapter_selection.get('type') == 'range':
+            if selection_type == 'range':
                 start_from = self.chapter_selection.get('start', 1)
                 end = self.chapter_selection.get('end', 10000)
                 max_chapters = end - start_from + 1
                 end_chapter = end
-            elif self.chapter_selection.get('type') == 'specific':
+                logger.info(f"Range Selection: Chapters {start_from} to {end} ({max_chapters} chapters)")
+            elif selection_type == 'specific':
                 chapters = self.chapter_selection.get('chapters', [])
                 if chapters:
                     start_from = min(chapters)
                     max_chapters = max(chapters) - start_from + 1
                     specific_chapters = chapters
                     end_chapter = max(chapters)
+                    logger.info(f"Specific Selection: Chapters {chapters} ({len(chapters)} chapters)")
+                else:
+                    logger.warning("Specific selection configured but no chapters specified")
             else:
                 # 'all' type - will be determined after project initialization
                 end_chapter = None
+                logger.info("All Chapters Selection: Will process all available chapters")
             
             # Create pipeline with callbacks and voice
             base_output_dir = Path(self.output_folder) if self.output_folder else None
-            
+            logger.info("Creating processing pipeline...")
+            logger.debug(f"   Base output directory: {base_output_dir}")
+
             self.pipeline = ProcessingPipeline(
                 project_name=self.project_name,
                 on_progress=lambda p: self.progress.emit(int(p * 100)),
@@ -196,23 +216,33 @@ class ProcessingThread(QThread):
                 base_output_dir=base_output_dir,
                 novel_title=self.novel_title
             )
-            
+            logger.info("Processing pipeline created successfully")
+
             # Set pause check callback so pipeline can check if processing is paused
             self.pipeline.set_pause_check_callback(lambda: self.is_paused)
-            
+            logger.debug("Pause check callback configured")
+
             # Set specific chapters if needed
             if specific_chapters:
                 self.pipeline.specific_chapters = specific_chapters
+                logger.info(f"Specific chapters configured: {specific_chapters}")
             
             # Initialize project first (needed for gap detection)
+            logger.info("PHASE 1: Initializing project...")
             self.status.emit("Initializing project...")
+            logger.debug(f"   Novel URL: {self.url}")
+            logger.debug(f"   TOC URL: {self.url}")
+            logger.debug(f"   Novel Title: {self.novel_title}")
+
             if not self.pipeline.initialize_project(
                 novel_url=self.url,
                 toc_url=self.url,
                 novel_title=self.novel_title
             ):
+                logger.error("Project initialization failed")
                 self.finished.emit(False, "Failed to initialize project", {})
                 return
+            logger.info("Project initialized successfully")
             
             # If project exists and was loaded, determine actual end_chapter if needed
             if end_chapter is None and self.pipeline.project_manager.project_exists():
@@ -224,21 +254,28 @@ class ProcessingThread(QThread):
             
             # RUN GAP DETECTION BEFORE PROCESSING
             # This detects missing chapters and ensures they're re-scraped
+            logger.info("PHASE 2: Running gap detection...")
+            logger.debug(f"   Start from: {start_from}")
+            logger.debug(f"   End chapter: {end_chapter}")
+
             missing_chapters = self._run_gap_detection(
                 pipeline=self.pipeline,
                 start_from=start_from,
                 end_chapter=end_chapter
             )
+            logger.info(f"Gap detection completed. Found {len(missing_chapters)} missing chapters")
             
             # If gaps were detected and batch merging is enabled, merge existing chapters into batches first
             if missing_chapters and self.output_format.get('type') == 'incremental_batches':
                 batch_size = self.output_format.get('batch_size', 50)
+                logger.info("PHASE 2.5: Pre-processing batch merging...")
+                logger.info(f"   Batch size: {batch_size} chapters per batch")
                 self.status.emit(f"Merging existing chapters into batches of {batch_size}...")
-                logger.info(f"Pre-processing: Merging existing chapters into batches before gap resolution")
-                print(f"DEBUG: Pre-processing batch merging with batch_size={batch_size}")
+                logger.debug(f"Pre-processing: Merging existing chapters into batches before gap resolution")
 
                 # Call batch merging on the pipeline's batch processing coordinator
                 self.pipeline.batch_processing_coordinator._merge_missing_batches(batch_size)
+                logger.info("Pre-processing batch merging completed")
 
             # If gaps were detected, they will be automatically handled by the pipeline
             # because process_all_chapters checks for missing files and re-processes them

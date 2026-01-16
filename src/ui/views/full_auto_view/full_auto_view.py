@@ -39,17 +39,18 @@ class FullAutoView(BaseView):
 
     def get_view_title(self) -> str:
         """Get the title for this view."""
-        return "Full Auto"
+        return "URL TO MP3"
 
     def __init__(self, parent=None):
         self.queue_items: List[Dict] = []
         self.current_processing: Optional[ProcessingThread] = None
         self._queue_file = Path.home() / ".act" / "queue.json"
-        
+        self._stop_and_erase_mode = False  # Flag to track stop and erase operations
+
         # Initialize components
         self.queue_manager = QueueManager(self._queue_file)
         self.handlers = FullAutoViewHandlers(self)
-        
+
         # Initialize UI components (BaseView calls setup_ui)
         super().__init__(parent)
         self._connect_handlers()
@@ -315,11 +316,12 @@ class FullAutoView(BaseView):
                 logger.info("Stopping processing (keeping saved data)")
                 
             elif clicked_button == stop_erase_btn:
-                # Stop and erase process data
+                # Stop and erase process data - set flag for complete removal
+                self._stop_and_erase_mode = True
                 self.current_processing.stop()
                 self.current_processing_section.set_status("Stopping and clearing data...")
-                logger.info("Stopping processing and clearing saved data")
-                
+                logger.info("Stopping processing and clearing saved data (erase mode)")
+
                 # Clear project data if pipeline exists
                 if self.current_processing.pipeline:
                     try:
@@ -367,6 +369,26 @@ class FullAutoView(BaseView):
             message: Completion message to display
             result: Detailed processing results from the pipeline
         """
+        # Handle stop and erase mode - completely remove item from queue
+        if self._stop_and_erase_mode:
+            self._stop_and_erase_mode = False  # Reset flag
+            if item in self.queue_items:
+                self.queue_items.remove(item)
+                self._update_queue_display()
+                self._save_queue()
+                logger.info(f"Removed item '{item.get('title', 'Unknown')}' from queue due to Stop and Erase")
+            # Reset UI state for stop and erase
+            self.controls_section.set_idle_state()
+            self.current_processing_section.set_status("Stopped and erased")
+            return
+
+        # Check if item still exists in queue (might have been removed by stop and erase)
+        if item not in self.queue_items:
+            logger.debug(f"Item '{item.get('title', 'Unknown')}' no longer in queue, skipping status update")
+            # Reset UI state
+            self.controls_section.set_idle_state()
+            return
+
         # Update item status based on actual processing results
         if success:
             # Check actual processing results - even if pipeline says success,
@@ -395,10 +417,10 @@ class FullAutoView(BaseView):
             # Pipeline reported failure
             item['status'] = 'Failed'
             item['progress'] = 0
-        
+
         # Reset UI state
         self.controls_section.set_idle_state()
-        
+
         # Update display
         self._update_queue_display()
         self._save_queue()

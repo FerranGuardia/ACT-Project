@@ -164,7 +164,7 @@ class QueueManager(BaseQueueManager):
 
     def _validate_output_format(self, output_format: Any) -> Dict[str, Any]:
         """Validate output format field."""
-        valid_types = ['individual_mp3s', 'single_audiobook']
+        valid_types = ['individual_mp3s', 'incremental_batches', 'merged_mp3', 'single_audiobook']
 
         if output_format is None:
             return {'type': 'individual_mp3s', 'batch_size': 50}  # Default format
@@ -172,6 +172,9 @@ class QueueManager(BaseQueueManager):
         if isinstance(output_format, dict):
             # Handle dictionary format from UI
             output_type = output_format.get('type', 'individual_mp3s')
+            if output_type == 'single_audiobook':
+                output_type = 'merged_mp3'
+                output_format = {**output_format, 'type': 'merged_mp3'}
             if output_type not in valid_types:
                 logger.warning(f"Unknown output type '{output_type}', using 'individual_mp3s'")
                 return {'type': 'individual_mp3s', 'batch_size': 50}

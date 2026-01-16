@@ -139,3 +139,39 @@ class ScraperViewHandlers:
             show_error_opening_folder(self.view, str(e))
             logger.error(f"Error opening folder: {e}")
 
+    def generate_title_from_url(self, url: str) -> str:
+        """
+        Generate a title from the URL.
+
+        Args:
+            url: The URL to generate a title from
+
+        Returns:
+            A generated title based on the URL
+        """
+        try:
+            # Extract domain and path to create a readable title
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+
+            # Get the domain without www.
+            domain = parsed.netloc.replace('www.', '')
+
+            # Get the path and clean it up
+            path = parsed.path.strip('/')
+            if path:
+                # Replace slashes and underscores with spaces, capitalize words
+                title = path.replace('/', ' ').replace('_', ' ').replace('-', ' ')
+                title = ' '.join(word.capitalize() for word in title.split())
+            else:
+                title = domain.split('.')[0].capitalize()
+
+            # Add domain if title is too short
+            if len(title) < 3:
+                title = f"{domain.split('.')[0].capitalize()} Novel"
+
+            return title
+        except Exception as e:
+            logger.warning(f"Error generating title from URL {url}: {e}")
+            return "Untitled Novel"
+
