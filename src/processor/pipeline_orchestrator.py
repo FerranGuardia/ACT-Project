@@ -157,7 +157,7 @@ class PipelineOrchestrator:
             start_from=start_from,
             max_chapters=max_chapters,
             skip_if_exists=skip_if_exists,
-            ignore_errors=True,  # Continue processing other chapters on failure
+            ignore_errors=False,  # Stop on first error to show real issues
             output_format=output_format
         )
 
