@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "last_updated": "2026-01-15T16:50:54.875703",
+  "last_updated": "2026-01-16T07:56:40.211095",
   "novels": {
     "https://novelfull.net/in-different-world-with-naruto-system.html": {
       "url": "https://novelfull.net/in-different-world-with-naruto-system.html",
@@ -12,14 +12,14 @@
     "https://example.com/toc": {
       "url": "https://example.com/toc",
       "created_at": "2026-01-13T08:55:05.806700",
-      "updated_at": "2026-01-15T16:50:02.652742",
+      "updated_at": "2026-01-15T22:19:33.531671",
       "title": "Test Novel",
       "author": "Test Author"
     },
     "https://example.com/novel": {
       "url": "https://example.com/novel",
       "created_at": "2026-01-13T08:55:06.254403",
-      "updated_at": "2026-01-15T16:49:13.336526",
+      "updated_at": "2026-01-15T22:10:33.752714",
       "title": "Test Novel",
       "author": "Test Author",
       "novel_url": "https://example.com/novel"
@@ -27,7 +27,7 @@
     "https://example.com/novel1": {
       "url": "https://example.com/novel1",
       "created_at": "2026-01-13T08:55:06.507190",
-      "updated_at": "2026-01-15T16:50:54.865491",
+      "updated_at": "2026-01-15T22:11:22.711988",
       "title": "Novel One",
       "author": "Test Author",
       "chapters": 42
@@ -35,7 +35,7 @@
     "https://example.com/novel2": {
       "url": "https://example.com/novel2",
       "created_at": "2026-01-13T08:55:06.510106",
-      "updated_at": "2026-01-15T16:50:54.875703",
+      "updated_at": "2026-01-15T22:11:22.723563",
       "title": "Novel Two"
     },
     "https://example.com/minimal": {
@@ -47,7 +47,7 @@
     "https://example.com/test-novel": {
       "url": "https://example.com/test-novel",
       "created_at": "2026-01-13T12:05:34.120401",
-      "updated_at": "2026-01-15T16:11:31.861640",
+      "updated_at": "2026-01-15T22:19:20.703235",
       "title": "Test Novel",
       "author": "Test Author",
       "chapters": 50,
@@ -267,7 +267,7 @@
     "https://example.com/mock-toc": {
       "url": "https://example.com/mock-toc",
       "created_at": "2026-01-14T23:46:28.070065",
-      "updated_at": "2026-01-15T16:11:32.776195",
+      "updated_at": "2026-01-15T22:19:22.018039",
       "title": "Mock Novel for No Gaps Testing"
     },
     "https://novelfull.net/the-second-coming-of-gluttony.html": {
@@ -299,7 +299,7 @@
     "https://example.com/test-queue-load/novel1": {
       "url": "https://example.com/test-queue-load/novel1",
       "created_at": "2026-01-15T10:22:48.766924",
-      "updated_at": "2026-01-15T16:09:56.884255",
+      "updated_at": "2026-01-15T22:17:14.090992",
       "title": "Test Novel",
       "author": "Test Author",
       "chapters": 42,
@@ -308,7 +308,7 @@
     "https://example.com/test-persistence/novel": {
       "url": "https://example.com/test-persistence/novel",
       "created_at": "2026-01-15T10:23:27.976740",
-      "updated_at": "2026-01-15T16:10:03.840864",
+      "updated_at": "2026-01-15T22:17:29.240572",
       "title": "Persistence Novel",
       "author": "Persistence Author",
       "chapters": 20
@@ -316,60 +316,74 @@
     "https://example.com/test-cross-queue/novel": {
       "url": "https://example.com/test-cross-queue/novel",
       "created_at": "2026-01-15T10:23:58.904158",
-      "updated_at": "2026-01-15T16:09:58.128237",
+      "updated_at": "2026-01-15T22:17:16.198587",
       "title": "Cross Queue Novel",
       "author": "Cross Author"
     },
     "https://example.com/test-concurrent-1/novel": {
       "url": "https://example.com/test-concurrent-1/novel",
       "created_at": "2026-01-15T10:24:01.883475",
-      "updated_at": "2026-01-15T16:10:00.547777",
+      "updated_at": "2026-01-15T22:17:22.450636",
       "title": "Concurrent Novel 1"
     },
     "https://example.com/test-concurrent-0/novel": {
       "url": "https://example.com/test-concurrent-0/novel",
       "created_at": "2026-01-15T10:24:01.887554",
-      "updated_at": "2026-01-15T16:10:00.543170",
+      "updated_at": "2026-01-15T22:17:22.445363",
       "title": "Concurrent Novel 0"
     },
     "https://example.com/test-concurrent-2/novel": {
       "url": "https://example.com/test-concurrent-2/novel",
       "created_at": "2026-01-15T10:24:01.890108",
-      "updated_at": "2026-01-15T16:10:00.551908",
+      "updated_at": "2026-01-15T22:17:22.457858",
       "title": "Concurrent Novel 2"
     },
     "https://example.com/test-concurrent-3/novel": {
       "url": "https://example.com/test-concurrent-3/novel",
       "created_at": "2026-01-15T10:24:01.895489",
-      "updated_at": "2026-01-15T16:10:00.555912",
+      "updated_at": "2026-01-15T22:17:22.454357",
       "title": "Concurrent Novel 3"
     },
     "https://example.com/test-concurrent-4/novel": {
       "url": "https://example.com/test-concurrent-4/novel",
       "created_at": "2026-01-15T10:24:01.898185",
-      "updated_at": "2026-01-15T16:10:00.558211",
+      "updated_at": "2026-01-15T22:17:22.462626",
       "title": "Concurrent Novel 4"
     },
     "https://example.com/test-search1/novel": {
       "url": "https://example.com/test-search1/novel",
-      "created_at": "2026-01-15T16:10:02.746998",
-      "updated_at": "2026-01-15T16:10:02.746998",
+      "created_at": "2026-01-15T22:17:27.469191",
+      "updated_at": "2026-01-15T22:17:27.469191",
       "title": "Fantasy Adventure",
       "author": "John Smith"
     },
     "https://example.com/test-search2/novel": {
       "url": "https://example.com/test-search2/novel",
-      "created_at": "2026-01-15T16:10:02.751389",
-      "updated_at": "2026-01-15T16:10:02.751389",
+      "created_at": "2026-01-15T22:17:27.471459",
+      "updated_at": "2026-01-15T22:17:27.471459",
       "title": "Sci-Fi Journey",
       "author": "Jane Doe"
     },
     "https://example.com/test-search3/novel": {
       "url": "https://example.com/test-search3/novel",
-      "created_at": "2026-01-15T16:10:02.753920",
-      "updated_at": "2026-01-15T16:10:02.753920",
+      "created_at": "2026-01-15T22:17:27.474548",
+      "updated_at": "2026-01-15T22:17:27.474548",
       "title": "Mystery Novel",
       "author": "John Smith"
+    },
+    "https://novelbin.me/novel-book/black-tech-internet-cafe-system": {
+      "url": "https://novelbin.me/novel-book/black-tech-internet-cafe-system",
+      "created_at": "2026-01-16T07:38:53.131099",
+      "updated_at": "2026-01-16T07:47:31.093286",
+      "title": "test",
+      "novel_url": "https://novelbin.me/novel-book/black-tech-internet-cafe-system"
+    },
+    "https://novelfull.net/black-tech-internet-cafe-system/chapter-1-super-internet-cafe-system.html": {
+      "url": "https://novelfull.net/black-tech-internet-cafe-system/chapter-1-super-internet-cafe-system.html",
+      "created_at": "2026-01-16T07:56:34.909386",
+      "updated_at": "2026-01-16T07:56:40.208548",
+      "title": "Black tech internet cafe",
+      "novel_url": "https://novelfull.net/black-tech-internet-cafe-system/chapter-1-super-internet-cafe-system.html"
     }
   }
 }
