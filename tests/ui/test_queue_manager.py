@@ -26,8 +26,8 @@ with patch('PySide6.QtWidgets'), \
      patch('core.logger.get_logger', return_value=MagicMock()):
 
     # Import the real implementations
-    from ui.views.full_auto_view.full_auto_queue_manager import QueueManager
     from ui.ui_constants import StatusMessages
+    from ui.views.full_auto_view.full_auto_queue_manager import QueueManager
 
 
 class TestQueueManager:

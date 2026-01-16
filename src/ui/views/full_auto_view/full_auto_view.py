@@ -4,32 +4,36 @@ Main orchestrator that combines all components.
 """
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
-
 from core.config_manager import get_config
+from typing import Optional, List, Dict, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ui.main_window import MainWindow  # type: ignore[unused-import]
 
+from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QPushButton, QListWidgetItem, QMessageBox
 from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import (QHBoxLayout, QListWidgetItem, QMessageBox,
-                               QPushButton, QVBoxLayout)
 
 from core.logger import get_logger
-from ui.ui_constants import DialogMessages, StatusMessages
-from ui.utils.error_handling import (show_confirmation, show_error,
-                                     show_success, show_validation_error)
 from ui.views.base_view import BaseView
+from ui.ui_constants import (
+    StatusMessages,
+    DialogMessages,
+)
+from ui.utils.error_handling import (
+    show_validation_error,
+    show_success,
+    show_error,
+    show_confirmation,
+)
+
 from ui.views.full_auto_view.add_queue_dialog import AddQueueDialog
+from ui.views.full_auto_view.queue_item_widget import QueueItemWidget
+from ui.views.full_auto_view.processing_thread import ProcessingThread
+from ui.views.full_auto_view.queue_section import QueueSection
+from ui.views.full_auto_view.current_processing_section import CurrentProcessingSection
 from ui.views.full_auto_view.controls_section import ControlsSection
-from ui.views.full_auto_view.current_processing_section import \
-    CurrentProcessingSection
 from ui.views.full_auto_view.full_auto_queue_manager import QueueManager
 from ui.views.full_auto_view.handlers import FullAutoViewHandlers
-from ui.views.full_auto_view.processing_thread import ProcessingThread
-from ui.views.full_auto_view.queue_item_widget import QueueItemWidget
-from ui.views.full_auto_view.queue_section import QueueSection
-from ui.widgets.activity_console_widget import ActivityConsoleWidget
 
 logger = get_logger("ui.full_auto_view")
 
@@ -39,18 +43,17 @@ class FullAutoView(BaseView):
 
     def get_view_title(self) -> str:
         """Get the title for this view."""
-        return "URL TO MP3"
+        return "Full Auto"
 
     def __init__(self, parent=None):
         self.queue_items: List[Dict] = []
         self.current_processing: Optional[ProcessingThread] = None
         self._queue_file = Path.home() / ".act" / "queue.json"
-        self._stop_and_erase_mode = False  # Flag to track stop and erase operations
-
+        
         # Initialize components
         self.queue_manager = QueueManager(self._queue_file)
         self.handlers = FullAutoViewHandlers(self)
-
+        
         # Initialize UI components (BaseView calls setup_ui)
         super().__init__(parent)
         self._connect_handlers()
@@ -72,11 +75,7 @@ class FullAutoView(BaseView):
         # Current processing section
         self.current_processing_section = CurrentProcessingSection()
         main_layout.addWidget(self.current_processing_section)
-
-        # Activity console
-        self.activity_console_widget = ActivityConsoleWidget()
-        main_layout.addWidget(self.activity_console_widget)
-
+        
         # Global controls
         global_controls_layout = QHBoxLayout()
         self.pause_all_button = QPushButton("⏸️ Pause All")
@@ -237,7 +236,6 @@ class FullAutoView(BaseView):
         provider: Optional[str] = item.get('provider')
         chapter_selection: Dict[str, Any] = item.get('chapter_selection', {'type': 'all'})
         output_format: Dict[str, Any] = item.get('output_format', {'type': 'individual_mp3s'})
-        print(f"DEBUG: Starting processing thread for item: {item['title']}, output_format: {output_format}")
         # Default to configured output_dir to avoid Desktop writes in tests
         default_output = get_config().get('paths.output_dir')
         output_folder: Optional[str] = item.get('output_folder', str(default_output))
@@ -316,12 +314,11 @@ class FullAutoView(BaseView):
                 logger.info("Stopping processing (keeping saved data)")
                 
             elif clicked_button == stop_erase_btn:
-                # Stop and erase process data - set flag for complete removal
-                self._stop_and_erase_mode = True
+                # Stop and erase process data
                 self.current_processing.stop()
                 self.current_processing_section.set_status("Stopping and clearing data...")
-                logger.info("Stopping processing and clearing saved data (erase mode)")
-
+                logger.info("Stopping processing and clearing saved data")
+                
                 # Clear project data if pipeline exists
                 if self.current_processing.pipeline:
                     try:
@@ -369,26 +366,6 @@ class FullAutoView(BaseView):
             message: Completion message to display
             result: Detailed processing results from the pipeline
         """
-        # Handle stop and erase mode - completely remove item from queue
-        if self._stop_and_erase_mode:
-            self._stop_and_erase_mode = False  # Reset flag
-            if item in self.queue_items:
-                self.queue_items.remove(item)
-                self._update_queue_display()
-                self._save_queue()
-                logger.info(f"Removed item '{item.get('title', 'Unknown')}' from queue due to Stop and Erase")
-            # Reset UI state for stop and erase
-            self.controls_section.set_idle_state()
-            self.current_processing_section.set_status("Stopped and erased")
-            return
-
-        # Check if item still exists in queue (might have been removed by stop and erase)
-        if item not in self.queue_items:
-            logger.debug(f"Item '{item.get('title', 'Unknown')}' no longer in queue, skipping status update")
-            # Reset UI state
-            self.controls_section.set_idle_state()
-            return
-
         # Update item status based on actual processing results
         if success:
             # Check actual processing results - even if pipeline says success,
@@ -417,10 +394,10 @@ class FullAutoView(BaseView):
             # Pipeline reported failure
             item['status'] = 'Failed'
             item['progress'] = 0
-
+        
         # Reset UI state
         self.controls_section.set_idle_state()
-
+        
         # Update display
         self._update_queue_display()
         self._save_queue()

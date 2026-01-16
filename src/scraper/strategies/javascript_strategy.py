@@ -51,7 +51,9 @@ class JavaScriptStrategy(BaseDetectionStrategy):
             # Estimate total chapters
             estimated_total = self._estimate_total_from_js(html, urls)
 
-            confidence = min(validation_score * 0.8 + 0.2, 1.0)  # Base confidence for JS method
+            # Reduce confidence for NovelFull sites to allow browser automation for pagination
+            base_confidence = 0.6 if "novelfull.net" in self.base_url else 0.8
+            confidence = min(validation_score * base_confidence + 0.2, 1.0)
 
             return self._create_result(
                 urls=urls,

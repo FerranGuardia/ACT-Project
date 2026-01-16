@@ -32,10 +32,11 @@ __all__ = ["MainWindow"]
 class MainWindow(QMainWindow):
     """
     Main application window.
-
+    
     Contains:
     - StackedWidget for different views (landing page, scraper, TTS, etc.)
     - Navigation between different modes
+    - Toolbar with back button
     - Status bar
     """
     
@@ -65,6 +66,21 @@ class MainWindow(QMainWindow):
         central_layout = QVBoxLayout()
         central_layout.setContentsMargins(0, 0, 0, 0)
         central_layout.setSpacing(0)
+
+        # Create toolbar with back button
+        toolbar_layout = QHBoxLayout()
+        toolbar_layout.setContentsMargins(10, 5, 10, 5)
+        
+        self.back_button = QPushButton("← Back")
+        self.back_button.clicked.connect(self.show_landing_page)
+        self.back_button.setMaximumWidth(100)
+        self.back_button.setVisible(False)
+        toolbar_layout.addWidget(self.back_button)
+        toolbar_layout.addStretch()
+        
+        toolbar_widget = QWidget()
+        toolbar_widget.setLayout(toolbar_layout)
+        central_layout.addWidget(toolbar_widget)
 
         # Create stacked widget for different views with scroll support
         from PySide6.QtWidgets import QScrollArea
@@ -228,6 +244,7 @@ class MainWindow(QMainWindow):
         if mode in mode_map:
             UIEventLogger.log_navigation("Landing Page", mode.replace("_", " ").title(), "user clicked mode card")
             self.stacked_widget.setCurrentIndex(mode_map[mode])
+            self.back_button.setVisible(True)  # Show back button when leaving landing page
 
             # Reset scroll position to top when switching views
             self._reset_scroll_position()
@@ -238,6 +255,7 @@ class MainWindow(QMainWindow):
         """Show the landing page."""
         UIEventLogger.log_navigation("Any View", "Landing Page", "back button pressed")
         self.stacked_widget.setCurrentIndex(self.LANDING_PAGE)
+        self.back_button.setVisible(False)
 
         # Reset scroll position to top when returning to landing page
         self._reset_scroll_position()

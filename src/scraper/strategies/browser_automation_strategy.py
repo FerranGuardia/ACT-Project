@@ -102,457 +102,109 @@ class BrowserAutomationStrategy(BaseDetectionStrategy):
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=True)
                 context = await browser.new_context(
-                    viewport={'width': 1280, 'height': 720},
-                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
                 )
-
                 page = await context.new_page()
 
                 try:
-                    # Set up request interception for API monitoring
-                    api_urls = []
-                    def handle_request(request):
-                        try:
-                            url = request.url
-                            if any(keyword in url.lower() for keyword in ['chapter', 'api', 'ajax']):
-                                # Prevent cross-site pivots from third-party requests
-                                if self._is_same_site(url):
-                                    api_urls.append(url)
-                        except Exception:
-                            pass
-
-                    page.on('request', handle_request)
-
                     # Navigate to the page
-                    await page.goto(toc_url, wait_until='networkidle')
+                    await page.goto(toc_url, wait_until="networkidle", timeout=30000)
 
-                    # Wait for dynamic content to load
-                    await page.wait_for_timeout(2000)
+                    # Try to trigger lazy loading by scrolling
+                    await self._scroll_to_load_content(page)
 
-                    # Try to trigger lazy loading by scrolling OR handle pagination
-                    await self._scroll_and_wait(page, should_stop)
+                    # Extract URLs from the main content
+                    urls = await self._extract_from_page_content(page)
 
-                    # Handle traditional pagination if present
+                    # Handle pagination if present
                     paginated_urls = await self._handle_pagination(page, should_stop)
-                    if paginated_urls:
-                        urls = paginated_urls
-                    else:
-                        # Extract URLs using multiple methods from current page
-                        urls = []
-
-                        # Method 1: Extract from page content
-                        content_urls = await self._extract_from_page_content(page)
-                        urls.extend(content_urls)
-
-                    # Method 2: Try common selectors for chapter lists
-                    selector_urls = await self._extract_with_selectors(page)
-                    urls.extend(selector_urls)
-
-                    # Method 3: Monitor and try API endpoints found
-                    api_extracted_urls = await self._try_api_endpoints(page, api_urls)
-                    urls.extend(api_extracted_urls)
-
-                    # Method 4: JavaScript execution to extract from variables
-                    js_urls = await self._extract_via_javascript(page)
-                    urls.extend(js_urls)
-
-                    # Remove duplicates
-                    urls = self._deduplicate_urls(urls)
-
-                    # Filter by chapter range if specified
-                    if min_chapter or max_chapter:
-                        urls = self._filter_by_chapter_range(urls, min_chapter, max_chapter)
+                    urls.extend(paginated_urls)
 
                     return urls
 
                 finally:
-                    await page.close()
-                    await context.close()
                     await browser.close()
 
         except Exception as e:
             logger.debug(f"Browser automation failed: {e}")
             return []
 
-    async def _scroll_and_wait(self, page, should_stop: Optional[Callable[[], bool]]):
-        """Scroll the page to trigger lazy loading."""
+    async def _scroll_to_load_content(self, page) -> None:
+        """Scroll to trigger lazy loading."""
         try:
             # Scroll down in increments to trigger lazy loading
-            scroll_increment = 500
-            max_scrolls = 20  # Limit to prevent infinite scrolling
-
-            for i in range(max_scrolls):
-                if should_stop and should_stop():
-                    break
-
-                # Scroll down
-                await page.evaluate(f"window.scrollBy(0, {scroll_increment})")
-
-                # Wait for content to load
-                await page.wait_for_timeout(500)
-
-                # Check if we reached the bottom
-                at_bottom = await page.evaluate("""
-                    window.innerHeight + window.scrollY >= document.body.offsetHeight - 100
-                """)
-
-                if at_bottom:
-                    break
-
-            # Scroll back to top for extraction
-            await page.evaluate("window.scrollTo(0, 0)")
-            await page.wait_for_timeout(500)
-
-        except Exception as e:
-            logger.debug(f"Scrolling failed: {e}")
+            for _ in range(5):
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await asyncio.sleep(0.5)
+        except Exception:
+            pass  # Ignore scrolling errors
 
     async def _extract_from_page_content(self, page) -> List[str]:
-        """Extract chapter URLs from the rendered page content."""
-        try:
-            # Get all links that might be chapters
-            links = await page.query_selector_all('a')
-
-            urls = []
-            for link in links:
-                try:
-                    href = await link.get_attribute('href')
-                    text = await link.inner_text()
-
-                    if href and self._is_chapter_link(href, text.strip()):
-                        full_url = self._normalize_url(href)
-                        urls.append(full_url)
-
-                except Exception:
-                    continue
-
-            return urls
-
-        except Exception as e:
-            logger.debug(f"Content extraction failed: {e}")
-            return []
-
-    async def _extract_with_selectors(self, page) -> List[str]:
-        """Extract URLs using common CSS selectors."""
-        selectors = [
-            'a[href*="chapter"]',
-            'a[href*="chap"]',
-            'a[href*="ch-"]',
-            '.chapter-list a',
-            '.chapter-item a',
-            '.toc a',
-            '#toc a',
-            'li a[href*="chapter"]',
-            'td a[href*="chapter"]',
-            '.chapter-link',
-            '.chapter-title a',
-        ]
-
+        """Extract chapter URLs from the current page content."""
         urls = []
 
-        for selector in selectors:
-            try:
-                elements = await page.query_selector_all(selector)
-
-                for element in elements:
-                    try:
-                        href = await element.get_attribute('href')
-                        if href:
-                            full_url = self._normalize_url(href)
-                            urls.append(full_url)
-                    except Exception:
-                        continue
-
-            except Exception:
-                continue
-
-        return urls
-
-    async def _try_api_endpoints(self, page, api_urls: List[str]) -> List[str]:
-        """Try to extract chapter URLs from discovered API endpoints."""
-        urls = []
-
-        for api_url in api_urls[:5]:  # Limit to first 5 to avoid too many requests
-            try:
-                if not self._is_same_site(api_url):
-                    continue
-                # Navigate to the API URL
-                await page.goto(api_url)
-
-                # Try to parse JSON response
-                content = await page.inner_text('pre, body')
-                if content:
-                    json_urls = self._parse_json_for_urls(content)
-                    urls.extend(json_urls)
-
-            except Exception:
-                continue
-
-        return urls
-
-    async def _extract_via_javascript(self, page) -> List[str]:
-        """Extract URLs by executing JavaScript on the page."""
-        try:
-            # JavaScript to extract chapter URLs from common patterns
-            js_code = """
-            (function() {
-                var urls = [];
-
-                // Try to extract from common JavaScript variables
-                var variables = ['chapters', 'chapterList', 'chapterUrls', 'chapter_data'];
-                for (var i = 0; i < variables.length; i++) {
-                    try {
-                        var data = window[variables[i]];
-                        if (data && Array.isArray(data)) {
-                            for (var j = 0; j < data.length; j++) {
-                                var item = data[j];
-                                if (item && typeof item === 'object') {
-                                    var url = item.url || item.href || item.link || item.chapterUrl;
-                                    if (url && typeof url === 'string' && url.includes('chapter')) {
-                                        urls.push(url);
-                                    }
-                                }
-                            }
-                        }
-                    } catch (e) {}
-                }
-
-                // Extract from all links that look like chapters
-                var links = document.querySelectorAll('a[href*="chapter"], a[href*="chap"]');
-                for (var i = 0; i < links.length; i++) {
-                    var href = links[i].getAttribute('href');
-                    if (href) {
-                        urls.push(href);
-                    }
-                }
-
-                return urls;
-            })();
-            """
-
-            result = await page.evaluate(js_code)
-            if result and isinstance(result, list):
-                # Normalize URLs
-                normalized_urls = []
-                for url in result:
-                    if isinstance(url, str):
-                        full_url = self._normalize_url(url)
-                        normalized_urls.append(full_url)
-
-                return normalized_urls
-
-        except Exception as e:
-            logger.debug(f"JavaScript extraction failed: {e}")
-
-        return []
-
-    async def _handle_pagination(self, page, should_stop: Optional[Callable[[], bool]]) -> List[str]:
-        """Handle traditional pagination by following page links."""
-        try:
-            urls = []
-
-            # Check for pagination links
-            pagination_selectors = [
-                'a[href*="page="]',  # Common pagination pattern
-                '.pagination a',     # Bootstrap-style pagination
-                'ul.pagination a',   # Bootstrap pagination
-                'nav.pagination a',  # Modern pagination
-                '.pager a',          # Alternative pagination
-                '.page-links a',     # WordPress pagination
-                'a.next',            # Next button
-                'a[rel="next"]',     # Next link
+        # For NovelFull, we need to be more selective to avoid duplicates
+        if "novelfull.net" in self.base_url:
+            urls = await self._extract_novelfull_chapters(page)
+        else:
+            # Original logic for other sites
+            selectors = [
+                'ul.list-chapter li a[href*="chapter-"]',
+                '.chapter-list a[href*="chapter-"]',
+                '.chapters a[href*="chapter-"]',
+                'a[href*="chapter-"]',
             ]
 
-            page_links = []
-            for selector in pagination_selectors:
+            for selector in selectors:
                 try:
                     links = await page.query_selector_all(selector)
                     for link in links:
                         href = await link.get_attribute('href')
-                        text = await link.inner_text()
-                        if href and text.strip():
-                            page_links.append((href, text.strip()))
+                        if href and self._is_chapter_url(href):
+                            if not href.startswith('http'):
+                                href = f"https://{self.domain}{href}"
+                            urls.append(href)
                 except Exception:
                     continue
 
-            # Remove duplicates
-            seen_hrefs = set()
-            unique_page_links = []
-            for href, text in page_links:
-                if href not in seen_hrefs:
-                    seen_hrefs.add(href)
-                    unique_page_links.append((href, text))
+        return urls
 
-            logger.debug(f"Found {len(unique_page_links)} pagination links")
+    async def _extract_novelfull_chapters(self, page) -> List[str]:
+        """Extract chapters from NovelFull pages."""
+        urls = []
 
-            # If we found pagination links, visit each page
-            if unique_page_links:
-                # Extract from current page first
-                current_urls = await self._extract_from_page_content(page)
-                urls.extend(current_urls)
+        try:
+            # Use the standard ul.list-chapter selector for NovelFull
+            chapter_links = await page.query_selector_all('ul.list-chapter li a[href*="chapter-"]')
 
-                # Visit each pagination page
-                for href, text in unique_page_links:
-                    if should_stop and should_stop():
-                        break
-
-                    try:
-                        # Skip non-numeric page links (like "Next", "Prev", etc.)
-                        if not any(char.isdigit() for char in text):
-                            continue
-
-                        full_url = self._normalize_url(href)
-                        if not self._is_same_site(full_url):
-                            continue
-
-                        logger.debug(f"Visiting pagination page: {text} -> {full_url}")
-
-                        # Navigate to the page
-                        await page.goto(full_url, wait_until='networkidle')
-                        await page.wait_for_timeout(1000)
-
-                        # Extract URLs from this page
-                        page_urls = await self._extract_from_page_content(page)
-                        urls.extend(page_urls)
-
-                        # Limit to prevent excessive requests
-                        if len(urls) > 1000:  # Reasonable limit
-                            break
-
-                    except Exception as e:
-                        logger.debug(f"Failed to visit pagination page {href}: {e}")
-                        continue
-
-                # Remove duplicates
-                urls = self._deduplicate_urls(urls)
-                logger.debug(f"Collected {len(urls)} URLs from {len(unique_page_links) + 1} pages")
-
-                return urls
+            for link in chapter_links:
+                href = await link.get_attribute('href')
+                if href and self._is_chapter_url(href):
+                    if not href.startswith('http'):
+                        href = f"https://novelfull.net{href}"
+                    urls.append(href)
 
         except Exception as e:
-            logger.debug(f"Pagination handling failed: {e}")
+            # Fallback to basic extraction
+            try:
+                basic_links = await page.query_selector_all('a[href*="chapter-"]')
+                for link in basic_links:
+                    href = await link.get_attribute('href')
+                    if href and self._is_chapter_url(href):
+                        if not href.startswith('http'):
+                            href = f"https://novelfull.net{href}"
+                        urls.append(href)
+            except Exception:
+                pass
 
-        return []
+        return urls
 
-    def _parse_json_for_urls(self, content: str) -> List[str]:
-        """Parse JSON content for chapter URLs."""
-        try:
-            import json
-            data = json.loads(content)
-
-            urls = []
-
-            def extract_urls(obj):
-                if isinstance(obj, dict):
-                    for key, value in obj.items():
-                        if key.lower() in ['url', 'href', 'link', 'chapter_url'] and isinstance(value, str):
-                            if 'chapter' in value.lower():
-                                urls.append(value)
-                        else:
-                            extract_urls(value)
-                elif isinstance(obj, list):
-                    for item in obj:
-                        extract_urls(item)
-
-            extract_urls(data)
-            return urls
-
-        except (json.JSONDecodeError, ImportError):
-            return []
-
-    def _is_chapter_link(self, url: str, text: str) -> bool:
-        """Check if a link is a chapter link."""
-        import re
-
-        url_lower = url.lower()
-        text_lower = text.lower()
-
-        # Text indicators
-        text_indicators = ['chapter', 'chap', 'ch ', 'episode', 'ep ', '第', '章']
-        has_text_indicator = any(indicator in text_lower for indicator in text_indicators)
-
-        # URL indicators
-        url_indicators = ['chapter', 'chap', 'ch-', 'ch_', 'episode', '/c/', '/chapter/']
-        has_url_indicator = any(indicator in url_lower for indicator in url_indicators)
-
-        # Must have numbers
-        has_number = bool(re.search(r'\d+', url))
-
-        return (has_text_indicator or has_url_indicator) and has_number
-
-    def _normalize_url(self, url: str) -> str:
-        """Normalize a URL to absolute form."""
-        if not url:
-            return url
-
-        if url.startswith(('http://', 'https://')):
-            return url
-        else:
-            from urllib.parse import urljoin
-            return urljoin(self.base_url, url)
-
-    def _deduplicate_urls(self, urls: List[str]) -> List[str]:
-        """Remove duplicate URLs while preserving order."""
-        seen = set()
-        unique_urls = []
-
-        for url in urls:
-            if url not in seen:
-                seen.add(url)
-                unique_urls.append(url)
-
-        return unique_urls
-
-    def _filter_by_chapter_range(
-        self,
-        urls: List[str],
-        min_chapter: Optional[int],
-        max_chapter: Optional[int]
-    ) -> List[str]:
-        """Filter URLs by chapter number range."""
-        if not min_chapter and not max_chapter:
-            return urls
-
-        filtered_urls = []
-        from ..chapter_parser import extract_chapter_number
-
-        for url in urls:
-            chapter_num = extract_chapter_number(url)
-            if chapter_num:
-                if min_chapter and chapter_num < min_chapter:
-                    continue
-                if max_chapter and chapter_num > max_chapter:
-                    continue
-                filtered_urls.append(url)
-
-        return filtered_urls
-
-    def _extract_novel_identifier(self) -> Optional[str]:
-        """
-        Extract novel identifier from base URL to filter URLs belonging to the same novel.
-
-        For NovelFull: https://novelfull.net/tensei-shitara-slime-datta-ken-wn.html
-        -> identifier: "tensei-shitara-slime-datta-ken-wn"
-
-        For other sites: Extract the path component that identifies the novel.
-        """
-        try:
-            from urllib.parse import urlparse
-
-            parsed = urlparse(self.base_url)
-            path = parsed.path.strip('/')
-
-            # For NovelFull, remove .html extension if present
-            if path.endswith('.html'):
-                path = path[:-5]  # Remove .html
-
-            # Return the path as identifier (should be the novel slug/name)
-            return path if path else None
-
-        except Exception as e:
-            logger.debug(f"Failed to extract novel identifier from {self.base_url}: {e}")
-            return None
+    def _is_chapter_url(self, url: str) -> bool:
+        """Check if URL looks like a chapter URL."""
+        return 'chapter-' in url and url.endswith('.html')
 
     def _analyze_coverage(self, urls: List[str]) -> Optional[Tuple[int, int]]:
+        """Analyze chapter number coverage."""
         from ..chapter_parser import extract_chapter_number
 
         chapter_nums = []
@@ -565,3 +217,153 @@ class BrowserAutomationStrategy(BaseDetectionStrategy):
             return None
 
         return (min(chapter_nums), max(chapter_nums))
+
+    def _validate_urls(self, urls: List[str]) -> Tuple[List[str], float]:
+        """Validate URLs and return filtered list with average confidence."""
+        if not urls:
+            return [], 0.0
+
+        valid_urls = []
+        total_confidence = 0.0
+
+        for url in urls:
+            if self._is_chapter_url(url):
+                valid_urls.append(url)
+                total_confidence += 0.9  # High confidence for browser-extracted URLs
+
+        avg_confidence = total_confidence / len(valid_urls) if valid_urls else 0.0
+        return valid_urls, avg_confidence
+
+    async def _handle_pagination(self, page, should_stop: Optional[Callable[[], bool]]) -> List[str]:
+        """Handle traditional pagination by following page links."""
+        try:
+            urls = []
+
+            # Extract from current page first
+            current_urls = await self._extract_from_page_content(page)
+            urls.extend(current_urls)
+
+            # For NovelFull and similar sites, implement systematic pagination
+            if "novelfull.net" in self.base_url:
+                novel_urls = await self._handle_novelfull_pagination(page, should_stop)
+                urls.extend(novel_urls)
+            else:
+                # Original pagination logic for other sites
+                legacy_urls = await self._handle_legacy_pagination(page, should_stop)
+                urls.extend(legacy_urls)
+
+            return urls
+
+        except Exception as e:
+            logger.debug(f"Pagination handling failed: {e}")
+            return urls
+
+    async def _handle_novelfull_pagination(self, page, should_stop: Optional[Callable[[], bool]]) -> List[str]:
+        """Handle NovelFull-style pagination systematically."""
+        urls = []
+        seen_urls = set()  # Track URLs we've already seen to avoid duplicates
+
+        base_url = page.url
+        # Remove query parameters to get base URL
+        base_url = base_url.split('?')[0]
+
+        page_num = 2  # Start from page 2 since we already did page 1
+
+        while True:
+            if should_stop and should_stop():
+                break
+
+            try:
+                # Construct next page URL
+                next_page_url = f"{base_url}?page={page_num}"
+
+                # Navigate to next page
+                await page.goto(next_page_url, wait_until="networkidle", timeout=10000)
+
+                # Check if page loaded and has content
+                content_check = await page.query_selector('ul.list-chapter')
+                if not content_check:
+                    break
+
+                # Extract URLs from this page
+                page_urls = await self._extract_from_page_content(page)
+
+                if not page_urls:
+                    break
+
+                # Add new URLs (avoid duplicates)
+                new_urls = 0
+                for url in page_urls:
+                    if url not in seen_urls:
+                        seen_urls.add(url)
+                        urls.append(url)
+                        new_urls += 1
+
+                # If we didn't get any new URLs from this page, we've likely reached the end
+                if new_urls == 0:
+                    break
+
+                page_num += 1
+
+                # Safety check: don't go beyond reasonable page count
+                if page_num > 50:  # Reasonable maximum
+                    break
+
+            except Exception as e:
+                break
+
+        return urls
+
+    async def _handle_legacy_pagination(self, page, should_stop: Optional[Callable[[], bool]]) -> List[str]:
+        """Handle traditional pagination by following page links."""
+        urls = []
+
+        # Check for pagination links
+        pagination_selectors = [
+            'a[href*="page="]',  # Common pagination pattern
+            '.pagination a',     # Bootstrap-style pagination
+            'ul.pagination a',   # Bootstrap pagination
+            'nav.pagination a',  # Modern pagination
+            '.pager a',          # Alternative pagination
+            '.page-links a',     # WordPress pagination
+            'a.next',            # Next button
+            'a[rel="next"]',     # Next link
+        ]
+
+        page_links = []
+        for selector in pagination_selectors:
+            try:
+                links = await page.query_selector_all(selector)
+                for link in links:
+                    href = await link.get_attribute('href')
+                    text = await link.inner_text()
+                    if href and text.strip():
+                        page_links.append((href, text.strip()))
+            except Exception:
+                continue
+
+        # Remove duplicates
+        seen_hrefs = set()
+        unique_page_links = []
+        for href, text in page_links:
+            if href not in seen_hrefs:
+                seen_hrefs.add(href)
+                unique_page_links.append((href, text))
+
+        # Visit each pagination page
+        for href, text in unique_page_links:
+            if should_stop and should_stop():
+                break
+
+            try:
+                # Navigate to the page
+                await page.goto(href, wait_until="networkidle", timeout=10000)
+
+                # Extract URLs from this page
+                page_urls = await self._extract_from_page_content(page)
+                urls.extend(page_urls)
+
+            except Exception as e:
+                continue
+
+        return urls

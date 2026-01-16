@@ -29,6 +29,13 @@ pytest tests/unit/
 # Integration tests only
 pytest tests/integration/
 
+# Deterministic end-to-end (runs under tests/integration/e2e)
+pytest tests/integration/e2e/ -n 0
+
+# Network end-to-end (external sites, opt-in)
+set ACT_RUN_NETWORK_E2E=1
+pytest tests/e2e/ -n 0
+
 # With coverage
 pytest tests/ --cov=src --cov-report=html
 ```
@@ -46,6 +53,19 @@ pytest tests/ --cov=src --cov-report=html
 - `@pytest.mark.slow` - Slow tests
 - `@pytest.mark.network` - Network-dependent tests
 - `@pytest.mark.real` - Real operations
+
+### E2E policy
+
+- **Deterministic E2E** lives under `tests/integration/e2e/` and runs against a local HTTP fixture site.
+	This exercises the real scraper + pipeline while staying consistent.
+- **Network E2E** lives under `tests/e2e/` and is **opt-in** via `ACT_RUN_NETWORK_E2E=1`.
+	These hit real novel sites and may be blocked/rate-limited.
+
+### E2E environment variables
+
+- `ACT_TTS_MAX_CHARS` (int): limit chapter text sent to TTS (scraping still saves full text).
+- `ACT_ALLOW_LOCALHOST_URLS=1`: allow `localhost/127.0.0.1` URLs (needed for local-fixture E2E).
+- `ACT_RUN_NETWORK_E2E=1`: enable network E2E tests under `tests/e2e/`.
 
 ## Fixtures
 

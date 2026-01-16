@@ -5,15 +5,15 @@ Main orchestrator that combines all components.
 
 import os
 import tempfile
-from typing import Optional, TYPE_CHECKING, Dict, Any
+from typing import Optional, List, TYPE_CHECKING, Dict, Any
 
 if TYPE_CHECKING:
     from ui.main_window import MainWindow  # type: ignore[unused-import]
 
 from PySide6.QtWidgets import QVBoxLayout, QListWidgetItem
 
+from core.config_manager import get_config
 from core.logger import get_logger
-from ui.styles import get_group_box_style
 from ui.views.base_view import BaseView
 from ui.ui_constants import (
     StatusMessages,
@@ -34,7 +34,6 @@ from ui.views.tts_view.queue_section import QueueSection
 from ui.views.tts_view.controls_section import TTSControlsSection
 from ui.views.tts_view.queue_item_widget import TTSQueueItemWidget
 from ui.views.tts_view.add_queue_dialog import AddQueueDialog
-from ui.widgets.activity_console_widget import ActivityConsoleWidget
 
 logger = get_logger("ui.tts_view")
 
@@ -47,37 +46,36 @@ class TTSView(BaseView):
         return "Text to Speech"
 
     def __init__(self, parent=None):
+        self.file_paths: List[str] = []
         self.conversion_thread: Optional[TTSConversionThread] = None
         self.queue_items: List[Dict[str, Any]] = []  # List of queue items
-
+        self._current_queue_item: Optional[Dict[str, Any]] = None
+        self._temp_files_to_cleanup: List[str] = []
+        
         # Initialize handlers
         self.handlers = TTSViewHandlers(self)
-
+        
         # Initialize UI components (BaseView calls setup_ui)
         super().__init__(parent)
         self._connect_handlers()
-
+        
         logger.info("TTS view initialized")
     
     def setup_ui(self) -> None:
         """Set up the TTS view UI."""
         main_layout = self.get_main_layout()
-
+        
         # Controls section (with queue management buttons)
         self.controls_section = TTSControlsSection()
         main_layout.addWidget(self.controls_section)
-
+        
         # Queue section
         self.queue_section = QueueSection()
         main_layout.addWidget(self.queue_section)
-
+        
         # Progress section (for current processing)
         self.progress_section = ProgressSection()
         main_layout.addWidget(self.progress_section)
-
-        # Activity console
-        self.activity_console_widget = ActivityConsoleWidget()
-        main_layout.addWidget(self.activity_console_widget)
     
     def _connect_handlers(self) -> None:
         """Connect all button handlers."""
@@ -88,7 +86,6 @@ class TTSView(BaseView):
         self.controls_section.pause_button.clicked.connect(self.pause_conversion)
         self.controls_section.stop_button.clicked.connect(self.stop_conversion)
     
-    
     def start_conversion(self):
         """Start the TTS conversion operation."""
         # Check if already running
@@ -96,31 +93,45 @@ class TTSView(BaseView):
             show_already_running_error(self)
             return
 
-        # Check if queue has items
         if not self.queue_items:
             show_error(self, DialogMessages.EMPTY_QUEUE_MSG)
             return
 
-        # Process first queue item
-        queue_item = self.queue_items[0]
-        file_paths_to_convert = queue_item['input_files']
-        input_text = queue_item['input_text']
-        output_dir = queue_item['output_dir']
-        voice = queue_item['voice']
-        provider = queue_item['provider']
-        rate = queue_item['rate']
-        pitch = queue_item['pitch']
-        volume = queue_item['volume']
-        file_format = queue_item['file_format']
+        pending_items = [item for item in self.queue_items if item['status'] in [StatusMessages.PENDING, "Pending"]]
+        if not pending_items:
+            show_error(self, DialogMessages.NO_PENDING_ITEMS_MSG)
+            return
 
-        # Handle text editor input (create temporary file)
-        if input_text:
-            import tempfile
+        item = pending_items[0]
+        self._current_queue_item = item
+        item['status'] = StatusMessages.PROCESSING
+
+        output_dir = item.get('output_dir') or str(get_config().get("paths.output_dir"))
+        voice = item.get('voice') or "en-US-AndrewNeural"
+        provider = item.get('provider')
+        rate = item.get('rate', 100)
+        pitch = item.get('pitch', 0)
+        volume = item.get('volume', 100)
+        file_format = item.get('file_format', ".mp3")
+
+        input_type = item.get('input_type')
+        input_data = item.get('input_data')
+        if input_type == "files":
+            file_paths_to_convert = input_data or []
+        elif input_type == "text":
+            if not input_data:
+                show_validation_error(self, DialogMessages.NO_TEXT_IN_EDITOR_MSG)
+                return
+
             with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt', encoding='utf-8') as tmp:
-                tmp.write(input_text)
+                tmp.write(input_data)
                 temp_file_path = tmp.name
+            self._temp_files_to_cleanup.append(temp_file_path)
             file_paths_to_convert = [temp_file_path]
-
+        else:
+            show_validation_error(self, "Please add files or enter text to convert")
+            return
+        
         # Create and start thread
         self.conversion_thread = TTSConversionThread(
             file_paths_to_convert,
@@ -136,11 +147,12 @@ class TTSView(BaseView):
         self.conversion_thread.status.connect(self._on_status)
         self.conversion_thread.finished.connect(self._on_finished)
         self.conversion_thread.file_created.connect(self._on_file_created)
-
+        
         # Update UI state
         self.controls_section.set_processing_state()
         self.progress_section.set_progress(0)
-
+        self._update_queue_display()
+        
         # Start thread
         self.conversion_thread.start()
         logger.info(f"Started TTS conversion: {len(file_paths_to_convert)} file(s)")
@@ -175,6 +187,9 @@ class TTSView(BaseView):
     def _on_progress(self, value: int):
         """Handle progress update."""
         self.progress_section.set_progress(value)
+        if self._current_queue_item:
+            self._current_queue_item['progress'] = value
+            self._update_queue_display()
     
     def _on_status(self, message: str):
         """Handle status update."""
@@ -190,39 +205,29 @@ class TTSView(BaseView):
         """
         # Reset UI state
         self.controls_section.set_idle_state()
-        
-        # Clean up temporary file if it was created from editor
-        current_tab = self.input_section.get_current_tab_index()
-        if current_tab == 1 and self.conversion_thread and self.conversion_thread.file_paths:
-            # Check if first file is a temp file (starts with temp directory)
-            temp_dir = tempfile.gettempdir()
-            for file_path in self.conversion_thread.file_paths:
-                if file_path.startswith(temp_dir):
-                    try:
-                        if os.path.exists(file_path):
-                            os.unlink(file_path)
-                            logger.debug(f"Cleaned up temporary file: {file_path}")
-                    except Exception as e:
-                        logger.warning(f"Failed to cleanup temp file {file_path}: {e}")
-        
-        # Clean up temporary file if it was created from text editor
-        if self.conversion_thread and self.conversion_thread.file_paths:
-            for file_path in self.conversion_thread.file_paths:
-                if file_path.startswith(tempfile.gettempdir()):
-                    try:
-                        if os.path.exists(file_path):
-                            os.unlink(file_path)
-                            logger.debug(f"Cleaned up temporary file: {file_path}")
-                    except Exception as e:
-                        logger.warning(f"Failed to cleanup temp file {file_path}: {e}")
 
+        for file_path in list(self._temp_files_to_cleanup):
+            try:
+                if os.path.exists(file_path):
+                    os.unlink(file_path)
+                    logger.debug(f"Cleaned up temporary file: {file_path}")
+            except Exception as e:
+                logger.warning(f"Failed to cleanup temp file {file_path}: {e}")
+        self._temp_files_to_cleanup.clear()
+
+        if self._current_queue_item:
+            self._current_queue_item['status'] = StatusMessages.COMPLETED if success else 'Failed'
+            self._current_queue_item['progress'] = 100 if success else 0
+            self._current_queue_item = None
+        
         if success:
             show_success(self, message)
             self.progress_section.set_status(StatusMessages.READY)
         else:
             show_error(self, message)
             self.progress_section.set_status(StatusMessages.ERROR_OCCURRED)
-
+        
+        self._update_queue_display()
         logger.info(f"TTS conversion finished: {message}")
     
     def _on_file_created(self, filepath: str) -> None:
@@ -235,50 +240,50 @@ class TTSView(BaseView):
         logger.debug(f"File created: {filepath}")
     
     def add_to_queue(self):
-        """Add current settings to the queue using a dialog."""
-        # Open the add queue dialog
+        """Add current settings to the queue."""
         dialog = AddQueueDialog(self)
-        if dialog.exec():
-            input_files, input_text, title, voice, provider, rate, pitch, volume, file_format, output_folder = dialog.get_data()
+        if not dialog.exec():
+            return
 
-            # Basic validation
-            if not input_files and not input_text:
-                show_validation_error(self, "Please select files or enter text to convert")
-                return
+        input_files, input_text, title, voice, provider, rate, pitch, volume, file_format, output_dir = dialog.get_data()
 
-            # Use default output folder if not specified
-            if not output_folder:
-                from pathlib import Path
-                from core.config_manager import get_config
-                config = get_config()
-                output_folder = str(config.get('paths.output_dir', Path.home() / "Documents" / "ACT" / "output"))
+        if input_files:
+            input_type = "files"
+            input_data = input_files
+            file_count = len(input_files)
+        elif input_text:
+            input_type = "text"
+            input_data = input_text
+            file_count = 1
+        else:
+            show_validation_error(self, "Please add files or enter text to convert")
+            return
 
-            # Determine file count for display
-            if input_files:
-                file_count = len(input_files)
-            else:
-                file_count = 1  # Text editor input counts as 1 item
-
-            # Create queue item
-            queue_item = {
-                'title': title,
-                'voice': voice,
-                'provider': provider,
-                'rate': rate,
-                'pitch': pitch,
-                'volume': volume,
-                'output_dir': output_folder,
-                'file_format': file_format,
-                'input_files': input_files,
-                'input_text': input_text,
-                'file_count': file_count,
-                'status': StatusMessages.PENDING,
-                'progress': 0
-            }
-            self.queue_items.append(queue_item)
-            self._update_queue_display()
-
-            logger.info(f"Added to queue: {title} - Voice: {voice}, Provider: {provider}")
+        output_dir = output_dir or str(get_config().get("paths.output_dir"))
+        if not output_dir:
+            show_validation_error(self, "Please select an output directory")
+            return
+        
+        # Create queue item
+        queue_item = {
+            'title': title,
+            'voice': voice,
+            'provider': provider,
+            'rate': rate,
+            'pitch': pitch,
+            'volume': volume,
+            'output_dir': output_dir,
+            'file_format': file_format,
+            'input_type': input_type,
+            'input_data': input_data,
+            'file_count': file_count,
+            'status': 'Pending',
+            'progress': 0
+        }
+        self.queue_items.append(queue_item)
+        self._update_queue_display()
+        
+        logger.info(f"Added to queue: {title} - Voice: {voice}")
     
     def clear_queue(self) -> None:
         """

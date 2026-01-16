@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "last_updated": "2026-01-16T12:40:50.325326",
+  "last_updated": "2026-01-16T15:00:39.932297",
   "novels": {
     "https://novelfull.net/in-different-world-with-naruto-system.html": {
       "url": "https://novelfull.net/in-different-world-with-naruto-system.html",
@@ -70,8 +70,9 @@
     "https://novelfull.net/black-tech-internet-cafe-system.html": {
       "url": "https://novelfull.net/black-tech-internet-cafe-system.html",
       "created_at": "2026-01-16T08:18:38.142210",
-      "updated_at": "2026-01-16T08:18:38.142210",
-      "title": "Black tech internet cafe system"
+      "updated_at": "2026-01-16T15:00:39.932297",
+      "title": "Black tech internet cafe system",
+      "novel_url": "https://novelfull.net/black-tech-internet-cafe-system.html"
     },
     "http://example.com": {
       "url": "http://example.com",

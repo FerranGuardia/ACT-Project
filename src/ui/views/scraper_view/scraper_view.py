@@ -9,11 +9,11 @@ from typing import Optional, TYPE_CHECKING, List, Dict, Any
 if TYPE_CHECKING:
     from ui.main_window import MainWindow  # type: ignore[unused-import]
 
-from PySide6.QtWidgets import QVBoxLayout, QGroupBox, QListWidgetItem
+from PySide6.QtWidgets import QVBoxLayout, QListWidgetItem
 
+from core.config_manager import get_config
 from core.logger import get_logger
 from ui.views.base_view import BaseView
-from ui.view_config import ViewConfig
 from ui.ui_constants import (
     ButtonText,
     StatusMessages,
@@ -30,12 +30,12 @@ from ui.utils.error_handling import (
 
 from ui.views.scraper_view.scraping_thread import ScrapingThread
 from ui.views.scraper_view.progress_section import ProgressSection
+from ui.views.scraper_view.output_files_section import OutputFilesSection
 from ui.views.scraper_view.handlers import ScraperViewHandlers
 from ui.views.scraper_view.queue_section import QueueSection
 from ui.views.scraper_view.controls_section import ScraperControlsSection
 from ui.views.scraper_view.queue_item_widget import ScraperQueueItemWidget
 from ui.views.scraper_view.add_queue_dialog import AddQueueDialog
-from ui.widgets.activity_console_widget import ActivityConsoleWidget
 
 logger = get_logger("ui.scraper_view")
 
@@ -51,6 +51,7 @@ class ScraperView(BaseView):
         # Initialize data structures first
         self.scraping_thread: Optional[ScrapingThread] = None
         self.queue_items: List[Dict[str, Any]] = []  # List of queue items
+        self.last_output_dir: Optional[str] = None
         
         # Initialize UI components (BaseView calls setup_ui)
         super().__init__(parent)
@@ -65,22 +66,22 @@ class ScraperView(BaseView):
     def setup_ui(self) -> None:
         """Set up the scraper view UI."""
         main_layout = self.get_main_layout()
-
+        
         # Controls section (with queue management buttons)
         self.controls_section = ScraperControlsSection()
         main_layout.addWidget(self.controls_section)
-
+        
         # Queue section
         self.queue_section = QueueSection()
         main_layout.addWidget(self.queue_section)
-
+        
         # Progress section (for current processing)
         self.progress_section = ProgressSection()
         main_layout.addWidget(self.progress_section)
-
-        # Activity console
-        self.activity_console_widget = ActivityConsoleWidget()
-        main_layout.addWidget(self.activity_console_widget)
+        
+        # Output files list
+        self.output_files_section = OutputFilesSection()
+        main_layout.addWidget(self.output_files_section)
     
     def _connect_handlers(self) -> None:
         """Connect all button handlers."""
@@ -89,20 +90,21 @@ class ScraperView(BaseView):
         self.controls_section.start_button.clicked.connect(self.start_scraping)
         self.controls_section.pause_button.clicked.connect(self.pause_scraping)
         self.controls_section.stop_button.clicked.connect(self.stop_scraping)
+        self.output_files_section.open_folder_button.clicked.connect(self.open_output_folder)
     
     def start_scraping(self) -> None:
         """
         Start the scraping operation.
-
-        Processes the first item from the queue. Checks if already running,
-        then creates and starts the scraping thread. Updates UI state accordingly.
+        
+        Processes the first item from the queue. If no queue items exist,
+        validates and uses input form. Checks if already running, then creates
+        and starts the scraping thread. Updates UI state accordingly.
         """
         # Check if already running
         if self.scraping_thread and self.scraping_thread.isRunning():
             show_already_running_error(self)
             return
-
-        # Check if queue has items
+        
         if not self.queue_items:
             show_error(self, DialogMessages.EMPTY_QUEUE_MSG)
             return
@@ -113,20 +115,22 @@ class ScraperView(BaseView):
         output_dir = queue_item['output_dir']
         file_format = queue_item['file_format']
         chapter_selection = queue_item['chapter_selection']
+        self.last_output_dir = output_dir
 
         logger.debug(f"Processing queue item: {url}")
-
+        
         # Create and start thread
         self.scraping_thread = ScrapingThread(url, chapter_selection, output_dir, file_format)
         self.scraping_thread.progress.connect(self._on_progress)
         self.scraping_thread.status.connect(self._on_status)
         self.scraping_thread.finished.connect(self._on_finished)
         self.scraping_thread.file_created.connect(self._on_file_created)
-
+        
         # Update UI state
         self.controls_section.set_processing_state()
+        self.output_files_section.clear_files()
         self.progress_section.set_progress(0)
-
+        
         # Start thread
         self.scraping_thread.start()
         logger.info(f"Started scraping: {url}")
@@ -184,7 +188,6 @@ class ScraperView(BaseView):
         """
         # Reset UI state
         self.controls_section.set_idle_state()
-        
         if success:
             show_success(self, message)
             self.progress_section.set_status(StatusMessages.READY)
@@ -197,63 +200,65 @@ class ScraperView(BaseView):
     def _on_file_created(self, filepath: str) -> None:
         """
         Handle new file creation.
-
+        
         Args:
             filepath: Path to the newly created file
         """
         filename = os.path.basename(filepath)
+        self.output_files_section.add_file(filename)
         logger.debug(f"File created: {filepath} (filename: {filename})")
     
-    def browse_output_dir(self) -> None:
-        """Open directory browser for output."""
-        self.handlers.browse_output_dir(self.output_settings)
-    
+    def open_output_folder(self) -> None:
+        """Open the output folder in file explorer."""
+        if not self.last_output_dir:
+            show_error(self, DialogMessages.EMPTY_QUEUE_MSG)
+            return
+        self.handlers.open_output_folder_path(self.last_output_dir)
     
     def add_to_queue(self) -> None:
         """
-        Add current settings to the queue using a dialog.
-
-        Opens a dialog for entering queue parameters, validates inputs,
-        creates a queue item, and updates the display.
+        Add current settings to the queue.
+        
+        Validates inputs, creates a queue item, and updates the display.
         """
-        # Open the add queue dialog
         dialog = AddQueueDialog(self)
-        if dialog.exec():
-            url, title, chapter_selection, file_format, output_folder = dialog.get_data()
+        if not dialog.exec():
+            return
 
-            # Validate URL (basic validation)
-            if not url:
-                show_validation_error(self, "Please enter a valid URL")
-                return
+        url, title, chapter_selection, file_format, output_folder = dialog.get_data()
 
-            # Use default output folder if not specified
-            if not output_folder:
-                from pathlib import Path
-                from core.config_manager import get_config
-                config = get_config()
-                output_folder = str(config.get('paths.output_dir', Path.home() / "Documents" / "ACT" / "scraped"))
+        valid, error_msg = self.handlers.validate_url(url)
+        if not valid:
+            show_validation_error(self, error_msg)
+            return
 
-            # Generate title from URL if not provided
-            if not title:
-                title = self.handlers.generate_title_from_url(url)
+        valid, error_msg = self.handlers.validate_chapter_selection(chapter_selection)
+        if not valid:
+            show_validation_error(self, error_msg)
+            return
 
-            # Format chapter selection for display
-            chapter_display = self._format_chapter_selection(chapter_selection)
-
-            # Create queue item
-            queue_item = {
-                'url': url,
-                'title': title,
-                'chapter_selection': chapter_selection,
-                'output_dir': output_folder,
-                'file_format': file_format,
-                'status': StatusMessages.PENDING,
-                'progress': 0
-            }
-            self.queue_items.append(queue_item)
-            self._update_queue_display()
-
-            logger.info(f"Added to queue: {title} ({url}) - {chapter_display}")
+        output_dir = output_folder or str(get_config().get("paths.output_dir"))
+        valid, error_msg = self.handlers.validate_output_dir(output_dir)
+        if not valid:
+            show_validation_error(self, error_msg)
+            return
+        
+        # Format chapter selection for display using constants
+        chapter_display = self._format_chapter_selection(chapter_selection)
+        
+        # Create queue item
+        queue_item = {
+            'url': url,
+            'chapter_selection': chapter_selection,
+            'output_dir': output_dir,
+            'file_format': file_format,
+            'status': StatusMessages.PENDING,
+            'progress': 0
+        }
+        self.queue_items.append(queue_item)
+        self._update_queue_display()
+        
+        logger.info(f"Added to queue: {title or url} - {chapter_display}")
     
     def clear_queue(self) -> None:
         """

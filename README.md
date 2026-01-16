@@ -48,6 +48,22 @@ python launch_ui.py
 3. **Merger**: Combine audio files into audiobooks
 4. **Full Pipeline**: Complete workflow from URL to audiobook
 
+## Testing
+
+```bash
+# Unit tests
+run_unit_tests.bat
+
+# Integration tests (offline by default; skips @pytest.mark.network)
+run_integration_tests.bat
+
+# Deterministic end-to-end (local fixture site)
+run_e2e_tests.bat
+
+# Network end-to-end (real external sites; opt-in)
+run_network_e2e_tests.bat
+```
+
 ## Configuration
 
 Settings are stored in `~/.act/config.json` and include:

@@ -224,13 +224,24 @@ class UniversalUrlDetector:
 
     def _create_strategies(self) -> List[BaseDetectionStrategy]:
         """Create all detection strategies."""
-        return [
-            JavaScriptStrategy(self.base_url, self.session_manager),
-            AjaxStrategy(self.base_url, self.session_manager),
-            HtmlParsingStrategy(self.base_url, self.session_manager),
-            BrowserAutomationStrategy(self.base_url, self.session_manager),
-            ApiReverseEngineeringStrategy(self.base_url, self.session_manager),
-        ]
+        # Special handling for NovelFull - prioritize browser automation for pagination
+        if "novelfull.net" in self.base_url:
+            return [
+                BrowserAutomationStrategy(self.base_url, self.session_manager),  # Prioritize for pagination
+                JavaScriptStrategy(self.base_url, self.session_manager),
+                AjaxStrategy(self.base_url, self.session_manager),
+                HtmlParsingStrategy(self.base_url, self.session_manager),
+                ApiReverseEngineeringStrategy(self.base_url, self.session_manager),
+            ]
+        else:
+            # Default order for other sites
+            return [
+                JavaScriptStrategy(self.base_url, self.session_manager),
+                AjaxStrategy(self.base_url, self.session_manager),
+                HtmlParsingStrategy(self.base_url, self.session_manager),
+                BrowserAutomationStrategy(self.base_url, self.session_manager),
+                ApiReverseEngineeringStrategy(self.base_url, self.session_manager),
+            ]
 
     async def detect_urls(
         self,
@@ -258,10 +269,14 @@ class UniversalUrlDetector:
         # Get optimal strategy order for this site
         strategy_order = self._get_optimal_strategy_order()
 
+        logger.info(f"Strategy order for {self.base_url}: {strategy_order}")
+
         if use_parallel:
             result = await self._detect_parallel(toc_url, strategy_order, should_stop, min_chapter, max_chapter)
         else:
             result = await self._detect_sequential(toc_url, strategy_order, should_stop, min_chapter, max_chapter)
+
+        logger.info(f"Selected strategy: {result.method}, URLs found: {len(result.urls)}")
 
         result.response_time = time.time() - start_time
 

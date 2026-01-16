@@ -5,9 +5,10 @@ Tests initialization, setup, queue operations, and UI interactions.
 Includes both unit tests (with mocks) and integration tests (with real Qt widgets).
 """
 
-import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Import the real implementations with proper mocking
 with patch('PySide6.QtWidgets'), \

@@ -17,7 +17,7 @@ echo Running integration tests...
 echo This may take a few minutes...
 echo.
 
-python -m pytest tests/integration/ -v --tb=short
+python -m pytest tests/integration/ -v --tb=short -n 0 -m "not network"
 set TEST_EXIT=%ERRORLEVEL%
 
 echo.

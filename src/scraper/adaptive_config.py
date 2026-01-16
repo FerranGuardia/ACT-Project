@@ -59,6 +59,16 @@ class SiteProfile:
 
     def get_optimal_strategy_order(self) -> List[str]:
         """Get strategies ordered by effectiveness score."""
+        # Special case for NovelFull - always try browser automation due to pagination
+        if "novelfull.net" in self.domain:
+            return [
+                "browser_automation",  # Force browser automation for NovelFull pagination
+                "javascript",
+                "ajax",
+                "html_parsing",
+                "api_reverse"
+            ]
+
         if not self.strategy_success_rates:
             return self._get_default_strategy_order()
 

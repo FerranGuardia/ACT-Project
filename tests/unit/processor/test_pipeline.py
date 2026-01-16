@@ -8,10 +8,11 @@ Tests pipeline functionality including:
 - Error handling
 """
 
-import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 # Path setup is handled by conftest.py
 from processor.pipeline_orchestrator import ProcessingPipeline
