@@ -93,6 +93,24 @@ class TestCleanText:
         result = clean_text(input_text)
         assert "Text with regular spaces and quotes" == result
 
+    def test_clean_text_accented_characters(self):
+        """Test that accented Latin characters are preserved for TTS."""
+        input_text = "Café, naïve, résumé, façade, rôle"
+        result = clean_text(input_text)
+
+        # Should preserve common accented characters used in English/French
+        assert "Café" in result
+        assert "naïve" in result
+        assert "résumé" in result
+        assert "façade" in result
+        assert "rôle" in result
+
+        # Ensure specific accented characters are not removed
+        assert "é" in result  # e with acute
+        assert "ï" in result  # i with diaeresis
+        assert "ç" in result  # c with cedilla
+        assert "ô" in result  # o with circumflex
+
     def test_clean_text_line_filtering(self):
         """Test that UI patterns are cleaned."""
         input_text = "This is content. Like | Share | Subscribe More content here."

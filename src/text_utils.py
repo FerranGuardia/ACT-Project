@@ -242,8 +242,18 @@ def clean_text(text: Optional[str]) -> str:
     def is_tts_safe(char):
         """Check if character is safe for TTS (English letters, numbers, basic punctuation)"""
         # Keep basic ASCII alphanumeric
-        if char.isalnum() and ord(char) < 128:  # Only ASCII letters/numbers
+        if char.isalnum() and ord(char) < 128:  # ASCII letters/numbers
             return True
+
+        # Keep Latin characters with accents (Latin-1 Supplement: 0x80-0xFF)
+        # This includes common accented characters like é, à, ü, ñ, etc.
+        char_code = ord(char)
+        if 0x80 <= char_code <= 0xFF:
+            # Allow Latin-1 Supplement characters, but filter out control characters
+            if char_code < 0xA0:  # Control characters in Latin-1
+                return False
+            return True
+
         if char in " .,!?;:()[]{}\"'/-_=+*&%$#@~`|\\":
             return True
 
@@ -252,9 +262,6 @@ def clean_text(text: Optional[str]) -> str:
         # Keep punctuation, symbols that are common in text
         if category in ('Po', 'Pd', 'Pe', 'Pf', 'Pi', 'Ps'):
             return True
-
-        # Explicitly filter out non-English character ranges
-        char_code = ord(char)
 
         # Filter out Chinese characters (CJK Unified Ideographs)
         if 0x4E00 <= char_code <= 0x9FFF:
