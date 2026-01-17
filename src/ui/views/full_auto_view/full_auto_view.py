@@ -43,7 +43,7 @@ class FullAutoView(BaseView):
 
     def get_view_title(self) -> str:
         """Get the title for this view."""
-        return "Full Auto"
+        return "URL to MP3"
 
     def __init__(self, parent=None):
         self.queue_items: List[Dict] = []

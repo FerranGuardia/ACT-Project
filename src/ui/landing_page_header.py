@@ -52,8 +52,8 @@ class LandingPageHeader(QWidget):
     def add_logo(self, layout: QVBoxLayout):
         """Add logo to layout."""
         possible_paths = [
-            Path(__file__).parent / "images",
-            Path(__file__).parent.parent.parent / "src" / "ui" / "images",
+            Path(__file__).parent / "images",  # src/ui/images (primary location)
+            Path(__file__).parent.parent.parent.parent,  # Project root (fallback)
         ]
         
         logo_path = None

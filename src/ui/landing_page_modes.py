@@ -42,25 +42,25 @@ MODES_CONFIG: Final[list[ModeConfig]] = [
         id="scraper",
         title="Scraper",
         description="Extract text content from webnovels and stories",
-        icon=""
+        icon="scrapper.png"
     ),
     ModeConfig(
         id="tts",
         title="Text-to-Speech",
         description="Convert text files into natural-sounding audio",
-        icon=""
+        icon="tts.png"
     ),
     ModeConfig(
         id="merger",
         title="Audio Merger",
         description="Combine multiple audio files into seamless chapters",
-        icon=""
+        icon="merger.png"
     ),
     ModeConfig(
         id="full_auto",
-        title="Full Automation",
+        title="URL to MP3",
         description="Complete pipeline: Scrape → TTS → Merge in one go",
-        icon=""
+        icon="url to mp3.png"
     ),
 ]
 
