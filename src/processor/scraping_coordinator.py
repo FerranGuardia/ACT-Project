@@ -101,7 +101,7 @@ class ScrapingCoordinator:
         from scraper.chapter_parser import extract_chapter_number
         url_chapter_num = extract_chapter_number(chapter.url)
         if url_chapter_num and url_chapter_num != chapter_num:
-            logger.warning(f"⚠ URL mismatch detected: Chapter {chapter_num} but URL suggests chapter {url_chapter_num} ({chapter.url})")
+            logger.warning(f" URL mismatch detected: Chapter {chapter_num} but URL suggests chapter {url_chapter_num} ({chapter.url})")
 
         if self.progress_tracker:
             self.progress_tracker.update_chapter(
@@ -119,7 +119,7 @@ class ScrapingCoordinator:
             content, title, error = self.scraper.scrape_chapter(chapter.url)
 
             if content:
-                logger.info(f"✓ Chapter {chapter_num} scraped successfully ({len(content)} characters)")
+                logger.info(f" Chapter {chapter_num} scraped successfully ({len(content)} characters)")
                 if self.progress_tracker:
                     self.progress_tracker.update_chapter(
                         chapter_num,
@@ -263,7 +263,7 @@ class ScrapingCoordinator:
         """Handle scraping errors with consistent logging and progress tracking."""
         # Check if error suggests novel was removed
         if any(keyword in error_msg.lower() for keyword in ["removed", "not found", "404"]):
-            logger.error(f"⚠ Chapter {chapter_num} may have been removed from the site: {error_msg}")
+            logger.error(f" Chapter {chapter_num} may have been removed from the site: {error_msg}")
             logger.error(f"   URL: {chapter_url}")
             logger.error("   This could indicate the novel was deleted or chapters were renumbered")
 

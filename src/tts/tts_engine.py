@@ -274,7 +274,7 @@ class TTSEngine:
                     output_path.unlink()
                     return False
                 
-                logger.info(f"✓ Created audio file: {output_path} ({file_size} bytes)")
+                logger.info(f" Created audio file: {output_path} ({file_size} bytes)")
                 return True
             
             finally:

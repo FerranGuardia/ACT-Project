@@ -71,7 +71,7 @@ class AudioFileItem(QWidget):
         up_button.setMaximumWidth(ViewConfig.QUEUE_ACTION_BUTTON_WIDTH)
         down_button = QPushButton("↓")
         down_button.setMaximumWidth(ViewConfig.QUEUE_ACTION_BUTTON_WIDTH)
-        remove_button = QPushButton("✖️")
+        remove_button = QPushButton("")
         remove_button.setMaximumWidth(ViewConfig.QUEUE_ACTION_BUTTON_WIDTH)
         
         layout.addWidget(up_button)
@@ -118,9 +118,9 @@ class MergerView(BaseView):
         files_layout = QVBoxLayout()
         
         buttons_layout = QHBoxLayout()
-        self.add_files_button = QPushButton("➕ Add Files")
+        self.add_files_button = QPushButton(" Add Files")
         # Standard buttons use default style from global stylesheet
-        self.add_folder_button = QPushButton("➕ Add Folder")
+        self.add_folder_button = QPushButton(" Add Folder")
         # Standard buttons use default style from global stylesheet
         self.auto_sort_button = QPushButton("Auto-sort by filename")
         # Standard buttons use default style from global stylesheet
@@ -190,12 +190,12 @@ class MergerView(BaseView):
         
         # Control buttons
         control_layout = QHBoxLayout()
-        self.start_button = QPushButton("▶️ Start Merging")
+        self.start_button = QPushButton("▶ Start Merging")
         set_button_primary(self.start_button)
-        self.pause_button = QPushButton("⏸️ Pause")
+        self.pause_button = QPushButton("⏸ Pause")
         # Standard buttons use default style from global stylesheet
         self.pause_button.setEnabled(False)
-        self.stop_button = QPushButton("⏹️ Stop")
+        self.stop_button = QPushButton("⏹ Stop")
         # Standard buttons use default style from global stylesheet
         self.stop_button.setEnabled(False)
         control_layout.addWidget(self.start_button)
@@ -271,7 +271,7 @@ class MergerView(BaseView):
                 button.clicked.connect(lambda checked, r=row: self._move_file_up(r))
             elif button.text() == "↓":
                 button.clicked.connect(lambda checked, r=row: self._move_file_down(r))
-            elif "✖️" in button.text():
+            elif "" in button.text():
                 button.clicked.connect(lambda checked, r=row: self._remove_file(r))
         
         self.files_list.addItem(item)
@@ -373,11 +373,11 @@ class MergerView(BaseView):
         if self.merger_thread and self.merger_thread.isRunning():
             if self.merger_thread.is_paused:
                 self.merger_thread.resume()
-                self.pause_button.setText("⏸️ Pause")
+                self.pause_button.setText("⏸ Pause")
                 logger.info("Resumed merging")
             else:
                 self.merger_thread.pause()
-                self.pause_button.setText("▶️ Resume")
+                self.pause_button.setText("▶ Resume")
                 logger.info("Paused merging")
     
     def stop_merging(self):
@@ -400,7 +400,7 @@ class MergerView(BaseView):
         # Reset UI
         self.start_button.setEnabled(True)
         self.pause_button.setEnabled(False)
-        self.pause_button.setText("⏸️ Pause")
+        self.pause_button.setText("⏸ Pause")
         self.stop_button.setEnabled(False)
         self.add_files_button.setEnabled(True)
         self.add_folder_button.setEnabled(True)

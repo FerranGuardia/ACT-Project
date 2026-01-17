@@ -168,7 +168,7 @@ class TTSConversionCoordinator:
                 # Verify output file exists and has content
                 if request.output_path.exists() and request.output_path.stat().st_size > 0:
                     file_size = request.output_path.stat().st_size
-                    logger.info(f"✓ Conversion successful: {request.output_path} ({file_size} bytes)")
+                    logger.info(f" Conversion successful: {request.output_path} ({file_size} bytes)")
                     return ConversionResult(
                         success=True,
                         output_path=request.output_path,

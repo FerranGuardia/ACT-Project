@@ -65,11 +65,11 @@ class ScraperGapService:
             activity_console.log_gap_found(missing_chapters, "scraper_gap_detection")
 
             logger.info(
-                f"🔍 Scraper gap detection: Found {len(missing_chapters)} missing text files "
+                f" Scraper gap detection: Found {len(missing_chapters)} missing text files "
                 f"in range {start_from}-{end_chapter or 'all'}"
             )
         else:
-            logger.debug(f"✓ No text file gaps detected in range {start_from}-{end_chapter or 'all'}")
+            logger.debug(f" No text file gaps detected in range {start_from}-{end_chapter or 'all'}")
 
         return missing_chapters
 

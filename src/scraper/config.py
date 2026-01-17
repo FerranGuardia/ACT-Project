@@ -6,24 +6,13 @@ Contains default settings, selectors, and patterns for web scraping.
 
 # Request settings
 REQUEST_TIMEOUT = 30
-
-# In test runs we want speed + determinism. Real scraping should remain conservative.
-import os
-
-_IS_TEST_ENV = (
-    os.environ.get("ACT_TEST_MODE") == "1"
-    or "PYTEST_CURRENT_TEST" in os.environ
-    or "PYTEST_ADDOPTS" in os.environ
-    or "PYTEST_WORKER" in os.environ
-)
-
-REQUEST_DELAY = 0.0 if _IS_TEST_ENV else 5.0  # Increased from 2.0 to reduce website impact
+REQUEST_DELAY = 5.0  # Increased from 2.0 to reduce website impact
 MAX_RETRIES = 3
 RETRY_BACKOFF_BASE = 3.0  # Increased from 2.0 for more conservative backoff
 
 # Rate limiting
-RATE_LIMIT_DELAY = 0.0 if _IS_TEST_ENV else 3.0  # Increased from 1.0 to reduce request frequency
-RATE_LIMIT_BUFFER = 0.0 if _IS_TEST_ENV else 1.0  # Increased from 0.5 for more conservative rate limiting
+RATE_LIMIT_DELAY = 3.0  # Increased from 1.0 to reduce request frequency
+RATE_LIMIT_BUFFER = 1.0  # Increased from 0.5 for more conservative rate limiting
 
 # Playwright settings
 PLAYWRIGHT_TIMEOUT = 30000
@@ -42,11 +31,11 @@ TITLE_SELECTORS = [
 ]
 
 CONTENT_SELECTORS = [
-    # NovelFull specific selectors (prioritize content-containing selectors first)
-    "div.cha-words",  # NovelFull main content container (contains actual chapter text)
-    "div.cha-content",  # NovelFull content wrapper (contains actual chapter text)
-    "div.chapter-c",  # NovelFull main content container (may only contain title)
-    "div#chapter-c",  # NovelFull content by ID
+    # NovelFull specific selectors (most specific first)
+    "div.cha-words",  # NovelFull main content container
+    "div.cha-content",  # NovelFull content wrapper
+    "div.chapter-c",
+    "div#chapter-c",
     "div.text-left",
     "div#text-chapter",
     "div.chapter-content-wrapper",

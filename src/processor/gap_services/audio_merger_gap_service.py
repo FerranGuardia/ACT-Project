@@ -68,11 +68,11 @@ class AudioMergerGapService:
 
         if missing_files:
             logger.warning(
-                f"⚠️  Audio merger validation: {len(missing_files)} source files missing "
+                f"  Audio merger validation: {len(missing_files)} source files missing "
                 f"for chapters: {missing_files}"
             )
         else:
-            logger.debug(f"✓ All {len(chapter_numbers)} source files available for merging")
+            logger.debug(f" All {len(chapter_numbers)} source files available for merging")
 
         return validation_result
 
@@ -102,7 +102,7 @@ class AudioMergerGapService:
 
         if missing_chapters:
             logger.info(
-                f"🔍 Audio merger gap check: {len(missing_chapters)} missing files "
+                f" Audio merger gap check: {len(missing_chapters)} missing files "
                 f"in range {start_chapter}-{end_chapter}: {missing_chapters}"
             )
 

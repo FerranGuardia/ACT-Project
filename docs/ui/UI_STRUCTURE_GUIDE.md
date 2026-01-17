@@ -174,12 +174,12 @@ class MyView(BaseView):
 Use state management methods instead of directly manipulating buttons:
 
 ```python
-# ❌ BAD: Direct manipulation scattered throughout code
+#  BAD: Direct manipulation scattered throughout code
 self.controls_section.start_button.setEnabled(False)
 self.controls_section.pause_button.setEnabled(True)
 self.controls_section.stop_button.setEnabled(True)
 
-# ✅ GOOD: Use state management methods
+#  GOOD: Use state management methods
 self.controls_section.set_processing_state()
 ```
 
@@ -188,12 +188,12 @@ self.controls_section.set_processing_state()
 Always use constants instead of magic strings:
 
 ```python
-# ❌ BAD: Magic strings
-button.setText("⏸️ Pause")
+#  BAD: Magic strings
+button.setText("⏸ Pause")
 if button.text() == "↑":
     # ...
 
-# ✅ GOOD: Use constants
+#  GOOD: Use constants
 from ui.ui_constants import ButtonText
 button.setText(ButtonText.PAUSE)
 if button.text() == ButtonText.MOVE_UP:
@@ -205,12 +205,12 @@ if button.text() == ButtonText.MOVE_UP:
 Use object references, not text matching:
 
 ```python
-# ❌ BAD: Fragile text matching
+#  BAD: Fragile text matching
 for button in widget.findChildren(QPushButton):
     if button.text() == "↑":
         button.clicked.connect(...)
 
-# ✅ GOOD: Use object references
+#  GOOD: Use object references
 widget.up_button.clicked.connect(...)
 widget.down_button.clicked.connect(...)
 ```
@@ -290,11 +290,11 @@ def start_operation(self) -> None:
 Always use config values, never hardcode:
 
 ```python
-# ❌ BAD
+#  BAD
 layout.setSpacing(10)
 button.setMinimumWidth(300)
 
-# ✅ GOOD
+#  GOOD
 from ui.view_config import ViewConfig
 layout.setSpacing(ViewConfig.INPUT_GROUP_SPACING)
 button.setMinimumWidth(ViewConfig.COMBO_BOX_VOICE_MIN_WIDTH)
@@ -309,10 +309,10 @@ button.setMinimumWidth(ViewConfig.COMBO_BOX_VOICE_MIN_WIDTH)
 Don't access child widgets directly from parent views:
 
 ```python
-# ❌ BAD: Direct access
+#  BAD: Direct access
 self.controls_section.start_button.setEnabled(False)
 
-# ✅ GOOD: Use methods
+#  GOOD: Use methods
 self.controls_section.set_processing_state()
 ```
 
@@ -321,11 +321,11 @@ self.controls_section.set_processing_state()
 Never use hardcoded strings:
 
 ```python
-# ❌ BAD
+#  BAD
 if status == "Processing":
     # ...
 
-# ✅ GOOD
+#  GOOD
 from ui.ui_constants import StatusMessages
 if status == StatusMessages.PROCESSING:
     # ...
@@ -336,13 +336,13 @@ if status == StatusMessages.PROCESSING:
 If you find yourself copying code, extract it:
 
 ```python
-# ❌ BAD: Duplicated in multiple views
+#  BAD: Duplicated in multiple views
 def _on_finished(self, success: bool, message: str):
     self.controls_section.start_button.setEnabled(True)
     self.controls_section.pause_button.setEnabled(False)
     # ... repeated code
 
-# ✅ GOOD: Use base class or helper methods
+#  GOOD: Use base class or helper methods
 def _on_finished(self, success: bool, message: str):
     self.controls_section.set_idle_state()
     # ... specific logic
@@ -353,12 +353,12 @@ def _on_finished(self, success: bool, message: str):
 Don't rely on button text for connections:
 
 ```python
-# ❌ BAD: Breaks if text changes
+#  BAD: Breaks if text changes
 for button in widget.findChildren(QPushButton):
     if button.text() == "↑":
         # ...
 
-# ✅ GOOD: Use object references
+#  GOOD: Use object references
 widget.up_button.clicked.connect(...)
 ```
 
@@ -367,12 +367,12 @@ widget.up_button.clicked.connect(...)
 Always validate inputs and handle errors:
 
 ```python
-# ❌ BAD: No validation
+#  BAD: No validation
 def start_operation(self):
     url = self.url_input.text()
     # Start immediately - might fail!
 
-# ✅ GOOD: Validate first
+#  GOOD: Validate first
 def start_operation(self):
     valid, error_msg = self.handlers.validate_inputs(...)
     if not valid:

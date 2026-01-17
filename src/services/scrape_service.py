@@ -2,7 +2,7 @@
 Standalone scraping service that exposes a simple, consistent API.
 """
 
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 from core.logger import get_logger
@@ -23,6 +23,17 @@ class ScrapeService:
         clean_url = self._validate_url(toc_url)
         scraper = self._get_scraper_for_url(clean_url)
         return scraper.get_chapter_urls(clean_url)
+
+    def get_chapter_urls_with_metadata(self, toc_url: str) -> Tuple[List[str], Dict[str, Any]]:
+        """
+        Get chapter URLs plus extraction metadata (confidence, pagination, completeness).
+
+        This is intended for diagnostics and UIs that want a failsafe signal to decide
+        whether the returned list is likely complete.
+        """
+        clean_url = self._validate_url(toc_url)
+        scraper = self._get_scraper_for_url(clean_url)
+        return scraper.get_chapter_urls_with_metadata(clean_url)
 
     def scrape_chapter(self, chapter_url: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         """Scrape a single chapter URL."""

@@ -73,7 +73,7 @@ class AudioPostProcessor:
         missing_batches = self._check_batch_gaps_before_merge(batch_size)
         if missing_batches:
             logger.warning(
-                f"⚠ Batch gap detection: Found {len(missing_batches)} missing batch files "
+                f" Batch gap detection: Found {len(missing_batches)} missing batch files "
                 f"before merge operation: {missing_batches[:3]}{'...' if len(missing_batches) > 3 else ''}"
             )
             # Note: We continue with merging, but user should be aware of missing batches
@@ -96,13 +96,13 @@ class AudioPostProcessor:
 
             logger.info(f"Merging batch {batch_num + 1}/{total_batches} ({len(batch_files)} files)...")
             if audio_merger.merge_audio_chunks(batch_files, batch_path):
-                logger.info(f"✓ Successfully merged batch {batch_num + 1} into: {batch_path}")
+                logger.info(f" Successfully merged batch {batch_num + 1} into: {batch_path}")
                 success_count += 1
             else:
                 logger.error(f"Failed to merge batch {batch_num + 1}")
 
         if success_count == total_batches:
-            logger.info(f"✓ Successfully merged all {total_batches} batches")
+            logger.info(f" Successfully merged all {total_batches} batches")
             return True
         else:
             logger.error(f"Failed to merge {total_batches - success_count} out of {total_batches} batches")
@@ -121,7 +121,7 @@ class AudioPostProcessor:
         success = audio_merger.merge_audio_chunks(audio_files, merged_path)
 
         if success:
-            logger.info(f"✓ Successfully merged audio files into: {merged_path}")
+            logger.info(f" Successfully merged audio files into: {merged_path}")
             return True
         else:
             logger.error("Failed to merge audio files")

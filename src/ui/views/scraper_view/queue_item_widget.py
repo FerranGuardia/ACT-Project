@@ -15,7 +15,7 @@ class ScraperQueueItemWidget(BaseQueueItemWidget):
     
     def get_icon(self) -> str:
         """Return the emoji/icon for this queue item."""
-        return "📄"
+        return ""
     
     def get_title_text(self) -> str:
         """Return the main title text for this queue item."""

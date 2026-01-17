@@ -142,7 +142,7 @@ class ACTLogger:
                 handler.setLevel(logging.DEBUG)
         
         logger = get_logger("logger")
-        logger.info("🟢 Verbose console logging ENABLED - All DEBUG messages will appear in console")
+        logger.info(" Verbose console logging ENABLED - All DEBUG messages will appear in console")
     
     @classmethod
     def disable_verbose_console(cls) -> None:
@@ -156,7 +156,7 @@ class ACTLogger:
                 handler.setLevel(logging.INFO)
         
         logger = get_logger("logger")
-        logger.info("🔴 Verbose console logging DISABLED - Only INFO and above will appear in console")
+        logger.info(" Verbose console logging DISABLED - Only INFO and above will appear in console")
 
     @staticmethod
     def get_log_file_path() -> Path:

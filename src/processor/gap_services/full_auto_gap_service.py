@@ -93,12 +93,12 @@ class FullAutoGapService:
             activity_console.log_gap_found(chapter_gaps, "full_auto_gap_detection")
 
             logger.info(
-                f"🔍 Full auto gap detection: Found {len(chapter_gaps)} total gaps "
+                f" Full auto gap detection: Found {len(chapter_gaps)} total gaps "
                 f"({len(text_only_gaps)} text-only, {len(audio_only_gaps)} audio-only, "
                 f"{len(both_missing_gaps)} both missing) in range {start_from}-{end_chapter or 'all'}"
             )
         else:
-            logger.debug(f"✓ No comprehensive gaps detected in range {start_from}-{end_chapter or 'all'}")
+            logger.debug(f" No comprehensive gaps detected in range {start_from}-{end_chapter or 'all'}")
 
         return gap_summary
 
@@ -131,7 +131,7 @@ class FullAutoGapService:
 
         if all_missing:
             logger.info(
-                f"🔍 Batch gap detection: Found {len(all_missing)} missing batch files "
+                f" Batch gap detection: Found {len(all_missing)} missing batch files "
                 f"across {len(batch_sizes)} batch sizes"
             )
 

@@ -83,7 +83,6 @@ Each module can be tested independently:
 - **Integration Tests**: Test modules together in a real browser context
 - **E2E Tests**: Test the complete bundled script with Playwright
 
-See `tests/unit/scraper/test_playwright_scripts/` for test examples.
 
 
 

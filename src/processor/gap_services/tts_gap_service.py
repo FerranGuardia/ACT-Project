@@ -66,11 +66,11 @@ class TTSGapService:
             activity_console.log_gap_found(missing_chapters, "tts_gap_detection")
 
             logger.info(
-                f"🔍 TTS gap detection: Found {len(missing_chapters)} missing audio files "
+                f" TTS gap detection: Found {len(missing_chapters)} missing audio files "
                 f"in range {start_from}-{end_chapter or 'all'}"
             )
         else:
-            logger.debug(f"✓ No audio file gaps detected in range {start_from}-{end_chapter or 'all'}")
+            logger.debug(f" No audio file gaps detected in range {start_from}-{end_chapter or 'all'}")
 
         return missing_chapters
 

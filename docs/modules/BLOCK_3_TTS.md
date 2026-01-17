@@ -1,6 +1,6 @@
 # TTS Module
 
-**Status**: ✅ Complete
+**Status**:  Complete
 **Location**: `src/tts/`
 
 ## Overview
@@ -39,7 +39,3 @@ engine.convert_text_to_speech(
 - Basic text preprocessing
 - Error handling and recovery
 
-## Testing
-
-- `tests/unit/tts/` - Unit tests for TTS components
-- `tests/integration/tts/` - Integration tests for provider fallback

@@ -176,9 +176,9 @@ class MainWindow(QMainWindow):
             available_families = db.families()
             for expected, actual in self._font_family_map.items():
                 if actual in available_families:
-                    logger.debug(f"✓ Font '{actual}' is available in Qt font database")
+                    logger.debug(f" Font '{actual}' is available in Qt font database")
                 else:
-                    logger.warning(f"✗ Font '{actual}' not found in Qt font database")
+                    logger.warning(f" Font '{actual}' not found in Qt font database")
         
         logger.info(f"Loaded {loaded_count} font files")
         

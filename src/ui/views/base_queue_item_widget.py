@@ -82,7 +82,7 @@ class BaseQueueItemWidget(QWidget):
         self.up_button.setToolTip("Move Up")
         self.down_button = QPushButton("↓")
         self.down_button.setToolTip("Move Down")
-        self.remove_button = QPushButton("✖️")
+        self.remove_button = QPushButton("")
         self.remove_button.setToolTip("Remove")
         # Make sure buttons are visible and properly styled
         for btn in [self.up_button, self.down_button, self.remove_button]:

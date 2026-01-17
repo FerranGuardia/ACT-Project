@@ -57,8 +57,8 @@ class AddQueueDialog(QDialog):
         files_layout.setContentsMargins(0, 0, 0, 0)
 
         buttons_layout = QHBoxLayout()
-        self.add_files_button = QPushButton("➕ Add Files")
-        self.add_folder_button = QPushButton("➕ Add Folder")
+        self.add_files_button = QPushButton(" Add Files")
+        self.add_folder_button = QPushButton(" Add Folder")
         self.remove_button = QPushButton("Remove Selected")
         self.remove_button.setEnabled(False)
         buttons_layout.addWidget(self.add_files_button)
@@ -275,7 +275,7 @@ class AddQueueDialog(QDialog):
                 logger.warning("No TTS providers available")
                 self.provider_button.setText("No Providers Available")
                 self.provider_button.setEnabled(False)
-                self.provider_status_label.setText("🔴")
+                self.provider_status_label.setText("")
                 self._providers_loaded = True
                 return
 
@@ -327,14 +327,14 @@ class AddQueueDialog(QDialog):
             provider_manager = TTSProviderManager()
             provider = provider_manager.get_provider(self.selected_provider)
             if provider and provider.is_available():
-                self.provider_status_label.setText("🟡")
+                self.provider_status_label.setText("")
                 self.provider_status_label.setToolTip("Provider library available - Use dialog to test audio generation")
             else:
-                self.provider_status_label.setText("🔴")
+                self.provider_status_label.setText("")
                 self.provider_status_label.setToolTip("Provider is unavailable")
         except Exception as e:
             logger.error(f"Error checking provider status: {e}")
-            self.provider_status_label.setText("🔴")
+            self.provider_status_label.setText("")
             self.provider_status_label.setToolTip("Error checking status")
 
     def _get_selected_provider(self) -> Optional[str]:

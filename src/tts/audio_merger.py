@@ -376,7 +376,7 @@ class AudioMerger:
 
                 # Verify output file exists and has content
                 if success and await self._verify_audio_file_async(chunk_path):
-                    logger.debug(f"✓ Chunk {index+1} converted successfully")
+                    logger.debug(f" Chunk {index+1} converted successfully")
                     return chunk_path
                 else:
                     logger.warning(f"Chunk {index+1} attempt {attempt+1} produced invalid file")
@@ -478,7 +478,7 @@ class AudioMerger:
             with open(output_path, 'wb') as f:
                 combined.export(f, format="mp3")  # type: ignore[attr-defined]
 
-            logger.info(f"✓ Merged {len(chunk_files)} audio chunks using pydub")
+            logger.info(f" Merged {len(chunk_files)} audio chunks using pydub")
             return True
 
         except Exception as e:
@@ -520,7 +520,7 @@ class AudioMerger:
                 )
 
                 if result.returncode == 0 and output_path.exists():
-                    logger.info(f"✓ Merged {len(chunk_files)} audio chunks using ffmpeg")
+                    logger.info(f" Merged {len(chunk_files)} audio chunks using ffmpeg")
                     return True
                 else:
                     logger.debug(f"ffmpeg merge failed: {result.stderr}")
@@ -544,7 +544,7 @@ class AudioMerger:
 
         try:
             shutil.copy2(chunk_files[0], output_path)
-            logger.info(f"✓ Copied first chunk to output (fallback mode)")
+            logger.info(f" Copied first chunk to output (fallback mode)")
             return True
         except Exception as e:
             logger.error(f"Failed to copy audio file in fallback mode - {type(e).__name__}: {e}")

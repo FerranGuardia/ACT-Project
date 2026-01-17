@@ -12,32 +12,32 @@ class ButtonText:
     """Button text constants."""
     
     # Common buttons
-    ADD_TO_QUEUE: Final[str] = "➕ Add to Queue"
-    CLEAR_QUEUE: Final[str] = "🗑️ Clear Queue"
-    START: Final[str] = "▶️ Start"
-    PAUSE: Final[str] = "⏸️ Pause"
-    RESUME: Final[str] = "▶️ Resume"
-    STOP: Final[str] = "⏹️ Stop"
+    ADD_TO_QUEUE: Final[str] = " Add to Queue"
+    CLEAR_QUEUE: Final[str] = " Clear Queue"
+    START: Final[str] = "▶ Start"
+    PAUSE: Final[str] = "⏸ Pause"
+    RESUME: Final[str] = "▶ Resume"
+    STOP: Final[str] = "⏹ Stop"
     
     # Scraper-specific
-    START_SCRAPING: Final[str] = "▶️ Start Scraping"
+    START_SCRAPING: Final[str] = "▶ Start Scraping"
     
     # TTS-specific
-    START_CONVERSION: Final[str] = "▶️ Start Conversion"
+    START_CONVERSION: Final[str] = "▶ Start Conversion"
     
     # Full Auto-specific
-    START_PROCESSING: Final[str] = "▶️ Start Processing"
+    START_PROCESSING: Final[str] = "▶ Start Processing"
     
     # Queue item actions
     MOVE_UP: Final[str] = "↑"
     MOVE_DOWN: Final[str] = "↓"
-    REMOVE: Final[str] = "✖️ Remove"
+    REMOVE: Final[str] = " Remove"
     
     # Other common buttons
     BROWSE: Final[str] = "Browse..."
-    PREVIEW: Final[str] = "🔊 Preview"
-    STOP_PREVIEW: Final[str] = "⏹️ Stop Preview"
-    OPEN_FOLDER: Final[str] = "📁 Open Folder"
+    PREVIEW: Final[str] = " Preview"
+    STOP_PREVIEW: Final[str] = "⏹ Stop Preview"
+    OPEN_FOLDER: Final[str] = " Open Folder"
 
 
 class StatusMessages:

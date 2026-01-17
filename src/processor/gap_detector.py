@@ -125,11 +125,11 @@ class GapDetector:
             if len(all_missing) > 10:
                 preview_str += f", ... (+{len(all_missing) - 10} more)"
             logger.info(
-                f"🔍 Gap detection: Found {len(all_missing)} missing chapters "
+                f" Gap detection: Found {len(all_missing)} missing chapters "
                 f"in range {start_from}-{end_chapter}: [{preview_str}]"
             )
         else:
-            logger.debug(f"✓ No gaps detected in range {start_from}-{end_chapter}")
+            logger.debug(f" No gaps detected in range {start_from}-{end_chapter}")
         
         return all_missing
     

@@ -108,14 +108,14 @@ class ProcessingThread(QThread):
             
             if missing_chapters:
                 logger.info(
-                    f"⚠ Failsafe: Detected {len(missing_chapters)} missing chapters "
+                    f" Failsafe: Detected {len(missing_chapters)} missing chapters "
                     f"that will be re-scraped: {missing_chapters[:10]}{'...' if len(missing_chapters) > 10 else ''}"
                 )
                 self.status.emit(
                     f"Found {len(missing_chapters)} missing chapters - will re-scrape"
                 )
             else:
-                logger.info("✓ Gap detection: No missing chapters found")
+                logger.info(" Gap detection: No missing chapters found")
                 self.status.emit("No gaps detected - proceeding normally")
             
             return missing_chapters

@@ -324,7 +324,7 @@ class BatchProcessingCoordinator:
         # Log conversion start to activity console
         activity_console.log_activity(
             ActivityCategory.TTS_STRATEGY_SELECTED,
-            f"🎯 Using DirectConversion for chapter {chapter.number}",
+            f" Using DirectConversion for chapter {chapter.number}",
             details={'strategy': 'DirectConversion', 'chapter': chapter.number}
         )
 
@@ -399,7 +399,7 @@ class BatchProcessingCoordinator:
             audio_merger = AudioMerger(provider_manager)
 
             if audio_merger.merge_audio_chunks(batch_files, batch_path):
-                logger.info(f"✓ Successfully merged batch {batch_start}-{batch_end} into: {batch_path}")
+                logger.info(f" Successfully merged batch {batch_start}-{batch_end} into: {batch_path}")
                 return True
             else:
                 logger.error(f"Failed to merge batch {batch_start}-{batch_end}")

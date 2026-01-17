@@ -180,7 +180,7 @@ class ConversionCoordinator:
             # so we need to use the context or find another way
             # For now, let the batch processing coordinator handle this
 
-            logger.info(f"✓ Completed chapter {chapter_num}")
+            logger.info(f" Completed chapter {chapter_num}")
             return True
 
         except Exception as e:

@@ -78,9 +78,9 @@ class FullAutoView(BaseView):
         
         # Global controls
         global_controls_layout = QHBoxLayout()
-        self.pause_all_button = QPushButton("⏸️ Pause All")
+        self.pause_all_button = QPushButton("⏸ Pause All")
         # Standard buttons use default style from global stylesheet
-        self.stop_all_button = QPushButton("⏹️ Stop All")
+        self.stop_all_button = QPushButton("⏹ Stop All")
         # Standard buttons use default style from global stylesheet
         global_controls_layout.addWidget(self.pause_all_button)
         global_controls_layout.addWidget(self.stop_all_button)

@@ -18,7 +18,7 @@ class MergerQueueItemWidget(BaseQueueItemWidget):
 
     def get_icon(self) -> str:
         """Return the icon for merger queue items."""
-        return "🔗"
+        return ""
 
     def get_title_text(self) -> str:
         """Return the title text for the merger item."""

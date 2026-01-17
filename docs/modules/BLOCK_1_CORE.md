@@ -1,6 +1,6 @@
 # Core Infrastructure
 
-**Status**: ✅ Complete
+**Status**:  Complete
 **Location**: `src/core/`, `src/utils/`
 
 ## Components
@@ -33,7 +33,3 @@ is_valid, clean_url = validate_url("https://example.com")
 is_valid, error = validate_tts_request(request)
 ```
 
-## Testing
-
-- `tests/unit/core/` - Logger and config tests
-- `tests/unit/utils/test_validation.py` - Input validation tests
