@@ -5,18 +5,23 @@ This module contains the PipelineOrchestrator class that coordinates
 between specialized coordinators and maintains backward compatibility.
 """
 
-from typing import Optional, Dict, Any, List
 from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
 
+import core.config_manager as config_manager
+
+
+def get_config():
+    return config_manager.get_config()
 from core.logger import get_logger
-from core.config_manager import get_config
 
-from .chapter_manager import Chapter
-from .progress_tracker import ProcessingStatus
-from .context import ProcessingContext
-from .scraping_coordinator import ScrapingCoordinator
-from .conversion_coordinator import ConversionCoordinator
 from .audio_post_processor import AudioPostProcessor
+from .backward_compatibility_adapter import BackwardCompatibilityAdapter
+from .batch_processing_coordinator import BatchProcessingCoordinator
+from .context import ProcessingContext
+from .conversion_coordinator import ConversionCoordinator
+from .processing_metadata_service import ProcessingMetadataService
+from .scraping_coordinator import ScrapingCoordinator
 
 logger = get_logger("processor.pipeline_orchestrator")
 
@@ -31,9 +36,9 @@ class PipelineOrchestrator:
     def __init__(
         self,
         project_name: str,
-        on_progress: Optional[callable] = None,
-        on_status_change: Optional[callable] = None,
-        on_chapter_update: Optional[callable] = None,
+        on_progress: Optional[Callable] = None,
+        on_status_change: Optional[Callable] = None,
+        on_chapter_update: Optional[Callable] = None,
         voice: Optional[str] = None,
         provider: Optional[str] = None,
         base_output_dir: Optional[Path] = None,
@@ -51,10 +56,27 @@ class PipelineOrchestrator:
             base_output_dir=base_output_dir
         )
 
-        # Initialize coordinators
+        # Initialize specialized coordinators
         self.scraping_coordinator = ScrapingCoordinator(self.context)
         self.conversion_coordinator = ConversionCoordinator(self.context)
         self.audio_post_processor = AudioPostProcessor(self.context)
+
+        # Initialize new focused coordinators
+        self.batch_processing_coordinator = BatchProcessingCoordinator(
+            self.context,
+            self.scraping_coordinator,
+            self.conversion_coordinator
+        )
+        self.processing_metadata_service = ProcessingMetadataService(self.context)
+
+        # Initialize backward compatibility adapter
+        self._backward_compatibility = BackwardCompatibilityAdapter(
+            self.context,
+            self.scraping_coordinator,
+            self.conversion_coordinator,
+            self.audio_post_processor,
+            self.batch_processing_coordinator
+        )
 
         self.config = get_config()
 
@@ -62,19 +84,32 @@ class PipelineOrchestrator:
         if not self.context.voice:
             self.context.voice = self.config.get("tts.voice", "en-US-AndrewNeural")
 
-    def set_pause_check_callback(self, callback: callable) -> None:
-        """Set a callback function to check if processing should be paused."""
-        self.context.set_pause_check_callback(callback)
+    def cleanup_resources(self) -> None:
+        """Clean up all resources used by coordinators."""
+        try:
+            # Clean up conversion coordinator resources (TTS resource manager)
+            if hasattr(self.conversion_coordinator, 'resource_manager'):
+                logger.debug("Cleaning up TTS resource manager")
+                self.conversion_coordinator.resource_manager.cleanup_all()
 
-    def stop(self) -> None:
-        """Stop the processing pipeline."""
-        self.context.should_stop = True
-        logger.info("Pipeline stop requested")
+            logger.info("Pipeline resources cleaned up successfully")
+        except Exception as e:
+            logger.warning(f"Error during pipeline resource cleanup: {e}")
 
-    def clear_project_data(self) -> None:
-        """Clear project data without deleting files."""
-        self.scraping_coordinator.project_manager.clear_project_data()
-        logger.info("Project data cleared")
+    # Delegate backward compatibility to adapter
+    def __getattr__(self, name):
+        """Delegate attribute access to backward compatibility adapter."""
+        if hasattr(self._backward_compatibility, name):
+            return getattr(self._backward_compatibility, name)
+        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+
+    def __setattr__(self, name, value):
+        """Delegate attribute setting to backward compatibility adapter if it has the attribute."""
+        # Check if _backward_compatibility exists in __dict__ to avoid recursion
+        if '_backward_compatibility' in self.__dict__ and hasattr(self._backward_compatibility, name):
+            setattr(self._backward_compatibility, name, value)
+        else:
+            super().__setattr__(name, value)
 
     def run_full_pipeline(
         self,
@@ -85,7 +120,9 @@ class PipelineOrchestrator:
         start_from: int = 1,
         max_chapters: Optional[int] = None,
         voice: Optional[str] = None,
-        provider: Optional[str] = None
+        provider: Optional[str] = None,
+        skip_if_exists: bool = False,
+        output_format: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Run the complete pipeline from TOC URL to finished audiobook."""
         logger.info("Starting full pipeline...")
@@ -109,147 +146,33 @@ class PipelineOrchestrator:
         if not self._ensure_chapter_urls_available(toc_url):
             return {"success": False, "error": "Failed to fetch chapter URLs"}
 
+        # Step 2.5: Initialize merged directory if batch merging is enabled
+        if output_format and output_format.get('type') == 'incremental_batches':
+            logger.info("Batch merging enabled - ensuring merged directory exists")
+            print(f"DEBUG: PipelineOrchestrator received output_format = {output_format}")
+            self.file_manager.get_merged_dir()
+
         # Step 3: Ensure scraper is initialized
         if not self.scraping_coordinator.ensure_scraper_initialized(toc_url):
             return {"success": False, "error": "Cannot initialize scraper"}
 
         # Step 4: Process all chapters
-        result = self.process_all_chapters(
-            ignore_errors=True,  # Continue processing other chapters on failure
+        result = self.batch_processing_coordinator.process_all_chapters(
             start_from=start_from,
-            max_chapters=max_chapters
+            max_chapters=max_chapters,
+            skip_if_exists=skip_if_exists,
+            ignore_errors=False,  # Stop on first error to show real issues
+            output_format=output_format
         )
+
+        # Step 5: Save processing metadata
+        self.processing_metadata_service.save_processing_metadata(result)
 
         return result
 
-    def process_all_chapters(
-        self,
-        start_from: int = 1,
-        max_chapters: Optional[int] = None,
-        skip_if_exists: bool = True,
-        ignore_errors: bool = False
-    ) -> Dict[str, Any]:
-        """Process all chapters in the project."""
-        if not self.scraping_coordinator.progress_tracker:
-            logger.error("Progress tracker not initialized")
-            return {"success": False, "error": "Progress tracker not initialized"}
 
-        logger.info("Starting chapter processing...")
-        self.scraping_coordinator.progress_tracker.update_status("processing", "Processing chapters")
 
-        # Get chapters to process
-        chapters_to_process = self.scraping_coordinator.get_chapters_to_process(start_from, max_chapters)
 
-        # If skip_if_exists is True, find the first missing chapter and adjust
-        if skip_if_exists and chapters_to_process:
-            first_missing = self.conversion_coordinator.get_first_missing_chapter(chapters_to_process)
-
-            if first_missing is not None:
-                # Filter to only process from first missing chapter onwards
-                chapters_to_process = [
-                    ch for ch in chapters_to_process
-                    if ch.number >= first_missing
-                ]
-                logger.info(f"Resuming from chapter {first_missing} (first missing chapter)")
-            else:
-                # All chapters already exist
-                logger.info("All chapters already processed, nothing to do")
-                chapters_to_process = []
-
-        logger.info(f"Processing {len(chapters_to_process)} chapters")
-        if ignore_errors:
-            logger.info("Error isolation enabled: will continue processing even if individual chapters fail")
-
-        # Process each chapter
-        completed = 0
-        failed = 0
-
-        # Default failure callback for cleanup
-        def default_failure_callback(chapter_num: int, exception: Exception):
-            """Default cleanup callback - removes temp files on failure."""
-            import tempfile
-            temp_dir = Path(tempfile.gettempdir())
-            temp_audio_path = temp_dir / f"chapter_{chapter_num}_temp.mp3"
-            if temp_audio_path.exists():
-                try:
-                    temp_audio_path.unlink()
-                    logger.debug(f"Failure callback: Cleaned up temp file for chapter {chapter_num}")
-                except Exception as cleanup_error:
-                    logger.warning(f"Failure callback: Failed to cleanup temp file: {cleanup_error}")
-
-        for chapter in chapters_to_process:
-            if self.context.check_should_stop():
-                logger.info("Processing stopped by user")
-                break
-
-            # Check for pause before processing each chapter
-            self.context.wait_if_paused()
-            if self.context.check_should_stop():
-                logger.info("Processing stopped by user")
-                break
-
-            success = self.process_chapter(
-                chapter,
-                skip_if_exists=skip_if_exists,
-                on_failure=default_failure_callback
-            )
-            if success:
-                completed += 1
-            else:
-                failed += 1
-                if not ignore_errors:
-                    logger.warning(f"Chapter {chapter.number} failed and ignore_errors=False - stopping processing")
-                    break
-                else:
-                    logger.warning(f"Chapter {chapter.number} failed but continuing (ignore_errors=True)")
-
-        # Final status
-        if self.scraping_coordinator.progress_tracker:
-            self.scraping_coordinator.progress_tracker.update_status("completed", "Processing completed")
-
-        progress_percentage = 0.0
-        if self.scraping_coordinator.progress_tracker:
-            progress_percentage = self.scraping_coordinator.progress_tracker.get_progress_percentage()
-
-        result: Dict[str, Any] = {
-            "success": True,
-            "total": len(chapters_to_process),
-            "completed": completed,
-            "failed": failed,
-            "progress": progress_percentage
-        }
-
-        logger.info(f"Processing complete: {completed} completed, {failed} failed")
-        return result
-
-    def process_chapter(
-        self,
-        chapter,
-        skip_if_exists: bool = True,
-        on_failure: Optional[callable] = None
-    ) -> bool:
-        """Process a single chapter: scrape → convert → save."""
-        # Step 1: Scrape chapter content
-        content, title, error = self.scraping_coordinator.scrape_chapter_content(chapter)
-
-        if error:
-            # Update progress tracker with failure
-            if self.scraping_coordinator.progress_tracker:
-                self.scraping_coordinator.progress_tracker.update_chapter(
-                    chapter.number,
-                    ProcessingStatus.FAILED,
-                    error
-                )
-            return False
-
-        # Step 2: Convert to audio
-        return self.conversion_coordinator.convert_chapter_to_audio(
-            chapter, content, title, skip_if_exists, on_failure
-        )
-
-    def merge_audio_files(self, output_format: Optional[Dict[str, Any]] = None) -> bool:
-        """Merge processed audio files."""
-        return self.audio_post_processor.merge_audio_files(output_format)
 
     def _ensure_chapter_urls_available(self, toc_url: str) -> bool:
         """Ensure chapter URLs are available, fetching if needed."""

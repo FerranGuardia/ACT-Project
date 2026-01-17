@@ -9,7 +9,7 @@ from typing import List, Optional
 from PySide6.QtCore import QThread, Signal
 
 from core.logger import get_logger
-from tts import TTSEngine
+from services import TTSService
 
 logger = get_logger("ui.tts_view.conversion_thread")
 
@@ -35,7 +35,7 @@ class TTSConversionThread(QThread):
         self.provider = provider
         self.should_stop = False
         self.is_paused = False
-        self.tts_engine = TTSEngine()
+        self.tts_service = TTSService()
     
     def stop(self):
         """Stop the conversion operation."""
@@ -98,7 +98,7 @@ class TTSConversionThread(QThread):
                     # Convert volume from (0-100) to Edge-TTS format (-50 to 50)
                     volume_value = ((self.volume - 100) / 100) * 50
                     
-                    success = self.tts_engine.convert_text_to_speech(
+                    success = self.tts_service.convert_text(
                         text=text,
                         output_path=Path(output_path),
                         voice=self.voice,

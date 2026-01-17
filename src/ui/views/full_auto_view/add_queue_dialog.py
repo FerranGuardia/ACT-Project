@@ -51,7 +51,7 @@ class AddQueueDialog(QDialog):
         # Output Folder Selection
         folder_layout = QHBoxLayout()
         self.folder_input = QLineEdit()
-        self.folder_input.setPlaceholderText("Select output folder (default: Desktop)")
+        self.folder_input.setPlaceholderText("Select output folder (default: Documents/ACT/output)")
         folder_button = QPushButton("Browse...")
         folder_button.clicked.connect(self._select_folder)
         folder_layout.addWidget(self.folder_input, 1)
@@ -103,10 +103,12 @@ class AddQueueDialog(QDialog):
         self.from_spin.setMinimum(1)
         self.from_spin.setMaximum(10000)
         self.from_spin.setValue(1)
+        self.from_spin.setEnabled(False)  # Disabled by default
         self.to_spin = QSpinBox()
         self.to_spin.setMinimum(1)
         self.to_spin.setMaximum(10000)
         self.to_spin.setValue(50)
+        self.to_spin.setEnabled(False)  # Disabled by default
         range_layout.addWidget(self.range_radio)
         range_layout.addWidget(QLabel("from"))
         range_layout.addWidget(self.from_spin)
@@ -121,6 +123,10 @@ class AddQueueDialog(QDialog):
         self.specific_input.setPlaceholderText("1, 5, 10, 15")
         self.specific_input.setEnabled(False)
         self.specific_radio.toggled.connect(self.specific_input.setEnabled)
+
+        # Connect range radio to enable/disable spinboxes
+        self.range_radio.toggled.connect(lambda enabled: self.from_spin.setEnabled(enabled))
+        self.range_radio.toggled.connect(lambda enabled: self.to_spin.setEnabled(enabled))
         chapter_layout.addWidget(self.specific_radio)
         chapter_layout.addWidget(self.specific_input)
         
@@ -137,7 +143,7 @@ class AddQueueDialog(QDialog):
         self.output_group.addButton(self.individual_mp3_radio, 0)
         output_layout.addWidget(self.individual_mp3_radio)
 
-        self.batch_mp3_radio = QRadioButton("Batch merged MP3s:")
+        self.batch_mp3_radio = QRadioButton("Incremental batch MP3s:")
         self.output_group.addButton(self.batch_mp3_radio, 1)
         batch_layout = QHBoxLayout()
         batch_layout.addWidget(self.batch_mp3_radio)
@@ -147,7 +153,7 @@ class AddQueueDialog(QDialog):
         self.batch_size_spin.setValue(50)
         self.batch_size_spin.setEnabled(False)
         batch_layout.addWidget(self.batch_size_spin)
-        batch_layout.addWidget(QLabel("chapters per file"))
+        batch_layout.addWidget(QLabel("chapters per batch (merged during processing)"))
         batch_layout.addStretch()
         output_layout.addLayout(batch_layout)
 
@@ -157,22 +163,6 @@ class AddQueueDialog(QDialog):
 
         # Connect batch radio to enable/disable spin box
         self.batch_mp3_radio.toggled.connect(self.batch_size_spin.setEnabled)
-
-        # Batch merging option
-        batch_layout = QHBoxLayout()
-        self.batch_mp3_radio = QRadioButton("Batched merged MP3s:")
-        self.output_group.addButton(self.batch_mp3_radio, 2)
-        self.batch_size_spin = QSpinBox()
-        self.batch_size_spin.setMinimum(1)
-        self.batch_size_spin.setMaximum(1000)
-        self.batch_size_spin.setValue(50)
-        self.batch_size_spin.setEnabled(False)
-        self.batch_mp3_radio.toggled.connect(self.batch_size_spin.setEnabled)
-        batch_layout.addWidget(self.batch_mp3_radio)
-        batch_layout.addWidget(QLabel("chapters per batch"))
-        batch_layout.addWidget(self.batch_size_spin)
-        batch_layout.addStretch()
-        output_layout.addLayout(batch_layout)
 
         output_group.setLayout(output_layout)
         layout.addWidget(output_group)
@@ -190,7 +180,7 @@ class AddQueueDialog(QDialog):
         folder = QFileDialog.getExistingDirectory(
             self,
             "Select Output Folder",
-            str(Path.home() / "Desktop"),
+            str(Path.home() / "Documents" / "ACT" / "output"),
             QFileDialog.Option.ShowDirsOnly
         )
         if folder:
@@ -204,7 +194,7 @@ class AddQueueDialog(QDialog):
                 logger.warning("No TTS providers available")
                 self.provider_button.setText("No Providers Available")
                 self.provider_button.setEnabled(False)
-                self.provider_status_label.setText("🔴")
+                self.provider_status_label.setText("")
                 self._providers_loaded = True
                 return
 
@@ -256,14 +246,14 @@ class AddQueueDialog(QDialog):
             provider_manager = TTSProviderManager()
             provider = provider_manager.get_provider(self.selected_provider)
             if provider and provider.is_available():
-                self.provider_status_label.setText("🟡")
+                self.provider_status_label.setText("")
                 self.provider_status_label.setToolTip("Provider library available - Use dialog to test audio generation")
             else:
-                self.provider_status_label.setText("🔴")
+                self.provider_status_label.setText("")
                 self.provider_status_label.setToolTip("Provider is unavailable")
         except Exception as e:
             logger.error(f"Error checking provider status: {e}")
-            self.provider_status_label.setText("🔴")
+            self.provider_status_label.setText("")
             self.provider_status_label.setToolTip("Error checking status")
     
     def _get_selected_provider(self) -> Optional[str]:
@@ -301,7 +291,7 @@ class AddQueueDialog(QDialog):
             # from the ProviderSelectionDialog which already tested audio generation.
             # If it passed that test, we should trust it can load voices.
 
-            # Load voices for the selected provider (filtered to en-US only)
+            # Load voices for the selected provider (filtered to English voices)
             voices = self.voice_manager.get_voice_list(locale="en-US", provider=provider)
 
             if not voices:
@@ -328,8 +318,13 @@ class AddQueueDialog(QDialog):
     
     def get_data(self) -> Tuple[str, str, str, Optional[str], Dict[str, Any], Dict[str, Any], Optional[str]]:
         """Get the entered URL, title, voice, provider, chapter selection, output format, and output folder."""
+        logger.debug("AddQueueDialog.get_data() called")
+
         url = self.url_input.text().strip()
         title = self.title_input.text().strip()
+
+        logger.debug(f"URL: '{url}'")
+        logger.debug(f"Title: '{title}'")
         # Extract voice name from formatted string
         voice_display = self.voice_combo.currentText()
         voice = voice_display.split(" - ")[0] if " - " in voice_display else voice_display
@@ -339,14 +334,22 @@ class AddQueueDialog(QDialog):
         output_folder = self.folder_input.text().strip() or None
         
         # Get chapter selection
+        logger.debug(f"all_chapters_radio checked: {self.all_chapters_radio.isChecked()}")
+        logger.debug(f"range_radio checked: {self.range_radio.isChecked()}")
+        logger.debug(f"specific_radio checked: {self.specific_radio.isChecked()}")
+        logger.debug(f"from_spin value: {self.from_spin.value()}, enabled: {self.from_spin.isEnabled()}")
+        logger.debug(f"to_spin value: {self.to_spin.value()}, enabled: {self.to_spin.isEnabled()}")
+
         if self.all_chapters_radio.isChecked():
             chapter_selection: Dict[str, Any] = {'type': 'all'}
+            logger.debug("Selected chapter type: ALL")
         elif self.range_radio.isChecked():
             chapter_selection = {
                 'type': 'range',
                 'from': self.from_spin.value(),
                 'to': self.to_spin.value()
             }
+            logger.debug(f"Selected chapter type: RANGE, from={chapter_selection['from']}, to={chapter_selection['to']}")
         else:  # specific
             try:
                 chapters = [int(x.strip()) for x in self.specific_input.text().split(',')]
@@ -358,15 +361,24 @@ class AddQueueDialog(QDialog):
                 chapter_selection = {'type': 'all'}  # Default to all if invalid
 
         # Get output format selection
+        logger.debug(f"merged_mp3_radio checked: {self.merged_mp3_radio.isChecked()}")
+        logger.debug(f"batch_mp3_radio checked: {self.batch_mp3_radio.isChecked()}")
+        logger.debug(f"individual_mp3_radio checked: {self.individual_mp3_radio.isChecked()}")
+        logger.debug(f"batch_size_spin value: {self.batch_size_spin.value()}")
+
         if self.merged_mp3_radio.isChecked():
             output_format = {'type': 'merged_mp3'}
+            logger.debug("Selected output format: MERGED_MP3")
         elif self.batch_mp3_radio.isChecked():
             output_format = {
-                'type': 'batched_mp3',
+                'type': 'incremental_batches',
                 'batch_size': self.batch_size_spin.value()
             }
+            logger.debug(f"Selected output format: INCREMENTAL_BATCHES, batch_size={output_format['batch_size']}")
+            print(f"DEBUG: AddQueueDialog returning output_format = {output_format}")
         else:
             output_format = {'type': 'individual_mp3s'}
+            logger.debug("Selected output format: INDIVIDUAL_MP3S")
 
         return url, title, voice, provider, chapter_selection, output_format, output_folder
 

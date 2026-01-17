@@ -204,27 +204,27 @@ def clean_text(text: Optional[str]) -> str:
     # Step 12: Handle emojis and special Unicode characters for TTS
     # Convert common emojis to text descriptions or remove them
     emoji_replacements = {
-        '🗿': ' (stone face) ',  # Moai emoji - common in Royal Road
-        '😀': '', '😃': '', '😄': '', '😁': '', '😆': '', '😅': '', '🤣': '', '😂': '',
-        '🙂': '', '🙃': '', '😉': '', '😊': '', '😇': '', '🥰': '', '😍': '', '🤩': '',
-        '😘': '', '😗': '', '😚': '', '😙': '', '😋': '', '😛': '', '😜': '', '🤪': '',
-        '😝': '', '🤑': '', '🤗': '', '🤭': '', '🤫': '', '🤔': '', '🤐': '', '🤨': '',
-        '😐': '', '😑': '', '😶': '', '😏': '', '😒': '', '🙄': '', '😬': '', '🤥': '',
-        '😌': '', '😔': '', '😪': '', '🤤': '', '😴': '', '😷': '', '🤒': '', '🤕': '',
-        '🤢': '', '🤮': '', '🤧': '', '🥵': '', '🥶': '', '😵': '', '🤯': '', '🤠': '',
-        '🥳': '', '😎': '', '🤓': '', '🧐': '', '😕': '', '😟': '', '🙁': '', '☹️': '',
-        '😮': '', '😯': '', '😲': '', '😳': '', '🥺': '', '😦': '', '😧': '', '😨': '',
-        '😰': '', '😥': '', '😢': '', '😭': '', '😱': '', '😖': '', '😣': '', '😞': '',
-        '😓': '', '😩': '', '😫': '', '🥱': '', '😤': '', '😡': '', '😠': '', '🤬': '',
-        '😈': '', '👿': '', '💀': '', '☠️': '', '💩': '', '🤡': '', '👹': '', '👺': '',
-        '👻': '', '👽': '', '👾': '', '🤖': '', '😺': '', '😸': '', '😹': '', '😻': '',
-        '😼': '', '😽': '', '🙀': '', '😿': '', '😾': '',
+        '': ' (stone face) ',  # Moai emoji - common in Royal Road
+        '': '', '': '', '': '', '': '', '': '', '': '', '': '', '': '',
+        '': '', '': '', '': '', '': '', '': '', '': '', '': '', '': '',
+        '': '', '': '', '': '', '': '', '': '', '': '', '': '', '': '',
+        '': '', '': '', '': '', '': '', '': '', '': '', '': '', '': '',
+        '': '', '': '', '': '', '': '', '': '', '': '', '': '', '': '',
+        '': '', '': '', '': '', '': '', '': '', '': '', '': '', '': '',
+        '': '', '': '', '': '', '': '', '': '', '': '', '': '', '': '',
+        '': '', '': '', '': '', '': '', '': '', '': '', '': '', '': '',
+        '': '', '': '', '': '', '': '', '': '', '': '', '': '', '': '',
+        '': '', '': '', '': '', '': '', '': '', '': '', '': '', '': '',
+        '': '', '': '', '': '', '': '', '': '', '': '', '': '', '': '',
+        '': '', '': '', '': '', '': '', '': '', '': '', '': '', '': '',
+        '': '', '': '', '': '', '': '', '': '', '': '', '': '', '': '',
+        '': '', '': '', '': '', '': '', '': '',
         # Common symbols that TTS might read awkwardly
         '→': ' to ', '←': ' from ', '↑': ' up ', '↓': ' down ',
         '⇒': ' then ', '⇐': ' from ', '⇔': ' or ',
-        '★': ' star ', '☆': ' star ', '✦': ' star ', '✧': ' star ',
-        '♥': ' heart ', '♡': ' heart ', '♦': ' diamond ', '♣': ' club ', '♠': ' spade ',
-        '♪': ' note ', '♫': ' notes ', '♬': ' notes ',
+        '': ' star ', '': ' star ', '': ' star ', '': ' star ',
+        '': ' heart ', '': ' heart ', '': ' diamond ', '': ' club ', '': ' spade ',
+        '': ' note ', '': ' notes ', '': ' notes ',
         '©': ' copyright ', '®': ' registered ', '™': ' trademark ',
         '…': '...',  # Ellipsis character to three dots
         '—': ' - ',  # Em dash to hyphen
@@ -240,20 +240,74 @@ def clean_text(text: Optional[str]) -> str:
     # Remove other emojis and special Unicode characters that TTS can't handle well
     # Keep basic punctuation and letters/numbers
     def is_tts_safe(char):
-        """Check if character is safe for TTS (letters, numbers, basic punctuation)"""
-        if char.isalnum():
+        """Check if character is safe for TTS (English letters, numbers, basic punctuation)"""
+        # Keep basic ASCII alphanumeric
+        if char.isalnum() and ord(char) < 128:  # ASCII letters/numbers
             return True
-        if char in " .,!?;:()[]{}\"'/-_=+*&%$#@~`|\\":
-            return True
-        # Check Unicode category
-        category = unicodedata.category(char)
-        # Keep punctuation, symbols that are common in text
-        if category in ('Po', 'Pd', 'Pe', 'Pf', 'Pi', 'Ps', 'Sc', 'Sk', 'Sm', 'So'):
-            # But skip emoji and pictographic symbols
-            if category == 'So' and ord(char) > 0x1F000:  # Emoji range
+
+        # Keep Latin characters with accents (Latin-1 Supplement: 0x80-0xFF)
+        # This includes common accented characters like é, à, ü, ñ, etc.
+        char_code = ord(char)
+        if 0x80 <= char_code <= 0xFF:
+            # Allow Latin-1 Supplement characters, but filter out control characters
+            if char_code < 0xA0:  # Control characters in Latin-1
                 return False
             return True
-        return False
+
+        if char in " .,!?;:()[]{}\"'/-_=+*&%$#@~`|\\":
+            return True
+
+        # Check Unicode category - only keep basic punctuation
+        category = unicodedata.category(char)
+        # Keep punctuation, symbols that are common in text
+        if category in ('Po', 'Pd', 'Pe', 'Pf', 'Pi', 'Ps'):
+            return True
+
+        # Filter out Chinese characters (CJK Unified Ideographs)
+        if 0x4E00 <= char_code <= 0x9FFF:
+            return False
+
+        # Filter out Korean Hangul syllables
+        if 0xAC00 <= char_code <= 0xD7AF:
+            return False
+
+        # Filter out Korean Hangul consonants (Jamo)
+        if 0x1100 <= char_code <= 0x11FF:
+            return False
+
+        # Filter out Korean Hangul compatibility jamo
+        if 0x3130 <= char_code <= 0x318F:
+            return False
+
+        # Filter out Japanese Hiragana and Katakana
+        if 0x3040 <= char_code <= 0x30FF:  # Hiragana + Katakana
+            return False
+
+        # Filter out CJK symbols and punctuation that might interfere
+        if 0x3000 <= char_code <= 0x303F:  # CJK symbols and punctuation
+            return False
+
+        # Filter out fullwidth forms (fullwidth ASCII punctuation used in CJK)
+        if 0xFF00 <= char_code <= 0xFFEF:  # Halfwidth and Fullwidth Forms
+            return False
+
+        # Filter out CJK radicals and strokes
+        if 0x2E80 <= char_code <= 0x2EFF:  # CJK Radicals Supplement
+            return False
+
+        # Filter out CJK compatibility ideographs
+        if 0xF900 <= char_code <= 0xFAFF:  # CJK Compatibility Ideographs
+            return False
+
+        # Filter out vertical forms and other CJK extensions that might cause issues
+        if 0xFE30 <= char_code <= 0xFE4F:  # CJK Compatibility Forms
+            return False
+
+        # Filter out emoji and pictographic symbols
+        if category == 'So' and char_code > 0x1F000:  # Emoji range
+            return False
+
+        return False  # Default: filter out anything not explicitly allowed
 
     # Filter out problematic Unicode characters
     text = ''.join(char if is_tts_safe(char) else ' ' for char in text)

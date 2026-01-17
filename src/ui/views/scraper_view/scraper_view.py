@@ -9,11 +9,11 @@ from typing import Optional, TYPE_CHECKING, List, Dict, Any
 if TYPE_CHECKING:
     from ui.main_window import MainWindow  # type: ignore[unused-import]
 
-from PySide6.QtWidgets import QVBoxLayout, QGroupBox, QListWidgetItem
+from PySide6.QtWidgets import QVBoxLayout, QListWidgetItem
 
+from core.config_manager import get_config
 from core.logger import get_logger
 from ui.views.base_view import BaseView
-from ui.view_config import ViewConfig
 from ui.ui_constants import (
     ButtonText,
     StatusMessages,
@@ -29,26 +29,29 @@ from ui.utils.error_handling import (
 )
 
 from ui.views.scraper_view.scraping_thread import ScrapingThread
-from ui.views.scraper_view.url_input_section import URLInputSection
-from ui.views.scraper_view.chapter_selection_section import ChapterSelectionSection
-from ui.views.scraper_view.output_settings import OutputSettings
 from ui.views.scraper_view.progress_section import ProgressSection
 from ui.views.scraper_view.output_files_section import OutputFilesSection
 from ui.views.scraper_view.handlers import ScraperViewHandlers
 from ui.views.scraper_view.queue_section import QueueSection
 from ui.views.scraper_view.controls_section import ScraperControlsSection
 from ui.views.scraper_view.queue_item_widget import ScraperQueueItemWidget
+from ui.views.scraper_view.add_queue_dialog import AddQueueDialog
 
 logger = get_logger("ui.scraper_view")
 
 
 class ScraperView(BaseView):
     """Scraper mode view for extracting text from webnovels."""
-    
+
+    def get_view_title(self) -> str:
+        """Get the title for this view."""
+        return "Scraper"
+
     def __init__(self, parent=None):
         # Initialize data structures first
         self.scraping_thread: Optional[ScrapingThread] = None
         self.queue_items: List[Dict[str, Any]] = []  # List of queue items
+        self.last_output_dir: Optional[str] = None
         
         # Initialize UI components (BaseView calls setup_ui)
         super().__init__(parent)
@@ -72,27 +75,6 @@ class ScraperView(BaseView):
         self.queue_section = QueueSection()
         main_layout.addWidget(self.queue_section)
         
-        # Input sections (for adding to queue)
-        input_group_layout = QVBoxLayout()
-        input_group_layout.setSpacing(ViewConfig.INPUT_GROUP_SPACING)
-        
-        # URL input section
-        self.url_input_section = URLInputSection()
-        input_group_layout.addWidget(self.url_input_section)
-        
-        # Chapter selection section
-        self.chapter_selection_section = ChapterSelectionSection()
-        input_group_layout.addWidget(self.chapter_selection_section)
-        
-        # Output settings
-        self.output_settings = OutputSettings()
-        input_group_layout.addWidget(self.output_settings)
-        
-        # Wrap input sections in a collapsible group (optional - can be shown/hidden)
-        input_group = QGroupBox("Add to Queue")
-        input_group.setLayout(input_group_layout)
-        main_layout.addWidget(input_group)
-        
         # Progress section (for current processing)
         self.progress_section = ProgressSection()
         main_layout.addWidget(self.progress_section)
@@ -100,8 +82,6 @@ class ScraperView(BaseView):
         # Output files list
         self.output_files_section = OutputFilesSection()
         main_layout.addWidget(self.output_files_section)
-        
-        main_layout.addStretch()
     
     def _connect_handlers(self) -> None:
         """Connect all button handlers."""
@@ -110,36 +90,34 @@ class ScraperView(BaseView):
         self.controls_section.start_button.clicked.connect(self.start_scraping)
         self.controls_section.pause_button.clicked.connect(self.pause_scraping)
         self.controls_section.stop_button.clicked.connect(self.stop_scraping)
-        self.output_settings.browse_button.clicked.connect(self.browse_output_dir)
         self.output_files_section.open_folder_button.clicked.connect(self.open_output_folder)
     
     def start_scraping(self) -> None:
         """
         Start the scraping operation.
         
-        Validates inputs, checks if already running, then creates and starts
-        the scraping thread. Updates UI state accordingly.
+        Processes the first item from the queue. If no queue items exist,
+        validates and uses input form. Checks if already running, then creates
+        and starts the scraping thread. Updates UI state accordingly.
         """
-        # Validate inputs
-        valid, error_msg = self.handlers.validate_inputs(
-            self.url_input_section,
-            self.chapter_selection_section,
-            self.output_settings
-        )
-        if not valid:
-            show_validation_error(self, error_msg)
-            return
-        
         # Check if already running
         if self.scraping_thread and self.scraping_thread.isRunning():
             show_already_running_error(self)
             return
         
-        # Get parameters
-        url = self.url_input_section.get_url()
-        output_dir = self.output_settings.get_output_dir()
-        file_format = self.output_settings.get_file_format()
-        chapter_selection = self.chapter_selection_section.get_chapter_selection()
+        if not self.queue_items:
+            show_error(self, DialogMessages.EMPTY_QUEUE_MSG)
+            return
+
+        # Process first queue item
+        queue_item = self.queue_items[0]
+        url = queue_item['url']
+        output_dir = queue_item['output_dir']
+        file_format = queue_item['file_format']
+        chapter_selection = queue_item['chapter_selection']
+        self.last_output_dir = output_dir
+
+        logger.debug(f"Processing queue item: {url}")
         
         # Create and start thread
         self.scraping_thread = ScrapingThread(url, chapter_selection, output_dir, file_format)
@@ -150,7 +128,6 @@ class ScraperView(BaseView):
         
         # Update UI state
         self.controls_section.set_processing_state()
-        self.url_input_section.set_enabled(False)
         self.output_files_section.clear_files()
         self.progress_section.set_progress(0)
         
@@ -179,10 +156,18 @@ class ScraperView(BaseView):
         Stop the scraping operation.
         
         Stops the current scraping thread and updates the UI status.
+        Properly waits for thread to terminate before returning.
         """
         if self.scraping_thread and self.scraping_thread.isRunning():
             self.scraping_thread.stop()
             self.progress_section.set_status(StatusMessages.STOPPING)
+            # Wait for thread to finish (with timeout)
+            if not self.scraping_thread.wait(5000):  # 5 second timeout
+                logger.warning("Scraping thread did not terminate within timeout")
+                self.scraping_thread.terminate()
+                self.scraping_thread.wait()  # Wait for forceful termination
+            # Ensure UI is reset
+            self.controls_section.set_idle_state()
             logger.info("Stopping scraping")
     
     def _on_progress(self, value: int) -> None:
@@ -203,8 +188,6 @@ class ScraperView(BaseView):
         """
         # Reset UI state
         self.controls_section.set_idle_state()
-        self.url_input_section.set_enabled(True)
-        
         if success:
             show_success(self, message)
             self.progress_section.set_status(StatusMessages.READY)
@@ -225,13 +208,12 @@ class ScraperView(BaseView):
         self.output_files_section.add_file(filename)
         logger.debug(f"File created: {filepath} (filename: {filename})")
     
-    def browse_output_dir(self) -> None:
-        """Open directory browser for output."""
-        self.handlers.browse_output_dir(self.output_settings)
-    
     def open_output_folder(self) -> None:
         """Open the output folder in file explorer."""
-        self.handlers.open_output_folder(self.output_settings)
+        if not self.last_output_dir:
+            show_error(self, DialogMessages.EMPTY_QUEUE_MSG)
+            return
+        self.handlers.open_output_folder_path(self.last_output_dir)
     
     def add_to_queue(self) -> None:
         """
@@ -239,21 +221,27 @@ class ScraperView(BaseView):
         
         Validates inputs, creates a queue item, and updates the display.
         """
-        # Validate inputs
-        valid, error_msg = self.handlers.validate_inputs(
-            self.url_input_section,
-            self.chapter_selection_section,
-            self.output_settings
-        )
+        dialog = AddQueueDialog(self)
+        if not dialog.exec():
+            return
+
+        url, title, chapter_selection, file_format, output_folder = dialog.get_data()
+
+        valid, error_msg = self.handlers.validate_url(url)
         if not valid:
             show_validation_error(self, error_msg)
             return
-        
-        # Get parameters
-        url = self.url_input_section.get_url()
-        output_dir = self.output_settings.get_output_dir()
-        file_format = self.output_settings.get_file_format()
-        chapter_selection = self.chapter_selection_section.get_chapter_selection()
+
+        valid, error_msg = self.handlers.validate_chapter_selection(chapter_selection)
+        if not valid:
+            show_validation_error(self, error_msg)
+            return
+
+        output_dir = output_folder or str(get_config().get("paths.output_dir"))
+        valid, error_msg = self.handlers.validate_output_dir(output_dir)
+        if not valid:
+            show_validation_error(self, error_msg)
+            return
         
         # Format chapter selection for display using constants
         chapter_display = self._format_chapter_selection(chapter_selection)
@@ -270,9 +258,7 @@ class ScraperView(BaseView):
         self.queue_items.append(queue_item)
         self._update_queue_display()
         
-        # Clear input fields
-        self.url_input_section.set_url("")
-        logger.info(f"Added to queue: {url} - {chapter_display}")
+        logger.info(f"Added to queue: {title or url} - {chapter_display}")
     
     def clear_queue(self) -> None:
         """

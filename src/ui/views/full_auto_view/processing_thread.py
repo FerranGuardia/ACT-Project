@@ -3,6 +3,7 @@ Processing Thread - Handles background processing pipeline operations.
 """
 
 from pathlib import Path
+from core.config_manager import get_config
 from typing import Optional, Dict, Any
 
 from PySide6.QtCore import QThread, Signal
@@ -20,7 +21,7 @@ class ProcessingThread(QThread):
     progress = Signal(int)  # Progress percentage
     status = Signal(str)  # Status message
     chapter_update = Signal(int, str, str)  # Chapter num, status, message
-    finished = Signal(bool, str)  # Success, message
+    finished = Signal(bool, str, dict)  # Success, message, result_details
     
     def __init__(self, url: str, project_name: str, voice: Optional[str] = None,
                  provider: Optional[str] = None, chapter_selection: Optional[Dict[str, Any]] = None,
@@ -33,7 +34,9 @@ class ProcessingThread(QThread):
         self.provider = provider
         self.chapter_selection = chapter_selection or {'type': 'all'}
         self.output_format = output_format or {'type': 'individual_mp3s'}
-        self.output_folder = output_folder or str(Path.home() / "Desktop")
+        # Default to configured output_dir to avoid writing to Desktop during tests
+        default_output = get_config().get('paths.output_dir')
+        self.output_folder = output_folder or str(default_output)
         self.novel_title = novel_title or project_name
         self.pipeline: Optional[ProcessingPipeline] = None
         self.should_stop = False
@@ -105,14 +108,14 @@ class ProcessingThread(QThread):
             
             if missing_chapters:
                 logger.info(
-                    f"⚠ Failsafe: Detected {len(missing_chapters)} missing chapters "
+                    f" Failsafe: Detected {len(missing_chapters)} missing chapters "
                     f"that will be re-scraped: {missing_chapters[:10]}{'...' if len(missing_chapters) > 10 else ''}"
                 )
                 self.status.emit(
                     f"Found {len(missing_chapters)} missing chapters - will re-scrape"
                 )
             else:
-                logger.info("✓ Gap detection: No missing chapters found")
+                logger.info(" Gap detection: No missing chapters found")
                 self.status.emit("No gaps detected - proceeding normally")
             
             return missing_chapters
@@ -175,7 +178,7 @@ class ProcessingThread(QThread):
                 toc_url=self.url,
                 novel_title=self.novel_title
             ):
-                self.finished.emit(False, "Failed to initialize project")
+                self.finished.emit(False, "Failed to initialize project", {})
                 return
             
             # If project exists and was loaded, determine actual end_chapter if needed
@@ -224,14 +227,43 @@ class ProcessingThread(QThread):
                     else:
                         logger.warning("Audio file merging failed, but continuing with success")
 
-                self.finished.emit(True, f"Processing completed successfully{gaps_info}")
+                # Update global metadata with novel information
+                self._update_global_metadata()
+
+                self.finished.emit(True, f"Processing completed successfully{gaps_info}", result)
             elif self.should_stop:
-                self.finished.emit(False, "Processing stopped")
+                self.finished.emit(False, "Processing stopped", result)
             else:
                 error = result.get('error', 'Processing failed')
-                self.finished.emit(False, error)
+                self.finished.emit(False, error, result)
                 
         except Exception as e:
             logger.error(f"Processing error: {e}")
-            self.finished.emit(False, f"Error: {str(e)}")
+            self.finished.emit(False, f"Error: {str(e)}", {})
+
+    def _update_global_metadata(self) -> None:
+        """
+        Update the global novels metadata with information about the processed novel.
+        """
+        try:
+            from core.metadata_coordinator import get_metadata_coordinator
+
+            metadata_manager = get_metadata_coordinator()
+
+            # Get novel information from the project
+            novel_info = {
+                'url': self.url,
+                'title': self.novel_title,
+                'novel_url': self.url,
+                'last_processed': self.pipeline.project_manager.get_project_metadata().get('last_updated'),
+                'output_folder': str(self.output_folder),
+                'total_chapters': len(self.pipeline.project_manager.get_chapter_manager().get_all_chapters()) if self.pipeline.project_manager.get_chapter_manager() else 0
+            }
+
+            # Update the global metadata
+            metadata_manager.update_novel_metadata(self.url, novel_info)
+            logger.info(f"Updated global metadata for novel: {self.novel_title}")
+
+        except Exception as e:
+            logger.warning(f"Failed to update global metadata: {e}")
 

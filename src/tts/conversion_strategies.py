@@ -10,20 +10,46 @@ import tempfile
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, List, Optional
 
 from core.logger import get_logger
 
+from .audio_merger import AudioMerger
 from .providers.base_provider import TTSProvider
 from .providers.provider_manager import TTSProviderManager
-from .audio_merger import AudioMerger
 from .resource_manager import TTSResourceManager
 
 if TYPE_CHECKING:
-    from .voice_resolver import VoiceResolutionResult
     from .text_processing_pipeline import ProcessedText
+    from .voice_resolver import VoiceResolutionResult
 
 logger = get_logger("tts.conversion_strategies")
+
+
+class AsyncBridge:
+    """Simple async/sync bridge for running coroutines in sync context."""
+
+    @staticmethod
+    def run_async(coro) -> Any:
+        """
+        Run an async coroutine in a synchronous context.
+
+        Handles both cases: when there's already a running event loop
+        and when we need to create a new one.
+        """
+        try:
+            # Check if we're already in an async context
+            loop = asyncio.get_running_loop()
+            # If we get here, we're in an async context - create a task and wait for it
+            if asyncio.iscoroutine(coro):
+                task = loop.create_task(coro)
+                return loop.run_until_complete(task)
+            else:
+                # coro is already a task or future
+                return loop.run_until_complete(coro)
+        except RuntimeError:
+            # No running loop, we can safely use asyncio.run
+            return asyncio.run(coro)
 
 
 class ConversionStrategy(ABC):
@@ -41,7 +67,8 @@ class ConversionStrategy(ABC):
         output_path: Path,
         rate: Optional[float] = None,
         pitch: Optional[float] = None,
-        volume: Optional[float] = None
+        volume: Optional[float] = None,
+        on_progress: Optional[Callable[[float], None]] = None
     ) -> bool:
         """Convert text to speech using this strategy."""
         pass
@@ -80,7 +107,8 @@ class DirectConversionStrategy(ConversionStrategy):
         output_path: Path,
         rate: Optional[float] = None,
         pitch: Optional[float] = None,
-        volume: Optional[float] = None
+        volume: Optional[float] = None,
+        on_progress: Optional[Callable[[float], None]] = None
     ) -> bool:
         """Convert text directly without chunking."""
         # Ensure output directory exists
@@ -100,6 +128,10 @@ class DirectConversionStrategy(ConversionStrategy):
         logger.info("Using direct conversion strategy")
 
         try:
+            # Emit progress start
+            if on_progress:
+                on_progress(0.0)
+
             success = voice_resolution.provider.convert_text_to_speech(
                 text=final_text,
                 voice=voice_resolution.voice_id,
@@ -109,11 +141,25 @@ class DirectConversionStrategy(ConversionStrategy):
                 volume=volume
             )
 
+            # Emit progress completion
+            if on_progress:
+                on_progress(1.0)
+
             if success:
-                logger.info("Direct conversion successful")
+                # Verify file was actually created
+                if not output_path.exists():
+                    logger.error(f"Direct: Provider reported success but output file does not exist: {output_path}")
+                    return False
+                
+                file_size = output_path.stat().st_size
+                if file_size == 0:
+                    logger.error(f"Direct: Provider reported success but output file is empty (0 bytes): {output_path}")
+                    return False
+                
+                logger.info(f"Direct conversion successful ({file_size} bytes)")
                 return True
             else:
-                logger.error(f"Direct conversion failed for voice '{voice_resolution.voice_id}'")
+                logger.error(f"Direct conversion failed for voice '{voice_resolution.voice_id}' - provider returned False")
                 return False
 
         except Exception as e:
@@ -135,7 +181,8 @@ class ChunkedConversionStrategy(ConversionStrategy):
         output_path: Path,
         rate: Optional[float] = None,
         pitch: Optional[float] = None,
-        volume: Optional[float] = None
+        volume: Optional[float] = None,
+        on_progress: Optional[Callable[[float], None]] = None
     ) -> bool:
         """Convert text using chunked approach with parallel processing."""
         try:
@@ -177,7 +224,8 @@ class ChunkedConversionStrategy(ConversionStrategy):
                 provider=voice_resolution.provider,
                 rate=rate,
                 pitch=pitch,
-                volume=volume
+                volume=volume,
+                on_progress=on_progress
             )
 
             if not chunk_files:
@@ -204,7 +252,7 @@ class ChunkedConversionStrategy(ConversionStrategy):
                 output_path.unlink()
                 return False
 
-            logger.info(f"✓ Created audio file: {output_path} ({file_size} bytes)")
+            logger.info(f" Created audio file: {output_path} ({file_size} bytes)")
             return True
 
         except Exception as e:
@@ -222,12 +270,17 @@ class ChunkedConversionStrategy(ConversionStrategy):
         provider: TTSProvider,
         rate: Optional[float] = None,
         pitch: Optional[float] = None,
-        volume: Optional[float] = None
+        volume: Optional[float] = None,
+        on_progress: Optional[Callable[[float], None]] = None
     ) -> List[Path]:
         """Convert text chunks in parallel."""
         # For now, convert sequentially to avoid async complexity
         # TODO: Implement proper parallel conversion
         chunk_files = []
+
+        # Emit initial progress
+        if on_progress:
+            on_progress(0.0)
 
         for i, chunk in enumerate(chunks):
             chunk_filename = f"{output_stem}_chunk_{i:04d}.mp3"
@@ -250,8 +303,17 @@ class ChunkedConversionStrategy(ConversionStrategy):
                 else:
                     logger.warning(f"Failed to convert chunk {i+1}/{len(chunks)}")
 
+                # Update progress after each chunk
+                if on_progress:
+                    progress = (i + 1) / len(chunks)
+                    on_progress(progress)
+
             except Exception as e:
                 logger.warning(f"Error converting chunk {i+1}/{len(chunks)}: {e}")
+                # Still update progress even on error
+                if on_progress:
+                    progress = (i + 1) / len(chunks)
+                    on_progress(progress)
 
         return chunk_files
 
@@ -268,8 +330,14 @@ class ChunkedConversionStrategy(ConversionStrategy):
 class ConversionStrategySelector:
     """Selects the appropriate conversion strategy based on text and provider capabilities."""
 
-    def __init__(self, provider_manager: TTSProviderManager):
+    def __init__(
+        self,
+        provider_manager: TTSProviderManager,
+        resource_manager: TTSResourceManager | None = None,
+    ):
         self.provider_manager = provider_manager
+        # Keep backward compatible default while allowing coordinator to pass a shared manager.
+        self.resource_manager = resource_manager or TTSResourceManager()
 
     def select_strategy(
         self,
@@ -291,19 +359,19 @@ class ConversionStrategySelector:
         # Check if provider supports chunking
         if not provider.supports_chunking():
             logger.debug("Provider does not support chunking, using direct conversion")
-            return DirectConversionStrategy(self.provider_manager, TTSResourceManager())
+            return DirectConversionStrategy(self.provider_manager, self.resource_manager)
 
         # Check text size limits
         max_bytes = provider.get_max_text_bytes()
         if not max_bytes:
             logger.debug("Provider has no byte limit, using direct conversion")
-            return DirectConversionStrategy(self.provider_manager, TTSResourceManager())
+            return DirectConversionStrategy(self.provider_manager, self.resource_manager)
 
         text_bytes_size = len(processed_text.enhanced.encode('utf-8'))
 
         if text_bytes_size > max_bytes:
             logger.info(f"Text exceeds {max_bytes} bytes ({text_bytes_size} bytes), using chunking...")
-            return ChunkedConversionStrategy(self.provider_manager, TTSResourceManager())
+            return ChunkedConversionStrategy(self.provider_manager, self.resource_manager)
         else:
             logger.debug(f"Text within limits ({text_bytes_size} bytes), using direct conversion")
-            return DirectConversionStrategy(self.provider_manager, TTSResourceManager())
+            return DirectConversionStrategy(self.provider_manager, self.resource_manager)

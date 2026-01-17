@@ -50,12 +50,12 @@ class LandingPageConfig:
     ARROW_WIDTH = 40
     
     # Logo constraints
-    LOGO_MAX_HEIGHT = 200
-    LOGO_MAX_WIDTH = 400
+    LOGO_MAX_HEIGHT = 240
+    LOGO_MAX_WIDTH = 480
     LOGO_PADDING = 20
     
-    # Logo filenames
-    LOGO_FILENAMES = ["logo.png", "logo atc 1.png", "logo_atc_1.png"]
+    # Logo filenames (checked in order)
+    LOGO_FILENAMES = ["logo 1 act.png", "logo act 1.png", "logo.png", "logo atc 1.png", "logo_atc_1.png"]
 
 
 class DesignTokens:

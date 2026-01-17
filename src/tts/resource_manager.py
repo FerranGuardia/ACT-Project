@@ -8,7 +8,7 @@ Provides proper resource management for temp files and directories.
 import shutil
 import time
 from pathlib import Path
-from typing import List, Set
+from typing import List, Set, Optional
 from contextlib import contextmanager
 
 from core.logger import get_logger
@@ -71,7 +71,7 @@ class TTSResourceManager:
         self.managed_resources.discard(resource_path)
         logger.debug(f"Unregistered resource: {resource_path}")
 
-    def cleanup_temp_files(self, file_paths: List[Path] = None) -> None:
+    def cleanup_temp_files(self, file_paths: Optional[List[Path]] = None) -> None:
         """
         Clean up temporary files.
 
@@ -90,7 +90,7 @@ class TTSResourceManager:
             except Exception as e:
                 logger.warning(f"Failed to cleanup temp file {file_path}: {e}")
 
-    def cleanup_temp_directories(self, dir_paths: List[Path] = None) -> None:
+    def cleanup_temp_directories(self, dir_paths: Optional[List[Path]] = None) -> None:
         """
         Clean up temporary directories.
 
@@ -147,6 +147,9 @@ class TTSResourceManager:
             # File is automatically cleaned up
         """
         temp_file = self._create_temp_file(suffix)
+        # Create the actual file
+        temp_file.parent.mkdir(parents=True, exist_ok=True)
+        temp_file.write_bytes(b"")  # Create empty file
         self.register_temp_file(temp_file)
 
         try:
@@ -173,19 +176,37 @@ class TTSResourceManager:
         finally:
             self.cleanup_temp_directories([temp_dir])
 
+    def _get_timestamp_ms(self) -> int:
+        """Get current timestamp in milliseconds."""
+        return int(time.time() * 1000)
+
     def _create_temp_file(self, suffix: str = ".mp3") -> Path:
         """Create a unique temporary file."""
         import tempfile
         temp_dir = Path(tempfile.gettempdir())
-        timestamp = int(time.time() * 1000)
+        timestamp = self._get_timestamp_ms()
         temp_file = temp_dir / f"tts_temp_{timestamp}_{id(self)}{suffix}"
         return temp_file
+
+    def create_tts_chunks_temp_dir(self) -> Path:
+        """
+        Create a temporary directory for TTS audio chunks.
+
+        Returns:
+            Path to the created temporary directory
+        """
+        import tempfile
+        temp_base = Path(tempfile.gettempdir())
+        timestamp = self._get_timestamp_ms()
+        temp_dir = temp_base / f"tts_chunks_{timestamp}"
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        return temp_dir
 
     def _create_temp_directory(self) -> Path:
         """Create a unique temporary directory."""
         import tempfile
         temp_base = Path(tempfile.gettempdir())
-        timestamp = int(time.time() * 1000)
+        timestamp = self._get_timestamp_ms()
         temp_dir = temp_base / f"tts_chunks_{timestamp}_{id(self)}"
         temp_dir.mkdir(parents=True, exist_ok=True)
         return temp_dir

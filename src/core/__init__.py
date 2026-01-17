@@ -9,8 +9,6 @@ from .constants import (
     DEFAULT_REQUEST_TIMEOUT,
     DEFAULT_REQUEST_DELAY,
     FFMPEG_TIMEOUT_SECONDS,
-    MAIN_WINDOW_MIN_WIDTH,
-    MAIN_WINDOW_MIN_HEIGHT,
     AUDIO_CHUNK_SIZE_CHARS,
     TEST_AUDIO_SIZE_THRESHOLD,
     TEST_NETWORK_TIMEOUT,
@@ -19,6 +17,7 @@ from .constants import (
     get_version,
 )
 from .error_handling import handle_errors, safe_operation, ErrorContext
+from .activity_console import ActivityConsole, get_activity_console, ActivityCategory, ActivityEntry
 
 __all__ = [
     # Constants
@@ -28,8 +27,6 @@ __all__ = [
     "DEFAULT_REQUEST_TIMEOUT",
     "DEFAULT_REQUEST_DELAY",
     "FFMPEG_TIMEOUT_SECONDS",
-    "MAIN_WINDOW_MIN_WIDTH",
-    "MAIN_WINDOW_MIN_HEIGHT",
     "AUDIO_CHUNK_SIZE_CHARS",
     "TEST_AUDIO_SIZE_THRESHOLD",
     "TEST_NETWORK_TIMEOUT",
@@ -41,4 +38,9 @@ __all__ = [
     "handle_errors",
     "safe_operation",
     "ErrorContext",
+    # Activity Console
+    "ActivityConsole",
+    "get_activity_console",
+    "ActivityCategory",
+    "ActivityEntry",
 ]

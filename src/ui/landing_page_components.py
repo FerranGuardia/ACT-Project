@@ -13,7 +13,7 @@ else:
 
 from PySide6.QtWidgets import QLabel, QFrame, QGraphicsDropShadowEffect
 from PySide6.QtCore import Qt, Signal  # type: ignore[attr-defined]
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QPixmap
 
 from ui.styles import COLORS, get_font_family
 from ui.landing_page_config import LandingPageConfig
@@ -21,6 +21,7 @@ from ui.styles import (
     get_card_style, get_card_title_style, get_card_description_style,
     get_card_icon_style, get_card_arrow_style
 )
+from ui.utils.event_logger import UIEventLogger
 
 __all__ = ['ClickableLabel', 'CardTitle', 'CardDescription', 'CardIcon', 'CardArrow', 'GenreCard']
 
@@ -66,11 +67,52 @@ class CardIcon(QLabel):
     """Reusable icon component for cards."""
     
     def __init__(self, icon: str, parent: Optional[QLabel] = None):
-        super().__init__(icon, parent)
+        super().__init__(parent)
+        self.icon_path = icon
         self.setup_icon()
     
     def setup_icon(self):
-        """Set up icon styling."""
+        """Set up icon styling and load image."""
+        from pathlib import Path
+        
+        # If icon is empty or None, don't display anything
+        if not self.icon_path:
+            self.setFixedWidth(0)
+            return
+        
+        # Resolve image path - check multiple locations
+        # 1. src/ui/images (primary location for assets)
+        # 2. Project root (fallback)
+        # 3. Absolute or relative to CWD
+        possible_paths = [
+            Path(__file__).parent / "images" / self.icon_path,  # src/ui/images (primary)
+            Path(__file__).parent.parent.parent.parent / self.icon_path,  # project root (fallback)
+            Path(self.icon_path),  # Absolute or relative to CWD
+        ]
+        
+        icon_path = None
+        for path in possible_paths:
+            if path.exists() and path.is_file():
+                icon_path = path
+                break
+        
+        if icon_path:
+            pixmap = QPixmap(str(icon_path))
+            if not pixmap.isNull():
+                # Scale to fit ICON_WIDTH while maintaining aspect ratio
+                icon_width = LandingPageConfig.ICON_WIDTH
+                scaled_pixmap = pixmap.scaledToWidth(
+                    icon_width,
+                    Qt.TransformationMode.SmoothTransformation
+                )
+                self.setPixmap(scaled_pixmap)
+                self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.setFixedWidth(icon_width)
+                self.setFixedHeight(scaled_pixmap.height())
+                return
+        
+        # Fallback: if image doesn't load, use text (for backwards compatibility)
+        self.setText(self.icon_path)
         self.setFont(QFont(get_font_family(), LandingPageConfig.ICON_FONT_SIZE))
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setStyleSheet(get_card_icon_style())
@@ -142,11 +184,13 @@ class GenreCard(QFrame):
         description: str,
         icon: Optional[str] = None,
         callback: Optional[Callable[[], None]] = None,
+        mode_id: Optional[str] = None,
         parent: Optional[QFrame] = None
     ):
         super().__init__(parent)
         self.title = title
         self.callback = callback
+        self.mode_id = mode_id
         self.title_label: Optional[CardTitle] = None
         self.setup_ui(title, description, icon)
     
@@ -220,6 +264,10 @@ class GenreCard(QFrame):
     
     def _on_title_clicked(self):
         """Handle title click."""
+        # Log the event
+        if hasattr(self, 'mode_id'):
+            UIEventLogger.log_button_click(f"Mode Card: {self.mode_id}", "selected")
+        
         if self.callback:
             self.callback()
     

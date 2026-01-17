@@ -241,7 +241,7 @@ class ProviderSelectionDialog(QDialog):
         
         # Test button
         test_button_layout = QHBoxLayout()
-        self.test_button = QPushButton("🧪 Test All Providers")
+        self.test_button = QPushButton(" Test All Providers")
         self.test_button.clicked.connect(self._test_all_providers)
         test_button_layout.addWidget(self.test_button)
         test_button_layout.addStretch()
@@ -300,7 +300,7 @@ class ProviderSelectionDialog(QDialog):
             type_str = info.get("type", "")
             
             # Create item with status placeholder
-            item_text = f"🟡 {name} {version} ({type_str}) - Checking..."
+            item_text = f" {name} {version} ({type_str}) - Checking..."
             item = QListWidgetItem(item_text)
             item.setData(Qt.ItemDataRole.UserRole, provider_name)
             
@@ -361,14 +361,14 @@ class ProviderSelectionDialog(QDialog):
         # Status indicator
         if tested:
             if is_available:
-                indicator = "🟢"
+                indicator = ""
             else:
-                indicator = "🔴"
+                indicator = ""
         else:
             if is_available:
-                indicator = "🟢"
+                indicator = ""
             else:
-                indicator = "🔴"
+                indicator = ""
         
         # Add implementation indicator for edge_tts variants
         impl_indicator = ""
@@ -431,7 +431,7 @@ class ProviderSelectionDialog(QDialog):
         details += f"<br><b>Status:</b> {status.get('message', 'Unknown')}"
         
         if status.get('tested', False):
-            details += f"<br><b>Test Result:</b> {'✓ Passed' if status.get('available', False) else '✗ Failed'}"
+            details += f"<br><b>Test Result:</b> {' Passed' if status.get('available', False) else ' Failed'}"
         
         self.details_text.setHtml(details)
         
@@ -484,7 +484,7 @@ class ProviderSelectionDialog(QDialog):
         # Check if all tests are done
         if not self.test_threads:
             self.test_button.setEnabled(True)
-            self.test_button.setText("🧪 Test All Providers")
+            self.test_button.setText(" Test All Providers")
     
     def _on_ok(self):
         """Handle OK button click."""

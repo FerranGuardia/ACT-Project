@@ -1,0 +1,127 @@
+{
+  "version": "2.0",
+  "last_updated": "2026-01-16T12:47:36.129208",
+  "novels": {
+    "https://novelfull.net/in-different-world-with-naruto-system.html": {
+      "url": "https://novelfull.net/in-different-world-with-naruto-system.html",
+      "created_at": "2026-01-13T01:12:50.437037",
+      "updated_at": "2026-01-13T02:11:13.429127",
+      "title": "in-different-world-with-naruto-system.html",
+      "novel_url": "https://novelfull.net/in-different-world-with-naruto-system.html"
+    },
+    "https://novelfull.net/i-alone-level-up.html": {
+      "url": "https://novelfull.net/i-alone-level-up.html",
+      "created_at": "2026-01-13T12:10:19.270125",
+      "updated_at": "2026-01-13T12:10:19.270125",
+      "title": "Test Novel Title",
+      "novel_url": "https://novelfull.net/i-alone-level-up.html",
+      "last_processed": "2024-01-01T00:00:00",
+      "output_folder": "C:/Test/Output",
+      "total_chapters": 50
+    },
+    "https://novelfull.net/versatile-mage.html": {
+      "url": "https://novelfull.net/versatile-mage.html",
+      "created_at": "2026-01-13T14:24:01.692335",
+      "updated_at": "2026-01-13T14:24:07.616682",
+      "title": "versatile-mage.html",
+      "novel_url": "https://novelfull.net/versatile-mage.html"
+    },
+    "https://novelfull.net/dungeon-defense.html": {
+      "url": "https://novelfull.net/dungeon-defense.html",
+      "created_at": "2026-01-14T06:51:15.421738",
+      "updated_at": "2026-01-14T06:51:22.417745",
+      "title": "Dungeon defense",
+      "novel_url": "https://novelfull.net/dungeon-defense.html"
+    },
+    "https://novelfull.net/the-second-coming-of-gluttony.html": {
+      "url": "https://novelfull.net/the-second-coming-of-gluttony.html",
+      "created_at": "2026-01-14T23:51:00.729050",
+      "updated_at": "2026-01-14T23:56:07.718904",
+      "novel_url": "https://novelfull.net/the-second-coming-of-gluttony.html"
+    },
+    "https://novelfull.net/warlock-apprentice.html": {
+      "url": "https://novelfull.net/warlock-apprentice.html",
+      "created_at": "2026-01-14T23:56:04.909178",
+      "updated_at": "2026-01-15T00:00:02.914053",
+      "novel_url": "https://novelfull.net/warlock-apprentice.html",
+      "title": "Warlock Apprentice Debug Test"
+    },
+    "https://www.fanmtl.com/novel/6952926.html": {
+      "url": "https://www.fanmtl.com/novel/6952926.html",
+      "created_at": "2026-01-15T07:55:59.236837",
+      "updated_at": "2026-01-15T12:23:10.906782",
+      "title": "prosperous sand village",
+      "novel_url": "https://www.fanmtl.com/novel/6952926.html"
+    },
+    "https://novelbin.me/novel-book/black-tech-internet-cafe-system": {
+      "url": "https://novelbin.me/novel-book/black-tech-internet-cafe-system",
+      "created_at": "2026-01-16T07:38:53.131099",
+      "updated_at": "2026-01-16T07:47:31.093286",
+      "title": "test",
+      "novel_url": "https://novelbin.me/novel-book/black-tech-internet-cafe-system"
+    },
+    "https://novelfull.net/black-tech-internet-cafe-system/chapter-1-super-internet-cafe-system.html": {
+      "url": "https://novelfull.net/black-tech-internet-cafe-system/chapter-1-super-internet-cafe-system.html",
+      "created_at": "2026-01-16T07:56:34.909386",
+      "updated_at": "2026-01-16T08:14:48.518434",
+      "title": "Black tech internet cafe",
+      "novel_url": "https://novelfull.net/black-tech-internet-cafe-system/chapter-1-super-internet-cafe-system.html"
+    },
+    "https://novelfull.net/black-tech-internet-cafe-system.html": {
+      "url": "https://novelfull.net/black-tech-internet-cafe-system.html",
+      "created_at": "2026-01-16T08:18:38.142210",
+      "updated_at": "2026-01-16T12:47:36.128199",
+      "title": "Black tech internet cafe system",
+      "novel_url": "https://novelfull.net/black-tech-internet-cafe-system.html"
+    },
+    "http://example.com": {
+      "url": "http://example.com",
+      "created_at": "2026-01-16T10:29:13.796984",
+      "updated_at": "2026-01-16T10:29:13.796984"
+    },
+    "https://example.com/toc": {
+      "url": "https://example.com/toc",
+      "created_at": "2026-01-16T10:29:35.235806",
+      "updated_at": "2026-01-16T11:07:39.356904",
+      "title": "Test Novel"
+    },
+    "https://example.com/novel": {
+      "url": "https://example.com/novel",
+      "created_at": "2026-01-16T10:31:29.658446",
+      "updated_at": "2026-01-16T11:07:07.886716",
+      "title": "Test Novel",
+      "author": "Test Author",
+      "novel_url": "https://example.com/novel"
+    },
+    "https://example.com/novel1": {
+      "url": "https://example.com/novel1",
+      "created_at": "2026-01-16T10:32:11.192666",
+      "updated_at": "2026-01-16T11:08:10.683998",
+      "title": "Novel One"
+    },
+    "https://example.com/novel2": {
+      "url": "https://example.com/novel2",
+      "created_at": "2026-01-16T10:32:11.200078",
+      "updated_at": "2026-01-16T11:08:10.690761",
+      "title": "Novel Two"
+    },
+    "https://example.com/minimal": {
+      "url": "https://example.com/minimal",
+      "created_at": "2026-01-16T10:32:21.578360",
+      "updated_at": "2026-01-16T11:07:55.590646",
+      "title": "Minimal Item"
+    },
+    "http://127.0.0.1:49278/index.html": {
+      "url": "http://127.0.0.1:49278/index.html",
+      "created_at": "2026-01-16T12:40:27.871497",
+      "updated_at": "2026-01-16T12:40:27.871497",
+      "novel_url": "http://127.0.0.1:49278/index.html"
+    },
+    "http://127.0.0.1:60230/index.html": {
+      "url": "http://127.0.0.1:60230/index.html",
+      "created_at": "2026-01-16T12:40:50.325326",
+      "updated_at": "2026-01-16T12:40:50.325326",
+      "novel_url": "http://127.0.0.1:60230/index.html"
+    }
+  }
+}

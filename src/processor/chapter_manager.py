@@ -63,20 +63,41 @@ class Chapter:
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Chapter":
-        """Create chapter from dictionary."""
-        chapter = cls(
-            number=data["number"],
-            url=data["url"],
-            title=data.get("title"),
-            status=ChapterStatus(data.get("status", "pending")),
-            error_message=data.get("error_message"),
-            text_file_path=data.get("text_file_path"),
-            audio_file_path=data.get("audio_file_path"),
-            scraped_at=data.get("scraped_at"),
-            converted_at=data.get("converted_at")
-        )
-        # Don't include content in serialization (too large)
-        return chapter
+        """Create chapter from dictionary with error handling for corrupted data."""
+        try:
+            # Validate required fields
+            if "number" not in data:
+                logger.error(f"Chapter data missing required 'number' field: {data}")
+                return None
+            if "url" not in data:
+                logger.error(f"Chapter data missing required 'url' field: {data}")
+                return None
+
+            # Handle status conversion with fallback
+            status_str = data.get("status", "pending")
+            try:
+                status = ChapterStatus(status_str)
+            except ValueError:
+                logger.warning(f"Invalid chapter status '{status_str}', defaulting to 'pending'")
+                status = ChapterStatus.PENDING
+
+            chapter = cls(
+                number=data["number"],
+                url=data["url"],
+                title=data.get("title"),
+                status=status,
+                error_message=data.get("error_message"),
+                text_file_path=data.get("text_file_path"),
+                audio_file_path=data.get("audio_file_path"),
+                scraped_at=data.get("scraped_at"),
+                converted_at=data.get("converted_at")
+            )
+            # Don't include content in serialization (too large)
+            return chapter
+        except Exception as e:
+            logger.error(f"Failed to create chapter from corrupted data: {e}")
+            logger.error(f"Problematic data: {data}")
+            return None
 
 
 class ChapterManager:
@@ -350,9 +371,23 @@ class ChapterManager:
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ChapterManager":
-        """Create chapter manager from dictionary."""
-        chapters = [Chapter.from_dict(ch_data) for ch_data in data.get("chapters", [])]
-        return cls(chapters=chapters)
+        """Create chapter manager from dictionary with error handling."""
+        chapters_data = data.get("chapters", [])
+        valid_chapters = []
+
+        for i, ch_data in enumerate(chapters_data):
+            try:
+                chapter = Chapter.from_dict(ch_data)
+                if chapter is not None:
+                    valid_chapters.append(chapter)
+                else:
+                    logger.warning(f"Skipping corrupted chapter at index {i}")
+            except Exception as e:
+                logger.error(f"Failed to load chapter at index {i}: {e}")
+                # Continue with other chapters
+
+        logger.info(f"Loaded {len(valid_chapters)} out of {len(chapters_data)} chapters")
+        return cls(chapters=valid_chapters)
 
 
 

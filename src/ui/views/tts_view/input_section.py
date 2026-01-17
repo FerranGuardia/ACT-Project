@@ -37,9 +37,9 @@ class InputSection(QWidget):
         files_layout.setContentsMargins(0, 0, 0, 0)
         
         buttons_layout = QHBoxLayout()
-        self.add_files_button = QPushButton("➕ Add Files")
+        self.add_files_button = QPushButton(" Add Files")
         # Standard buttons use default style from global stylesheet
-        self.add_folder_button = QPushButton("➕ Add Folder")
+        self.add_folder_button = QPushButton(" Add Folder")
         # Standard buttons use default style from global stylesheet
         self.remove_button = QPushButton("Remove Selected")
         # Standard buttons use default style from global stylesheet

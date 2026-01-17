@@ -7,14 +7,15 @@ to reduce code duplication.
 
 from typing import List
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (QHBoxLayout, QLabel, QProgressBar, QPushButton,
-                               QVBoxLayout, QWidget)
+                               QVBoxLayout, QWidget, QSizePolicy)
 
 from ui.styles import (get_font_family, get_font_size_large,
                        get_icon_container_style, get_queue_item_style,
-                       get_secondary_text_style, get_status_label_style)
+                       get_queue_item_button_style, get_secondary_text_style,
+                       get_status_label_style)
 from ui.view_config import ViewConfig
 
 
@@ -65,27 +66,30 @@ class BaseQueueItemWidget(QWidget):
         self.status_label.setStyleSheet(get_status_label_style())
         info_layout.addWidget(self.status_label)
         
-        # Progress bar (always created, but may be hidden)
+        # Progress bar (always created and added to layout)
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(self.progress)
-        if self.status == "Processing":
-            info_layout.addWidget(self.progress_bar)
-        else:
-            self.progress_bar.hide()
+        info_layout.addWidget(self.progress_bar)
+        # Show/hide based on status
+        self.progress_bar.setVisible(self.status == "Processing")
         
         layout.addLayout(info_layout, 1)
         
         # Action buttons
         actions_layout = QVBoxLayout()
-        self.up_button = QPushButton("↑ Move Up")
-        self.up_button.setMaximumWidth(ViewConfig.QUEUE_ACTION_BUTTON_WIDTH)
-        self.down_button = QPushButton("↓ Move Down")
-        self.down_button.setMaximumWidth(ViewConfig.QUEUE_ACTION_BUTTON_WIDTH)
-        self.remove_button = QPushButton("✖️ Remove")
+        self.up_button = QPushButton("↑")
+        self.up_button.setToolTip("Move Up")
+        self.down_button = QPushButton("↓")
+        self.down_button.setToolTip("Move Down")
+        self.remove_button = QPushButton("")
+        self.remove_button.setToolTip("Remove")
         # Make sure buttons are visible and properly styled
         for btn in [self.up_button, self.down_button, self.remove_button]:
-            btn.setMinimumWidth(70)
+            btn.setFixedWidth(ViewConfig.QUEUE_ITEM_BUTTON_FIXED_WIDTH)  # Fixed width for consistent appearance
+            btn.setMinimumHeight(ViewConfig.QUEUE_ITEM_BUTTON_MIN_HEIGHT)  # Ensure buttons have adequate height
+            btn.setMaximumHeight(ViewConfig.QUEUE_ITEM_BUTTON_MAX_HEIGHT)  # Prevent buttons from getting too tall
+            btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)  # Fixed width and height
             btn.setVisible(True)
             btn.setEnabled(True)
         actions_layout.addWidget(self.up_button)
@@ -93,31 +97,48 @@ class BaseQueueItemWidget(QWidget):
         actions_layout.addWidget(self.remove_button)
         actions_layout.addStretch()
         layout.addLayout(actions_layout)
-        
+
         self.setLayout(layout)
         self.setStyleSheet(get_queue_item_style())
-    
+
+        # Apply custom button styling to match queue item theme
+        for btn in [self.up_button, self.down_button, self.remove_button]:
+            btn.setStyleSheet(get_queue_item_button_style())
+
+        # Button sizing is already set above
+
+    def sizeHint(self) -> QSize:
+        """Override sizeHint to ensure all elements fit properly using centralized constants."""
+        # Width: icon + content area + button column
+        icon_width = ViewConfig.QUEUE_ITEM_ICON_SIZE
+        button_width = ViewConfig.QUEUE_ITEM_BUTTON_FIXED_WIDTH  # Use actual button width
+        margins = ViewConfig.QUEUE_ITEM_MARGINS[1] + ViewConfig.QUEUE_ITEM_MARGINS[3]  # left + right
+
+        # Content area gets remaining space, minimum width for comfortable text display
+        content_min_width = ViewConfig.QUEUE_ITEM_CONTENT_MIN_WIDTH
+        total_width = icon_width + content_min_width + button_width + margins
+
+        # Height: simple calculation based on constants
+        # Button total height: 3 buttons + 2 gaps between them
+        button_total_height = (ViewConfig.QUEUE_ITEM_BUTTON_MIN_HEIGHT * 3) + (ViewConfig.QUEUE_ITEM_LAYOUT_SPACING * 2)
+
+        # Content area height: ensure it's tall enough for buttons but maintain minimum readable height
+        content_height = max(ViewConfig.QUEUE_ITEM_CONTENT_MIN_HEIGHT, button_total_height)
+
+        # Total height includes margins
+        total_height = content_height + ViewConfig.QUEUE_ITEM_MARGINS[0] + ViewConfig.QUEUE_ITEM_MARGINS[2]
+
+        return QSize(total_width, total_height)
+
     def update_status(self, status: str, progress: int = 0) -> None:
         """Update the status and progress of the queue item."""
         self.status = status
         self.progress = progress
         self.status_label.setText(f"Status: {self.status}")
         self.progress_bar.setValue(self.progress)
-        
+
         # Show/hide progress bar based on status
-        if self.status == "Processing":
-            if self.progress_bar not in self.findChildren(QProgressBar, options=Qt.FindChildOption.FindDirectChildrenOnly):
-                # Find the info layout and add progress bar
-                main_layout = self.layout()
-                if main_layout is not None:
-                    layout_item = main_layout.itemAt(1)
-                    if layout_item is not None:
-                        info_layout = layout_item.layout()
-                        if info_layout is not None:
-                            info_layout.addWidget(self.progress_bar)
-            self.progress_bar.show()
-        else:
-            self.progress_bar.hide()
+        self.progress_bar.setVisible(self.status == "Processing")
     
     def get_icon(self) -> str:
         """Return the emoji/icon for this queue item."""

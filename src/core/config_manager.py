@@ -9,28 +9,31 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Optional, cast
 
-from .logger import get_logger
+from core.logger import get_logger
+
+from .constants import DEFAULT_AUDIO_BITRATE, DEFAULT_AUDIO_FORMAT, get_version
 
 logger = get_logger("core.config_manager")
+
+
+__all__ = ["ConfigManager", "get_config"]
 
 
 class ConfigManager:
     """Manages application configuration and user preferences."""
 
     _instance: Optional["ConfigManager"] = None
-    _initialized: bool = False
 
     def __new__(cls) -> "ConfigManager":
         """Singleton pattern to ensure only one config manager instance."""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
+            # Initialize only once in __new__ to avoid __init__ being called multiple times
+            cls._instance._initialize()
         return cls._instance
 
-    def __init__(self) -> None:
-        """Initialize the configuration manager."""
-        if self._initialized:
-            return
-
+    def _initialize(self) -> None:
+        """Initialize the configuration manager (called only once)."""
         self.config_dir = Path.home() / ".act"
         self.config_dir.mkdir(parents=True, exist_ok=True)
 
@@ -39,7 +42,10 @@ class ConfigManager:
         self._default_config = self._get_default_config()
 
         self.load_config()
-        self._initialized = True
+
+    def __init__(self) -> None:
+        """Prevent multiple initialization - all work done in __new__."""
+        pass
 
     def _get_default_config(self) -> Dict[str, Any]:
         """
@@ -48,24 +54,47 @@ class ConfigManager:
         Returns:
             Dictionary with default configuration
         """
+        # Read version from VERSION file
+        version = get_version()
+
+        # Detect if running in test environment (robust)
+        import os
+        import sys
+        import tempfile
+
+        # Multiple signals: env vars, pytest module presence, cwd hints, and explicit override
+        is_test_env = (
+            os.environ.get("ACT_TEST_MODE") == "1" or
+            "PYTEST_CURRENT_TEST" in os.environ or
+            "PYTEST_ADDOPTS" in os.environ or
+            "PYTEST_WORKER" in os.environ or
+            ("pytest" in sys.modules) or
+            ("pytest" in str(Path.cwd()).lower()) or
+            any("test" in part for part in str(Path.cwd()).lower().split(os.sep))
+        )
+
+        # Use temp directory for tests to avoid desktop pollution
+        if is_test_env:
+            temp_base = Path(tempfile.gettempdir()) / "act_test"
+            temp_base.mkdir(exist_ok=True)
+
         return {
             "app": {
-                "version": "1.1.0",
-                "theme": "light",
-                "language": "es",
+                "version": version,
+                "language": "en",
             },
             "paths": {
-                "output_dir": str(Path.home() / "Desktop"),
-                "scraped_dir": str(Path.home() / "Documents" / "ACT" / "scraped"),
-                "projects_dir": str(Path.home() / "Documents" / "ACT" / "projects"),
+                "output_dir": str(temp_base / "output") if is_test_env else str(Path.home() / "Documents" / "ACT" / "output"),
+                "scraped_dir": str(temp_base / "scraped") if is_test_env else str(Path.home() / "Documents" / "ACT" / "scraped"),
+                "projects_dir": str(temp_base / "projects") if is_test_env else str(Path.home() / "Documents" / "ACT" / "projects"),
             },
             "tts": {
-                "voice": "es-ES-ElviraNeural",
+                "voice": "en-US-AndrewNeural",
                 "rate": "+0%",
                 "pitch": "+0Hz",
                 "volume": "+0%",
-                "output_format": "mp3",
-                "bitrate": "128k",
+                "output_format": DEFAULT_AUDIO_FORMAT,
+                "bitrate": DEFAULT_AUDIO_BITRATE,
             },
             "scraper": {
                 "chapters_per_file": 1,
@@ -142,7 +171,7 @@ class ConfigManager:
         Get a configuration value using dot notation.
 
         Args:
-            key: Configuration key (e.g., 'tts.voice' or 'app.theme')
+            key: Configuration key (e.g., 'tts.voice' or 'app.language')
             default: Default value if key not found
 
         Returns:
@@ -158,10 +187,65 @@ class ConfigManager:
         try:
             for k in keys:
                 value = value[k]
+            # Validate path values to prevent desktop pollution
+            if key in ['paths.output_dir', 'paths.scraped_dir', 'paths.projects_dir']:
+                value = self._validate_path_value(key, value)
             return value
         except (KeyError, TypeError):
             logger.debug(f"Config key '{key}' not found, returning default")
             return default
+
+    def _validate_path_value(self, key: str, value: Any) -> str:
+        """
+        Validate and fix path configuration values.
+
+        Prevents directories from being created in problematic locations like Desktop.
+        This protects against config files that have been manually edited with invalid paths.
+
+        Args:
+            key: Configuration key
+            value: Raw value from config
+
+        Returns:
+            Validated path string
+        """
+        if not isinstance(value, str):
+            logger.warning(f"Config key '{key}' should be a string, got {type(value).__name__}")
+            return self._get_default_path(key)
+
+        path = Path(value)
+
+        # Check for problematic paths
+        problematic_paths = [
+            Path.home() / "Desktop",
+            Path.home(),  # Don't allow root user directory
+        ]
+
+        for problematic in problematic_paths:
+            try:
+                if path.resolve() == problematic.resolve():
+                    logger.warning(f"Config key '{key}' points to problematic location: {value}. Using default.")
+                    return self._get_default_path(key)
+            except (OSError, RuntimeError):
+                # Path resolution failed, use default
+                logger.warning(f"Could not resolve path for '{key}': {value}. Using default.")
+                return self._get_default_path(key)
+
+        # Ensure path is absolute
+        if not path.is_absolute():
+            logger.warning(f"Config key '{key}' should be an absolute path: {value}. Using default.")
+            return self._get_default_path(key)
+
+        return str(path)
+
+    def _get_default_path(self, key: str) -> str:
+        """Get default path for a configuration key."""
+        defaults = {
+            'paths.output_dir': str(Path.home() / "Documents" / "ACT" / "output"),
+            'paths.scraped_dir': str(Path.home() / "Documents" / "ACT" / "scraped"),
+            'paths.projects_dir': str(Path.home() / "Documents" / "ACT" / "projects"),
+        }
+        return defaults.get(key, str(Path.home() / "Documents" / "ACT"))
 
     def set(self, key: str, value: Any, save: bool = True) -> None:
         """
@@ -174,7 +258,7 @@ class ConfigManager:
 
         Example:
             >>> config = ConfigManager()
-            >>> config.set('tts.voice', 'es-ES-ElviraNeural')
+            >>> config.set('tts.voice', 'en-US-AndrewNeural')
         """
         keys = key.split(".")
         config = self._config
@@ -204,7 +288,7 @@ class ConfigManager:
 
     def reset_to_defaults(self) -> None:
         """Reset configuration to default values."""
-        self._config = self._default_config.copy()
+        self._config = self._get_default_config()
         self.save_config()
         logger.info("Configuration reset to defaults")
 
@@ -240,9 +324,3 @@ def get_config() -> ConfigManager:
         >>> voice = config.get('tts.voice')
     """
     return ConfigManager()
-
-
-
-
-
-

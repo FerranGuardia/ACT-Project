@@ -4,6 +4,7 @@ Main orchestrator that combines all components.
 """
 
 from pathlib import Path
+from core.config_manager import get_config
 from typing import Optional, List, Dict, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -31,7 +32,7 @@ from ui.views.full_auto_view.processing_thread import ProcessingThread
 from ui.views.full_auto_view.queue_section import QueueSection
 from ui.views.full_auto_view.current_processing_section import CurrentProcessingSection
 from ui.views.full_auto_view.controls_section import ControlsSection
-from ui.views.full_auto_view.queue_manager import QueueManager
+from ui.views.full_auto_view.full_auto_queue_manager import QueueManager
 from ui.views.full_auto_view.handlers import FullAutoViewHandlers
 
 logger = get_logger("ui.full_auto_view")
@@ -39,7 +40,11 @@ logger = get_logger("ui.full_auto_view")
 
 class FullAutoView(BaseView):
     """Full automation view with queue system."""
-    
+
+    def get_view_title(self) -> str:
+        """Get the title for this view."""
+        return "URL to MP3"
+
     def __init__(self, parent=None):
         self.queue_items: List[Dict] = []
         self.current_processing: Optional[ProcessingThread] = None
@@ -73,9 +78,9 @@ class FullAutoView(BaseView):
         
         # Global controls
         global_controls_layout = QHBoxLayout()
-        self.pause_all_button = QPushButton("⏸️ Pause All")
+        self.pause_all_button = QPushButton("⏸ Pause All")
         # Standard buttons use default style from global stylesheet
-        self.stop_all_button = QPushButton("⏹️ Stop All")
+        self.stop_all_button = QPushButton("⏹ Stop All")
         # Standard buttons use default style from global stylesheet
         global_controls_layout.addWidget(self.pause_all_button)
         global_controls_layout.addWidget(self.stop_all_button)
@@ -160,17 +165,18 @@ class FullAutoView(BaseView):
                 item['title'],
                 item['url'],
                 item['status'],
-                item['progress'],
-                parent=None  # Explicitly set parent
+                item['progress']
             )
-            
-            # Connect action buttons using handlers
-            self.handlers.connect_queue_item_buttons(
-                queue_widget,
-                idx,
-                self._move_queue_item_up,
-                self._move_queue_item_down,
-                self._remove_queue_item
+
+            # Connect action buttons using direct object references (consistent with other views)
+            queue_widget.up_button.clicked.connect(
+                lambda checked, row=idx: self._move_queue_item_up(row)
+            )
+            queue_widget.down_button.clicked.connect(
+                lambda checked, row=idx: self._move_queue_item_down(row)
+            )
+            queue_widget.remove_button.clicked.connect(
+                lambda checked, row=idx: self._remove_queue_item(row)
             )
             
             list_item = QListWidgetItem()
@@ -230,7 +236,9 @@ class FullAutoView(BaseView):
         provider: Optional[str] = item.get('provider')
         chapter_selection: Dict[str, Any] = item.get('chapter_selection', {'type': 'all'})
         output_format: Dict[str, Any] = item.get('output_format', {'type': 'individual_mp3s'})
-        output_folder: Optional[str] = item.get('output_folder', str(Path.home() / "Desktop"))
+        # Default to configured output_dir to avoid Desktop writes in tests
+        default_output = get_config().get('paths.output_dir')
+        output_folder: Optional[str] = item.get('output_folder', str(default_output))
         novel_title: Optional[str] = item.get('title', project_name)
         self.current_processing = ProcessingThread(
             item['url'],
@@ -245,7 +253,7 @@ class FullAutoView(BaseView):
         self.current_processing.progress.connect(self._on_progress)
         self.current_processing.status.connect(self._on_status)
         self.current_processing.chapter_update.connect(self._on_chapter_update)
-        self.current_processing.finished.connect(lambda success, msg: self._on_finished(item, success, msg))
+        self.current_processing.finished.connect(lambda success, msg, result: self._on_finished(item, success, msg, result))
         
         # Update UI state
         self.controls_section.set_processing_state()
@@ -348,21 +356,44 @@ class FullAutoView(BaseView):
         self.current_processing_section.set_status(status_text)
         logger.debug(f"Chapter {chapter_num} update: {status} - {message}")
     
-    def _on_finished(self, item: Dict[str, Any], success: bool, message: str) -> None:
+    def _on_finished(self, item: Dict[str, Any], success: bool, message: str, result: Dict[str, Any]) -> None:
         """
         Handle processing completion.
-        
+
         Args:
             item: The queue item that finished processing
             success: Whether the operation completed successfully
             message: Completion message to display
+            result: Detailed processing results from the pipeline
         """
-        # Update item status
+        # Update item status based on actual processing results
         if success:
-            item['status'] = 'Completed'
-            item['progress'] = 100
+            # Check actual processing results - even if pipeline says success,
+            # we might have failed chapters
+            completed = result.get('completed', 0)
+            failed = result.get('failed', 0)
+            total_attempted = completed + failed
+
+            if total_attempted == 0:
+                # No chapters were processed - likely an error
+                item['status'] = 'Failed'
+                item['progress'] = 0
+            elif failed > 0 and completed == 0:
+                # All chapters failed
+                item['status'] = 'Failed'
+                item['progress'] = 0
+            elif failed > 0:
+                # Partial success - some chapters completed, some failed
+                item['status'] = 'Partial'
+                item['progress'] = int((completed / total_attempted) * 100)
+            else:
+                # All chapters completed successfully
+                item['status'] = 'Completed'
+                item['progress'] = 100
         else:
+            # Pipeline reported failure
             item['status'] = 'Failed'
+            item['progress'] = 0
         
         # Reset UI state
         self.controls_section.set_idle_state()

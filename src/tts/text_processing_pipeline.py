@@ -135,7 +135,7 @@ class TextProcessingPipeline:
             cleaners: List of text cleaners to apply
             validator: Text validator instance
         """
-        self.cleaners = cleaners or [TTSTextCleaner()]
+        self.cleaners = cleaners if cleaners is not None else [TTSTextCleaner()]
         self.validator = validator or TextValidator()
 
         logger.debug("TextProcessingPipeline initialized")

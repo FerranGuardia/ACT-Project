@@ -23,7 +23,7 @@ class OutputFilesSection(QGroupBox):
         self.files_list = QListWidget()
         self.files_list.setStyleSheet(get_list_widget_style())
         
-        self.open_folder_button = QPushButton("📂 Open Folder")
+        self.open_folder_button = QPushButton(" Open Folder")
         # Standard buttons use default style from global stylesheet
         
         layout.addWidget(self.files_list)

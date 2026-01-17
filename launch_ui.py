@@ -18,6 +18,10 @@ def main():
         # Import and run UI
         from ui.main_window import MainWindow
         from PySide6.QtWidgets import QApplication
+        from core.logger import ACTLogger
+        
+        # Enable verbose console logging for debugging
+        ACTLogger.enable_verbose_console()
         
         app = QApplication(sys.argv)
         app.setApplicationName("ACT - Audiobook Creator Tools")

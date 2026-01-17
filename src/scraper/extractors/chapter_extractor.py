@@ -441,7 +441,7 @@ class ChapterExtractor:
             logger.debug("No Cloudflare challenge detected")
             return
         
-        logger.warning("⚠ Cloudflare challenge detected - waiting for completion...")
+        logger.warning(" Cloudflare challenge detected - waiting for completion...")
         
         # Wait for challenge to complete (max 20 seconds)
         max_wait = 20
@@ -480,7 +480,7 @@ class ChapterExtractor:
                     try:
                         final_title = page.title().lower()  # type: ignore[attr-defined]
                         if not ("just a moment" in final_title or "checking your browser" in final_title):
-                            logger.debug(f"✓ Cloudflare challenge completed after {waited}s")
+                            logger.debug(f" Cloudflare challenge completed after {waited}s")
                             return
                     except Exception as e:
                         pass

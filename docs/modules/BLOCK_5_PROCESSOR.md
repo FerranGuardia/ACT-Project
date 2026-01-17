@@ -1,124 +1,87 @@
 # Processor Module
 
-**Status**: Complete (Refactored)
+**Status**:  Complete
 **Location**: `src/processor/`
 
-## Architecture Overview
+## Overview
 
-The processor module has been refactored from a monolithic `ProcessingPipeline` class into a clean, modular architecture following SOLID principles.
+Handles the conversion pipeline from web scraping to audio output using a modular coordinator architecture.
 
-### New Modular Architecture
+## Architecture
 
-```
-ProcessingContext
-├── Shared state and configuration
-├── Callback management
-└── Processing control
+The processor module follows a **coordinator pattern** with clear separation of concerns:
 
-ScrapingCoordinator
-├── URL discovery and chapter fetching
-├── Content extraction from web pages
-└── Progress tracking integration
+### Core Coordinators
+- **PipelineOrchestrator**: High-level workflow coordination (140 lines)
+- **ScrapingCoordinator**: Web scraping and content extraction
+- **ConversionCoordinator**: Text-to-speech conversion
+- **AudioPostProcessor**: Audio file merging
 
-ConversionCoordinator
-├── TTS conversion workflow
-├── File management (text/audio)
-└── Temp file cleanup
+### Specialized Coordinators
+- **BatchProcessingCoordinator**: Complex batch processing and incremental merging
+- **ProcessingMetadataService**: Metadata saving and processing summaries
+- **PauseStopManager**: Centralized pause/stop state management
+- **BackwardCompatibilityAdapter**: Legacy API compatibility layer
 
-AudioPostProcessor
-├── Audio file merging
-├── Batch processing
-└── Output format handling
+### Shared Components
+- **ProcessingContext**: Shared state and configuration with PauseStopManager integration
 
-PipelineOrchestrator
-├── High-level workflow coordination
-├── Coordinator management
-└── Public API compatibility
-```
+## Usage
 
-## Components
-
-### Core Classes
-
-- **`ProcessingContext`**: Shared state and configuration management
-- **`ScrapingCoordinator`**: Handles all web scraping operations
-- **`ConversionCoordinator`**: Manages TTS conversion and file operations
-- **`AudioPostProcessor`**: Handles audio file merging and post-processing
-
-### Legacy Components (Maintained for Compatibility)
-
-- **`ProcessingPipeline`**: Alias for `PipelineOrchestrator` (backward compatibility)
-- **`ProjectManager`**: Project state persistence
-- **`ChapterManager`**: Chapter data structures and tracking
-- **`FileManager`**: File operations and organization
-- **`ProgressTracker`**: Progress reporting and callbacks
-
-## Data Flow
-
-```
-URL → ScrapingCoordinator → ConversionCoordinator → AudioPostProcessor
-       ↓                        ↓                        ↓
-   Chapter URLs            Audio Files            Merged Audio
-   Content Extraction      File Management        Output Formats
-```
-
-## Key Classes
-
-### New Architecture Usage
-
+### Simple Usage (Recommended)
 ```python
-from processor import (
-    PipelineOrchestrator,
-    ProcessingContext,
-    ScrapingCoordinator,
-    ConversionCoordinator,
-    AudioPostProcessor
-)
+from processor import PipelineOrchestrator
 
-# Create shared context
-context = ProcessingContext(
-    project_name="my_novel",
-    novel_title="My Novel Title"
-)
-
-# Initialize coordinators
-scraping = ScrapingCoordinator(context)
-conversion = ConversionCoordinator(context)
-audio = AudioPostProcessor(context)
-
-# Or use the high-level orchestrator
-orchestrator = PipelineOrchestrator("my_novel")
+# Full pipeline execution
+orchestrator = PipelineOrchestrator("my_project")
 result = orchestrator.run_full_pipeline(toc_url="https://example.com/toc")
 ```
 
-### Legacy API (Still Supported)
-
+### Advanced Usage (Modular)
 ```python
-from processor import ProcessingPipeline  # Still works!
-
-pipeline = ProcessingPipeline(
-    project_name="project",
-    on_progress=callback,
-    on_status_change=callback
+from processor import (
+    ProcessingContext,
+    ScrapingCoordinator,
+    ConversionCoordinator,
+    BatchProcessingCoordinator
 )
-result = pipeline.run_full_pipeline(toc_url="https://example.com/toc")
+
+# Custom coordinator setup
+context = ProcessingContext(project_name="my_novel")
+scraping = ScrapingCoordinator(context)
+conversion = ConversionCoordinator(context)
+batch_processor = BatchProcessingCoordinator(context, scraping, conversion)
+
+# Use individual coordinators
+result = batch_processor.process_all_chapters()
 ```
 
-## Status Tracking
+### Legacy API (Backward Compatible)
+```python
+from processor import ProcessingPipeline  # Alias for PipelineOrchestrator
 
-Chapter statuses: PENDING, SCRAPED, CONVERTING, COMPLETED, FAILED
+# All existing code continues to work unchanged
+pipeline = ProcessingPipeline("my_project")
+pipeline.initialize_project(toc_url="https://example.com/toc")
+chapters = pipeline.fetch_chapter_urls(toc_url)
+# ... existing API methods work
+```
 
-## Benefits of Refactoring
+## Key Features
 
-- **Single Responsibility**: Each class has one clear purpose
-- **Testability**: Individual coordinators can be tested in isolation
-- **Maintainability**: Changes are localized to specific coordinators
-- **Extensibility**: New coordinators can be added without affecting existing code
-- **Backward Compatibility**: Existing code continues to work unchanged
+### Architecture Benefits
+- **Single Responsibility**: Each coordinator has one clear purpose
+- **Testability**: Focused classes are easier to unit test
+- **Maintainability**: Changes isolated to relevant coordinators
+- **Reusability**: Coordinators can be used independently
+- **Zero Breaking Changes**: All legacy APIs maintained
 
-## Testing
+### Processing Features
+- Modular processing pipeline with coordinator pattern
+- Progress tracking with callbacks and status updates
+- Comprehensive error handling and recovery mechanisms
+- Project state persistence and resume capability
+- Pause/stop control with centralized management
+- Batch processing with incremental merging support
+- Metadata generation and file tracking
 
-- `tests/unit/processor/test_coordinators.py` - Unit tests for new coordinators
-- `tests/unit/processor/test_pipeline.py` - Legacy API tests (updated imports)
-- `tests/integration/processor/test_coordinator_integration.py` - Integration tests
-- `tests/integration/processor/test_processor_integration.py` - Legacy integration tests

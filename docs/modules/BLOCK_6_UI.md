@@ -1,34 +1,29 @@
 # UI Module
 
-**Status**: Complete
+**Status**:  Complete
 **Location**: `src/ui/`
-**Technology**: PySide6
+**Framework**: PySide6
 
-## Architecture
+## Overview
 
-QStackedWidget-based navigation with 5 views:
-- LandingPage (mode selection)
-- ScraperView
-- TTSView  
-- MergerView
-- FullAutoView
-
-Threading: QThread subclasses with signal/slot pattern for UI updates.
+Graphical user interface for the audiobook creation workflow.
 
 ## Views
 
-- **LandingPage**: Card-based mode selection
-- **ScraperView**: URL input, chapter selection, progress tracking
-- **TTSView**: File selection, voice settings, preview functionality
-- **MergerView**: Audio file reordering, merging controls
-- **FullAutoView**: Queue management, pipeline orchestration
+- **Landing Page**: Mode selection interface
+- **Scraper View**: URL input and chapter selection
+- **TTS View**: Text-to-speech conversion settings
+- **Merger View**: Audio file combination controls
+- **Full Auto View**: Complete pipeline orchestration
 
-## Testing
+## Features
 
-- Unit tests: 88 tests (`tests/unit/ui/`)
-- Integration tests: 18 tests (`tests/integration/ui/`)
+- Multi-view navigation
+- Progress tracking and status updates
+- File selection dialogs
+- Error handling and user feedback
 
-## Launch
+## Usage
 
 ```bash
 python launch_ui.py
@@ -36,6 +31,7 @@ python launch_ui.py
 
 ## Dependencies
 
-- PySide6
-- pydub (audio merging)
-- ffmpeg (system requirement)
+- PySide6 for GUI framework
+- pydub for audio processing
+- ffmpeg for audio format support
+

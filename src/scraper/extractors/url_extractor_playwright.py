@@ -209,8 +209,8 @@ class PlaywrightExtractor:
             error_msg = str(e).lower()
             if "execution context was destroyed" in error_msg or "navigation" in error_msg:
                 logger.error(f"Playwright failed due to page navigation (likely Cloudflare protection): {e}")
-                logger.warning("⚠ This site may have strong anti-bot protection that prevents automated scraping")
-                logger.warning("💡 Consider using manual methods or alternative scraping approaches for this site")
+                logger.warning(" This site may have strong anti-bot protection that prevents automated scraping")
+                logger.warning(" Consider using manual methods or alternative scraping approaches for this site")
             else:
                 logger.error(f"Playwright with scrolling failed: {e}")
             import traceback
@@ -238,7 +238,7 @@ class PlaywrightExtractor:
             logger.debug("No Cloudflare challenge detected, proceeding...")
             return
         
-        logger.warning("⚠ Cloudflare challenge detected - waiting...")
+        logger.warning(" Cloudflare challenge detected - waiting...")
         max_wait = 15
         waited = 0
         challenge_complete = False
@@ -295,7 +295,7 @@ class PlaywrightExtractor:
                     pass
             time.sleep(1)
         else:
-            logger.warning("⚠ Cloudflare wait timed out, proceeding anyway...")
+            logger.warning(" Cloudflare wait timed out, proceeding anyway...")
             try:
                 page.wait_for_load_state("domcontentloaded", timeout=5000)  # type: ignore[attr-defined]
             except Exception as e:
@@ -306,7 +306,7 @@ class PlaywrightExtractor:
         try:
             captcha_iframes = page.query_selector_all('iframe[src*="captcha"], iframe[src*="recaptcha"]')  # type: ignore[attr-defined]
             if captcha_iframes:
-                logger.warning("⚠ CAPTCHA detected (separate from Cloudflare) - this may block scraping")
+                logger.warning(" CAPTCHA detected (separate from Cloudflare) - this may block scraping")
                 time.sleep(3)  # Brief wait in case it auto-resolves
         except Exception as e:
             pass
@@ -589,7 +589,7 @@ class PlaywrightExtractor:
                 seen.add(url)
                 unique_urls.append(url)
         
-        logger.info(f"✓ Playwright found {len(unique_urls)} unique chapter URLs from {len(page_urls[:max_pages_to_visit]) + 1} pages")
+        logger.info(f" Playwright found {len(unique_urls)} unique chapter URLs from {len(page_urls[:max_pages_to_visit]) + 1} pages")
         page.close()  # type: ignore[attr-defined]
         return unique_urls
     
@@ -688,9 +688,9 @@ class PlaywrightExtractor:
                 unique_urls.append(url)
         
         if unique_urls:
-            logger.info(f"✓ Playwright found {len(unique_urls)} unique chapter URLs")
+            logger.info(f" Playwright found {len(unique_urls)} unique chapter URLs")
         else:
-            logger.warning(f"⚠ Playwright found {len(unique_links)} links but extracted 0 chapter URLs")
+            logger.warning(f" Playwright found {len(unique_links)} links but extracted 0 chapter URLs")
         
         return unique_urls
 

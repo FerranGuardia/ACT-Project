@@ -6,17 +6,24 @@ Handles conversion of text to audio files using the new TTSConversionCoordinator
 """
 
 import asyncio
+import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from core.logger import get_logger
+from core.constants import PREVIEW_TEXT_LENGTH
 
 from .conversion_coordinator import TTSConversionCoordinator
 from .voice_resolver import VoiceResolver
 from .text_processing_pipeline import TextProcessingPipeline, TTSTextCleaner
 from .resource_manager import TTSResourceManager
 from .providers.provider_manager import TTSProviderManager
+from .error_handling import log_chunked_conversion_error
 from .providers.base_provider import TTSProvider
+from .audio_merger import AudioMerger
+from .voice_manager import VoiceManager  # For backward compatibility
+from .tts_utils import TTSUtils  # For backward compatibility
 
 logger = get_logger("tts.tts_engine")
 
@@ -64,13 +71,9 @@ class AsyncBridge:
         try:
             # Check if we're already in an async context
             loop = asyncio.get_running_loop()
-            # If we get here, we're in an async context but need sync result
-            # This should be avoided in GUI apps, but if it happens, raise an error
-            # rather than creating threads which can cause deadlocks
-            raise RuntimeError(
-                "Cannot run async operation in synchronous context when event loop is already running. "
-                "This operation should be called from a synchronous context only."
-            )
+            # If we get here, we're in an async context - we can't use run_until_complete
+            # For now, raise an error to indicate this shouldn't be called from async context
+            raise RuntimeError("AsyncBridge.run_async cannot be called from an async context. Use 'await coro' instead.")
         except RuntimeError:
             # No running loop, we can safely use asyncio.run
             return asyncio.run(coro)
@@ -101,9 +104,9 @@ class TTSEngine:
     This is a compatibility layer that uses the new modular TTS architecture.
     """
 
-    def __init__(self, base_text_cleaner: Optional[Callable[[str], str]] = None,
-                 provider_manager: Optional[TTSProviderManager] = None,
-                 config: Optional[TTSConfig] = None):
+    def __init__(self, base_text_cleaner: Callable[[str], str] | None = None,
+                 provider_manager: TTSProviderManager | None = None,
+                 config: TTSConfig | None = None):
         """
         Initialize TTS engine.
 
@@ -136,9 +139,25 @@ class TTSEngine:
             resource_manager=self.resource_manager
         )
 
+        # Initialize components for backward compatibility
+        self.audio_merger = AudioMerger(self.provider_manager, config=self.config)
+        self.voice_manager = VoiceManager(provider_manager=self.provider_manager)  # Deprecated but needed for tests
+        self.voice_validator = self.voice_resolver  # Alias for backward compatibility
+        self.text_processor = self.text_pipeline  # Alias for backward compatibility
+        self.tts_utils = TTSUtils(self.provider_manager)  # For backward compatibility
+
         logger.info("TTSEngine initialized with new architecture")
 
-    def get_available_voices(self, locale: Optional[str] = None, provider: Optional[str] = None) -> List[Dict[str, Any]]:
+    def __del__(self):
+        """Clean up resources when TTSEngine is destroyed."""
+        try:
+            if hasattr(self, 'resource_manager') and self.resource_manager:
+                self.resource_manager.cleanup_all()
+        except Exception:
+            # Ignore cleanup errors during destruction
+            pass
+
+    def get_available_voices(self, locale: str | None = None, provider: str | None = None) -> List[Dict[str, Any]]:
         """Get available voices (delegates to coordinator)."""
         return self.coordinator.get_available_voices(locale=locale, provider=provider)
 
@@ -146,11 +165,12 @@ class TTSEngine:
         self,
         text: str,
         output_path: Path,
-        voice: Optional[str] = None,
-        rate: Optional[float] = None,
-        pitch: Optional[float] = None,
-        volume: Optional[float] = None,
-        provider: Optional[str] = None
+        voice: str | None = None,
+        rate: float | None = None,
+        pitch: float | None = None,
+        volume: float | None = None,
+        provider: str | None = None,
+        on_progress: Optional[Callable[[float], None]] = None
     ) -> bool:
         """
         Convert text to speech and save as audio file.
@@ -177,7 +197,8 @@ class TTSEngine:
             rate=rate,
             pitch=pitch,
             volume=volume,
-            provider=provider
+            provider=provider,
+            on_progress=on_progress
         )
     async def _convert_chunks_parallel(
         self,
@@ -185,14 +206,14 @@ class TTSEngine:
         voice: str,
         temp_dir: Path,
         output_stem: str,
-        provider: Optional[str | TTSProvider] = None,
-        rate: Optional[float] = None,
-        pitch: Optional[float] = None,
-        volume: Optional[float] = None
+        provider: str | TTSProvider | None = None,
+        rate: float | None = None,
+        pitch: float | None = None,
+        volume: float | None = None
     ) -> List[Path]:
         """Delegate to AudioMerger for parallel chunk conversion."""
         # Handle both string provider names and TTSProvider objects (for backward compatibility with tests)
-        provider_instance: Optional[TTSProvider] = None
+        provider_instance: TTSProvider | None = None
         if provider:
             if isinstance(provider, str):
                 provider_instance = self.provider_manager.get_provider(provider)
@@ -210,17 +231,15 @@ class TTSEngine:
         text: str,
         voice: str,
         output_path: Path,
-        rate: Optional[float],
-        pitch: Optional[float],
-        volume: Optional[float],
-        provider: Optional[str]
+        rate: float | None,
+        pitch: float | None,
+        volume: float | None,
+        provider: str | None
     ) -> bool:
         """Delegate to AudioMerger for chunked conversion with merging."""
         try:
             # Use temp directory for chunks
-            import time
-            temp_dir = Path(tempfile.gettempdir()) / f"tts_chunks_{int(time.time() * 1000)}"
-            temp_dir.mkdir(parents=True, exist_ok=True)
+            temp_dir = self.resource_manager.create_tts_chunks_temp_dir()
             
             try:
                 # Chunk the text
@@ -255,7 +274,7 @@ class TTSEngine:
                     output_path.unlink()
                     return False
                 
-                logger.info(f"✓ Created audio file: {output_path} ({file_size} bytes)")
+                logger.info(f" Created audio file: {output_path} ({file_size} bytes)")
                 return True
             
             finally:
@@ -268,9 +287,7 @@ class TTSEngine:
                     logger.warning(f"Failed to clean up temp directory {temp_dir}: {e}")
         
         except Exception as e:
-            error_msg = str(e)
-            error_type = type(e).__name__
-            logger.error(f"Error in chunked conversion: {error_type}: {error_msg}")
+            log_chunked_conversion_error(e)
             return False
 
     def _chunk_text(self, text: str, max_bytes: int = 3000) -> List[str]:
@@ -289,12 +306,12 @@ class TTSEngine:
     def convert_file_to_speech(
         self,
         input_file: Path,
-        output_path: Optional[Path] = None,
-        voice: Optional[str] = None,
-        rate: Optional[float] = None,
-        pitch: Optional[float] = None,
-        volume: Optional[float] = None,
-        provider: Optional[str] = None
+        output_path: Path | None = None,
+        voice: str | None = None,
+        rate: float | None = None,
+        pitch: float | None = None,
+        volume: float | None = None,
+        provider: str | None = None
     ) -> bool:
         """
         Convert text file to speech.
@@ -322,3 +339,49 @@ class TTSEngine:
             provider=provider
         )
 
+    # Backward compatibility methods for tests
+
+    def _prepare_text(self, text: str) -> str:
+        """Prepare text for conversion (backward compatibility)."""
+        processed_text = self.text_pipeline.process(text)
+        return processed_text.enhanced
+
+    def _validate_and_resolve_voice(self, voice: str, provider: str | None = None):
+        """Validate and resolve voice (backward compatibility)."""
+        return self.voice_resolver.resolve_voice(voice, provider)
+
+    def _determine_conversion_strategy(self, text: str, provider: TTSProvider | None = None) -> str:
+        """Determine conversion strategy (backward compatibility)."""
+        if not provider:
+            return "direct"
+
+        text_bytes = len(text.encode('utf-8'))
+        max_bytes = provider.get_max_text_bytes()
+
+        if max_bytes and text_bytes > max_bytes:
+            return "chunked"
+        else:
+            return "direct"
+
+    def _log_conversion_start(
+        self,
+        text: str,
+        output_path: Path,
+        voice_id: str,
+        provider_name: str | None,
+        rate: float | None,
+        pitch: float | None,
+        volume: float | None
+    ) -> None:
+        """Log conversion start (backward compatibility)."""
+        text_bytes_size = len(text.encode('utf-8'))
+
+        logger.info(f"Converting text to speech: {output_path.name}")
+        logger.info(f"Voice: {voice_id}, Provider: {provider_name or 'auto'}, Rate: {rate}%, Pitch: {pitch}%, Volume: {volume}%")
+        logger.info(f"Text size: {text_bytes_size} bytes")
+
+        # Debug: Check text content
+        if len(text) < PREVIEW_TEXT_LENGTH:
+            logger.info(f"Text preview: '{text}'")
+        else:
+            logger.info(f"Text preview: '{text[:PREVIEW_TEXT_LENGTH]}...'")

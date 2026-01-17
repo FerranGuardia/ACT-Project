@@ -5,10 +5,11 @@ Refactored for better maintainability and modifiability.
 Uses separated components and configuration.
 """
 
-from typing import Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
     from typing import Optional  # type: ignore[unused-import]
+
     from PySide6.QtWidgets import QWidget  # type: ignore[unused-import]
 else:
     # Runtime fallback for Optional (used in type hints only)
@@ -16,12 +17,12 @@ else:
     from PySide6.QtWidgets import QWidget
 
 from core.logger import get_logger
-from ui.styles import COLORS
+from ui.landing_page_cards import CardsSection
 from ui.landing_page_config import LandingPageConfig
+from ui.landing_page_header import LandingPageHeader
 from ui.landing_page_modes import MODES_CONFIG
 from ui.landing_page_utils import LayoutHelper
-from ui.landing_page_header import LandingPageHeader
-from ui.landing_page_cards import CardsSection
+from ui.styles import COLORS
 
 __all__ = ['LandingPage']
 
@@ -78,7 +79,38 @@ class LandingPage(QWidget):
             navigation_callback=self.navigate_to_mode
         )
         main_layout.addWidget(self.cards_section, 1)
-        
+
+        # Add footer with version info
+        footer_layout = LayoutHelper.create_horizontal(
+            spacing=0,
+            margins=(0, 10, 0, 5)
+        )
+
+        from PySide6.QtCore import Qt, QUrl
+        from PySide6.QtGui import QDesktopServices
+        from PySide6.QtWidgets import QLabel
+
+        footer_label = QLabel("ACT v1.1.0 | Created by ")
+        footer_label.setStyleSheet("color: #888; font-size: 11px;")
+
+        # Create clickable GitHub link
+        github_label = QLabel('<a href="https://github.com/FerranGuardia" style="color: #4A90E2; text-decoration: none;">Ferran Guardia</a>')
+        github_label.setStyleSheet("color: #888; font-size: 11px;")
+        github_label.setTextFormat(Qt.TextFormat.RichText)
+        github_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+        github_label.setOpenExternalLinks(True)
+        github_label.linkActivated.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/FerranGuardia")))
+
+        license_label = QLabel(" | MIT License")
+        license_label.setStyleSheet("color: #888; font-size: 11px;")
+
+        footer_layout.addWidget(footer_label)
+        footer_layout.addWidget(github_label)
+        footer_layout.addWidget(license_label)
+        footer_layout.addStretch()
+
+        main_layout.addLayout(footer_layout)
+
         self.setLayout(main_layout)
     
     def update_background(self):

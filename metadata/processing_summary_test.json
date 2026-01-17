@@ -1,0 +1,5 @@
+{
+  "processing_summary": "ProcessingSummary(timestamp='2026-01-16T07:47:31.037134', novel_title='test', novel_url=None, total_chapters=31, completed_chapters=0, failed_chapters=4, success_rate='0.0%', processing_time=None, output_format=None, total_completed_in_project=0)",
+  "file_locations": "FileLocations(project_metadata='C:\\\\Users\\\\Nitropc\\\\Documents\\\\ACT\\\\projects\\\\test\\\\project.json', scraped_text_dir='C:\\\\Users\\\\Nitropc\\\\Desktop\\\\test\\\\test_scraps', audio_output_dir='C:\\\\Users\\\\Nitropc\\\\Desktop\\\\test\\\\test_audio', metadata_dir='metadata')",
+  "chapters_processed": []
+}

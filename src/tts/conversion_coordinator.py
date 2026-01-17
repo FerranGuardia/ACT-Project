@@ -6,7 +6,7 @@ Replaces the monolithic TTSEngine approach with a clean, modular design.
 """
 
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Callable
 from dataclasses import dataclass
 
 from core.config_manager import get_config
@@ -31,6 +31,7 @@ class ConversionRequest:
     pitch: Optional[float] = None
     volume: Optional[float] = None
     provider: Optional[str] = None
+    on_progress: Optional[Callable[[float], None]] = None
 
 
 @dataclass
@@ -75,12 +76,13 @@ class TTSConversionCoordinator:
 
         # Initialize components with defaults
         self.provider_manager = provider_manager or TTSProviderManager()
+        self.resource_manager = resource_manager or TTSResourceManager()
         self.voice_resolver = voice_resolver or VoiceResolver(self.provider_manager)
         self.text_pipeline = text_pipeline or TextProcessingPipeline()
         self.strategy_selector = strategy_selector or ConversionStrategySelector(
-            self.provider_manager
+            self.provider_manager,
+            self.resource_manager
         )
-        self.resource_manager = resource_manager or TTSResourceManager()
 
         logger.info("TTS Conversion Coordinator initialized")
 
@@ -92,7 +94,8 @@ class TTSConversionCoordinator:
         rate: Optional[float] = None,
         pitch: Optional[float] = None,
         volume: Optional[float] = None,
-        provider: Optional[str] = None
+        provider: Optional[str] = None,
+        on_progress: Optional[Callable[[float], None]] = None
     ) -> bool:
         """
         Convert text to speech using the coordinated workflow.
@@ -116,7 +119,8 @@ class TTSConversionCoordinator:
             rate=rate,
             pitch=pitch,
             volume=volume,
-            provider=provider
+            provider=provider,
+            on_progress=on_progress
         )
 
         result = self.convert(request)
@@ -156,14 +160,15 @@ class TTSConversionCoordinator:
                 output_path=request.output_path,
                 rate=request.rate,
                 pitch=request.pitch,
-                volume=request.volume
+                volume=request.volume,
+                on_progress=request.on_progress
             )
 
             if success:
                 # Verify output file exists and has content
                 if request.output_path.exists() and request.output_path.stat().st_size > 0:
                     file_size = request.output_path.stat().st_size
-                    logger.info(f"✓ Conversion successful: {request.output_path} ({file_size} bytes)")
+                    logger.info(f" Conversion successful: {request.output_path} ({file_size} bytes)")
                     return ConversionResult(
                         success=True,
                         output_path=request.output_path,

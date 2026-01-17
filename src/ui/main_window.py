@@ -18,6 +18,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFontDatabase, QCloseEvent, QFont, QShortcut, QKeySequence
 
 from core.logger import get_logger
+from ui.utils.event_logger import UIEventLogger
 from ui.landing_page import LandingPage
 from ui.views import ScraperView, TTSView, MergerView, FullAutoView
 from ui.styles import get_global_style
@@ -35,7 +36,6 @@ class MainWindow(QMainWindow):
     Contains:
     - StackedWidget for different views (landing page, scraper, TTS, etc.)
     - Navigation between different modes
-    - Toolbar with back button
     - Status bar
     """
     
@@ -52,34 +52,30 @@ class MainWindow(QMainWindow):
         from ui.view_config import ViewConfig
         self.setMinimumSize(ViewConfig.MAIN_WINDOW_MIN_WIDTH, ViewConfig.MAIN_WINDOW_MIN_HEIGHT)
         
+        # UI event logging is controlled by the launcher
+        
         # Load fonts
         self._load_fonts()
         
         # Apply global styles AFTER creating widgets
         self._apply_global_style()
 
-        # Build central container with an in-view back button for visibility
+        # Build central container
         central = QWidget()
         central_layout = QVBoxLayout()
         central_layout.setContentsMargins(0, 0, 0, 0)
         central_layout.setSpacing(0)
 
-        back_row = QHBoxLayout()
-        back_row.setContentsMargins(12, 12, 12, 0)
-        back_row.setSpacing(10)
-        self.back_button = QPushButton(ViewConfig.BACK_BUTTON_TEXT)
-        self.back_button.clicked.connect(self.show_landing_page)
-        self.back_button.setVisible(False)  # Hidden on landing page
-        self.back_button.setMinimumHeight(ViewConfig.BACK_BUTTON_HEIGHT)
-        self.back_button.setMinimumWidth(ViewConfig.BACK_BUTTON_WIDTH)
-        self.back_button.setProperty("class", "primary")
-        back_row.addWidget(self.back_button)
-        back_row.addStretch(1)
-        central_layout.addLayout(back_row)
-
-        # Create stacked widget for different views
+        # Create stacked widget for different views with scroll support
+        from PySide6.QtWidgets import QScrollArea
         self.stacked_widget = QStackedWidget()
-        central_layout.addWidget(self.stacked_widget, 1)
+
+        # Wrap in scroll area for proper scrolling and content display
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidget(self.stacked_widget)
+        self.scroll_area.setWidgetResizable(True)
+
+        central_layout.addWidget(self.scroll_area, 1)
         central.setLayout(central_layout)
         self.setCentralWidget(central)
         
@@ -103,12 +99,6 @@ class MainWindow(QMainWindow):
         # Set landing page as initial view
         self.stacked_widget.setCurrentIndex(self.LANDING_PAGE)
         
-        # Connect stacked widget changes to update back button visibility
-        self.stacked_widget.currentChanged.connect(self._on_view_changed)
-
-        # Keyboard shortcut: Left Arrow to go back when not on landing
-        self.back_shortcut = QShortcut(QKeySequence(Qt.Key_Left), self)
-        self.back_shortcut.activated.connect(self._handle_back_shortcut)
         
         logger.info("Main window initialized")
     
@@ -170,9 +160,9 @@ class MainWindow(QMainWindow):
             available_families = db.families()
             for expected, actual in self._font_family_map.items():
                 if actual in available_families:
-                    logger.debug(f"✓ Font '{actual}' is available in Qt font database")
+                    logger.debug(f" Font '{actual}' is available in Qt font database")
                 else:
-                    logger.warning(f"✗ Font '{actual}' not found in Qt font database")
+                    logger.warning(f" Font '{actual}' not found in Qt font database")
         
         logger.info(f"Loaded {loaded_count} font files")
         
@@ -215,17 +205,16 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logger.warning(f"Failed to set global font: {e}")
     
-    def _on_view_changed(self, index: int) -> None:
-        """Handle view change to update back button visibility."""
-        if index == self.LANDING_PAGE:
-            self.back_button.setVisible(False)
-        else:
-            self.back_button.setVisible(True)
 
-    def _handle_back_shortcut(self) -> None:
-        """Handle left-arrow shortcut to return to landing when away."""
-        if self.stacked_widget.currentIndex() != self.LANDING_PAGE:
-            self.show_landing_page()
+    def _reset_scroll_position(self) -> None:
+        """Reset the scroll area position to the top."""
+        try:
+            # Ensure scroll position is at the top when switching views
+            self.scroll_area.verticalScrollBar().setValue(0)
+            logger.debug("Scroll position reset to top")
+        except Exception as e:
+            logger.warning(f"Failed to reset scroll position: {e}")
+
     
     def navigate_to_mode(self, mode: str) -> None:
         """Navigate to the specified mode."""
@@ -235,16 +224,24 @@ class MainWindow(QMainWindow):
             "merger": self.MERGER_VIEW,
             "full_auto": self.FULL_AUTO_VIEW,
         }
-        
+
         if mode in mode_map:
+            UIEventLogger.log_navigation("Landing Page", mode.replace("_", " ").title(), "user clicked mode card")
             self.stacked_widget.setCurrentIndex(mode_map[mode])
-            self.back_button.setVisible(True)
+
+            # Reset scroll position to top when switching views
+            self._reset_scroll_position()
+
             logger.info(f"Navigated to {mode} view")
     
     def show_landing_page(self) -> None:
         """Show the landing page."""
+        UIEventLogger.log_navigation("Any View", "Landing Page", "back button pressed")
         self.stacked_widget.setCurrentIndex(self.LANDING_PAGE)
-        self.back_button.setVisible(False)
+
+        # Reset scroll position to top when returning to landing page
+        self._reset_scroll_position()
+
         logger.info("Returned to landing page")
     
     def _apply_global_style(self):

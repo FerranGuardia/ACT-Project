@@ -47,9 +47,9 @@ class VoiceSettings(QGroupBox):
         self.voice_combo = QComboBox()
         self.voice_combo.setStyleSheet(get_combo_box_style())
         self.voice_combo.setMinimumWidth(ViewConfig.COMBO_BOX_VOICE_MIN_WIDTH)
-        self.preview_button = QPushButton("🔊 Preview")
+        self.preview_button = QPushButton(" Preview")
         # Standard buttons use default style from global stylesheet
-        self.stop_preview_button = QPushButton("⏹️ Stop Preview")
+        self.stop_preview_button = QPushButton("⏹ Stop Preview")
         # Standard buttons use default style from global stylesheet
         self.stop_preview_button.setEnabled(False)
         voice_select_layout.addWidget(self.voice_combo)

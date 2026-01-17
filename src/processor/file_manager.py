@@ -11,7 +11,11 @@ from typing import Optional, List
 import shutil
 
 from core.logger import get_logger
-from core.config_manager import get_config
+import core.config_manager as config_manager
+
+
+def get_config():
+    return config_manager.get_config()
 
 logger = get_logger("processor.file_manager")
 
@@ -35,12 +39,14 @@ class FileManager:
         """
         self.config = get_config()
         self.project_name = self._sanitize_filename(project_name)
-        self.novel_title = self._sanitize_filename(novel_title or project_name)
+        self.novel_title = self._sanitize_filename(str(novel_title or project_name))
         
         # Get base output directory
         if base_output_dir is None:
             output_dir_str = self.config.get("paths.output_dir")
             base_output_dir = Path(output_dir_str)
+        elif isinstance(base_output_dir, str):
+            base_output_dir = Path(base_output_dir)
         
         self.base_output_dir = base_output_dir
         self.project_dir = base_output_dir / self.project_name
@@ -48,33 +54,36 @@ class FileManager:
         # Subdirectories with title prefix: "novel_title_scraps" and "novel_title_audio"
         self.text_dir = self.project_dir / f"{self.novel_title}_scraps"
         self.audio_dir = self.project_dir / f"{self.novel_title}_audio"
-        self.metadata_dir = self.project_dir / "metadata"
         
         # Create directories
         self._create_directories()
     
-    def _sanitize_filename(self, name: str) -> str:
+    def _sanitize_filename(self, name) -> str:
         """
         Sanitize filename by removing invalid characters.
-        
+
         Args:
-            name: Original name
-            
+            name: Original name (will be converted to string)
+
         Returns:
             Sanitized name safe for filesystem
         """
+        # Ensure name is a string
+        if not isinstance(name, str):
+            name = str(name)
+
         # Replace invalid characters with underscore
         invalid_chars = '<>:"/\\|?*'
         for char in invalid_chars:
             name = name.replace(char, '_')
-        
+
         # Remove leading/trailing spaces and dots
         name = name.strip(' .')
-        
+
         # Limit length
         if len(name) > 200:
             name = name[:200]
-        
+
         return name or "unnamed_project"
     
     def _create_directories(self) -> None:
@@ -82,8 +91,7 @@ class FileManager:
         directories = [
             self.project_dir,
             self.text_dir,
-            self.audio_dir,
-            self.metadata_dir
+            self.audio_dir
         ]
         
         for directory in directories:
@@ -117,14 +125,6 @@ class FileManager:
         """
         return self.audio_dir
     
-    def get_metadata_dir(self) -> Path:
-        """
-        Get the metadata directory.
-        
-        Returns:
-            Path to metadata directory
-        """
-        return self.metadata_dir
     
     def save_text_file(
         self,
@@ -143,12 +143,8 @@ class FileManager:
         Returns:
             Path to saved file
         """
-        # Create filename
-        if title:
-            safe_title = self._sanitize_filename(title)
-            filename = f"chapter_{chapter_num:04d}_{safe_title}.txt"
-        else:
-            filename = f"chapter_{chapter_num:04d}.txt"
+        # Create filename - always use simple format for consistency
+        filename = f"chapter_{chapter_num:04d}.txt"
         
         file_path = self.text_dir / filename
         
@@ -162,8 +158,8 @@ class FileManager:
             file_path.write_text(content_to_save, encoding="utf-8")
             logger.debug(f"Saved text file: {file_path}")
             return file_path
-        except Exception as e:
-            logger.error(f"Error saving text file {file_path}: {e}")
+        except (IOError, OSError, UnicodeEncodeError) as e:
+            logger.error(f"Failed to save text file {file_path} - {type(e).__name__}: {e}")
             raise
     
     def save_audio_file(
@@ -201,8 +197,8 @@ class FileManager:
             else:
                 logger.error(f"Source audio file does not exist: {audio_path}")
                 raise FileNotFoundError(f"Audio file not found: {audio_path}")
-        except Exception as e:
-            logger.error(f"Error saving audio file {dest_path}: {e}")
+        except (IOError, OSError, FileNotFoundError) as e:
+            logger.error(f"Failed to save audio file {dest_path} - {type(e).__name__}: {e}")
             raise
     
     def get_text_file_path(self, chapter_num: int) -> Path:
@@ -304,17 +300,28 @@ class FileManager:
             try:
                 temp_file.unlink()
                 logger.debug(f"Removed temp file: {temp_file}")
-            except Exception as e:
-                logger.warning(f"Could not remove temp file {temp_file}: {e}")
-    
+            except (OSError, IOError) as e:
+                logger.warning(f"Could not remove temp file {temp_file} - {type(e).__name__}: {e}")
+
+    def get_merged_dir(self) -> Path:
+        """
+        Get the merged audio directory, creating it if it doesn't exist.
+
+        Returns:
+            Path to the merged audio directory
+        """
+        merged_dir = self.audio_dir / "merged"
+        merged_dir.mkdir(exist_ok=True)
+        return merged_dir
+
     def delete_project(self) -> None:
         """Delete the entire project directory and all its contents."""
         if self.project_dir.exists():
             try:
                 shutil.rmtree(self.project_dir)
                 logger.info(f"Deleted project directory: {self.project_dir}")
-            except Exception as e:
-                logger.error(f"Error deleting project directory: {e}")
+            except (OSError, IOError) as e:
+                logger.error(f"Failed to delete project directory - {type(e).__name__}: {e}")
                 raise
 
 

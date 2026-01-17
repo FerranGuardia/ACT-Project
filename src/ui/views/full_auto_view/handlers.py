@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 from PySide6.QtWidgets import QMessageBox, QPushButton, QListWidgetItem
 
 from core.logger import get_logger
+from utils.validation import validate_url as _validate_url
 
 logger = get_logger("ui.full_auto_view.handlers")
 
@@ -25,14 +26,11 @@ class FullAutoViewHandlers:
         """Validate a URL."""
         if not url:
             return False, "URL cannot be empty"
-        
-        try:
-            parsed = urlparse(url)
-            if not parsed.scheme or not parsed.netloc:
-                return False, "Please enter a valid URL"
-        except Exception:
-            return False, "Please enter a valid URL"
-        
+
+        is_valid, url_or_err = _validate_url(url)
+        if not is_valid:
+            return False, f"Please enter a valid URL ({url_or_err})"
+
         return True, ""
     
     def validate_chapter_selection(self, chapter_selection: Dict[str, Any]) -> Tuple[bool, str]:
@@ -54,14 +52,4 @@ class FullAutoViewHandlers:
             logger.warning(f"Failed to parse URL for title generation: {e}")
             return "Untitled Novel"
     
-    def connect_queue_item_buttons(self, queue_widget, row: int,
-                                   move_up_callback, move_down_callback, remove_callback):
-        """Connect action buttons for a queue item widget."""
-        for button in queue_widget.findChildren(QPushButton):
-            if "Move Up" in button.text():
-                button.clicked.connect(lambda checked, r=row: move_up_callback(r))
-            elif "Move Down" in button.text():
-                button.clicked.connect(lambda checked, r=row: move_down_callback(r))
-            elif "Remove" in button.text():
-                button.clicked.connect(lambda checked, r=row: remove_callback(r))
 

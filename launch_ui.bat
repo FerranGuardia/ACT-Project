@@ -5,6 +5,18 @@ echo ========================================
 echo ACT UI Builder
 echo ========================================
 echo.
+
+REM Activate virtual environment
+if exist .venv\Scripts\activate.bat (
+    echo Activating virtual environment...
+    call .venv\Scripts\activate.bat
+    echo.
+) else (
+    echo WARNING: Virtual environment not found at .venv
+    echo Using system Python instead...
+    echo.
+)
+
 echo Python version:
 python --version
 echo.
@@ -31,7 +43,7 @@ if errorlevel 1 (
 echo.
 echo Launching UI...
 echo.
-python launch_ui.py
+python launch_ui_production.py
 if errorlevel 1 (
     echo.
     echo ERROR: Failed to launch UI

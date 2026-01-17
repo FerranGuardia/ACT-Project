@@ -12,32 +12,32 @@ class ButtonText:
     """Button text constants."""
     
     # Common buttons
-    ADD_TO_QUEUE: Final[str] = "➕ Add to Queue"
-    CLEAR_QUEUE: Final[str] = "🗑️ Clear Queue"
-    START: Final[str] = "▶️ Start"
-    PAUSE: Final[str] = "⏸️ Pause"
-    RESUME: Final[str] = "▶️ Resume"
-    STOP: Final[str] = "⏹️ Stop"
+    ADD_TO_QUEUE: Final[str] = " Add to Queue"
+    CLEAR_QUEUE: Final[str] = " Clear Queue"
+    START: Final[str] = "▶ Start"
+    PAUSE: Final[str] = "⏸ Pause"
+    RESUME: Final[str] = "▶ Resume"
+    STOP: Final[str] = "⏹ Stop"
     
     # Scraper-specific
-    START_SCRAPING: Final[str] = "▶️ Start Scraping"
+    START_SCRAPING: Final[str] = "▶ Start Scraping"
     
     # TTS-specific
-    START_CONVERSION: Final[str] = "▶️ Start Conversion"
+    START_CONVERSION: Final[str] = "▶ Start Conversion"
     
     # Full Auto-specific
-    START_PROCESSING: Final[str] = "▶️ Start Processing"
+    START_PROCESSING: Final[str] = "▶ Start Processing"
     
     # Queue item actions
     MOVE_UP: Final[str] = "↑"
     MOVE_DOWN: Final[str] = "↓"
-    REMOVE: Final[str] = "✖️ Remove"
+    REMOVE: Final[str] = " Remove"
     
     # Other common buttons
     BROWSE: Final[str] = "Browse..."
-    PREVIEW: Final[str] = "🔊 Preview"
-    STOP_PREVIEW: Final[str] = "⏹️ Stop Preview"
-    OPEN_FOLDER: Final[str] = "📁 Open Folder"
+    PREVIEW: Final[str] = " Preview"
+    STOP_PREVIEW: Final[str] = "⏹ Stop Preview"
+    OPEN_FOLDER: Final[str] = " Open Folder"
 
 
 class StatusMessages:
@@ -51,6 +51,8 @@ class StatusMessages:
     STOPPING: Final[str] = "Stopping..."
     ERROR_OCCURRED: Final[str] = "Error occurred"
     PENDING: Final[str] = "Pending"
+    PARTIAL: Final[str] = "Partial"
+    COMPLETED: Final[str] = "Completed"
     
     # Queue statuses
     STATUS_PREFIX: Final[str] = "Status: "
@@ -93,19 +95,18 @@ class DialogMessages:
     NO_DIRECTORY_TITLE: Final[str] = "No Directory"
     NO_DIRECTORY_MSG: Final[str] = "Please select an output directory first"
     DIRECTORY_NOT_FOUND_TITLE: Final[str] = "Directory Not Found"
-    DIRECTORY_NOT_FOUND_MSG_FORMAT: Final[str] = "Directory does not exist:\n{path}"
+    DIRECTORY_NOT_FOUND_TITLE: Final[str] = "Directory Not Found"
     ERROR_OPENING_FOLDER_TITLE: Final[str] = "Error"
-    ERROR_OPENING_FOLDER_MSG_FORMAT: Final[str] = "Could not open folder:\n{error}"
 
 
 class QueueItemText:
     """Queue item display text constants."""
-    
+
     ALL_CHAPTERS: Final[str] = "All chapters"
     CHAPTERS_PREFIX: Final[str] = "Chapters "
     CHAPTERS_RANGE_FORMAT: Final[str] = "Chapters {from_ch}-{to_ch}"
-    CHAPTERS_LIST_FORMAT: Final[str] = "Chapters: {chapters}"
-    
+    CHAPTERS_LIST_FORMAT: Final[str] = "Chapters {chapters}"
+
     # Validation messages
     NO_URL_MSG: Final[str] = "Please enter a novel URL"
     INVALID_URL_MSG: Final[str] = "Please enter a valid URL"

@@ -167,10 +167,8 @@ qt_designer/
 # Legacy UI tests - will be removed after UI refactoring
 tests/unit/old ui test/
 
-# UI tests - being refactored, ignore all UI test directories
-tests/unit/ui/
+# UI tests - being refactored, ignore refactoring directories
 tests/unit/ui_tests_refactoring/
-tests/integration/ui/
 tests/integration/ui_tests_refactoring/
 tests/legacy/
 
@@ -180,3 +178,18 @@ gui_test/
 # Private documentation - not committed to repository
 docs/private/
 
+# Test metadata directories
+Test Novel for Metadata/
+
+# Debug runs and artifacts
+debug_runs/
+*_debug_*.json
+*debug*.json
+*_results.json
+*_analysis.json
+*_config.json
+*_strategy*.json
+*summary.json
+collected_urls.txt
+*content_preview.txt
+performance_report.md

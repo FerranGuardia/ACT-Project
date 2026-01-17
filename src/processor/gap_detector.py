@@ -78,37 +78,41 @@ class GapDetector:
             # Check all chapters from start_from onwards
             end_chapter = max_chapter_in_manager
         else:
-            # Use provided end_chapter, but don't exceed what's in manager
-            end_chapter = min(end_chapter, max_chapter_in_manager)
+            # Use the provided end_chapter exactly as specified
+            # Don't limit it based on what's in the manager - respect the caller's range
+            pass
         
         if start_from > end_chapter:
-            logger.debug(f"Invalid range: start_from ({start_from}) > end_chapter ({end_chapter})")
+            logger.warning(f"Invalid range: start_from ({start_from}) > end_chapter ({end_chapter})")
             return []
-        
+
         # Get all chapter numbers that should exist in this range
         expected_chapters = set(range(start_from, end_chapter + 1))
         
         # Get chapters that actually exist in the manager
         existing_chapters = {
-            ch.number for ch in all_chapters 
+            ch.number for ch in all_chapters
             if start_from <= ch.number <= end_chapter
         }
-        
+
+        # Create a lookup dictionary for efficient chapter access
+        existing_chapters_dict = {ch.number: ch for ch in all_chapters if start_from <= ch.number <= end_chapter}
+
         # Find missing chapters (not in chapter manager)
         missing_from_manager = expected_chapters - existing_chapters
-        
+
         # Check file existence for chapters that exist in manager
         missing_files = []
         for chapter_num in sorted(existing_chapters):
-            chapter = chapter_manager.get_chapter(chapter_num)
+            chapter = existing_chapters_dict.get(chapter_num)
             if not chapter:
                 missing_files.append(chapter_num)
                 continue
-            
+
             # Check if files are missing
             audio_missing = check_audio and not self.file_manager.audio_file_exists(chapter_num)
             text_missing = check_text and not self.file_manager.text_file_exists(chapter_num)
-            
+
             if audio_missing or text_missing:
                 missing_files.append(chapter_num)
         
@@ -121,11 +125,11 @@ class GapDetector:
             if len(all_missing) > 10:
                 preview_str += f", ... (+{len(all_missing) - 10} more)"
             logger.info(
-                f"🔍 Gap detection: Found {len(all_missing)} missing chapters "
+                f" Gap detection: Found {len(all_missing)} missing chapters "
                 f"in range {start_from}-{end_chapter}: [{preview_str}]"
             )
         else:
-            logger.debug(f"✓ No gaps detected in range {start_from}-{end_chapter}")
+            logger.debug(f" No gaps detected in range {start_from}-{end_chapter}")
         
         return all_missing
     
