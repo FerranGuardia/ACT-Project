@@ -118,7 +118,8 @@ class TTSViewHandlers:
             # Add provider names with display labels
             provider_labels = {
                 "edge_tts": "Edge TTS (Cloud)",
-                "pyttsx3": "pyttsx3 (Offline)"
+                "pyttsx3": "pyttsx3 (Offline)",
+                "pocket_tts": "Pocket TTS (CPU)"
             }
             
             for provider in providers:

@@ -79,7 +79,7 @@ class QueueManager(BaseQueueManager):
 
     def _validate_provider(self, provider: Any) -> Optional[str]:
         """Validate provider field."""
-        valid_providers = ['edge_tts', 'pyttsx3']
+        valid_providers = ['edge_tts', 'pyttsx3', 'pocket_tts']
 
         if provider is None:
             return None  # Auto-select provider

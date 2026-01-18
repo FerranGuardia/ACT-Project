@@ -36,7 +36,8 @@ class TTSQueueItemWidget(BaseQueueItemWidget):
         # Voice and provider info
         provider_display = {
             "edge_tts": "Edge",
-            "pyttsx3": "Offline"
+            "pyttsx3": "Offline",
+            "pocket_tts": "Pocket (CPU)"
         }.get(self.provider, self.provider)
 
         voice_info = f"{self.voice} ({provider_display})"

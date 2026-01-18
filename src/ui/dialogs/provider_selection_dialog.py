@@ -32,6 +32,12 @@ PROVIDER_INFO = {
         "description": "Microsoft Edge TTS cloud-based provider. High quality voices, requires internet connection. Falls back to pyttsx3 if unavailable.",
         "priority": 1  # Primary provider
     },
+    "pocket_tts": {
+        "name": "Pocket TTS",
+        "version": "Local model",
+        "type": "Offline",
+        "description": "Pocket TTS local CPU model. English-only voices, no internet required, higher quality than system voices."
+    },
     "pyttsx3": {
         "name": "pyttsx3",
         "version": "Offline",
@@ -291,7 +297,7 @@ class ProviderSelectionDialog(QDialog):
         self.provider_list.clear()
         
         # Get all providers (including unavailable ones)
-        all_provider_names = ["edge_tts", "pyttsx3"]
+        all_provider_names = ["edge_tts", "pocket_tts", "pyttsx3"]
         
         for provider_name in all_provider_names:
             info = PROVIDER_INFO.get(provider_name, {})
@@ -315,7 +321,7 @@ class ProviderSelectionDialog(QDialog):
     
     def _check_all_providers(self):
         """Check status of all providers asynchronously."""
-        all_provider_names = ["edge_tts", "pyttsx3"]
+        all_provider_names = ["edge_tts", "pocket_tts", "pyttsx3"]
         
         for provider_name in all_provider_names:
             thread = ProviderStatusThread(self.provider_manager, provider_name)
@@ -444,7 +450,7 @@ class ProviderSelectionDialog(QDialog):
         self.test_button.setEnabled(False)
         self.test_button.setText("Testing...")
         
-        all_provider_names = ["edge_tts", "pyttsx3"]
+        all_provider_names = ["edge_tts", "pocket_tts", "pyttsx3"]
         
         for provider_name in all_provider_names:
             # Update status to testing

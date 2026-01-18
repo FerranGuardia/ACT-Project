@@ -234,7 +234,8 @@ class AddQueueDialog(QDialog):
         # Get provider info
         provider_labels = {
             "edge_tts": "Edge TTS",
-            "pyttsx3": "pyttsx3 (Offline)"
+            "pyttsx3": "pyttsx3 (Offline)",
+            "pocket_tts": "Pocket TTS (CPU)"
         }
         
         label = provider_labels.get(self.selected_provider, self.selected_provider)
