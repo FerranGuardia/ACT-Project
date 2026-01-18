@@ -15,6 +15,7 @@ from core.logger import get_logger
 from utils.validation import validate_tts_request
 from .base_provider import TTSProvider, ProviderType
 from .edge_tts_provider import EdgeTTSProvider
+from .pocket_tts_provider import PocketTTSProvider
 from .pyttsx3_provider import Pyttsx3Provider
 
 logger = get_logger("tts.providers.manager")
@@ -178,6 +179,17 @@ class TTSProviderManager:
         except Exception as e:
             logger.warning(f"Failed to initialize Edge TTS provider: {e}")
         
+        # Initialize Pocket TTS (offline, high quality local model)
+        try:
+            pocket_provider = PocketTTSProvider()
+            if pocket_provider.is_available():
+                self._providers["pocket_tts"] = pocket_provider
+                logger.info("Pocket TTS provider initialized and available")
+            else:
+                logger.warning("Pocket TTS provider not available")
+        except Exception as e:
+            logger.warning(f"Failed to initialize Pocket TTS provider: {e}")
+
         # Initialize pyttsx3 (offline, fallback when Edge TTS is unavailable)
         try:
             pyttsx3_provider = Pyttsx3Provider()
