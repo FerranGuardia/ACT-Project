@@ -2,7 +2,8 @@
 TTS Provider Manager
 
 Manages multiple TTS providers and implements fallback logic.
-Tries Edge TTS first (cloud, high quality), falls back to pyttsx3 (offline).
+Tries Edge TTS first (cloud, high quality), then Pocket TTS (offline),
+then falls back to pyttsx3 (offline).
 """
 
 import time

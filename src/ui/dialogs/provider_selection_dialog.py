@@ -29,7 +29,7 @@ PROVIDER_INFO = {
         "name": "Edge TTS",
         "version": "Library: 7.2.0",
         "type": "Cloud",
-        "description": "Microsoft Edge TTS cloud-based provider. High quality voices, requires internet connection. Falls back to pyttsx3 if unavailable.",
+        "description": "Microsoft Edge TTS cloud-based provider. High quality voices, requires internet connection. Falls back to Pocket TTS or pyttsx3 if unavailable.",
         "priority": 1  # Primary provider
     },
     "pocket_tts": {
