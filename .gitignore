@@ -147,6 +147,7 @@ dmypy.json
 test_output/
 audiobooks/
 scraped_chapters/
+external/
 *.mp3
 *.wav
 *.m4a
