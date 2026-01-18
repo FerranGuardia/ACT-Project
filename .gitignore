@@ -148,6 +148,7 @@ test_output/
 audiobooks/
 scraped_chapters/
 external/
+architecture_visualization.html
 *.mp3
 *.wav
 *.m4a
