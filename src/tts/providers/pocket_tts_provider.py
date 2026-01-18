@@ -101,8 +101,37 @@ class PocketTTSProvider(TTSProvider):
 
     def _get_voice_state(self, model, voice_id: str):
         prompt = self._get_voice_prompt(voice_id)
-        if prompt not in self._voice_states:
-            self._voice_states[prompt] = model.get_state_for_audio_prompt(prompt)
+        if prompt in self._voice_states:
+            return self._voice_states[prompt]
+
+        # Work around Pocket TTS predefined voice cache length mismatch by
+        # building the model state with a sequence length that matches the prompt.
+        if (
+            prompt in self._VOICE_CATALOG
+            and hasattr(model, "_run_flow_lm_and_increment_step")
+            and hasattr(model, "_slice_kv_cache")
+        ):
+            try:
+                from pocket_tts.utils.utils import load_predefined_voice
+                from pocket_tts.modules.stateful_module import init_states
+
+                audio_prompt = load_predefined_voice(prompt)
+                model_state = init_states(
+                    model.flow_lm,
+                    batch_size=1,
+                    sequence_length=audio_prompt.shape[1],
+                )
+                model._run_flow_lm_and_increment_step(  # type: ignore[attr-defined]
+                    model_state=model_state,
+                    audio_conditioning=audio_prompt,
+                )
+                model._slice_kv_cache(model_state, audio_prompt.shape[1])  # type: ignore[attr-defined]
+                self._voice_states[prompt] = model_state
+                return model_state
+            except Exception as e:
+                logger.warning(f"Failed predefined voice state build: {e}")
+
+        self._voice_states[prompt] = model.get_state_for_audio_prompt(prompt)
         return self._voice_states[prompt]
 
     def _write_wav(self, audio_tensor, sample_rate: int, output_path: Path) -> None:
