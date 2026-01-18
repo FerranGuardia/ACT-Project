@@ -25,16 +25,16 @@ logger = get_logger("tts.providers.pocket_tts")
 class PocketTTSProvider(TTSProvider):
     """Pocket TTS provider using local CPU model."""
 
-    _VOICE_CATALOG: Dict[str, str] = {
-        "alba": "hf://kyutai/tts-voices/alba-mackenna/casual.wav",
-        "marius": "hf://kyutai/tts-voices/marius/casual.wav",
-        "javert": "hf://kyutai/tts-voices/javert/casual.wav",
-        "jean": "hf://kyutai/tts-voices/jean/casual.wav",
-        "fantine": "hf://kyutai/tts-voices/fantine/casual.wav",
-        "cosette": "hf://kyutai/tts-voices/cosette/casual.wav",
-        "eponine": "hf://kyutai/tts-voices/eponine/casual.wav",
-        "azelma": "hf://kyutai/tts-voices/azelma/casual.wav",
-    }
+    _VOICE_CATALOG = (
+        "alba",
+        "marius",
+        "javert",
+        "jean",
+        "fantine",
+        "cosette",
+        "eponine",
+        "azelma",
+    )
 
     def __init__(self) -> None:
         self._available: Optional[bool] = None
@@ -73,7 +73,7 @@ class PocketTTSProvider(TTSProvider):
             return self._voices_cache
 
         voices: List[Dict] = []
-        for voice_id in self._VOICE_CATALOG.keys():
+        for voice_id in self._VOICE_CATALOG:
             voices.append({
                 "id": voice_id,
                 "name": voice_id.capitalize(),
@@ -95,9 +95,9 @@ class PocketTTSProvider(TTSProvider):
 
     def _get_voice_prompt(self, voice_id: str) -> str:
         if voice_id in self._VOICE_CATALOG:
-            return self._VOICE_CATALOG[voice_id]
+            return voice_id
         logger.warning(f"Unknown Pocket TTS voice '{voice_id}', falling back to 'alba'")
-        return self._VOICE_CATALOG["alba"]
+        return "alba"
 
     def _get_voice_state(self, model, voice_id: str):
         prompt = self._get_voice_prompt(voice_id)
