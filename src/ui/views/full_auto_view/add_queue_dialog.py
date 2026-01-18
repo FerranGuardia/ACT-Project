@@ -305,7 +305,7 @@ class AddQueueDialog(QDialog):
             self.voice_combo.addItems(voices)
 
             # Set default voice
-            default_voice = "en-US-AndrewNeural"
+            default_voice = "Alba" if provider == "pocket_tts" else "en-US-AndrewNeural"
             index = self.voice_combo.findText(default_voice, Qt.MatchFlag.MatchContains)
             if index >= 0:
                 self.voice_combo.setCurrentIndex(index)
