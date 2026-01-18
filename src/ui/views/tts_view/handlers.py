@@ -264,7 +264,8 @@ class TTSViewHandlers:
             preview_button.setEnabled(False)
             
             # Create temporary output file
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tmp:
+            temp_suffix = ".wav" if provider == "pocket_tts" else ".mp3"
+            with tempfile.NamedTemporaryFile(delete=False, suffix=temp_suffix) as tmp:
                 temp_path = tmp.name
             
             # Store temp file path for cleanup

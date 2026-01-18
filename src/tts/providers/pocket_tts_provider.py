@@ -13,6 +13,8 @@ import subprocess
 import tempfile
 import wave
 
+import numpy as np
+
 from core.logger import get_logger
 from utils.validation import validate_file_path
 from .base_provider import TTSProvider, ProviderType
@@ -104,14 +106,30 @@ class PocketTTSProvider(TTSProvider):
         return self._voice_states[prompt]
 
     def _write_wav(self, audio_tensor, sample_rate: int, output_path: Path) -> None:
-        audio_int16 = (audio_tensor * 32767).clamp(-32768, 32767).to(dtype=audio_tensor.dtype).short()
-        samples = audio_int16.cpu().tolist()
+        audio_samples = self._to_float_array(audio_tensor)
+        audio_samples = np.clip(audio_samples, -1.0, 1.0)
+        pcm = (audio_samples * 32767.0).astype(np.int16)
+
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with wave.open(str(output_path), "wb") as wf:
             wf.setnchannels(1)
             wf.setsampwidth(2)
             wf.setframerate(sample_rate)
-            wf.writeframes(array("h", samples).tobytes())
+            wf.writeframes(pcm.tobytes())
+
+    def _to_float_array(self, audio_tensor) -> np.ndarray:
+        try:
+            if hasattr(audio_tensor, "detach"):
+                return audio_tensor.detach().cpu().numpy().astype(np.float32)
+            if hasattr(audio_tensor, "numpy"):
+                return audio_tensor.numpy().astype(np.float32)
+        except Exception as e:
+            logger.warning(f"Failed to convert tensor to numpy directly: {e}")
+
+        if isinstance(audio_tensor, (list, tuple, array)):
+            return np.asarray(audio_tensor, dtype=np.float32)
+
+        return np.asarray([0.0], dtype=np.float32)
 
     def _convert_wav_to_mp3(self, wav_path: Path, output_path: Path) -> bool:
         try:
