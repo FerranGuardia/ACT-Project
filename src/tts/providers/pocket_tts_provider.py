@@ -8,10 +8,13 @@ CPU-only, high quality, English voices.
 from array import array
 from pathlib import Path
 from typing import Dict, List, Optional
+import shutil
+import subprocess
 import tempfile
 import wave
 
 from core.logger import get_logger
+from utils.validation import validate_file_path
 from .base_provider import TTSProvider, ProviderType
 
 logger = get_logger("tts.providers.pocket_tts")
@@ -113,18 +116,42 @@ class PocketTTSProvider(TTSProvider):
     def _convert_wav_to_mp3(self, wav_path: Path, output_path: Path) -> bool:
         try:
             from pydub import AudioSegment  # type: ignore[import-untyped]
-        except ImportError:
-            logger.error("pydub not installed; cannot convert Pocket TTS WAV to MP3")
-            return False
-
-        try:
             audio = AudioSegment.from_wav(str(wav_path))  # type: ignore[attr-defined]
             with open(output_path, "wb") as f:
                 audio.export(f, format="mp3")  # type: ignore[attr-defined]
             return True
+        except ImportError:
+            logger.warning("pydub not installed; attempting ffmpeg fallback")
         except Exception as e:
-            logger.error(f"Failed to convert Pocket TTS WAV to MP3: {e}")
+            logger.warning(f"pydub MP3 conversion failed: {e}, attempting ffmpeg fallback")
+
+        ffmpeg_path = shutil.which("ffmpeg")
+        if not ffmpeg_path:
+            logger.error("ffmpeg not found; install ffmpeg or choose WAV output")
             return False
+
+        is_valid_wav, wav_path_safe = validate_file_path(wav_path, allow_create=False)
+        if not is_valid_wav:
+            logger.error(f"Invalid WAV path: {wav_path_safe}")
+            return False
+
+        is_valid_out, output_path_safe = validate_file_path(output_path, allow_create=True)
+        if not is_valid_out:
+            logger.error(f"Invalid MP3 output path: {output_path_safe}")
+            return False
+
+        cmd = [ffmpeg_path, "-y", "-i", str(wav_path_safe), str(output_path_safe)]
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+            logger.error(f"ffmpeg conversion failed: {e}")
+            return False
+
+        if result.returncode != 0:
+            logger.error(f"ffmpeg conversion failed: {result.stderr.strip()}")
+            return False
+
+        return output_path.exists() and output_path.stat().st_size > 0
 
     def convert_text_to_speech(
         self,

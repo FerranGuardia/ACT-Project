@@ -86,7 +86,8 @@ class ProviderStatusThread(QThread):
             
             # Create temporary file for test
             import tempfile
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tmp:
+            file_suffix = ".wav" if self.provider_name == "pocket_tts" else ".mp3"
+            with tempfile.NamedTemporaryFile(delete=False, suffix=file_suffix) as tmp:
                 temp_path = Path(tmp.name)
             
             try:
@@ -171,7 +172,8 @@ class ProviderTestThread(QThread):
             test_text = "Hello, this is a test of the TTS provider."
             
             # Create temporary file for test
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tmp:
+            file_suffix = ".wav" if self.provider_name == "pocket_tts" else ".mp3"
+            with tempfile.NamedTemporaryFile(delete=False, suffix=file_suffix) as tmp:
                 temp_path = Path(tmp.name)
             
             # Try to convert
