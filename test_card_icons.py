@@ -16,8 +16,9 @@ if images_path.exists():
 
 # Test CardIcon class
 try:
-    from ui.landing_page_components import CardIcon
     from PySide6.QtWidgets import QApplication
+
+    from ui.landing_page_components import CardIcon
     
     app = QApplication([])
     

@@ -4,37 +4,33 @@ Audio Merger View - Combine multiple audio files into one.
 
 import os
 from pathlib import Path
-from typing import Optional, List, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional
 
 if TYPE_CHECKING:
     from ui.main_window import MainWindow  # type: ignore[unused-import]
 
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFileDialog,
-    QListWidget, QProgressBar, QGroupBox, QSpinBox, QLineEdit, QMessageBox,
-    QListWidgetItem
-)
-
-from ui.views.base_view import BaseView
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QFont
+from PySide6.QtWidgets import (QFileDialog, QGroupBox, QHBoxLayout, QLabel,
+                               QLineEdit, QListWidget, QListWidgetItem,
+                               QMessageBox, QProgressBar, QPushButton,
+                               QSpinBox, QVBoxLayout, QWidget)
 
 from core.logger import get_logger
 from core.metadata_coordinator import get_metadata_coordinator
-from ui.styles import (
-    get_line_edit_style, get_group_box_style, get_list_widget_style,
-    get_progress_bar_style, get_spin_box_style, get_status_label_style,
-    set_button_primary, COLORS, get_font_family
-)
-from ui.view_config import ViewConfig
-from ui.ui_constants import StatusMessages
-
 # Import the audio merging functionality
 from merger.audio_file_merger import AudioFileMergerThread
+from ui.styles import (COLORS, get_font_family, get_group_box_style,
+                       get_line_edit_style, get_list_widget_style,
+                       get_progress_bar_style, get_spin_box_style,
+                       get_status_label_style, set_button_primary)
+from ui.ui_constants import StatusMessages
+from ui.view_config import ViewConfig
+from ui.views.base_view import BaseView
 
+from .merger_queue_item_widget import MergerQueueItemWidget
 # Import queue functionality
 from .merger_queue_manager import MergerQueueManager
-from .merger_queue_item_widget import MergerQueueItemWidget
 
 logger = get_logger("ui.merger_view")
 

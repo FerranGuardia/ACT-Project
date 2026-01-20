@@ -5,23 +5,21 @@ Separated into individual components for better maintainability.
 """
 
 from pathlib import Path
-from typing import Callable, cast, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, cast
 
 if TYPE_CHECKING:
     from typing import Optional  # type: ignore[unused-import]
 else:
     from typing import Optional
 
-from PySide6.QtWidgets import QLabel, QFrame, QGraphicsDropShadowEffect
 from PySide6.QtCore import Qt, Signal  # type: ignore[attr-defined]
 from PySide6.QtGui import QFont, QPixmap
+from PySide6.QtWidgets import QFrame, QGraphicsDropShadowEffect, QLabel
 
-from ui.styles import COLORS, get_font_family
 from ui.landing_page_config import LandingPageConfig
-from ui.styles import (
-    get_card_style, get_card_title_style, get_card_description_style,
-    get_card_icon_style, get_card_arrow_style
-)
+from ui.styles import (COLORS, get_card_arrow_style,
+                       get_card_description_style, get_card_icon_style,
+                       get_card_style, get_card_title_style, get_font_family)
 from ui.utils.event_logger import UIEventLogger
 
 __all__ = ['ClickableLabel', 'CardTitle', 'CardDescription', 'CardIcon', 'CardArrow', 'GenreCard']

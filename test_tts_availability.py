@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 """Test TTS service availability and connectivity."""
-import sys
 import asyncio
+import sys
+
 sys.path.insert(0, 'src')
 
 from tts.providers.edge_tts_provider import EdgeTTSProvider
-from tts.providers.pyttsx3_provider import Pyttsx3Provider
 from tts.providers.pocket_tts_provider import PocketTTSProvider
+from tts.providers.pyttsx3_provider import Pyttsx3Provider
+
 
 async def test_edge_tts():
     """Test Edge TTS provider."""

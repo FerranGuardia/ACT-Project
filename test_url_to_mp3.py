@@ -5,9 +5,10 @@ from pathlib import Path
 
 sys.path.insert(0, 'src')
 
+from PySide6.QtWidgets import QApplication
+
 from ui.landing_page_components import CardIcon
 from ui.landing_page_modes import MODES_CONFIG
-from PySide6.QtWidgets import QApplication
 
 app = QApplication([])
 

@@ -4,36 +4,31 @@ Main orchestrator that combines all components.
 """
 
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
 from core.config_manager import get_config
-from typing import Optional, List, Dict, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ui.main_window import MainWindow  # type: ignore[unused-import]
 
-from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QPushButton, QListWidgetItem, QMessageBox
 from PySide6.QtCore import QTimer
+from PySide6.QtWidgets import (QHBoxLayout, QListWidgetItem, QMessageBox,
+                               QPushButton, QVBoxLayout)
 
 from core.logger import get_logger
+from ui.ui_constants import DialogMessages, StatusMessages
+from ui.utils.error_handling import (show_confirmation, show_error,
+                                     show_success, show_validation_error)
 from ui.views.base_view import BaseView
-from ui.ui_constants import (
-    StatusMessages,
-    DialogMessages,
-)
-from ui.utils.error_handling import (
-    show_validation_error,
-    show_success,
-    show_error,
-    show_confirmation,
-)
-
 from ui.views.full_auto_view.add_queue_dialog import AddQueueDialog
-from ui.views.full_auto_view.queue_item_widget import QueueItemWidget
-from ui.views.full_auto_view.processing_thread import ProcessingThread
-from ui.views.full_auto_view.queue_section import QueueSection
-from ui.views.full_auto_view.current_processing_section import CurrentProcessingSection
 from ui.views.full_auto_view.controls_section import ControlsSection
+from ui.views.full_auto_view.current_processing_section import \
+    CurrentProcessingSection
 from ui.views.full_auto_view.full_auto_queue_manager import QueueManager
 from ui.views.full_auto_view.handlers import FullAutoViewHandlers
+from ui.views.full_auto_view.processing_thread import ProcessingThread
+from ui.views.full_auto_view.queue_item_widget import QueueItemWidget
+from ui.views.full_auto_view.queue_section import QueueSection
 
 logger = get_logger("ui.full_auto_view")
 
