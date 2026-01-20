@@ -75,7 +75,9 @@ class ProcessingMetadataService:
         file_manager: Optional[Any] = None
     ):
         self.context = context
-        self.project_manager = project_manager or ProjectManager(context.project_name)
+        # Use base_output_dir as base_projects_dir to keep metadata and output together
+        base_projects_dir = context.base_output_dir if context.base_output_dir else None
+        self.project_manager = project_manager or ProjectManager(context.project_name, base_projects_dir=base_projects_dir)
 
         if file_manager is None:
             from .file_manager import FileManager

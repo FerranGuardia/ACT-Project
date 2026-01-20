@@ -25,7 +25,9 @@ class ConversionCoordinator:
 
     def __init__(self, context: ProcessingContext):
         self.context = context
-        self.project_manager = ProjectManager(context.project_name)
+        # Use base_output_dir as base_projects_dir to keep metadata and output together
+        base_projects_dir = context.base_output_dir if context.base_output_dir else None
+        self.project_manager = ProjectManager(context.project_name, base_projects_dir=base_projects_dir)
         self.file_manager = FileManager(context.project_name,
                                       base_output_dir=context.base_output_dir,
                                       novel_title=context.novel_title)
