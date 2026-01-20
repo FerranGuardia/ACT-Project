@@ -71,7 +71,7 @@ class AudioFileItem(QWidget):
         up_button.setMaximumWidth(ViewConfig.QUEUE_ACTION_BUTTON_WIDTH)
         down_button = QPushButton("↓")
         down_button.setMaximumWidth(ViewConfig.QUEUE_ACTION_BUTTON_WIDTH)
-        remove_button = QPushButton("")
+        remove_button = QPushButton("✕")
         remove_button.setMaximumWidth(ViewConfig.QUEUE_ACTION_BUTTON_WIDTH)
         
         layout.addWidget(up_button)

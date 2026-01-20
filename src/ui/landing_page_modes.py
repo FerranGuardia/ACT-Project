@@ -58,7 +58,7 @@ MODES_CONFIG: Final[list[ModeConfig]] = [
     ),
     ModeConfig(
         id="full_auto",
-        title="Full Automation",
+        title="URL TO MP3",
         description="Complete pipeline: Scrape → TTS → Merge in one go",
         icon="⚡"
     ),

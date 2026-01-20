@@ -4,6 +4,7 @@ Reusable components for the landing page.
 Separated into individual components for better maintainability.
 """
 
+from pathlib import Path
 from typing import Callable, cast, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -13,7 +14,7 @@ else:
 
 from PySide6.QtWidgets import QLabel, QFrame, QGraphicsDropShadowEffect
 from PySide6.QtCore import Qt, Signal  # type: ignore[attr-defined]
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QPixmap
 
 from ui.styles import COLORS, get_font_family
 from ui.landing_page_config import LandingPageConfig
@@ -67,15 +68,59 @@ class CardIcon(QLabel):
     """Reusable icon component for cards."""
     
     def __init__(self, icon: str, parent: Optional[QLabel] = None):
-        super().__init__(icon, parent)
+        super().__init__(parent)
+        self.icon_text = icon
         self.setup_icon()
     
     def setup_icon(self):
-        """Set up icon styling."""
+        """Set up icon styling and load image if available."""
+        # Try to load image file first
+        image_path = self._find_image_path()
+        
+        if image_path and image_path.exists():
+            # Load image file
+            pixmap = QPixmap(str(image_path))
+            if not pixmap.isNull():
+                # Scale to fit icon size
+                scaled_pixmap = pixmap.scaledToWidth(
+                    LandingPageConfig.ICON_WIDTH - LandingPageConfig.ICON_PADDING,
+                    Qt.TransformationMode.SmoothTransformation
+                )
+                self.setPixmap(scaled_pixmap)
+                self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.setFixedWidth(LandingPageConfig.ICON_WIDTH)
+                return
+        
+        # Fallback to emoji text
+        self.setText(self.icon_text)
         self.setFont(QFont(get_font_family(), LandingPageConfig.ICON_FONT_SIZE))
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setStyleSheet(get_card_icon_style())
         self.setFixedWidth(LandingPageConfig.ICON_WIDTH)
+    
+    def _find_image_path(self) -> Optional[Path]:
+        """Find image file corresponding to icon in assets folder."""
+        # Map icon text to image filenames
+        icon_map = {
+            "📖": ["scraper.png", "scrapper.png"],
+            "🎙️": ["tts.png"],
+            "🔊": ["merger.png"],
+            "⚡": ["url to mp3.png", "full_auto.png", "automation.png"],
+        }
+        
+        filenames = icon_map.get(self.icon_text, [])
+        if not filenames:
+            return None
+        
+        # Try to find in assets folder
+        images_path = Path(__file__).parent / "images"
+        
+        for filename in filenames:
+            path = images_path / filename
+            if path.exists():
+                return path
+        
+        return None
 
 
 class CardTitle(ClickableLabel):
