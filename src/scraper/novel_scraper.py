@@ -38,17 +38,20 @@ class NovelScraper(BaseScraper):
             **kwargs: Additional arguments passed to BaseScraper
         """
         super().__init__(base_url, **kwargs)
-        
+
         # Initialize URL extractor and chapter extractor
         self.url_extractor = UrlExtractor(
             base_url=base_url,
             timeout=self.timeout,
-            delay=self.delay
+            delay=self.delay,
+            use_playwright=self.use_playwright,
         )
         self.chapter_extractor = ChapterExtractor(
             base_url=base_url,
             timeout=self.timeout,
-            delay=self.delay
+            delay=self.delay,
+            use_playwright=self.use_playwright,
+            use_copy_paste=self.use_copy_paste,
         )
 
     def get_chapter_urls(self, toc_url: str, min_chapter_number: Optional[int] = None, max_chapter_number: Optional[int] = None) -> List[str]:

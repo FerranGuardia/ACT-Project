@@ -31,6 +31,10 @@ class BaseScraper(ABC):
         self,
         base_url: str,
         should_stop: Optional[Callable[[], bool]] = None,
+        use_copy_paste: bool = False,
+        timeout: int = 30,
+        delay: float = 1.0,
+        use_playwright: bool = True,
     ):
         """
         Initialize the base scraper.
@@ -38,16 +42,22 @@ class BaseScraper(ABC):
         Args:
             base_url: Base URL of the webnovel site
             should_stop: Optional callback function that returns True if scraping should stop
+            use_copy_paste: Whether to use copy/paste extraction instead of HTML parsing
+            timeout: Request timeout in seconds
+            delay: Delay between requests in seconds
+            use_playwright: Whether to use Playwright for scraping
         """
         self.base_url = base_url
         self.should_stop = should_stop or (lambda: False)
+        self.use_copy_paste = use_copy_paste
         self.config = get_config()
         self.logger = logger
 
         # Get settings from config with fallback to defaults
-        self.timeout = self.config.get("scraper.timeout", REQUEST_TIMEOUT)
-        self.delay = self.config.get("scraper.delay", REQUEST_DELAY)
+        self.timeout = timeout
+        self.delay = delay
         self.max_retries = self.config.get("scraper.max_retries", MAX_RETRIES)
+        self.use_playwright = use_playwright
 
     @abstractmethod
     def scrape_chapter(self, chapter_url: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:

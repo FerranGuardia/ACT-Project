@@ -101,6 +101,11 @@ class ConfigManager:
                 "use_playwright": True,
                 "timeout": 30,
             },
+            "processing": {
+                "enable_gap_filling": False,  # Enable automatic gap filling in pipeline
+                "gap_fill_max_retries": 3,   # Max retries for gap filling
+                "gap_fill_delay": 1.0,       # Delay between gap filling attempts
+            },
             "editor": {
                 "font_family": "Consolas",
                 "font_size": 12,

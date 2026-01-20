@@ -201,6 +201,220 @@ def clean_text(text: Optional[str]) -> str:
 
     text = "\n".join(cleaned_lines)
 
+    # Step 11.5: De-obfuscate letter-spaced lines before whitespace collapse
+    def _deobfuscate_spaced_letters_line(line: str) -> str:
+        # First handle double-space obfuscation (existing logic)
+        if "  " in line:
+            words = re.findall(r"[A-Za-z]+", line)
+            if len(words) >= 6:
+                short_ratio = sum(1 for w in words if len(w) <= 2) / len(words)
+                avg_len = sum(len(w) for w in words) / len(words)
+                if short_ratio >= 0.6 and avg_len <= 2.2:
+                    word_break_token = "__WB__"
+                    marked = re.sub(r" {2,}", f" {word_break_token} ", line)
+                    marked = re.sub(
+                        r"(?<=\b[A-Za-z]{1,2})\s+(?=[A-Za-z]{1,2}\b)",
+                        "",
+                        marked,
+                    )
+                    marked = re.sub(rf"\s*{word_break_token}\s*", " ", marked)
+                    return marked
+
+        # Handle single-space syllable obfuscation (new logic)
+        # Check for lines with many short alphabetic fragments separated by single spaces
+        words = re.findall(r"[A-Za-z]+", line)
+        if len(words) < 6:
+            return line
+
+        # Calculate metrics for single-space obfuscation detection
+        short_ratio = sum(1 for w in words if len(w) <= 3) / len(words)  # Allow up to 3-letter fragments
+        avg_len = sum(len(w) for w in words) / len(words)
+        space_count = line.count(' ')
+
+        # Detect obfuscation: high ratio of short fragments, many spaces
+        is_obfuscated = (
+            short_ratio >= 0.6 and  # 60%+ of fragments are 3 letters or less
+            avg_len <= 3.0 and      # Average fragment length <= 3.0
+            space_count >= len(words) - 1  # At least one space per word
+        )
+
+        if not is_obfuscated:
+            return line
+
+        # Smart deobfuscation: reconstruct words from syllable fragments with proper spacing
+
+        # Extract all fragments
+        fragments = re.findall(r'[A-Za-z]+', line)
+
+        if len(fragments) < 6:
+            return line
+
+        # Process fragments into properly spaced words
+        words = []
+        current_word = ''
+
+        function_words = {
+            'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by',
+            'is', 'was', 'are', 'were', 'be', 'been', 'being', 'have', 'has', 'had',
+            'do', 'does', 'did', 'this', 'that', 'these', 'those',
+            'he', 'she', 'it', 'they', 'we', 'you', 'i', 'his', 'her', 'its', 'their', 'our', 'your', 'my',
+            'who', 'what', 'where', 'when', 'why', 'how', 'all', 'not', 'only', 'also', 'then', 'than'
+        }
+
+        # Simple syllable-based word reconstruction
+        # This uses basic heuristics to group syllables into readable words
+
+        words = []
+        current_word = ''
+
+        # Common syllable patterns and word boundaries
+        vowels = 'aeiou'
+        consonants = 'bcdfghjklmnpqrstvwxyz'
+
+        for fragment in fragments:
+            fragment_lower = fragment.lower()
+
+            # If this is a function word, start new word
+            if fragment_lower in function_words:
+                if current_word:
+                    words.append(current_word)
+                words.append(fragment)
+                current_word = ''
+            # If capitalized, likely a proper noun - start new word
+            elif fragment and fragment[0].isupper():
+                if current_word:
+                    words.append(current_word)
+                current_word = fragment
+            # If fragment ends with vowel and next starts with consonant, continue word
+            elif current_word and current_word[-1].lower() in vowels and fragment_lower[0] in consonants:
+                current_word += fragment
+            # If fragment is very short (1-2 chars), likely part of current word
+            elif len(fragment) <= 2:
+                current_word += fragment
+            # Otherwise, start new word
+            else:
+                if current_word:
+                    words.append(current_word)
+                current_word = fragment
+
+        if current_word:
+            words.append(current_word)
+
+        # Add the last word
+        if current_word:
+            words.append(current_word)
+
+
+        # Reconstruct the line with proper spacing
+        result = ' '.join(words)
+
+        # Preserve sentence-ending punctuation from the original
+        if line.endswith('.'):
+            result += '.'
+        elif line.endswith('!'):
+            result += '!'
+        elif line.endswith('?'):
+            result += '?'
+
+        return result
+
+    def _split_into_words_maximum_matching(text: str) -> list[str]:
+        """Split concatenated text into words using maximum matching algorithm."""
+        if not text:
+            return []
+
+        # Common English words for word boundary detection (prioritize longer words)
+        common_words = {
+            # Long/common words first for maximum matching
+            'magnificent', 'glorious', 'country', 'place', 'called', 'metropolis', 'incorporated',
+            'military', 'cultural', 'commercial', 'aspects', 'known', 'core', 'southern', 'region',
+            'inside', 'dain', 'jiuhua', 'acity', 'that', 'not', 'only', 'all', 'the', 'was', 'and',
+            'but', 'also', 'with', 'for', 'are', 'had', 'from', 'they', 'this', 'were', 'have', 'been',
+            'when', 'where', 'what', 'how', 'who', 'why', 'here', 'there', 'then', 'than', 'can', 'will',
+            'would', 'could', 'should', 'may', 'might', 'must', 'shall', 'ought', 'dare', 'need',
+            'used', 'made', 'done', 'gone', 'come', 'take', 'give', 'make', 'find', 'lose', 'keep', 'hold',
+            'city', 'town', 'house', 'room', 'door', 'wall', 'floor', 'ceiling', 'window', 'table', 'chair',
+            'book', 'page', 'word', 'letter', 'line', 'point', 'time', 'day', 'night', 'week', 'month', 'year',
+            'man', 'woman', 'person', 'people', 'child', 'boy', 'girl', 'father', 'mother', 'brother', 'sister',
+            'friend', 'enemy', 'leader', 'follower', 'teacher', 'student', 'doctor', 'patient', 'soldier', 'warrior',
+            'king', 'queen', 'prince', 'princess', 'lord', 'lady', 'master', 'slave', 'rich', 'poor', 'strong', 'weak',
+            'good', 'bad', 'right', 'wrong', 'true', 'false', 'real', 'fake', 'old', 'new', 'young', 'big', 'small',
+            'long', 'short', 'high', 'low', 'fast', 'slow', 'hot', 'cold', 'hard', 'soft', 'easy', 'difficult',
+            'happy', 'sad', 'angry', 'afraid', 'love', 'hate', 'like', 'fear', 'hope', 'wish', 'dream', 'sleep',
+            'walk', 'run', 'jump', 'sit', 'stand', 'lie', 'eat', 'drink', 'sleep', 'wake', 'live', 'die', 'kill',
+            'work', 'play', 'rest', 'fight', 'win', 'lose', 'begin', 'end', 'start', 'stop', 'open', 'close',
+            'white', 'black', 'red', 'blue', 'green', 'yellow', 'orange', 'purple', 'brown', 'gray', 'pink',
+            'north', 'south', 'east', 'west', 'left', 'right', 'front', 'back', 'top', 'bottom', 'middle', 'center'
+        }
+
+        words = []
+        remaining = text.lower()
+        text_lower = text.lower()
+
+        while remaining:
+            # Try to find the longest possible word from the start
+            found_word = None
+            for length in range(min(len(remaining), 15), 2, -1):  # Try lengths from 15 down to 3
+                candidate = remaining[:length]
+                if candidate in common_words:
+                    found_word = candidate
+                    break
+
+            if found_word:
+                # Use the original casing for the word
+                start_idx = text_lower.find(found_word)
+                original_word = text[start_idx:start_idx + len(found_word)]
+                words.append(original_word)
+                remaining = remaining[len(found_word):]
+                text_lower = text_lower[len(found_word):]
+            else:
+                # No word found, take next 3-5 characters as a word (heuristic)
+                word_length = min(5, len(remaining))
+                if len(remaining) <= 3:
+                    word_length = len(remaining)
+
+                word = remaining[:word_length]
+                original_word = text[:word_length]
+                words.append(original_word)
+
+                remaining = remaining[word_length:]
+                text = text[word_length:]
+
+        return words
+
+    def _reconstruct_words_from_fragments(fragments: list[str]) -> str:
+        """Reconstruct words from syllable/letter fragments."""
+        if len(fragments) <= 1:
+            return ' '.join(fragments)
+
+        # Simple heuristic: join fragments that are likely part of the same word
+        # Based on common syllable patterns in English
+
+        result_words = []
+        current_word = fragments[0]
+
+        for fragment in fragments[1:]:
+            # Decide whether to continue current word or start a new one
+
+            # If current word + fragment would be too long, or if fragment looks like a new word start
+            should_start_new_word = (
+                len(current_word + fragment) > 12 or  # Combined word too long
+                (len(fragment) >= 3 and fragment[0].isupper()) or  # Capitalized fragment (proper noun)
+                fragment.lower() in ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by']  # Common short words
+            )
+
+            if should_start_new_word:
+                result_words.append(current_word)
+                current_word = fragment
+            else:
+                current_word += fragment
+
+        result_words.append(current_word)
+
+        return ' '.join(result_words)
+
+    text = "\n".join(_deobfuscate_spaced_letters_line(line) for line in text.splitlines())
+
     # Step 12: Handle emojis and special Unicode characters for TTS
     # Convert common emojis to text descriptions or remove them
     emoji_replacements = {
@@ -233,84 +447,58 @@ def clean_text(text: Optional[str]) -> str:
         ''': "'", ''': "'",  # Smart apostrophes to regular apostrophes
     }
 
-    # Replace known emojis and symbols
+    # Replace known emojis and symbols (skip empty keys)
     for emoji, replacement in emoji_replacements.items():
+        if not emoji:
+            continue
         text = text.replace(emoji, replacement)
 
-    # Remove other emojis and special Unicode characters that TTS can't handle well
-    # Keep basic punctuation and letters/numbers
-    def is_tts_safe(char):
-        """Check if character is safe for TTS (English letters, numbers, basic punctuation)"""
-        # Keep basic ASCII alphanumeric
-        if char.isalnum() and ord(char) < 128:  # ASCII letters/numbers
-            return True
+    # Step 12.1: Normalize music-note artifacts that separate letters/words
+    note_break_token = "__WB__"
+    text = re.sub(r"(?:notes){2,}", f" {note_break_token} ", text, flags=re.IGNORECASE)
+    text = re.sub(r"(?:\bnotes?\b\s*){2,}", f" {note_break_token} ", text, flags=re.IGNORECASE)
 
-        # Keep Latin characters with accents (Latin-1 Supplement: 0x80-0xFF)
-        # This includes common accented characters like é, à, ü, ñ, etc.
-        char_code = ord(char)
-        if 0x80 <= char_code <= 0xFF:
-            # Allow Latin-1 Supplement characters, but filter out control characters
-            if char_code < 0xA0:  # Control characters in Latin-1
-                return False
-            return True
+    # Collapse patterns like "a notes b notes c" back into letters
+    for _ in range(6):
+        updated = re.sub(
+            r"\b([A-Za-z])\b\s+notes?\s+\b([A-Za-z])\b",
+            r"\1\2",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if updated == text:
+            break
+        text = updated
 
-        if char in " .,!?;:()[]{}\"'/-_=+*&%$#@~`|\\":
-            return True
+    # Remove remaining note tokens and restore word breaks
+    text = re.sub(r"\bnotes?\b", " ", text, flags=re.IGNORECASE)
+    text = text.replace(note_break_token, " ")
 
-        # Check Unicode category - only keep basic punctuation
-        category = unicodedata.category(char)
-        # Keep punctuation, symbols that are common in text
-        if category in ('Po', 'Pd', 'Pe', 'Pf', 'Pi', 'Ps'):
-            return True
+    # Collapse sequences of spaced single letters into words (e.g., "n o t e s" -> "notes")
+    def _collapse_spaced_letters(match: re.Match[str]) -> str:
+        return re.sub(r"\s+", "", match.group(0))
 
-        # Filter out Chinese characters (CJK Unified Ideographs)
-        if 0x4E00 <= char_code <= 0x9FFF:
-            return False
+    text = re.sub(
+        r"(?:[A-Za-z]\s+){3,}[A-Za-z]",
+        _collapse_spaced_letters,
+        text,
+    )
 
-        # Filter out Korean Hangul syllables
-        if 0xAC00 <= char_code <= 0xD7AF:
-            return False
+    def _collapse_spelled_out_line(line: str) -> str:
+        tokens = re.findall(r"\b\w+\b", line)
+        if not tokens:
+            return line
+        single_ratio = sum(1 for t in tokens if len(t) == 1) / len(tokens)
+        if single_ratio < 0.2:
+            return line
+        return re.sub(r"\b([A-Za-z])\b\s+", r"\1", line)
 
-        # Filter out Korean Hangul consonants (Jamo)
-        if 0x1100 <= char_code <= 0x11FF:
-            return False
+    text = "\n".join(_collapse_spelled_out_line(line) for line in text.splitlines())
 
-        # Filter out Korean Hangul compatibility jamo
-        if 0x3130 <= char_code <= 0x318F:
-            return False
-
-        # Filter out Japanese Hiragana and Katakana
-        if 0x3040 <= char_code <= 0x30FF:  # Hiragana + Katakana
-            return False
-
-        # Filter out CJK symbols and punctuation that might interfere
-        if 0x3000 <= char_code <= 0x303F:  # CJK symbols and punctuation
-            return False
-
-        # Filter out fullwidth forms (fullwidth ASCII punctuation used in CJK)
-        if 0xFF00 <= char_code <= 0xFFEF:  # Halfwidth and Fullwidth Forms
-            return False
-
-        # Filter out CJK radicals and strokes
-        if 0x2E80 <= char_code <= 0x2EFF:  # CJK Radicals Supplement
-            return False
-
-        # Filter out CJK compatibility ideographs
-        if 0xF900 <= char_code <= 0xFAFF:  # CJK Compatibility Ideographs
-            return False
-
-        # Filter out vertical forms and other CJK extensions that might cause issues
-        if 0xFE30 <= char_code <= 0xFE4F:  # CJK Compatibility Forms
-            return False
-
-        # Filter out emoji and pictographic symbols
-        if category == 'So' and char_code > 0x1F000:  # Emoji range
-            return False
-
-        return False  # Default: filter out anything not explicitly allowed
-
-    # Filter out problematic Unicode characters
-    text = ''.join(char if is_tts_safe(char) else ' ' for char in text)
+    # Step 12.2: Remove zero-width and control characters without inserting spaces
+    # Some sites insert these to confuse scrapers; keep word cohesion intact.
+    text = re.sub(r"[\u200B-\u200F\u202A-\u202E\u2060\uFEFF]", "", text)
+    text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", text)
 
     # Step 13: Replace square brackets with parentheses for TTS compatibility
     # TTS engines may read [] as "bracket" or "square bracket", so use () instead
@@ -387,6 +575,30 @@ def clean_text_for_tts(text: str, base_cleaner: Optional[Callable[[str], str]] =
             text = cleaned if isinstance(cleaned, str) else str(cleaned or "")
         except Exception as e:
             logger.warning(f"Error applying base cleaner: {e}")
+
+    # Filter out problematic Unicode characters for TTS
+    def is_tts_safe(char):
+        """Check if character is safe for TTS (English letters, numbers, basic punctuation)."""
+        # Keep basic ASCII alphanumeric
+        if char.isalnum() and ord(char) < 128:
+            return True
+
+        char_code = ord(char)
+        # Keep Latin-1 Supplement characters (accented letters)
+        if 0x80 <= char_code <= 0xFF:
+            return char_code >= 0xA0
+
+        if char in " .,!?;:()[]{}\"'/-_=+*&%$#@~`|\\":
+            return True
+
+        # Keep general punctuation
+        category = unicodedata.category(char)
+        if category in ('Po', 'Pd', 'Pe', 'Pf', 'Pi', 'Ps'):
+            return True
+
+        return False
+
+    text = ''.join(char if is_tts_safe(char) else ' ' for char in text)
 
     # Precompile regex patterns once for performance
     RE_SEPARATORS = re.compile(r'(=+|-{3,}|_{3,}|\*{3,}|#{2,}|~{2,}|\|{2,})')

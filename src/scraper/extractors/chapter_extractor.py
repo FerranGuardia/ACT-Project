@@ -57,18 +57,29 @@ class ChapterExtractor:
     multiple selector patterns.
     """
 
-    def __init__(self, base_url: str, timeout: int = REQUEST_TIMEOUT, delay: float = REQUEST_DELAY):
+    def __init__(
+        self,
+        base_url: str,
+        timeout: int = REQUEST_TIMEOUT,
+        delay: float = REQUEST_DELAY,
+        use_playwright: bool = True,
+        use_copy_paste: bool = False,
+    ):
         """
         Initialize the chapter extractor.
-        
+
         Args:
             base_url: Base URL of the webnovel site
             timeout: Request timeout in seconds
             delay: Delay between requests in seconds
+            use_playwright: Whether to use Playwright for scraping
+            use_copy_paste: Whether to use copy/paste extraction instead of HTML parsing
         """
         self.base_url = base_url
         self.timeout = timeout
         self.delay = delay
+        self.use_playwright = use_playwright
+        self.use_copy_paste = use_copy_paste
         self._session = None
 
     def get_session(self):  # type: ignore[return-type]
@@ -121,7 +132,7 @@ class ChapterExtractor:
             content, title, error = result
             
             # If we got a 403 error, try Playwright as fallback
-            if error and "403" in error:
+            if error and "403" in error and self.use_playwright:
                 logger.warning(f"Got 403 error for {chapter_url}, trying Playwright fallback...")
                 playwright_result = self._scrape_with_playwright(chapter_url, should_stop)
                 playwright_content, playwright_title, playwright_error = playwright_result
@@ -139,7 +150,7 @@ class ChapterExtractor:
         except Exception as e:
             logger.exception(f"Error scraping chapter {chapter_url}: {e}")
             # Try Playwright as last resort
-            if HAS_PLAYWRIGHT:
+            if HAS_PLAYWRIGHT and self.use_playwright:
                 logger.info(f"Trying Playwright as last resort for {chapter_url}")
                 try:
                     playwright_result = self._scrape_with_playwright(chapter_url, should_stop)
@@ -318,8 +329,8 @@ class ChapterExtractor:
         for elem in all_elements:
             if should_stop and should_stop():
                 return None
-            text_raw = elem.get_text(strip=True)  # type: ignore[attr-defined]
-            text: str = str(text_raw) if text_raw is not None else ""
+            text_raw = elem.get_text()  # type: ignore[attr-defined]
+            text: str = str(text_raw).strip() if text_raw is not None else ""
             if text and len(text) > 20:
                 # Filter out navigation/UI elements - be more specific to avoid filtering chapter content
                 # Only filter if the text is primarily navigation (short text with navigation words)
@@ -355,8 +366,8 @@ class ChapterExtractor:
         
         if not text_parts:
             # Fallback: get all text
-            text_raw = content_elem.get_text(separator="\n", strip=True)  # type: ignore[attr-defined]
-            text = str(text_raw) if text_raw is not None else ""
+            text_raw = content_elem.get_text()  # type: ignore[attr-defined]
+            text = str(text_raw).strip() if text_raw is not None else ""
             logger.debug(f"Fallback text extraction: found {len(text)} characters of raw text")
             if text and len(text) > 50:
                 lines: list[str] = []
@@ -398,7 +409,157 @@ class ChapterExtractor:
         if not result:
             logger.warning(f"No content extracted from chapter - content_elem found but no usable text")
         return result
-    
+
+    def _extract_content_via_copy_paste(self, page: Any, should_stop: Optional[Callable[[], bool]] = None) -> Optional[str]:
+        """
+        Extract chapter content using copy/paste approach to bypass HTML obfuscation.
+
+        This method simulates user copy/paste operations to get rendered text directly,
+        bypassing HTML-level text splitting obfuscation.
+
+        Args:
+            page: Playwright page object
+            should_stop: Optional callback that returns True if scraping should stop
+
+        Returns:
+            Extracted content text, or None if extraction failed
+        """
+        if should_stop and should_stop():
+            return None
+
+        try:
+            logger.debug("Attempting copy/paste content extraction")
+
+            # Try different content selectors
+            content_selectors = [
+                '.chapter-content',
+                '#chapter-content',
+                '.entry-content',
+                'article .content',
+                '.novel-text',
+                '.chapter-body',
+                '.story-content',
+                '.post-content',
+                '.content',
+                'article',
+                'main'
+            ]
+
+            extracted_text = None
+
+            for selector in content_selectors:
+                if should_stop and should_stop():
+                    return None
+
+                try:
+                    # Check if selector exists and is visible
+                    element = page.locator(selector)
+                    is_visible = element.is_visible()
+                    if not is_visible:
+                        continue
+
+                    logger.debug(f"Trying copy/paste with selector: {selector}")
+
+                    # Clear any existing selection first
+                    page.evaluate("window.getSelection().removeAllRanges();")
+
+                    # Click to focus the element
+                    element.click()
+
+                    # Small delay to ensure focus
+                    page.wait_for_timeout(200)
+
+                    # Select all text in the element (Ctrl+A)
+                    page.keyboard.press('Control+a')
+
+                    # Small delay after selection
+                    page.wait_for_timeout(100)
+
+                    # Copy the selected text (Ctrl+C)
+                    page.keyboard.press('Control+c')
+
+                    # Small delay for copy operation
+                    page.wait_for_timeout(200)
+
+                    # Try to read clipboard content
+                    clipboard_text = page.evaluate("""
+                        try {
+                            // Try modern clipboard API first
+                            if (navigator.clipboard && navigator.clipboard.readText) {
+                                return navigator.clipboard.readText();
+                            }
+                        } catch (e) {
+                            console.log('Clipboard API failed:', e);
+                        }
+
+                        // Fallback: try to get selected text
+                        try {
+                            const selection = window.getSelection();
+                            if (selection && selection.toString()) {
+                                return selection.toString();
+                            }
+                        } catch (e) {
+                            console.log('Selection fallback failed:', e);
+                        }
+
+                        return '';
+                    """)
+
+                    # If we got meaningful text, use it
+                    if clipboard_text and len(clipboard_text.strip()) > 100:
+                        logger.debug(f"Successfully extracted {len(clipboard_text)} characters via copy/paste")
+                        extracted_text = clipboard_text.strip()
+                        break
+
+                except Exception as e:
+                    logger.debug(f"Copy/paste failed for selector {selector}: {e}")
+                    continue
+
+            if extracted_text:
+                # Clean the extracted text (remove excessive whitespace)
+                lines = [line.strip() for line in extracted_text.split('\n') if line.strip()]
+                cleaned_content = '\n\n'.join(lines)
+                return cleaned_content
+
+            logger.warning("Copy/paste extraction failed for all selectors")
+            return None
+
+        except Exception as e:
+            logger.error(f"Copy/paste content extraction failed: {e}")
+            return None
+
+    def _extract_title_via_copy_paste(self, page: Any, chapter_url: str) -> str:
+        """
+        Extract chapter title using copy/paste approach.
+
+        Args:
+            page: Playwright page object
+            chapter_url: URL of the chapter (for fallback)
+
+        Returns:
+            Chapter title
+        """
+        try:
+            # Try to get title from page title first
+            page_title = page.title()
+            if page_title and len(page_title) > 5 and len(page_title) < 200:
+                # Clean up common title patterns
+                title = re.sub(r'^\s*(Chapter\s+\d+|Read\s+).*?[-|]\s*', '', page_title, flags=re.I)
+                title = title.strip()
+                if title and 3 < len(title) < 100:
+                    return title
+
+            # Fallback: try to extract from URL
+            chapter_num = extract_chapter_number(chapter_url)
+            if chapter_num:
+                return f"Chapter {chapter_num}"
+
+            return "Chapter 1"
+
+        except Exception as e:
+            logger.debug(f"Title extraction failed: {e}")
+            return "Chapter 1"
+
     def _wait_for_cloudflare_optimized(self, page: Any, should_stop: Optional[Callable[[], bool]] = None) -> None:
         """
         Optimized Cloudflare challenge detection and waiting.
@@ -514,6 +675,12 @@ class ChapterExtractor:
         if not HAS_BS4 or BeautifulSoup is None:
             return None, None, "BeautifulSoup4 not available"
         
+        browser = None
+        html_content = None
+        soup = None
+        page = None
+        browser = None
+
         try:
             logger.debug(f"Using Playwright to scrape {chapter_url}")
             with sync_playwright() as p:  # type: ignore[attr-defined]
@@ -529,7 +696,7 @@ class ChapterExtractor:
                         "--disable-features=IsolateOrigins,site-per-process",
                     ]
                 )
-                
+
                 # Create context with realistic browser fingerprint
                 context = browser.new_context(
                     user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -551,7 +718,7 @@ class ChapterExtractor:
                         "Cache-Control": "max-age=0",
                     }
                 )
-                
+
                 # Add stealth script to hide webdriver property
                 context.add_init_script("""
                     Object.defineProperty(navigator, 'webdriver', {
@@ -566,9 +733,9 @@ class ChapterExtractor:
                         get: () => ['en-US', 'en']
                     });
                 """)
-                
+
                 page = context.new_page()
-                
+
                 # Navigate to chapter page with better wait strategy
                 try:
                     page.goto(chapter_url, wait_until="domcontentloaded", timeout=self.timeout * 1000)
@@ -576,80 +743,88 @@ class ChapterExtractor:
                     logger.warning(f"Navigation timeout/error (may be Cloudflare): {nav_error}")
                     # Try to wait a bit and continue
                     page.wait_for_timeout(3000)
-                
+
                 # Wait for Cloudflare challenge using improved method
                 self._wait_for_cloudflare_optimized(page, should_stop)
-                
+
                 # Wait for content to load
                 try:
                     page.wait_for_load_state("networkidle", timeout=15000)
                 except Exception as e:
                     # Network idle timeout is okay, wait a bit more
                     page.wait_for_timeout(2000)
-                
+
                 # Get page content
                 html_content = page.content()
-                
-                # Close browser
-                browser.close()
-            
+
             # Parse HTML with BeautifulSoup
             soup = BeautifulSoup(html_content, "html.parser")  # type: ignore[arg-type, assignment]
-            
+
             # Check if page indicates novel was removed
             page_text = soup.get_text().lower() if soup else ""
             if any(keyword in page_text for keyword in ['not found', '404', 'removed', 'deleted', 'does not exist', 'page not found']):
                 return None, None, "Page indicates novel/chapter was removed"
-            
-            # Extract content and title first
-            content = self._extract_content(soup, should_stop)
-            title = self._extract_title(soup, chapter_url)
-            
-            # Check if we got Cloudflare challenge page content instead of actual content
-            challenge_keywords = [
-                'verify you are human',
-                'checking your browser',
-                'just a moment',
-                'completing the action below',
-                'cloudflare',
-                'ddos protection',
-                'cf-browser-verification',
-                'please wait',
-                'ddos protection by cloudflare'
-            ]
-            
-            # Check both page text and extracted content for challenge indicators
-            page_text_lower = page_text.lower()
-            challenge_indicators_found = [kw for kw in challenge_keywords if kw in page_text_lower]
-            
-            if challenge_indicators_found:
-                # Check if we have actual content too (sometimes challenge and content coexist briefly)
-                if not content or len(content) < 200:  # Increased threshold to 200 chars for better detection
-                    logger.warning(f"Got Cloudflare challenge page instead of chapter content (indicators: {challenge_indicators_found[:3]})")
-                    return None, None, f"Cloudflare challenge not bypassed - got challenge page content (found: {', '.join(challenge_indicators_found[:3])})"
-                else:
-                    # We have content, but also challenge text - might be mixed, log warning but proceed
+
+            # Extract content and title
+            if self.use_copy_paste:
+                content = self._extract_content_via_copy_paste(page, should_stop)
+                title = self._extract_title_via_copy_paste(page, chapter_url)
+            else:
+                content = self._extract_content(soup, should_stop)
+                title = self._extract_title(soup, chapter_url)
+
+                # Check if we got Cloudflare challenge page content instead of actual content
+                challenge_keywords = [
+                    'verify you are human',
+                    'checking your browser',
+                    'just a moment',
+                    'completing the action below',
+                    'cloudflare',
+                    'ddos protection',
+                    'cf-browser-verification',
+                    'please wait',
+                    'ddos protection by cloudflare'
+                ]
+
+                # Check both page text and extracted content for challenge indicators
+                page_text_lower = page_text.lower()
+                challenge_indicators_found = [kw for kw in challenge_keywords if kw in page_text_lower]
+
+                if challenge_indicators_found:
+                    # Check if we have actual content too (sometimes challenge and content coexist briefly)
+                    if not content or len(content) < 200:  # Increased threshold to 200 chars for better detection
+                        logger.warning(f"Got Cloudflare challenge page instead of chapter content (indicators: {challenge_indicators_found[:3]})")
+                        return None, None, f"Cloudflare challenge not bypassed - got challenge page content (found: {', '.join(challenge_indicators_found[:3])})"
+                    else:
+                        # We have content, but also challenge text - might be mixed, log warning but proceed
+                        content_lower = content.lower()
+                        content_challenge_indicators = [kw for kw in challenge_keywords if kw in content_lower]
+                        if content_challenge_indicators:
+                            logger.warning(f"Found challenge indicators in content too - may be mixed content (indicators: {content_challenge_indicators[:2]})")
+
+                if not content:
+                    return None, None, "No content found with Playwright"
+
+                # Additional check: if content is too short or contains challenge text, it's likely wrong
+                if len(content) < 200:  # Increased threshold
                     content_lower = content.lower()
                     content_challenge_indicators = [kw for kw in challenge_keywords if kw in content_lower]
                     if content_challenge_indicators:
-                        logger.warning(f"Found challenge indicators in content too - may be mixed content (indicators: {content_challenge_indicators[:2]})")
-            
-            if not content:
-                return None, None, "No content found with Playwright"
-            
-            # Additional check: if content is too short or contains challenge text, it's likely wrong
-            if len(content) < 200:  # Increased threshold
-                content_lower = content.lower()
-                content_challenge_indicators = [kw for kw in challenge_keywords if kw in content_lower]
-                if content_challenge_indicators:
-                    return None, None, f"Content too short ({len(content)} chars) and contains challenge keywords - likely challenge page (found: {', '.join(content_challenge_indicators[:2])})"
-            
-            # Clean content
-            cleaned_content = clean_text(content)
-            
-            return cleaned_content, title, None
-            
+                        return None, None, f"Content too short ({len(content)} chars) and contains challenge keywords - likely challenge page (found: {', '.join(content_challenge_indicators[:2])})"
+
+                # Clean content
+                cleaned_content = clean_text(content)
+
+                return cleaned_content, title, None
+
         except Exception as e:
             logger.error(f"Playwright scraping failed for {chapter_url}: {e}")
             return None, None, f"Playwright error: {str(e)}"
+        finally:
+            # Ensure browser is always closed to prevent memory leaks
+            if browser:
+                try:
+                    browser.close()
+                except Exception as cleanup_error:
+                    logger.warning(f"Error closing browser: {cleanup_error}")
 

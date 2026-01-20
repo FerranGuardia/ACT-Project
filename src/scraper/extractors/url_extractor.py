@@ -36,6 +36,7 @@ class UrlExtractor:
         base_url: str,
         timeout: int = REQUEST_TIMEOUT,
         delay: float = REQUEST_DELAY,
+        use_playwright: bool = True,
     ):
         """
         Initialize the URL fetcher.
@@ -48,6 +49,7 @@ class UrlExtractor:
         self.base_url = base_url
         self.timeout = timeout
         self.delay = delay
+        self.use_playwright = use_playwright
 
         # Use SessionManager for session and rate limiting
         self._session_manager = SessionManager(min_request_delay=delay)
@@ -412,31 +414,34 @@ class UrlExtractor:
                 return sort_chapters_by_number(urls), metadata
 
         # Try Playwright as fallback
-        try:
-            from .url_extractor_playwright import PlaywrightExtractor
+        if not self.use_playwright:
+            logger.info(" Playwright disabled by configuration")
+        else:
+            try:
+                from .url_extractor_playwright import PlaywrightExtractor
 
-            playwright_extractor = PlaywrightExtractor(
-                base_url=self.base_url,
-                session_manager=self._session_manager,
-                timeout=self.timeout,
-                delay=self.delay
-            )
+                playwright_extractor = PlaywrightExtractor(
+                    base_url=self.base_url,
+                    session_manager=self._session_manager,
+                    timeout=self.timeout,
+                    delay=self.delay
+                )
 
-            logger.info("Trying legacy method 3: Playwright with scrolling")
-            urls = playwright_extractor.extract(
-                toc_url=toc_url,
-                should_stop=should_stop,
-                min_chapter_number=min_chapter_number,
-                max_chapter_number=max_chapter_number
-            )
-            metadata["methods_tried"]["playwright"] = len(urls) if urls else 0
-            if urls:
-                logger.info(f" Found {len(urls)} chapters via Playwright")
-                metadata["method_used"] = "playwright"
-                metadata["urls_found"] = len(urls)
-                return sort_chapters_by_number(urls), metadata
-        except ImportError:
-            logger.warning(" Playwright not available")
+                logger.info("Trying legacy method 3: Playwright with scrolling")
+                urls = playwright_extractor.extract(
+                    toc_url=toc_url,
+                    should_stop=should_stop,
+                    min_chapter_number=min_chapter_number,
+                    max_chapter_number=max_chapter_number
+                )
+                metadata["methods_tried"]["playwright"] = len(urls) if urls else 0
+                if urls:
+                    logger.info(f" Found {len(urls)} chapters via Playwright")
+                    metadata["method_used"] = "playwright"
+                    metadata["urls_found"] = len(urls)
+                    return sort_chapters_by_number(urls), metadata
+            except ImportError:
+                logger.warning(" Playwright not available")
 
         logger.warning("All legacy methods failed to fetch sufficient chapter URLs")
         return [], metadata

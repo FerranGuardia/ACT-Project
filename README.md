@@ -7,15 +7,11 @@ Convert web novels to audiobooks using automated scraping and text-to-speech con
 
 ## Features
 
-- **Web Scraping (Legacy)**: Extract chapters via JavaScript, AJAX, HTML parsing, and Playwright fallback
+- **Advanced Web Scraping**: Extract chapters using adaptive multi-strategy detection
 - **Text-to-Speech**: Convert text to speech using online or offline TTS engines
 - **Audio Processing**: Combine audio files into complete audiobooks
 - **Project Management**: Resume interrupted conversions
 - **Graphical Interface**: Desktop application with multiple operational modes
-
-## Release Status
-
-Preparing for 1.1 release. Current version: `1.1.0-pre`.
 
 ## Quick Start
 
@@ -52,6 +48,22 @@ python launch_ui.py
 3. **Merger**: Combine audio files into audiobooks
 4. **Full Pipeline**: Complete workflow from URL to audiobook
 
+## Testing
+
+```bash
+# Unit tests
+run_unit_tests.bat
+
+# Integration tests (offline by default; skips @pytest.mark.network)
+run_integration_tests.bat
+
+# Deterministic end-to-end (local fixture site)
+run_e2e_tests.bat
+
+# Network end-to-end (real external sites; opt-in)
+run_network_e2e_tests.bat
+```
+
 ## Configuration
 
 Settings are stored in `~/.act/config.json` and include:
@@ -68,6 +80,10 @@ Settings are stored in `~/.act/config.json` and include:
 - **TTS conversion fails**: Check internet connection or try offline TTS
 - **Audio merging fails**: Install ffmpeg system-wide
 - **Scraping fails**: Some sites require additional setup
+
+## Acknowledgments
+
+We extend our gratitude to [Kyutai Labs](https://kyutai.org/) for developing [Pocket TTS](https://github.com/kyutai-labs/pocket-tts), a lightweight, efficient CPU-based text-to-speech engine that powers our offline TTS capabilities. Their contribution enables high-quality audio generation without GPU requirements.
 
 ## License
 

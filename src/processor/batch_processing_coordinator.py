@@ -238,6 +238,17 @@ class BatchProcessingCoordinator:
             "progress": progress_percentage
         }
 
+        # Pipeline integration: Check for and optionally fill text gaps
+        # This maintains standalone functionality while enabling pipeline connectivity
+        gap_filling_result = self._check_and_fill_text_gaps(
+            chapters_to_process,
+            start_from,
+            processed_chapters,
+            failed_chapters
+        )
+        if gap_filling_result:
+            result["gap_filling"] = gap_filling_result
+
         logger.info(f"Processing complete: {len(processed_chapters)} completed, {len(failed_chapters)} failed, {len(skipped_chapters)} skipped")
         return result
 
@@ -442,6 +453,119 @@ class BatchProcessingCoordinator:
 
         except Exception as e:
             logger.error(f"Error checking/merging missing batches: {e}")
+
+    def _check_and_fill_text_gaps(
+        self,
+        chapters_to_process: List[Chapter],
+        start_from: int,
+        processed_chapters: List[int],
+        failed_chapters: List[int]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Pipeline integration: Check for and optionally fill text gaps.
+
+        This method maintains standalone functionality by being optional,
+        but enables pipeline connectivity when ScraperGapService is available.
+
+        Args:
+            chapters_to_process: Original list of chapters that were supposed to be processed
+            start_from: Starting chapter number
+            processed_chapters: Chapters that were successfully processed
+            failed_chapters: Chapters that failed processing
+
+        Returns:
+            Gap filling results if gap filling was performed, None otherwise
+        """
+        try:
+            # Check if gap filling is enabled (pipeline integration)
+            # This allows standalone operation while enabling pipeline connectivity
+            from core.config_manager import get_config
+            config = get_config()
+            enable_gap_filling = config.get("processing.enable_gap_filling", False)
+
+            if not enable_gap_filling:
+                logger.debug("Gap filling disabled - operating in standalone mode")
+                return None
+
+            # Try to initialize ScraperGapService for pipeline integration
+            try:
+                from processor.gap_services.scraper_gap_service import ScraperGapService
+                from services.scrape_service import ScrapeService
+
+                # Get TOC URL from project metadata for gap filling
+                toc_url = None
+                if hasattr(self.scraping_coordinator, 'project_manager'):
+                    metadata = self.scraping_coordinator.project_manager.get_metadata()
+                    toc_url = metadata.get("toc_url") or metadata.get("novel_url")
+
+                if not toc_url:
+                    logger.debug("No TOC URL available for gap filling")
+                    return None
+
+                # Initialize gap service with scraper integration
+                scrape_service = ScrapeService()
+                scraper_gap_service = ScraperGapService(
+                    self.scraping_coordinator.project_manager,
+                    self.conversion_coordinator.file_manager,
+                    scrape_service=scrape_service
+                )
+
+                if not scraper_gap_service.can_fill_gaps():
+                    logger.debug("Gap filling not available - missing scrape service")
+                    return None
+
+                # Determine range to check for gaps
+                end_chapter = max((ch.number for ch in chapters_to_process), default=start_from)
+
+                # Detect text gaps
+                missing_text_files = scraper_gap_service.detect_text_gaps(
+                    start_from=start_from,
+                    end_chapter=end_chapter
+                )
+
+                if not missing_text_files:
+                    logger.debug("No text gaps detected")
+                    return {
+                        "gaps_found": False,
+                        "missing_text_files": [],
+                        "filled_chapters": [],
+                        "failed_chapters": []
+                    }
+
+                logger.info(f"Pipeline integration: Found {len(missing_text_files)} text gaps, attempting to fill")
+
+                # Attempt to fill gaps
+                fill_result = scraper_gap_service.fill_gaps(
+                    missing_text_files,
+                    toc_url
+                )
+
+                logger.info(f"Gap filling completed: {len(fill_result.get('filled_chapters', []))} filled, {len(fill_result.get('failed_chapters', []))} failed")
+
+                return {
+                    "gaps_found": True,
+                    "missing_text_files": missing_text_files,
+                    "filled_chapters": fill_result.get("filled_chapters", []),
+                    "failed_chapters": fill_result.get("failed_chapters", []),
+                    "success": fill_result.get("success", False),
+                    "total_attempted": fill_result.get("total_attempted", 0)
+                }
+
+            except ImportError as e:
+                logger.debug(f"Gap filling services not available: {e}")
+                return None
+            except Exception as e:
+                logger.warning(f"Error during gap filling: {e}")
+                return {
+                    "gaps_found": True,
+                    "error": str(e),
+                    "filled_chapters": [],
+                    "failed_chapters": []
+                }
+
+        except Exception as e:
+            logger.debug(f"Pipeline integration check failed: {e}")
+            return None
 
 
 __all__ = ["BatchProcessingCoordinator"]

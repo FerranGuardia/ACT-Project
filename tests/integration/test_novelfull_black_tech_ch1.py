@@ -1,11 +1,29 @@
+import os
 import re
+import sys
 import unittest
+from pathlib import Path
 
-from scraper.novel_scraper import NovelScraper
+
+def _add_src_path() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    src_path = repo_root / "src"
+    if str(src_path) not in sys.path:
+        sys.path.insert(0, str(src_path))
 
 
 class TestNovelFullBlackTechChapterOne(unittest.TestCase):
     def test_chapter_one_scrape_has_no_notes_noise(self):
+        _add_src_path()
+        os.environ.setdefault("ACT_TEST_MODE", "1")
+        from core.config_manager import get_config
+        from scraper.novel_scraper import NovelScraper
+
+        config = get_config()
+        config.set("scraper.use_playwright", True, save=False)
+        config.set("scraper.timeout", 30, save=False)
+        config.set("scraper.delay", 0, save=False)
+
         toc_url = "https://novelfull.net/black-tech-internet-cafe-system.html"
         scraper = NovelScraper(base_url="https://novelfull.net")
 
